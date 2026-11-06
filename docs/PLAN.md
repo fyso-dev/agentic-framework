@@ -383,6 +383,17 @@ Slot conventions, the `framework/extensions/_template` Copier template, a minima
 
 Fixes found on review: `ext:update` stopped at the second extension because Copier refuses a dirty tree, so it now updates one extension at a time and asks for a commit between them; a Node test hit an untrusted mise conf.d file through the `node` shim.
 
+### Phase 7.1 — Marketplace and integrations (D31)
+Discovery of extensions through git catalogs, install and upgrade from the panel, and the integration bases for bots ([ADR 0002](adr/0002-extension-marketplace.md)).
+
+**Done (2026-11-06):** git catalogs + `ext:search` / `ext:add <id>`, panel install/upgrade through Dagu ([contract §8](extensions-contract.md#8-marketplace-d31)); official catalog `fyso-dev/fyso-extensions` with `sample` (`fyso-dev/fyso-ext-sample`); options compared: Activepieces verified natively ([spike](adr/spikes/activepieces.md)), MCP Registry API verified, ACI.dev and ToolHive rejected.
+
+**Next, in order:**
+1. **`fyso-ext-activepieces`** — first real catalog entry. Start by verifying the MCP OAuth login path for OpenMausBot bots (the only open risk); then a mise task that builds each version once into `.data/ext/activepieces/<version>` (bun + node pinned), two processes (API, worker) through `run-ext.sh`, a route without `fyso_login`, `AP_ENCRYPTION_KEY`/`AP_JWT_SECRET` in `secrets.yaml`, its MCP in the `mcp.json` slot.
+   **Exit:** installed from the marketplace on a generated project, a bot runs a piece action with a real connection (e.g. Gmail) through MCP, doctor green.
+2. **MCP Registry search in the panel** — search `registry.modelcontextprotocol.io`, show official publishers first, hide `oci` packages (Docker), write the chosen server into `project/mcp.json` with `${VAR}` placeholders for `isSecret` values (bots only see `BOT_*` secrets).
+   **Exit:** a server added from the panel appears in the generated `.mcp.json` and a bot can call it after `mise run secrets` and a restart.
+
 ### Phase 8 — Multi-host
 Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunnel, the Dagu worker service, OMB self-hosted VPS computers, and the per-host doctor.
 **Exit:** a second VPS joins with `mise run host:add`; a DAG pinned to its label runs there with its logs visible on the control host, and a bot uses it as its computer.
