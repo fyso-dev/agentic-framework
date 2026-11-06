@@ -9,7 +9,7 @@
 | Item | Value |
 |---|---|
 | OMB | `npx -y openmausbot@0.1.140` (pinned). Source read at tag `v0.1.140` = commit [`4b74b80`](https://github.com/milind-soni/OpenMausBot/tree/4b74b8044b9f562668a7333747ba9313c0d3ca38) |
-| Node | OMB 0.1.140 declares `engines.node >= 24` ("Node 24+ is required"). The default `node` here is 22, so the scripts put `/opt/homebrew/opt/node@24/bin` first on `PATH` (it reports v26.5.0). **mise must pin Node ≥ 24.** |
+| Node | OMB 0.1.140 declares `engines.node >= 24` ("Node 24+ is required"). The default `node` here is 22, so the scripts put a Node 24 bin directory (`NODE24_BIN`) first on `PATH` (it reports v26.5.0). **mise must pin Node ≥ 24.** |
 | claude CLI | 2.1.318, subscription login (keychain) |
 | Isolation | `serve --port 8504 --data-dir <wt>/.data/omb --no-pair --no-open`, `OMB_WEBHOOK_PORT=8505`, `OPENMAUSBOT_URL=http://127.0.0.1:8504`, `ALLOW_INSECURE_HTTP=true`, npm cache in `.data/npmcache`. Every CLI call goes through `spikes/omb/omb`, which adds `--port 8504` |
 | Identity check | `doctor --json` → `server.environmentId` equals `<data-dir>/environment-id`. This is a reliable "is it my instance" check (see Implications) |

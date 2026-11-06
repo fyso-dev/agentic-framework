@@ -2,8 +2,10 @@
 # Claude's default text mode prints only the final answer at exit, so ask for
 # stream-json: every event is written to the step stdout log as it happens.
 type: graph
-params:
-  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
+# REPO (the repository root) comes from SPIKE_REPO, set by scripts/up.sh.
+env:
+  - REPO: ${SPIKE_REPO}
+
 working_dir: ${REPO}
 steps:
   - id: claude_stream

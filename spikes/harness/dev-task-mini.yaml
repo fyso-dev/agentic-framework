@@ -3,9 +3,11 @@
 # Throwaway: worktrees are left in place for inspection; scripts/cleanup.sh removes them.
 type: graph
 
+# REPO (the repository root) comes from SPIKE_REPO, set by scripts/up.sh.
+env:
+  - REPO: ${SPIKE_REPO}
+
 params:
-  # Absolute path of the repository the worktrees branch from (this spike worktree).
-  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
   - TASK: "Create a file named HELLO.md in the current directory containing exactly one line: 'hello from the harness spike'. Do nothing else, then stop."
   - BASE: spike/harness
   - CLAUDE_MODEL: haiku

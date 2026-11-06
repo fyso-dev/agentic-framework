@@ -2,8 +2,11 @@
 # Every probe uses continue_on.failure so one run shows all outcomes.
 type: graph
 
+# REPO (the repository root) comes from SPIKE_REPO, set by scripts/up.sh.
+env:
+  - REPO: ${SPIKE_REPO}
+
 params:
-  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
   - BASE: spike/harness
   - TASK: "Create a file named HELLO.md in the current directory containing exactly one line: 'hello'. Do nothing else, then stop."
 
