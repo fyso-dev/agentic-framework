@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D23; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D25; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -57,7 +57,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 2 | Bots: team file, auth, Dagu MCP | ✅ done |
 | 3 | Snapshot and replicate | ✅ done |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ✅ done |
-| 5 | Builder (dogfooding) with Dagu `harness.run` | ⏳ next |
+| 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote PR deferred by the user |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ⬜ not started |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -87,3 +87,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | **Phase 3 done.** The Dagu-scheduled `fyso-snapshot` commits bots and memory (after gitleaks). Wiping `.data/` and running `up` restores bots, memory (the bot recalled the fact) and workflows. Framework workflows reach Dagu through file symlinks (`DAGU_DAG_DISCOVERY_SYMLINKS`); step env is allowlisted (`DAGU_ENV_PASSTHROUGH_PREFIXES`) |
 | 2026-11-05 | **Phase 4 panel SPA.** Vite + React + TypeScript in `framework/panel/`, coded against [panel-contract.md](panel-contract.md) and the Claude Design boards: checklist, bots (draft → `fyso-bots-plan` → `fyso-bots-apply`), apps with health, one action component for Dagu runs, ES/EN, light/dark, mock mode. `team.yaml` `${VAR}` placeholders are not valid YAML inside flow maps (`soul: { file: ${FYSO_ROOT}/… }`); the panel swaps them for tokens while parsing |
 | 2026-11-05 | **Phase 4 done.** Panel SPA (from the Claude Design boards) + plumbing, built in parallel by Claude and Codex against `panel-contract.md`. Verified end to end against the real stack: checklist 4/4, launcher with health, and edit → preview → apply (snapshot commit, then `bots: update from panel`, model changed in OMB) |
+| 2026-11-06 | [Phase 5 Builder](adr/phase-5-builder.md): recovered the interrupted implementation; real Codex → worktree → checks → local commit → cleanup succeeded on Dagu 2.24.0. Generated stack doctor passed. Nine regression tests cover guards and failures. Claude hit its subscription limit. D24 makes remote publication explicit; remote PR acceptance is deferred by the user; local delivery is complete |
+| 2026-11-06 | OMB browser access corrected (D25): the packaged server rejects unpaired browsers even on loopback. Caddy holds a native session behind project login; panel links use the gateway. Verified in Chrome and with real HTTP regressions; `doctor` now checks browser-style access. [Evidence](../artifacts/delivery-evidence/phase-5/README.md) |

@@ -34,7 +34,7 @@ for _ in $(seq 1 120); do
     cat <<MSG
   Panel        http://panel.localhost:$FYSO_HTTP_PORT     (user: $FYSO_ADMIN_USER)
   Dagu         http://dagu.localhost:$FYSO_HTTP_PORT
-  OpenMausBot  http://127.0.0.1:$FYSO_OMB_PORT           (local, no pairing needed)
+  OpenMausBot  http://omb.localhost:$FYSO_HTTP_PORT         (same project login)
 
   mise run status · mise run logs <dagu|omb|caddy> · mise run doctor · mise run down
 MSG

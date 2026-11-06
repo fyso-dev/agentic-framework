@@ -1,6 +1,6 @@
 # Fyso Agentic Framework — Implementation Plan
 
-Status: **draft for review** · Date: 2026-11-05 · No code written yet.
+Status: **Phases 0–5 locally verified; Phase 5 remote PR deferred by the user** · Updated: 2026-11-06.
 
 Brand: **Fyso**. "Fyso Agentic Framework" is a working name; the final product name comes later. The panel, the docs and the generated projects use Fyso branding. The panel's visual design is produced in **Claude Design** from [docs/panel-spec.md](panel-spec.md); the implementation follows that design. `@fyso/ui` is not used.
 
@@ -56,9 +56,11 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D19 | **Dagu login = basic auth with the same credentials as Caddy**, Dagu bound to `127.0.0.1`. Trusted-header proxy auth needs a paid Dagu SSO license (spike `gateway`). The browser asks once; Caddy validates and forwards the same `Authorization` header |
 | D20 | **D16 resolved: sops + age.** Both passed a real round trip through mise; sops is more mature. fnox stays an option for 1Password/Vault later (spike `tooling`) |
 | D21 | **Pinned, tested versions:** Dagu `2.24.0`, OpenMausBot `0.1.140`, Node `24`. Policy: pin releases at least a week old, and re-run the spike checks before bumping |
-| D22 | **OMB is not behind the gateway login.** Its own device pairing protects it, and a basic-auth header could clash with its own auth. Locally the panel links to `http://127.0.0.1:<omb port>`, where OMB trusts the owner and no pairing is needed |
+| D22 | *Superseded by D25.* **OMB is not behind the gateway login.** Its own device pairing protects it, and a basic-auth header could clash with its own auth. Locally the panel links to `http://127.0.0.1:<omb port>`, where OMB trusts the owner and no pairing is needed |
 | D23 | **Local by default:** Caddy binds `127.0.0.1` unless `FYSO_BIND` is set (a server). `admin/admin` is never reachable from the LAN by accident |
 | D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
+| D24 | **Builder publication is explicit:** `PUBLISH=false` by default; `true` requests push to `origin` and a PR, and publication errors fail the run. Failed worktrees stay available for inspection. This refines §7 without changing snapshot behavior (D5) |
+| D25 | **OMB browser access uses the authenticated gateway.** The packaged 0.1.140 server requires a browser session even on loopback. Caddy obtains a native OMB session with `openmausbot connect`, keeps its token server-side, and injects its bearer after project basic auth. Cross-origin and cross-site API requests are rejected. Supersedes D22; direct CLI access remains project-local |
 
 ## 3. Architecture
 
@@ -83,7 +85,7 @@ Append-only. A superseded decision stays, marked with what replaced it.
 - **There is no backend to write.**
   - **Caddy** handles the routing (one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server) and the login (`basic_auth`). It also serves the project's config files read-only to the panel, and passes Dagu API calls through.
   - **Dagu login (D19):** Dagu uses basic auth with the same `admin` credentials as Caddy and listens only on `127.0.0.1`. The browser asks once and Caddy forwards the same header, so there is no second prompt and Dagu cannot be reached without going through Caddy.
-  - **OMB** keeps its own device pairing and opens in a new tab.
+  - **OMB** opens in a new tab behind project basic auth. Caddy holds its native OMB session (D25); browsers need no pairing code.
   - **Every panel action is a Dagu workflow** started with parameters. Dagu does the work, keeps the logs and allows retries. The same workflows run from the terminal with `mise run …`.
 - **OMB and Dagu are coupled in only one place:** OMB reaches Dagu through Dagu's built-in MCP server (`.mcp.json` in the bot `cwd`).
 
@@ -196,7 +198,7 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
    - Never `bare: true` for Claude, because it skips the keychain login.
 3. **Change gate:** fail if the worktree has no diff. A refused permission still exits 0.
 4. Project checks.
-5. `gh pr create`, then `action: git.worktree.remove`.
+5. With `PUBLISH=true`, push the feature branch to `origin` and run `gh pr create`; with `false`, return the local branch. Then `action: git.worktree.remove`. Failures preserve the worktree.
 
 Notes:
 - The agent's final text becomes the step output and a run artifact. Run and step status are live, but stdout appears only when the step ends.
@@ -331,9 +333,11 @@ Deliberate differences from the design (from the SPA build):
 
 The built `dist/` is committed (~0.5 MB), so generated projects need no Node build step. Mock mode (`?mock`) is for panel development.
 
-### Phase 5 — Builder (dogfooding)
+### Phase 5 — Builder (dogfooding) — local delivery complete; remote PR deferred
 `dev-task` with `harness.run` and the Builder bot.
-**Exit:** the Builder ships a real small issue to the template repo through a PR.
+
+Local implementation and evidence: [Phase 5 Builder](adr/phase-5-builder.md). Codex completed the full local flow on Dagu 2.24.0; Claude hit its subscription limit. The generated stack passed `mise run doctor`. The user requested the commit and explicitly deferred configuring a remote. Local delivery is complete; the original remote PR acceptance below is deferred until a remote exists.
+**Original remote exit:** the Builder ships a real small issue to the template repo through a PR. **Current local scope:** verified coding-agent change → checks → feature-branch commit, with publication deferred by the user.
 
 ### Phase 6 — Deploy and template lifecycle
 VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.

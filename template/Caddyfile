@@ -57,11 +57,25 @@ http://dagu.localhost:{$FYSO_HTTP_PORT} {
 	reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT}
 }
 
-# OpenMausBot keeps its own device pairing (no gateway login on top: its own
-# auth would clash with basic auth). Locally, open it directly on
-# http://127.0.0.1:{$FYSO_OMB_PORT}, where no pairing is needed.
+# OMB's native session stays in the gateway. Browsers authenticate with the
+# project's basic login; never forward their Authorization header to OMB.
 http://omb.localhost:{$FYSO_HTTP_PORT} {
+	import fyso_login
+	# The injected bearer authenticates API calls, so enforce browser CSRF
+	# protection at the gateway as well as OMB's own permission checks.
+	@foreignOrigin {
+		path /api/*
+		header Origin *
+		not header Origin http://omb.localhost:{$FYSO_HTTP_PORT}
+	}
+	respond @foreignOrigin 403
+	@crossSite {
+		path /api/*
+		header Sec-Fetch-Site cross-site
+	}
+	respond @crossSite 403
 	reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
+		header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
 		flush_interval -1
 	}
 }

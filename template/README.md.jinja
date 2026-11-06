@@ -16,7 +16,7 @@ mise run up
 |---|---|
 | Panel | http://panel.localhost:{{ port_base }} |
 | Dagu (workflows) | http://dagu.localhost:{{ port_base }} |
-| OpenMausBot (bots) | http://127.0.0.1:{{ port_base + 4 }} locally · `omb.localhost:{{ port_base }}` with device pairing |
+| OpenMausBot (bots) | http://omb.localhost:{{ port_base }} (project login, no pairing code) |
 
 `mise run doctor` checks everything · `mise run status` · `mise run logs <dagu|omb|caddy>` · `mise run down`
 
@@ -30,3 +30,23 @@ mise run up
 | `.data/` | runtime | data of Dagu, OpenMausBot and Caddy; never committed |
 
 Ports {{ port_base }}–{{ port_base + 9 }} belong to this project. This project never connects to another Dagu or OpenMausBot on the machine.
+
+## Build a change
+
+Ask the Builder bot in OpenMausBot, or start `fyso-dev-task` in Dagu with:
+
+- `TASK`: the requested change and acceptance criteria.
+- `PROVIDER`: `claude` (default) or `codex`, using the host CLI login.
+- `BASE`: an existing local branch (`main` by default).
+- `BRANCH`: optional feature branch; otherwise `builder/<run-id>`.
+- `MODEL`: optional provider model.
+- `PUBLISH`: `false` by default; `true` pushes to `origin` and opens a PR with `gh`.
+
+The workflow requires a nonempty change, checks paths and secrets, and runs
+`project/check.sh` if that file is executable. That script runs from the candidate
+worktree; write it to run your project's tests. A person reviews and merges.
+Failures preserve `.data/worktrees/<run-id>` for inspection. Successful runs remove
+the worktree and retain the branch. No code change reaches the base branch.
+
+Claude and Codex must already be installed and signed in on the host. Their user
+configuration can still affect execution (particularly Codex hooks and skills).
