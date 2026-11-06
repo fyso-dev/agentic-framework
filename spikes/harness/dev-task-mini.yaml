@@ -1,0 +1,76 @@
+# Phase 0 spike (harness): minimal `dev-task` shape built only from Dagu built-ins.
+# worktree -> harness.run (claude) / harness.run (codex) -> git status proof.
+# Throwaway: worktrees are left in place for inspection; scripts/cleanup.sh removes them.
+type: graph
+
+params:
+  # Absolute path of the repository the worktrees branch from (this spike worktree).
+  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
+  - TASK: "Create a file named HELLO.md in the current directory containing exactly one line: 'hello from the harness spike'. Do nothing else, then stop."
+  - BASE: spike/harness
+  - CLAUDE_MODEL: haiku
+
+# NOTE (Dagu 2.22.4): DAG-level working_dir is env-expanded only; ${params.REPO} stays literal.
+# Params are also exported as env vars, so use the unscoped ${REPO} form here.
+working_dir: ${REPO}
+
+steps:
+  # 1. One throwaway branch + worktree per agent, via the native git.worktree action.
+  - id: wt_claude
+    action: git.worktree.add
+    with:
+      branch: spike/harness-tmp-claude-${context.run.id}
+      create_branch: true
+      base: ${params.BASE}
+      path: .data/wt/claude-${context.run.id}
+
+  - id: wt_codex
+    action: git.worktree.add
+    with:
+      branch: spike/harness-tmp-codex-${context.run.id}
+      create_branch: true
+      base: ${params.BASE}
+      path: .data/wt/codex-${context.run.id}
+
+  # 2a. Claude Code on the subscription login (no --bare, no ANTHROPIC_API_KEY).
+  - id: claude
+    depends: [wt_claude]
+    # NOTE (Dagu 2.22.4): step working_dir does not resolve ${steps.<id>.outputs.path}
+    # (it stays literal, silently). Rebuild the deterministic path from env instead.
+    working_dir: ${REPO}/.data/wt/claude-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: claude
+      prompt: ${params.TASK}
+      model: ${params.CLAUDE_MODEL}
+      permission-mode: acceptEdits
+      allowed-tools: "Write,Read"
+      max-turns: 5
+    timeout_sec: 300
+    output: CLAUDE_RESULT
+    stdout:
+      artifact: claude.txt
+
+  # 2b. Codex on the ChatGPT login (codex exec, workspace-write sandbox).
+  - id: codex
+    depends: [wt_codex]
+    working_dir: ${REPO}/.data/wt/codex-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: codex
+      prompt: ${params.TASK}
+      sandbox: workspace-write
+      ephemeral: true
+    timeout_sec: 300
+    output: CODEX_RESULT
+    stdout:
+      artifact: codex.txt
+
+  # 3. Proof: the file exists in each worktree and nowhere else.
+  - id: proof_claude
+    depends: [claude]
+    run: git -C "${steps.wt_claude.outputs.path}" status --porcelain && cat "${steps.wt_claude.outputs.path}/HELLO.md"
+
+  - id: proof_codex
+    depends: [codex]
+    run: git -C "${steps.wt_codex.outputs.path}" status --porcelain && cat "${steps.wt_codex.outputs.path}/HELLO.md"
