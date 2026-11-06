@@ -20,8 +20,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D31; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
-| Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
+| Decisions log (D1–D32; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
 *How the pieces fit together.*
@@ -49,7 +49,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
-| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data (D30) | [extensions-contract.md](extensions-contract.md) |
+| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace (D30, D31) | [extensions-contract.md](extensions-contract.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
 ## Layer 4 — Execution
@@ -113,6 +113,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 | 2026-11-06 | Unified bot actions: every row opens OMB, while configuration edit and native import remain explicit sibling actions. |
 | 2026-11-06 | Initial delivery PR #1 merged into `main` (`9847295`). Installation documentation now targets `main`; historical preview evidence retains its original ref. |
-| 2026-11-06 | **Phase 7 done.** Extensions are Copier templates with their own answers file that fill fixed slots ([contract](extensions-contract.md), D30). Verified: mise conf.d, process-compose multi-file merge, Caddy empty-glob import, Dagu recursive discovery (opt-in, kept flat). `.mcp.json` is now generated. Sample v1 → v2 → remove on a live project, doctor green, panel shows extensions. |
+| 2026-11-06 | **Phase 7 done.** Extensions are Copier templates with their own answers file that fill fixed slots ([contract](extensions-contract.md), D30). Verified: mise conf.d, process-compose multi-file merge, Caddy empty-glob import, Dagu recursive discovery (opt-in, kept flat). `.mcp.json` is now generated. Sample v1 → v2 → remove on a live project, doctor green, panel shows extensions. The extension starter ships an authoring README; generated projects document the `ext:*` tasks. |
+| 2026-11-06 | **Extension marketplace (D31, [ADR 0002](adr/0002-extension-marketplace.md)).** Git catalogs + version tags; `ext:search`, `ext:add <id>`, panel install/upgrade through Dagu. Verified live: install commits only the slots, upgrade from the panel with uncommitted bot state (clean worktree + fast-forward), new process and route loaded without a restart, doctor green. Findings: process-compose runs commands with the environment of `up` (extensions keep `$VARS` in single quotes after `run-ext.sh`); a fresh project is never clean (restore writes `state/`). Devbox plugins (Nix) and Docker app stores do not replace this; bot integrations come from the MCP Registry and Activepieces (next spike) |
 
-| 2026-11-06 | Optional engines (D31): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |
+| 2026-11-06 | Optional engines (D32): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |

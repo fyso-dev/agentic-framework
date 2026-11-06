@@ -1,6 +1,8 @@
 version: "0.5"
 processes:
   ext-sample:
-    command: framework/scripts/run-ext.sh sample -- miniserve --interfaces 127.0.0.1 --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public
+    # Single quotes: process-compose's shell would expand $VARS with the environment of
+    # the last `mise run up`; run-ext loads the current one (hot install, D31).
+    command: framework/scripts/run-ext.sh sample -- bash -c 'exec miniserve --interfaces 127.0.0.1 --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public'
     readiness_probe:
-      exec: { command: extensions/sample/doctor.sh }
+      exec: { command: framework/scripts/run-ext.sh sample -- extensions/sample/doctor.sh }

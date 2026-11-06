@@ -30,7 +30,7 @@ for t in dagu openmausbot caddy process-compose sops; do
 done
 
 echo "Logins"
-# Only engines a bot uses are required; at least one must be signed in (PLAN D31).
+# Only engines a bot uses are required; at least one must be signed in (PLAN D32).
 used=" $(node framework/scripts/panel-data.cjs engines 2>/dev/null | tr '\n' ' ')"
 signed=0
 login() { # <engine> <status command...>

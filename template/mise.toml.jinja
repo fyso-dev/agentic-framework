@@ -4,7 +4,7 @@ min_version = "2026.10.6"
 
 [tools]
 "aqua:dagucloud/dagu" = "2.24.0"
-"npm:openmausbot" = "0.1.140"
+"npm:openmausbot" = "0.1.141"
 "aqua:F1bonacc1/process-compose" = "1.124.0"
 "aqua:caddyserver/caddy" = "2.11.9"
 "aqua:getsops/sops" = "3.13.3"
@@ -96,7 +96,7 @@ description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
 run = "node framework/scripts/bot-architect.cjs submit"
 
 [tasks."ext:add"]
-description = "Add project extensions"
+description = "Add an extension by catalog id or Copier source: mise run ext:add <id|src>"
 run = "framework/scripts/ext.sh add"
 
 [tasks."ext:update"]
@@ -106,6 +106,10 @@ run = "framework/scripts/ext.sh update"
 [tasks."ext:list"]
 description = "List project extensions"
 run = "framework/scripts/ext.sh list"
+
+[tasks."ext:search"]
+description = "Search the extension catalogs: mise run ext:search [text]"
+run = "framework/scripts/ext.sh search"
 
 [tasks."ext:remove"]
 description = "Remove project extensions"

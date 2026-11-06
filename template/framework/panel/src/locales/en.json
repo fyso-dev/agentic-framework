@@ -364,9 +364,29 @@
     "workflows_other": "{{count}} workflows",
     "skills_one": "{{count}} skill (enable it on a bot)",
     "skills_other": "{{count}} skills (enable them on a bot)",
-    "manage": "Installing, upgrading and removing extensions happens in the terminal. To upgrade them all:",
+    "manage": "Removing an extension is a terminal task. To upgrade all of them:",
     "emptyTitle": "No extensions installed.",
-    "emptyHint": "Install one from its repo:",
+    "emptyHint": "Install one from the marketplace or from its repo:",
     "emptyCommand": "mise run ext:add gh:org/fyso-ext-name"
+  },
+  "market": {
+    "title": "Marketplace",
+    "catalogs": "Catalogs: {{names}}",
+    "refresh": "Refresh catalog",
+    "refreshing": "Reading catalogs…",
+    "never": "Read the catalogs in project/marketplaces.yaml to see the available extensions.",
+    "empty": "The catalogs list no extensions.",
+    "catalogError": "Could not read the catalog {{name}}: {{error}}",
+    "from": "from {{catalog}}",
+    "install": "Install {{version}}",
+    "update": "Upgrade to {{version}}",
+    "installing": "Installing…",
+    "updating": "Upgrading…",
+    "installed": "Installed {{version}}",
+    "noTags": "No published versions",
+    "done": "{{id}} {{version}} is installed and committed ({{commit}}). If it declares secrets, set them with:",
+    "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
+    "hintCommand": "mise run ext:add <id>",
+    "tags": "Tags"
   }
 }

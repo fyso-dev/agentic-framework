@@ -34,6 +34,10 @@ block_ports() {
   done < <(env)
 }
 
+# Extension ports as NAME=value lines, read fresh from the project's mise config:
+# a process restarted after `ext:add` still has the environment of `mise run up`.
+ext_port_env() { mise exec -- env | sed -n '/^FYSO_EXT_[A-Z0-9_]*_PORT=/p'; }
+
 # Unix sockets have a ~104-char path limit on macOS, so keep it short.
 PC_SOCKET="/tmp/fyso-${FYSO_PROJECT:-unknown}-${FYSO_HTTP_PORT:-0}.sock"
 pc() {
@@ -43,7 +47,7 @@ pc() {
   done
   # Only startup loads configuration. Client commands address that same server;
   # process-compose 1.124.0 rejects -f for process list/logs and down.
-  if [ "${1:-}" = up ]; then
+  if [ "${1:-}" = up ] || [ "${1:-} ${2:-}" = "project update" ]; then
     process-compose "${configs[@]}" "$@" --unix-socket "$PC_SOCKET"
   else
     process-compose "$@" --unix-socket "$PC_SOCKET"

@@ -43,6 +43,35 @@ export type Extension = {
   skills: string[];
 };
 
+/** Output `catalog` of `fyso-ext-catalog` (docs/extensions-contract.md §8). */
+export type MarketplaceEntry = {
+  id: string;
+  src: string;
+  catalog: string;
+  name: string;
+  name_i18n?: Record<string, string>;
+  description: string;
+  description_i18n?: Record<string, string>;
+  tags: string[];
+  homepage?: string;
+  /** Highest version tag of the extension repo, read live. */
+  latest: string | null;
+  installed: boolean;
+  /** Installed version (`_commit`), when installed. */
+  version: string | null;
+  update: boolean;
+  error?: string;
+};
+
+export type Marketplace = {
+  collectedAt: string;
+  catalogs: { source: string; name: string; error?: string }[];
+  extensions: MarketplaceEntry[];
+};
+
+/** Output `result` of `fyso-ext-install`. */
+export type ExtInstallResult = { id: string; mode: "add" | "update"; version: string | null; commit: string };
+
 export type Engine = {
   id: string;
   label: string;
@@ -91,6 +120,8 @@ export const DAGS = {
   botsPlan: "fyso-bots-plan",
   botsApply: "fyso-bots-apply",
   snapshot: "fyso-snapshot",
+  extCatalog: "fyso-ext-catalog",
+  extInstall: "fyso-ext-install",
 } as const;
 
 export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string } };
