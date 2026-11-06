@@ -10,6 +10,7 @@ _preserve_symlinks: true
 _exclude:
   - "copier.yaml"
   - "copier.yml"
+  - "!framework/extensions/_template/copier.yml"
   - "~*"
   - "*.py[co]"
   - "__pycache__"

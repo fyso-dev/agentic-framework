@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Engine, type Plan, type Project, type Run, type SetupCheck } from "./types";
+import { DAGS, type App, type Backend, type Extension, type Engine, type Plan, type Project, type Run, type SetupCheck } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -97,6 +97,23 @@ function engines(scenario: Scenario): Engine[] {
   ];
 }
 
+function extensions(scenario: Scenario): Extension[] {
+  if (scenario === "empty") return [];
+  return [
+    {
+      id: "sample", src: "gh:fyso/ext-sample", version: "v1.2.0", apps: ["sample"],
+      secrets: [
+        {
+          name: "SAMPLE_TOKEN", description: "Token de ejemplo", description_i18n: { en: "Sample token" },
+          required: true, set: scenario !== "failed",
+        },
+        { name: "SAMPLE_WEBHOOK", required: false, set: false },
+      ],
+      mcpServers: ["sample"], workflows: ["ext-sample-report"], skills: ["sample-ops"],
+    },
+  ];
+}
+
 function apps(scenario: Scenario): App[] {
   const framework: App[] = [
     {
@@ -128,6 +145,11 @@ function apps(scenario: Scenario): App[] {
       id: "reports", name: "Reportes", name_i18n: { en: "Reports" }, description: "Resumen semanal",
       description_i18n: { en: "Weekly summary" }, icon: "chart", url: "http://reports.localhost:8400",
       group: "project", enabled: false,
+    },
+    {
+      id: "sample", name: "Ejemplo", name_i18n: { en: "Sample" }, description: "Extensión de ejemplo",
+      description_i18n: { en: "Sample extension" }, icon: "puzzle", url: "http://sample.localhost:8400",
+      group: "extension", enabled: true,
     },
   ];
 }
@@ -249,6 +271,10 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     async getApps() {
       await sleep(250);
       return apps(scenario);
+    },
+    async getExtensions() {
+      await sleep(250);
+      return extensions(scenario);
     },
 
     async enqueue(dag, params) {

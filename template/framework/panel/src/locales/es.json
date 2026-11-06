@@ -259,7 +259,8 @@
     "downDetail": "No responde en el último chequeo.",
     "emptyTitle": "Este proyecto todavía no tiene apps propias.",
     "emptyHint": "Copiá la plantilla para crear la primera:",
-    "emptyCommand": "cp -r framework/apps/_template project/apps/mi-app"
+    "emptyCommand": "cp -r framework/apps/_template project/apps/mi-app",
+    "extension": "Apps de extensiones"
   },
   "observ": {
     "title": "Observabilidad",
@@ -346,5 +347,26 @@
       "cancelled": "Cancelada",
       "skipped": "Omitida"
     }
+  },
+  "ext": {
+    "title": "Extensiones instaladas",
+    "ready": "Lista",
+    "missing_one": "Falta {{count}} secreto",
+    "missing_other": "Faltan {{count}} secretos",
+    "noVersion": "sin versión",
+    "secrets": "Secretos",
+    "secretSet": "cargado",
+    "secretMissing": "falta",
+    "secretOptional": "opcional, sin cargar",
+    "mcp_one": "{{count}} servidor MCP",
+    "mcp_other": "{{count}} servidores MCP",
+    "workflows_one": "{{count}} workflow",
+    "workflows_other": "{{count}} workflows",
+    "skills_one": "{{count}} skill (activala en un bot)",
+    "skills_other": "{{count}} skills (activalas en un bot)",
+    "manage": "Instalar, actualizar o quitar extensiones se hace desde la terminal. Para actualizar todas:",
+    "emptyTitle": "No hay extensiones instaladas.",
+    "emptyHint": "Instalá una desde su repo:",
+    "emptyCommand": "mise run ext:add gh:org/fyso-ext-nombre"
   }
 }

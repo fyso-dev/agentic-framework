@@ -259,7 +259,8 @@
     "downDetail": "Not responding at the last check.",
     "emptyTitle": "This project has no apps of its own yet.",
     "emptyHint": "Copy the template to create the first one:",
-    "emptyCommand": "cp -r framework/apps/_template project/apps/my-app"
+    "emptyCommand": "cp -r framework/apps/_template project/apps/my-app",
+    "extension": "Extension apps"
   },
   "observ": {
     "title": "Observability",
@@ -346,5 +347,26 @@
       "cancelled": "Cancelled",
       "skipped": "Skipped"
     }
+  },
+  "ext": {
+    "title": "Installed extensions",
+    "ready": "Ready",
+    "missing_one": "{{count}} secret missing",
+    "missing_other": "{{count}} secrets missing",
+    "noVersion": "no version",
+    "secrets": "Secrets",
+    "secretSet": "set",
+    "secretMissing": "missing",
+    "secretOptional": "optional, not set",
+    "mcp_one": "{{count}} MCP server",
+    "mcp_other": "{{count}} MCP servers",
+    "workflows_one": "{{count}} workflow",
+    "workflows_other": "{{count}} workflows",
+    "skills_one": "{{count}} skill (enable it on a bot)",
+    "skills_other": "{{count}} skills (enable them on a bot)",
+    "manage": "Installing, upgrading and removing extensions happens in the terminal. To upgrade them all:",
+    "emptyTitle": "No extensions installed.",
+    "emptyHint": "Install one from its repo:",
+    "emptyCommand": "mise run ext:add gh:org/fyso-ext-name"
   }
 }

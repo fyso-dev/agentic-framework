@@ -1,0 +1,17 @@
+_min_copier_version: "9.19.1"
+_templates_suffix: .extjinja
+_envops:
+  block_start_string: "[%"
+  block_end_string: "%]"
+  variable_start_string: "[["
+  variable_end_string: "]]"
+extension_id:
+  type: str
+  default: sample
+  validator: >-
+    [% if not (extension_id | regex_search('^[a-z][a-z0-9-]{1,30}$')) %]
+    Use 2-31 lowercase letters, digits or dashes, starting with a letter.
+    [% endif %]
+# Preserve the generated extension's Copier configuration in the output.
+_exclude:
+  - "!copier.yml"
