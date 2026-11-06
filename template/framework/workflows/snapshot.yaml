@@ -10,6 +10,10 @@ working_dir: ${ROOT}
 steps:
   - id: bots
     command: framework/scripts/snapshot.sh bots
+    # OpenMausBot may still be starting (e.g. a scheduled run right after `up`).
+    retry_policy:
+      limit: 6
+      interval_sec: 20
   - id: memory
     command: framework/scripts/snapshot.sh memory
     depends: [bots]
