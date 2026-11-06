@@ -1,0 +1,8 @@
+# Sample workflow. Delete or replace it.
+description: Says hello. Proves Dagu runs this project's workflows.
+params:
+  - NAME: world
+steps:
+  - name: greet
+    command: echo "hello, ${NAME}"
+    output: GREETING

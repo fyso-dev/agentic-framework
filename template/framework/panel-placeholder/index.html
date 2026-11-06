@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fyso</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+  a { display: block; padding: .75rem 1rem; margin: .5rem 0; border: 1px solid #8884; border-radius: .5rem; text-decoration: none; }
+</style>
+</head>
+<body>
+  <h1>Fyso</h1>
+  <p>El panel llega en la Fase 4. Mientras tanto / The panel arrives in Phase 4. Meanwhile:</p>
+  <a id="dagu" href="#">Dagu · Workflows</a>
+  <a id="omb" href="#">OpenMausBot · Bots</a>
+  <script>
+    const port = location.port ? ":" + location.port : "";
+    document.getElementById("dagu").href = location.protocol + "//dagu.localhost" + port;
+    document.getElementById("omb").href = location.protocol + "//omb.localhost" + port;
+  </script>
+</body>
+</html>

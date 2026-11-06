@@ -1,0 +1,32 @@
+# {{ project_name }}
+
+A Fyso Agentic Framework project: OpenMausBot (bots) + Dagu (workflows) behind one gateway.
+
+## Run it
+
+Requirements: [mise](https://mise.jdx.dev). Everything else is pinned in `mise.toml`.
+
+```sh
+mise trust && mise install
+mise run setup     # once: your age key + encrypted secrets (login admin / admin)
+mise run up
+```
+
+| What | Where |
+|---|---|
+| Panel | http://panel.localhost:{{ port_base }} |
+| Dagu (workflows) | http://dagu.localhost:{{ port_base }} |
+| OpenMausBot (bots) | http://127.0.0.1:{{ port_base + 4 }} locally · `omb.localhost:{{ port_base }}` with device pairing |
+
+`mise run doctor` checks everything · `mise run status` · `mise run logs <dagu|omb|caddy>` · `mise run down`
+
+## Where things live
+
+| Path | Owner | What |
+|---|---|---|
+| `project/` | this project | bots, workflows, apps — yours to change |
+| `framework/` | template | updated with `uvx copier update --trust`; do not edit |
+| `secrets.enc.yaml` | this project | encrypted with sops + age; edit with `mise run secrets` |
+| `.data/` | runtime | data of Dagu, OpenMausBot and Caddy; never committed |
+
+Ports {{ port_base }}–{{ port_base + 9 }} belong to this project. This project never connects to another Dagu or OpenMausBot on the machine.

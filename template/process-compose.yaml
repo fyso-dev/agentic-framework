@@ -1,0 +1,50 @@
+# Native processes of this project (PLAN D1). Started by `mise run up`.
+# Each script clears its environment and passes only what that process needs.
+version: "0.5"
+log_location: .data/logs/process-compose.log
+log_level: info
+
+processes:
+  dagu:
+    command: framework/scripts/run-dagu.sh
+    log_location: .data/logs/dagu.log
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh dagu
+      initial_delay_seconds: 2
+      period_seconds: 3
+      failure_threshold: 20
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+
+  omb:
+    command: framework/scripts/run-omb.sh
+    log_location: .data/logs/omb.log
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh omb
+      initial_delay_seconds: 5
+      period_seconds: 3
+      failure_threshold: 60
+    availability:
+      restart: on_failure
+      backoff_seconds: 5
+
+  caddy:
+    command: framework/scripts/run-caddy.sh
+    log_location: .data/logs/caddy.log
+    depends_on:
+      dagu:
+        condition: process_healthy
+      omb:
+        condition: process_healthy
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh caddy
+      initial_delay_seconds: 1
+      period_seconds: 2
+      failure_threshold: 15
+    availability:
+      restart: on_failure
+      backoff_seconds: 3

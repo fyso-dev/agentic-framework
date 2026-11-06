@@ -1,0 +1,70 @@
+# Pinned tools, environment and tasks for this project (PLAN D1, D21).
+# Change versions deliberately; never use "latest".
+min_version = "2026.10.6"
+
+[tools]
+"aqua:dagucloud/dagu" = "2.24.0"
+"npm:openmausbot" = "0.1.140"
+"aqua:F1bonacc1/process-compose" = "1.124.0"
+"aqua:caddyserver/caddy" = "2.11.9"
+"aqua:getsops/sops" = "3.13.3"
+"aqua:FiloSottile/age" = "1.3.2"
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"core:node" = "24.15.0"
+
+[settings.npm]
+package_manager = "npm"
+
+[env]
+# Encrypted secrets (sops + age, PLAN D20). Created by `mise run setup`.
+_.file = { path = "secrets.enc.yaml", redact = true }
+
+FYSO_PROJECT = "{{ project_slug }}"
+FYSO_PROJECT_NAME = "{{ project_name }}"
+FYSO_ROOT = "{% raw %}{{ config_root }}{% endraw %}"
+FYSO_DATA = "{% raw %}{{ config_root }}{% endraw %}/.data"
+FYSO_ADMIN_USER = "{{ admin_user }}"
+
+# Port block (PLAN §3.1): base {{ port_base }}.
+FYSO_HTTP_PORT = "{{ port_base }}"
+FYSO_DAGU_PORT = "{{ port_base + 1 }}"
+FYSO_DAGU_SCHEDULER_PORT = "{{ port_base + 2 }}"
+FYSO_DAGU_WORKER_HEALTH_PORT = "{{ port_base + 3 }}"
+FYSO_OMB_PORT = "{{ port_base + 4 }}"
+FYSO_OMB_WEBHOOK_PORT = "{{ port_base + 5 }}"
+FYSO_DAGU_COORDINATOR_PORT = "{{ port_base + 6 }}"
+FYSO_DAGU_COORDINATOR_HEALTH_PORT = "{{ port_base + 7 }}"
+FYSO_CADDY_ADMIN_PORT = "{{ port_base + 8 }}"
+
+# Every `openmausbot` CLI call targets THIS project's server, never the
+# desktop app it would otherwise auto-discover on 8799.
+OPENMAUSBOT_URL = "http://127.0.0.1:{{ port_base + 4 }}"
+ALLOW_INSECURE_HTTP = "true"
+
+[tasks.setup]
+description = "Create the age key (if missing), .sops.yaml and secrets.enc.yaml"
+run = "framework/scripts/setup.sh"
+
+[tasks.up]
+description = "Start Dagu, OpenMausBot and Caddy in the background"
+run = "framework/scripts/up.sh"
+
+[tasks.down]
+description = "Stop every process of this project"
+run = "process-compose down --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+
+[tasks.status]
+description = "Show the state of each process"
+run = "process-compose process list --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+
+[tasks.logs]
+description = "Follow the logs of one process: mise run logs <dagu|omb|caddy>"
+run = "process-compose process logs --follow --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+
+[tasks.doctor]
+description = "Check ports, logins, instances and routes"
+run = "framework/scripts/doctor.sh"
+
+[tasks.secrets]
+description = "Edit the encrypted secrets file"
+run = "sops edit secrets.enc.yaml"
