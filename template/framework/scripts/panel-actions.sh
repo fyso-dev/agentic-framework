@@ -25,6 +25,7 @@ case "${1:-}" in
     if ! git diff --cached --quiet -- project/bots/team.yaml; then
       git commit -q -m 'bots: update from panel' -- project/bots/team.yaml >&2
     fi
+    node framework/scripts/bot-versioning.cjs
     node -e 'const fs=require("fs"),cp=require("child_process"),r=JSON.parse(fs.readFileSync(process.argv[1])); console.log(JSON.stringify({created:r.created,changed:r.changed,deleted:r.deleted,commit:cp.execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()}))' "$tmp/apply.json"
     ;;
   check)

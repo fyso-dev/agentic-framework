@@ -46,6 +46,7 @@ async function main(env=process.env) {
     return {live,native,digest:sha(canonical(native)+fs.readFileSync(projectFile,'utf8')+canonical(live.map(b=>[b.id,b.name]).sort()))};
   }
   const op=env.OP||'list';
+  if(op==='import')return require('./import-bot.cjs').importBot(env);
   if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
   if(op==='read') {
     const current=await state(),bot=current.live.find(b=>b.id===env.BOT_ID);

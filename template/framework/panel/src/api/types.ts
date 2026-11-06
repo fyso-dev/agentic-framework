@@ -65,6 +65,7 @@ export type Run = {
 
 /** Action workflows (contract §3). Dagu DAG names. */
 export const DAGS = {
+  botArchitect: "fyso-bot-architect",
   observability: "fyso-observability",
   setupCheck: "fyso-setup-check",
   botsPlan: "fyso-bots-plan",
@@ -72,9 +73,12 @@ export const DAGS = {
   snapshot: "fyso-snapshot",
 } as const;
 
-export type RuntimeBot = { id: string; name: string; title?: string; modelSelection?: { instanceId?: string; model?: string } };
+export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string } };
+
+export type BotVersioning = { collectedAt: string; commit: string | null; projectDirty?: boolean; bots: {name: string; team: string; project: boolean; snapshot: boolean}[] };
 
 export type Backend = {
+  getBotVersioning(): Promise<BotVersioning>;
   getRuntimeBots(): Promise<RuntimeBot[]>;
   getObservability(): Promise<import("./observability").Observation>;
   getProject(): Promise<Project>;

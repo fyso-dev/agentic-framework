@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D28; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D29; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -106,3 +106,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | [Repository install proof](../artifacts/delivery-evidence/repository-install/README.md): generated directly from GitHub with Copier 9.19.1, initialized Git, installed/resolved pinned tools, encrypted secrets, started isolated services and passed doctor. Fixture stopped afterward. |
 
 | 2026-11-06 | Corrected duplicate bot lists: one native roster with matching configuration actions and pending drafts. Chief/native-only bots remain visible; unchanged stale declarations no longer resurrect native deletions. |
+
+| 2026-11-06 | Native bot import (D29): distinguish project/snapshot/native-only definitions using committed Git evidence and import one native profile into project configuration without modifying OMB. [Verified evidence](../artifacts/delivery-evidence/bot-import/README.md). |

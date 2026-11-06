@@ -31,3 +31,14 @@ test('configuration remains usable before native discovery and in mock mode',asy
   assert.equal(rows.length,1);
   assert.equal(rows[0].model,'claude/declared');
 });
+test('version badges require committed evidence and keep snapshots distinct from declarations',async()=>{
+  const {versionStatus}=await load();
+  const row={key:'native',name:'Native bot',team:''};
+  const saved={commit:'abc',bots:[{name:'Native bot',team:'',project:false,snapshot:true}]};
+  assert.equal(versionStatus(row,undefined),'unknown');
+  assert.equal(versionStatus(row,{commit:null,bots:[]}),'unknown');
+  assert.equal(versionStatus(row,{commit:'abc',bots:[]}),'native');
+  assert.equal(versionStatus(row,saved),'snapshot');
+  assert.equal(versionStatus({...row,ambiguous:true},saved),'unknown');
+  assert.equal(versionStatus(row,{...saved,bots:[{...saved.bots[0],project:true}]}),'project');
+});

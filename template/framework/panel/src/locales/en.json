@@ -158,7 +158,19 @@
     "runtimeLoading": "Loading OpenMausBot…",
     "runtimeEmpty": "There are no bots in OpenMausBot.",
     "runtimeOpen": "Open OpenMausBot",
-    "configurationTitle": "Configuration and drafts"
+    "configurationTitle": "Configuration and drafts",
+    "version": {
+      "project": "In project",
+      "snapshot": "In snapshot",
+      "native": "OpenMausBot only",
+      "unknown": "Unverified"
+    },
+    "import": "Import and version",
+    "importNamed": "Import and version {{name}}",
+    "importDraftHint": "Apply or discard the draft before importing another bot.",
+    "versionUnavailable": "Git status could not be verified. Import is disabled.",
+    "versionHint": "“In project” and “In snapshot” indicate a definition saved in the latest commit; later native edits may not be saved.",
+    "importDirtyHint": "Project configuration has uncommitted changes. Commit or discard them before importing."
   },
   "form": {
     "back": "Bots",

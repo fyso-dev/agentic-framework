@@ -235,6 +235,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   return {
     initialDraft: scenario === "failed" || scenario === "applyfail" ? DRAFT : null,
 
+    async getBotVersioning() { return {collectedAt:new Date().toISOString(), commit:null, bots:[]}; },
     async getRuntimeBots() { return []; },
     async getObservability() { throw new Error("Observability requires the real stack"); },
     async getProject() {

@@ -35,3 +35,15 @@ class BotRosterHTTPTests(unittest.TestCase):
         self.assertEqual(len({bot["id"] for bot in bots}), len(bots))
         self.assertTrue(all(not bot.get("messages") for bot in bots))
         self.assertNotIn("omb_sess_", body)
+
+    def test_versioning_metadata_requires_login_and_exposes_only_git_evidence(self):
+        path = "/config/bot-versioning.json"
+        self.assertEqual(self.request(auth=False, path=path)[0], 401)
+        self.assertEqual(self.request(method="POST", path=path)[0], 405)
+        status, body = self.request(path=path)
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertTrue(data["commit"])
+        self.assertTrue(data["bots"])
+        for field in ('"soul"', '"messages"', '"modelSelection"', 'omb_sess_'):
+            self.assertNotIn(field, body)

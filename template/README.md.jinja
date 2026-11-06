@@ -83,3 +83,5 @@ Bot snapshots contain imported skill bundles. Ambient skills discovered in the
 host CLI remain host-owned; they are not copied into project snapshots. Native
 team paths resolve relative to the source file, and instruction placeholders are
 preserved. Known home/project paths are normalized in the versioned memory copy.
+
+The bot list distinguishes definitions committed in the project, profiles saved only in a native snapshot, and bots found only in OpenMausBot. Use **Import and version** to bring a native-only or snapshot-only bot into project configuration without changing its running profile. Apply or discard panel drafts first; the project team file must also be clean in Git.

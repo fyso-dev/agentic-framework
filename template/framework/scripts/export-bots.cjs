@@ -22,7 +22,7 @@ async function run() {
         if(!entry.skills.length)delete entry.skills;
       }
     }
-    const target='state/bots';fs.mkdirSync(target,{recursive:true});
+    const target=env.FYSO_BOT_EXPORT_DIR||'state/bots';fs.mkdirSync(target,{recursive:true});
     const selected=path.join(tmp,'selected-skills');fs.mkdirSync(selected);
     for(const bot of team.bots||[])for(const skill of bot.skills||[]) {
       const source=path.resolve(tmp,skill.file);

@@ -48,6 +48,7 @@ export function toRun(d: DaguRunDetails, fallbackId = ""): Run {
 }
 
 export const httpBackend: Backend = {
+  getBotVersioning: () => json("config/bot-versioning.json"),
   getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("api/omb/bots")).bots,
   getObservability: () => json("config/observability.json"),
   getProject: () => json<Project>("config/project.json"),

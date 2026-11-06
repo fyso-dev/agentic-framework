@@ -186,6 +186,7 @@ async function collect(env = process.env, now = new Date()) {
 if (require.main === module) {
   const started=performance.now();
   collect().then(result=>{
+    require("./bot-versioning.cjs").write();
     const target=path.join(process.env.FYSO_DATA,'panel/observability.json');
     fs.mkdirSync(path.dirname(target),{recursive:true});
     const temp=target+`.${process.pid}.tmp`;

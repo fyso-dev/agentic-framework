@@ -158,7 +158,19 @@
     "runtimeLoading": "Consultando OpenMausBot…",
     "runtimeEmpty": "No hay bots en OpenMausBot.",
     "runtimeOpen": "Abrir OpenMausBot",
-    "configurationTitle": "Configuración y borradores"
+    "configurationTitle": "Configuración y borradores",
+    "version": {
+      "project": "En el proyecto",
+      "snapshot": "En snapshot",
+      "native": "Sólo OpenMausBot",
+      "unknown": "Sin verificar"
+    },
+    "import": "Importar y versionar",
+    "importNamed": "Importar y versionar {{name}}",
+    "importDraftHint": "Aplicá o descartá el borrador antes de importar otro bot.",
+    "versionUnavailable": "No se pudo verificar el estado en Git. La importación está deshabilitada.",
+    "versionHint": "“En el proyecto” y “En snapshot” indican una definición guardada en el último commit; los cambios posteriores del bot pueden no estar guardados.",
+    "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Commitealos o descartalos antes de importar."
   },
   "form": {
     "back": "Bots",

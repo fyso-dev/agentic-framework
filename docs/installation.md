@@ -141,3 +141,5 @@ See the [documentation index](README.md) for contracts, phase status and recorde
 ## Recorded verification
 
 The [repository installation proof](../artifacts/delivery-evidence/repository-install/README.md) records a real GitHub generation and first startup with all doctor checks passing. Native tools were already cached on the verification host; this does not certify empty-host downloads or remote deployment.
+
+Native bot discovery labels committed project definitions, snapshot-only profiles and OpenMausBot-only bots separately. **Import and version** incorporates an existing native bot into project configuration and creates a local commit without changing its runtime profile. Apply/discard panel drafts and commit/discard pending changes to the project team before importing. A saved definition is not proof that subsequent native edits have been saved.

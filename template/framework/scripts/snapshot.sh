@@ -32,6 +32,7 @@ case "${1:-}" in
   commit)
     git add -A -- "${paths[@]}"
     if git diff --cached --quiet -- "${paths[@]}"; then
+      node framework/scripts/bot-versioning.cjs
       echo "no changes"; exit 0
     fi
     if ! gitleaks git --staged --no-banner --redact . >&2 || ! framework/scripts/check-paths.sh >&2; then
@@ -40,6 +41,7 @@ case "${1:-}" in
     fi
     git commit -q -m "snapshot: $(date -u +%Y-%m-%dT%H:%MZ)" -- "${paths[@]}"
     if [ -n "$(git remote)" ]; then git push -q || echo "warning: push failed; the commit stays local" >&2; fi
+    node framework/scripts/bot-versioning.cjs
     echo "committed $(git rev-parse --short HEAD)"
     ;;
   *) fail "usage: snapshot.sh <bots|memory|commit>" ;;

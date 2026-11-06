@@ -152,3 +152,9 @@ captured as the run's `ORIGIN` JSON output, independently of agent success.
 `harness.run` publishes Claude JSON or Codex JSONL as `agent.txt`; the exporter
 reads only whitelisted usage numbers and never serves that raw artifact. Legacy
 artifacts without structured data retain unknown consumption.
+
+## Bot versioning metadata and import
+
+`GET /config/bot-versioning.json` is an exact read-only Caddy file route. It contains `{collectedAt, commit, bots:[{name,team,project,snapshot}]}`, derived from committed `project/bots/team.yaml` and `state/bots/team.yaml`; no instructions, chat or secret values are exported. The panel polls every five seconds. The file refreshes at startup, snapshot commit, native import and observability collection (two-minute schedule); the commit and collection time identify its evidence. Missing evidence or ambiguous identities produce an unverified label and disable import.
+
+Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract with `{OP:"import",BOT_ID:"<native ID>"}` and returns `{action,botId,name,commit,replayed}`. The panel reloads configuration after success, without resetting a draft. Drafts disable this action until applied or discarded.

@@ -1,13 +1,15 @@
 // Bots: the list over team.yaml (draft vs file on disk) and the review/apply dialog.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine } from "../api/types";
+import { DAGS, type Engine } from "../api/types";
 import { IconBot, IconPlus } from "../components/Icons";
 import { unappliedCount } from "../components/Layout";
 import { Avatar, External, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import { splitModel, type BotState } from "../lib/team";
-import { botRoster } from "../lib/botRoster";
+import { botRoster, versionStatus } from "../lib/botRoster";
+import { useDaguAction } from "../lib/useDaguAction";
+import { ActionStatus, ActionError } from "../components/Action";
 import { useStore } from "../store";
 import { Preview } from "./Preview";
 import { useEngineName } from "./Setup";
@@ -48,6 +50,12 @@ export function Bots({ review }: { review: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const eng = useEngineLabel();
+  const importing = useDaguAction<{botId:string; commit:string}>(s.backend,DAGS.botArchitect,"result");
+  const importBot = async (id:string) => {
+    if (s.draft || importing.phase === "running") return;
+    const result = await importing.start({OP:"import",BOT_ID:id});
+    if (result) s.reload();
+  };
   const runtime = s.runtimeBots.data ?? null;
   const runtimeError = s.runtimeBots.status === "error";
   const rows = botRoster(s.rows, s.mock ? null : runtime);
@@ -80,7 +88,13 @@ export function Bots({ review }: { review: boolean }) {
       )}
 
       {!s.mock && <p className="mute">{t("bots.runtimeHint")}</p>}
+      {!s.mock && <p className="note">{t("bots.versionHint")}</p>}
       {!s.mock && runtimeError && <p role="alert" className="banner banner-down">{t("bots.runtimeError")}</p>}
+
+      {!s.mock && s.botVersioning.status === "error" && <p role="alert" className="banner banner-warn">{t("bots.versionUnavailable")}</p>}
+      {!s.mock && s.botVersioning.data?.projectDirty && <p className="note">{t("bots.importDirtyHint")}</p>}
+      {s.draft && <p className="note">{t("bots.importDraftHint")}</p>}
+      {importing.phase !== "never" && <div className="card" style={{padding:12}}><ActionStatus action={importing} /><ActionError action={importing} /></div>}
 
       {s.team.status === "error" && (
         <div role="alert" className="banner banner-down">
@@ -128,6 +142,8 @@ export function Bots({ review }: { review: boolean }) {
           {rows.map(row => {
             const { name, title, model, configuration } = row;
             const state = configuration?.state ?? "applied";
+            const version = versionStatus(row,s.botVersioning.status === "ok" ? s.botVersioning.data : undefined);
+            const canImport = row.nativeId && !row.ambiguous && !configuration && version !== "project";
             const { engine, modelId } = splitModel(model);
             const inner = (
               <>
@@ -138,7 +154,7 @@ export function Bots({ review }: { review: boolean }) {
                 </div>
                 <span className="bot-engine"><span className="pill pill-outline">{eng.kind(engine)}</span></span>
                 <span className="bot-model ellipsis" title={model}>{modelId}</span>
-                <span className="bot-state"><BotStatePill state={state} /></span>
+                <span className="bot-state">{state !== "applied" || s.mock ? <BotStatePill state={state} /> : <span className={`pill ${version === "native" ? "pill-warn" : "pill-outline"}`} title={s.botVersioning.data ? `${s.botVersioning.data.commit || ""} · ${s.botVersioning.data.collectedAt}` : undefined}>{t(`bots.version.${version}`)}</span>}</span>
                 <span aria-hidden="true" className="chev" style={{ visibility: state === "deleted" || !configuration ? "hidden" : undefined }}>›</span>
               </>
             );
@@ -149,7 +165,10 @@ export function Bots({ review }: { review: boolean }) {
                 ) : configuration ? (
                   <a className="row bot-row" href={href.bot(configuration.bot.index)} aria-label={t("bots.edit", { name })}>{inner}</a>
                 ) : (
-                  <div className="row bot-row">{inner}{s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}</div>
+                  <div className="row bot-row" style={{flexWrap:"wrap"}}>{inner}
+                    {canImport && <button type="button" className="btn btn-pri" disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={() => void importBot(row.nativeId!)} aria-label={t("bots.importNamed",{name})}>{t("bots.import")}</button>}
+                    {s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}
+                  </div>
                 )}
               </li>
             );

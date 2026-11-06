@@ -66,6 +66,8 @@ Append-only. A superseded decision stays, marked with what replaced it.
 
 | D28 | **Panel bot discovery reads the native live roster.** An exact GET-only gateway route forwards OMB `/api/bots?messages=0`; the panel polls every five seconds and includes the chief and OMB-created bots. One list joins the live roster with configuration and pending drafts; discovery never overwrites drafts. This adds visibility, not automatic reconciliation of native profiles into project declarations |
 
+| D29 | **Native import and Git evidence stay explicit.** One bot roster distinguishes committed project declarations, committed native snapshots, and native-only profiles. A GET-only metadata file reports names from Git HEAD, never profile contents. Import uses the existing Bot Architect workflow to export one exact native ID and commit its native profile plus imported skill files, without runtime writes. Dirty project declarations, ambiguous names and local panel drafts block import. Existing defaults are materialized when needed to preserve effective profiles without unwanted inheritance |
+
 ## 3. Architecture
 
 ```

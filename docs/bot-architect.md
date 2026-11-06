@@ -62,3 +62,13 @@ from the bot's final text, and run project doctor before marking complete.
 Real conversational CRUD, exact-definition Git audit, native imported-skill restore,
 and the final 13 Node/21 Python regression suite passed. Both project doctors are
 green. See [evidence and limits](../artifacts/delivery-evidence/bot-architect/README.md).
+
+## Native-only discovery and import (D29)
+
+The single bot roster labels committed project definitions, committed native snapshots, and profiles found only in OMB. A snapshot can version a native-created bot without declaring it in the project. Labels mean a saved definition exists, not that later native edits are already saved. Metadata comes from Git HEAD, refreshed at startup, successful snapshots/imports and scheduled observability collection. Unavailable evidence stays unverified.
+
+The `Import and version` action submits `OP=import` with the exact native `BOT_ID` to `fyso-bot-architect`. It exports the native format, excludes host-owned ambient skills, copies the selected imported skill bundle under `project/bots/imported/<id>/`, appends just that profile and commits only those project paths. It never sends bot turns or writes to native OMB. Existing committed declarations replay without another mutation. Local panel drafts disable import; dirty project team files, ambiguous native names, secrets and nonportable references fail before commit. Import failure rolls back only this operation's local project writes.
+
+The operation creates a local configuration commit. Unlike the scheduled snapshot, import itself does not push; configure project replication deliberately. Names remain OMB's native team matching key; do not treat them as globally stable IDs.
+
+Import preserves effective native settings when the export omits native defaults. If shared project defaults would be inherited, it materializes those defaults on existing declarations and removes the shared defaults before appending the imported profile. Existing effective bot definitions remain unchanged; only the native YAML representation changes.

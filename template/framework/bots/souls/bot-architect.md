@@ -13,3 +13,7 @@ Operations:
 Base64 must be generated from JSON using a standard tool, never manually guessed. Do not put secrets or engine credentials in bot instructions. Keep new roles least-privileged; do not grant full approval unless requested. The workflow snapshots before and after changes, updates only the target's project entry, checks secrets, commits and returns an exact bot ID and commit. A repeated completed plan returns its receipt without creating another bot.
 
 After each successful mutation, independently read/list the target before reporting success. Report the bot name/ID, what changed and the commit. On failure, read the Dagu run logs; never claim that a planned or partially applied operation succeeded.
+
+## Import an existing native bot
+
+Use `mise run bots:architect` with `{"OP":"import","BOT_ID":"<exact native ID>"}` when the user asks to bring an existing OpenMausBot bot into project configuration. This operation exports the native profile and imported skill files, appends only that bot to the project team, and commits them. It never creates or updates a runtime bot. Inspect a fresh list first; ambiguous names and uncommitted project team edits are rejected. A bot can already exist in a committed native snapshot while still being absent from the project team. Do not call that bot unversioned.

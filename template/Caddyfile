@@ -17,7 +17,7 @@
 # Panel files and same-origin Dagu API.
 http://panel.localhost:{$FYSO_HTTP_PORT} {
 	import fyso_login
-	@config path /config/project.json /config/apps.json /config/observability.json
+	@config path /config/project.json /config/apps.json /config/observability.json /config/bot-versioning.json
 	handle @config {
 		@read method GET HEAD
 		handle @read {
