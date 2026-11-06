@@ -1,0 +1,10 @@
+description: Panel setup-check
+type: graph
+max_active_runs: 1
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: check
+    command: framework/scripts/panel-actions.sh check
+    output: CHECK

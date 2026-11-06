@@ -1,0 +1,21 @@
+description: Panel bots-apply
+type: graph
+max_active_runs: 1
+params:
+  - TEAM_B64: ""
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: snapshot-bots
+    command: framework/scripts/snapshot.sh bots
+  - id: snapshot-memory
+    command: framework/scripts/snapshot.sh memory
+    depends: [snapshot-bots]
+  - id: snapshot-commit
+    command: framework/scripts/snapshot.sh commit
+    depends: [snapshot-memory]
+  - id: apply
+    command: framework/scripts/panel-actions.sh apply
+    depends: [snapshot-commit]
+    output: APPLY
