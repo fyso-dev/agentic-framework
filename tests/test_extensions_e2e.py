@@ -116,3 +116,10 @@ class ExtensionsE2E(unittest.TestCase):
             run('mise', 'run', 'ext:remove', 'sample', cwd=project)
             self.assertFalse((project / 'extensions/sample').exists())
             self.assertFalse((project / '.copier-answers.ext-sample.yml').exists())
+            # The panel refuses a source outside the project: Copier would save that machine
+            # path in the answers file and every later snapshot would fail check-paths.
+            outside = subprocess.run(['mise', 'exec', '--', 'framework/scripts/ext.sh', 'apply', 'add', 'sample'],
+                                     cwd=project, text=True, capture_output=True, timeout=300)
+            self.assertNotEqual(outside.returncode, 0)
+            self.assertIn('is a path of this machine', outside.stderr)
+            self.assertFalse((project / '.copier-answers.ext-sample.yml').exists())

@@ -18,7 +18,7 @@ An **extension** is a small Copier template, applied on top of a generated proje
 | Remove | `mise run ext:remove <ext>` | deletes the slot files of §2 and the answers file. Copier has no uninstall |
 
 - Each extension's `copier.yml` sets `_answers_file: .copier-answers.ext-<ext>.yml`. The answers files **are** the list of installed extensions, versioned in git. There is no registry.
-- `src` is anything Copier accepts: `gh:org/fyso-ext-foo`, a git URL, or a local path. Pin with `--vcs-ref <tag>`.
+- `src` is anything Copier accepts: `gh:org/fyso-ext-foo`, a git URL, or a local path. Pin with `--vcs-ref <tag>`. Copier saves it in the answers file, which `check-paths` scans before every snapshot: a path inside the project is stored relative, and an absolute path outside it is refused by the panel and warned about by `ext:add` (publish the extension to git instead).
 - Copier needs a clean git tree for `update`. The tasks fail with Copier's own message; they do not stash.
 
 ## 2. Slots

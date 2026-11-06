@@ -26,6 +26,18 @@ case "$action" in
       src=${line%%$'\t'*}; ref=${line#*$'\t'}
       [[ " ${args[*]-} " == *" --vcs-ref "* ]] || [ -z "$ref" ] || args+=(--vcs-ref "$ref")
     fi
+    # Copier saves the source in the answers file, which check-paths scans before every
+    # snapshot: keep machine-specific paths out of it.
+    case $src in "~"/*) src="$HOME/${src#"~/"}" ;; esac
+    if [[ $src == /* ]]; then
+      if [[ $src == "$PWD"/* ]]; then
+        src=${src#"$PWD"/}
+      else
+        msg="$src is a path of this machine; it would be saved in .copier-answers.ext-*.yml and fail check-paths (snapshots). Publish the extension to git (gh:org/repo)."
+        [ -z "${EXT_APPLY:-}" ] || fail "$msg"
+        printf 'warning: %s\n' "$msg" >&2
+      fi
+    fi
     # First free port of the extension block, for templates that ask `extension_port`.
     if [[ " ${args[*]-} " != *"extension_port="* ]]; then
       used=" $(env | sed -n 's/^FYSO_EXT_[A-Z0-9_]*_PORT=//p' | tr '\n' ' ') "
@@ -66,7 +78,7 @@ case "$action" in
     read_version() { node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._commit || "")' "$1"; }
     if [ "$mode" = add ]; then
       [ ! -e "$answers" ] || fail "$id is already installed"
-      "$0" add "$id" -- --defaults >&2
+      EXT_APPLY=1 "$0" add "$id" -- --defaults >&2
       version=$(read_version "$answers")
       # Commit only this extension's slots (docs/extensions-contract.md §2), never other work.
       slots=("$answers" ".config/mise/conf.d/ext-$id.toml" "extensions/$id")
