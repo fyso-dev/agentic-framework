@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Pinned, isolated openmausbot CLI: always targets the spike server on 8504.
+source "$(dirname "$0")/env.sh"
+exec npx -y openmausbot@0.1.140 "$@" --port 8504 2> >(grep -v -e 'ExperimentalWarning' -e 'trace-warnings' >&2)
