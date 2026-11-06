@@ -68,3 +68,13 @@ admin_user:
   type: str
   help: Login user for the gateway and Dagu (the password lives in secrets.enc.yaml)
   default: admin
+
+engine:
+  type: str
+  help: >-
+    Coding engine this host is signed in to. Bots and fyso-dev-task use it by
+    default; the other engine stays optional (PLAN D30).
+  choices:
+    Claude Code (claude login): claude
+    Codex (codex login): codex
+  default: claude

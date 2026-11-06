@@ -10,7 +10,7 @@ params:
   - SOURCE_THREAD: ""        # native OMB identifier, never inferred
   - SOURCE_TURN: ""
   - BRANCH: ""               # empty: builder/<run id>
-  - PROVIDER: claude         # claude | codex (their subscription logins; no API key)
+  - PROVIDER: {{ engine }}         # claude | codex (their subscription logins; no API key)
   - PUBLISH: "false"         # true only when the person requests a remote PR
   - BASE: main               # a branch name, not HEAD
   - MODEL: ""                # empty: the provider's default model

@@ -68,6 +68,8 @@ Append-only. A superseded decision stays, marked with what replaced it.
 
 | D29 | **Native import and Git evidence stay explicit.** One bot roster distinguishes committed project declarations, committed native snapshots, and native-only profiles. A GET-only metadata file reports names from Git HEAD, never profile contents. Import uses the existing Bot Architect workflow to export one exact native ID and commit its native profile plus imported skill files, without runtime writes. Dirty project declarations, ambiguous names and local panel drafts block import. Existing defaults are materialized when needed to preserve effective profiles without unwanted inheritance |
 
+| D30 | **Engines are optional; the project picks one.** Copier asks for `engine` (`claude` or `codex`, default `claude`). It sets every bot's model in `project/bots/team.yaml`, the Builder's default `PROVIDER` and `fyso-dev-task`'s default. Doctor fails only when an engine used by a declared bot is not signed in, or when none is; any other engine is an optional warning. Projects switch engines by editing their team file. Refines D27's Codex default for Bot Architect |
+
 ## 3. Architecture
 
 ```
@@ -191,10 +193,10 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 
 | Bot | Default model | Uses |
 |---|---|---|
-| **Workflow Architect** | `claude/…` (subscription) | Dagu MCP + skill `dagu-workflows` |
+| **Workflow Architect** | project engine, strong model (subscription) | Dagu MCP + skill `dagu-workflows` |
 | **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
-| **Bot Architect** | `codex/gpt-6.1-sol` (subscription) | Native OMB team plans through `fyso-bot-architect` |
-| **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` |
+| **Bot Architect** | project engine, strong model (subscription, D30) | Native OMB team plans through `fyso-bot-architect` |
+| **Builder** | project engine, strong model (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
 **`dev-task`** is a Dagu DAG built only from existing pieces (verified in spike `harness`):
 
