@@ -10,7 +10,7 @@ require_env FYSO_ROOT FYSO_DATA FYSO_OMB_PORT
 mode="${1:-plan}"
 source_file="${2:-project/bots/team.yaml}"
 rendered="$FYSO_DATA/team.rendered.yaml"
-sed "s|\${FYSO_ROOT}|$FYSO_ROOT|g" "$source_file" > "$rendered"
+node framework/scripts/render-team.cjs "$source_file" > "$rendered"
 omb() { openmausbot "$@" --port "$FYSO_OMB_PORT"; }
 case "$mode" in
   plan)  omb team apply "$rendered" --dry-run ;;

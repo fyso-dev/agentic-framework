@@ -11,12 +11,7 @@ paths=(state project/workflows project/wiki)
 
 case "${1:-}" in
   bots)
-    mkdir -p state/bots
-    tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
-    omb team export --out "$tmp" >/dev/null
-    # Portable and stable: no absolute project path, no export timestamp.
-    grep -v '^# Written by openmausbot team export' "$tmp" \
-      | sed "s|$FYSO_ROOT|\${FYSO_ROOT}|g" > state/bots/team.yaml
+    node framework/scripts/export-bots.cjs
     echo "bots exported"
     ;;
   memory)
@@ -32,18 +27,21 @@ case "${1:-}" in
       [ -d "$src/memory" ] && rsync -a --delete "$src/memory/" "$dst/memory/"
       echo "memory saved: $name"
     done
+    node framework/scripts/portable-state.cjs state/memory
     ;;
   commit)
     git add -A -- "${paths[@]}"
     if git diff --cached --quiet -- "${paths[@]}"; then
+      node framework/scripts/bot-versioning.cjs
       echo "no changes"; exit 0
     fi
-    if ! gitleaks git --staged --no-banner --redact . >&2; then
+    if ! gitleaks git --staged --no-banner --redact . >&2 || ! framework/scripts/check-paths.sh >&2; then
       git reset -q -- "${paths[@]}"
-      fail "gitleaks found possible secrets; nothing was committed (see the log above)"
+      fail "snapshot checks failed; nothing was committed (see the log above)"
     fi
     git commit -q -m "snapshot: $(date -u +%Y-%m-%dT%H:%MZ)" -- "${paths[@]}"
     if [ -n "$(git remote)" ]; then git push -q || echo "warning: push failed; the commit stays local" >&2; fi
+    node framework/scripts/bot-versioning.cjs
     echo "committed $(git rev-parse --short HEAD)"
     ;;
   *) fail "usage: snapshot.sh <bots|memory|commit>" ;;

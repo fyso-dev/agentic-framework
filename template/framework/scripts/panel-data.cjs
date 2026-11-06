@@ -5,8 +5,9 @@ const { execFileSync } = require('node:child_process');
 const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
 const read = file => yaml.parse(fs.readFileSync(file, 'utf8'));
 const env = process.env;
-const urls = {dagu:`http://dagu.localhost:${env.FYSO_HTTP_PORT}`, omb:`http://127.0.0.1:${env.FYSO_OMB_PORT}`};
+const urls = {dagu:`http://dagu.localhost:${env.FYSO_HTTP_PORT}`, omb:`http://omb.localhost:${env.FYSO_HTTP_PORT}`};
 if (process.argv[2] === 'config') {
+  require('./bot-versioning.cjs').write();
   const apps = [...fs.globSync('framework/apps/*.yaml'), ...fs.globSync('project/apps/*/app.yaml')].map(file => {
     const app = read(file);
     app.group = file.startsWith('framework/') ? 'framework' : 'project';

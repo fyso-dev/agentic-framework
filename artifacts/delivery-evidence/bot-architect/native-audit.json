@@ -1,0 +1,20 @@
+[
+  {
+    "action": "delete",
+    "commit": "027b4f70c9e77c8c86b9420f7360c9a4eacf3776",
+    "beforeCommit": "33741614f00c9e1485e0bbd3f748ac763af68d37",
+    "unrelatedDefinitionsUnchanged": true
+  },
+  {
+    "action": "create",
+    "commit": "c8d8eca32a93ac6d28fd49ea4e44155a218adbb9",
+    "beforeCommit": "d7e89f6e8d0b56fb9e780fb93b5ee68d56248fdd",
+    "unrelatedDefinitionsUnchanged": true
+  },
+  {
+    "action": "update",
+    "commit": "c7b4d895d1302cb41c0ae599df608bde8cc1f274",
+    "beforeCommit": "39194f3d6ef8cee66cc87acabaf6f4337894e70d",
+    "unrelatedDefinitionsUnchanged": true
+  }
+]

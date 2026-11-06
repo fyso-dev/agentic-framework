@@ -52,6 +52,10 @@ if stack_running; then
   code=$(curl -s -o /dev/null -w '%{http_code}' -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" \
     -H "Host: dagu.localhost:$FYSO_HTTP_PORT" "http://127.0.0.1:$FYSO_HTTP_PORT/api/v1/dags")
   [ "$code" = 200 ] && ok "Dagu API through the gateway with one login" || bad "Dagu through the gateway returned $code"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" \
+    -H "Host: omb.localhost:$FYSO_HTTP_PORT" -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Dest: empty' \
+    "http://127.0.0.1:$FYSO_HTTP_PORT/api/bots")
+  [ "$code" = 200 ] && ok "OpenMausBot browser access through the gateway" || bad "OpenMausBot browser access returned $code"
   framework/scripts/bots.sh check >/dev/null 2>&1 && ok "bots match project/bots/team.yaml" \
     || warn "bots differ from project/bots/team.yaml (tuned in OpenMausBot? the snapshot records it in state/bots/; 'mise run bots:plan' shows the difference)"
 else

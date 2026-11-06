@@ -12,6 +12,7 @@ min_version = "2026.10.6"
 "aqua:gitleaks/gitleaks" = "8.30.1"
 "core:node" = "24.15.0"
 "npm:yaml" = "2.8.1"
+"aqua:cli/cli" = "2.95.0"
 
 [settings.npm]
 package_manager = "npm"
@@ -89,3 +90,7 @@ run = "framework/scripts/doctor.sh"
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
 run = "sops edit secrets.enc.yaml"
+
+[tasks."bots:architect"]
+description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
+run = "node framework/scripts/bot-architect.cjs submit"

@@ -55,7 +55,8 @@
     "unapplied_one": "{{count}} sin aplicar",
     "unapplied_other": "{{count}} sin aplicar",
     "appsDown_one": "{{count}} app no responde",
-    "appsDown_other": "{{count}} apps no responden"
+    "appsDown_other": "{{count}} apps no responden",
+    "observability": "Observabilidad"
   },
   "setup": {
     "title": "Puesta a punto",
@@ -148,7 +149,29 @@
     "emptyBody": "Creá el primero acá. Después lo aplicás y queda disponible en OpenMausBot.",
     "enginesAvailable": "Motores disponibles en este proyecto: {{list}}.",
     "enginesUnknown": "Todavía no se verificaron los motores.",
-    "enginesReview": "Revisar motores"
+    "enginesReview": "Revisar motores",
+    "architectHint": "Para crear, consultar, editar o eliminar bots, abrí OpenMausBot y elegí Bot Architect. El formulario manual sigue disponible.",
+    "architectOpen": "Gestionar por conversación",
+    "runtimeTitle": "Bots en OpenMausBot",
+    "runtimeHint": "Lista en vivo, incluido el chief. Los cambios en OpenMausBot aparecen automáticamente cada 5 segundos.",
+    "runtimeError": "No se pudo actualizar OpenMausBot. La lista anterior puede estar desactualizada.",
+    "runtimeLoading": "Consultando OpenMausBot…",
+    "runtimeEmpty": "No hay bots en OpenMausBot.",
+    "runtimeOpen": "Abrir OpenMausBot",
+    "configurationTitle": "Configuración y borradores",
+    "version": {
+      "project": "En el proyecto",
+      "snapshot": "En snapshot",
+      "native": "Sólo OpenMausBot",
+      "unknown": "Sin verificar"
+    },
+    "import": "Importar y versionar",
+    "importNamed": "Importar y versionar {{name}}",
+    "importDraftHint": "Aplicá o descartá el borrador antes de importar otro bot.",
+    "versionUnavailable": "No se pudo verificar el estado en Git. La importación está deshabilitada.",
+    "versionHint": "“En el proyecto” y “En snapshot” indican una definición guardada en el último commit; los cambios posteriores del bot pueden no estar guardados.",
+    "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Commitealos o descartalos antes de importar.",
+    "editAction": "Editar"
   },
   "form": {
     "back": "Bots",
@@ -237,5 +260,91 @@
     "emptyTitle": "Este proyecto todavía no tiene apps propias.",
     "emptyHint": "Copiá la plantilla para crear la primera:",
     "emptyCommand": "cp -r framework/apps/_template project/apps/mi-app"
+  },
+  "observ": {
+    "title": "Observabilidad",
+    "subtitle": "Conversaciones, ejecuciones y consumo de IA del proyecto.",
+    "refresh": "Actualizar datos",
+    "mock": "Esta vista requiere datos de la pila real; no presenta consumo ficticio.",
+    "loadError": "No se pudo leer el resumen. Actualizá los datos con Dagu; si falla, revisá sus logs.",
+    "unknown": "Sin dato",
+    "window": "{{from}} → {{to}} · UTC",
+    "collected": "Actualizado",
+    "stale": "Datos desactualizados",
+    "partial": "Cobertura parcial. Las fuentes faltantes no equivalen a consumo cero.",
+    "truncated": "Historial reciente limitado; los totales de consumo corresponden al mes UTC.",
+    "bot": "Bot",
+    "model": "Modelo / motor",
+    "all": "Todos",
+    "filterScope": "Los filtros afectan el consumo y el filtro por bot afecta las conversaciones. Las corridas y alertas muestran todo el proyecto.",
+    "costs": "Importes por categoría",
+    "apiReportedUsd": "API · reportado",
+    "subscriptionEquivalentUsd": "Suscripción · equivalente",
+    "estimatedApiUsd": "API · estimado",
+    "unclassifiedUsd": "Sin clasificar",
+    "costNote": "USD reportados por el motor, no conciliados con facturas. El equivalente de suscripción no es un cargo adicional ni incluye la cuota fija. Caché está incluida en la entrada.",
+    "turns": "Turnos / intentos",
+    "input": "Tokens entrada",
+    "output": "Tokens salida",
+    "cache": "Entrada en caché",
+    "coverage": "{{count}} turnos o intentos sin importe",
+    "missingTokens": "{{count}} sin tokens completos",
+    "alerts": "Avisos del proyecto",
+    "noAlerts": "Sin umbrales superados entre los datos disponibles.",
+    "alertNote": "Avisos locales; no detienen bots ni envían mensajes. Configuración: project/observability.json. El umbral monetario usa solo API reportada y puede tener cobertura incompleta.",
+    "usage": "Consumo por bot y modelo",
+    "source": "Fuente",
+    "empty": "No hay registros para esta selección.",
+    "conversations": "Conversaciones y delegaciones",
+    "conversationModel": "Las conversaciones agrupan delegaciones de varios modelos; se filtran solo por bot.",
+    "started": "Inicio",
+    "duration": "Duración",
+    "tools": "Herramientas",
+    "errors": "Errores",
+    "details": "Ver detalle nativo",
+    "running": "En curso",
+    "runs": "Ejecuciones recientes",
+    "workflow": "Workflow",
+    "status": "Estado",
+    "retries": "Reintentos",
+    "conversation": "Conversación de origen",
+    "unlinked": "Sin vínculo registrado",
+    "threadOnly": "Conversación identificada; turno desconocido",
+    "sources": {
+      "ledger": "Consumo OMB",
+      "traces": "Trazas OMB",
+      "runs": "Dagu",
+      "harness": "Agente de Dagu"
+    },
+    "sourceState": {
+      "ok": "Disponible",
+      "empty": "Sin registros",
+      "unavailable": "No disponible"
+    },
+    "warning": {
+      "invalidSettings": "Configuración inválida; se usaron valores predeterminados.",
+      "invalidLedgerRows": "Hay registros de consumo ilegibles.",
+      "invalidArtifacts": "Hay artefactos ilegibles.",
+      "runDetailsUnavailable": "No se pudieron leer detalles de algunas corridas."
+    },
+    "alert": {
+      "budget": "API reportada: USD {{value}} · umbral USD {{limit}}",
+      "failures": "{{value}} fallos en las corridas recientes · umbral {{limit}}",
+      "longRun": "Corrida activa de {{value}} s · umbral {{limit}} s",
+      "longConversation": "Conversación activa de {{value}} s · umbral {{limit}} s"
+    },
+    "statuses": {
+      "succeeded": "Completada",
+      "failed": "Fallida",
+      "aborted": "Interrumpida",
+      "rejected": "Rechazada",
+      "running": "En ejecución",
+      "waiting": "Esperando",
+      "queued": "En cola",
+      "not_started": "Sin iniciar",
+      "partially_succeeded": "Completada parcialmente",
+      "cancelled": "Cancelada",
+      "skipped": "Omitida"
+    }
   }
 }

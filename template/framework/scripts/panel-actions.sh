@@ -13,7 +13,7 @@ if [ -n "${TEAM_B64:-}" ]; then
 else
   cp project/bots/team.yaml "$team"
 fi
-sed "s|\${FYSO_ROOT}|$FYSO_ROOT|g" "$team" > "$tmp/rendered.yaml"
+node framework/scripts/render-team.cjs "$team" "$FYSO_ROOT/project/bots" > "$tmp/rendered.yaml"
 case "${1:-}" in
   plan) omb team apply "$tmp/rendered.yaml" --dry-run --json ;;
   apply)
@@ -25,6 +25,7 @@ case "${1:-}" in
     if ! git diff --cached --quiet -- project/bots/team.yaml; then
       git commit -q -m 'bots: update from panel' -- project/bots/team.yaml >&2
     fi
+    node framework/scripts/bot-versioning.cjs
     node -e 'const fs=require("fs"),cp=require("child_process"),r=JSON.parse(fs.readFileSync(process.argv[1])); console.log(JSON.stringify({created:r.created,changed:r.changed,deleted:r.deleted,commit:cp.execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()}))' "$tmp/apply.json"
     ;;
   check)

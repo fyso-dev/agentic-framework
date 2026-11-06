@@ -55,7 +55,8 @@
     "unapplied_one": "{{count}} unapplied",
     "unapplied_other": "{{count}} unapplied",
     "appsDown_one": "{{count}} app is not responding",
-    "appsDown_other": "{{count}} apps are not responding"
+    "appsDown_other": "{{count}} apps are not responding",
+    "observability": "Observability"
   },
   "setup": {
     "title": "Setup",
@@ -148,7 +149,29 @@
     "emptyBody": "Create the first one here. Then apply it and it becomes available in OpenMausBot.",
     "enginesAvailable": "Engines available in this project: {{list}}.",
     "enginesUnknown": "The engines have not been checked yet.",
-    "enginesReview": "Review engines"
+    "enginesReview": "Review engines",
+    "architectHint": "To create, inspect, update or delete bots, open OpenMausBot and choose Bot Architect. The manual form remains available.",
+    "architectOpen": "Manage by conversation",
+    "runtimeTitle": "Bots in OpenMausBot",
+    "runtimeHint": "Live roster, including the chief. Changes in OpenMausBot appear automatically every 5 seconds.",
+    "runtimeError": "OpenMausBot could not be refreshed. The previous roster may be out of date.",
+    "runtimeLoading": "Loading OpenMausBot…",
+    "runtimeEmpty": "There are no bots in OpenMausBot.",
+    "runtimeOpen": "Open OpenMausBot",
+    "configurationTitle": "Configuration and drafts",
+    "version": {
+      "project": "In project",
+      "snapshot": "In snapshot",
+      "native": "OpenMausBot only",
+      "unknown": "Unverified"
+    },
+    "import": "Import and version",
+    "importNamed": "Import and version {{name}}",
+    "importDraftHint": "Apply or discard the draft before importing another bot.",
+    "versionUnavailable": "Git status could not be verified. Import is disabled.",
+    "versionHint": "“In project” and “In snapshot” indicate a definition saved in the latest commit; later native edits may not be saved.",
+    "importDirtyHint": "Project configuration has uncommitted changes. Commit or discard them before importing.",
+    "editAction": "Edit"
   },
   "form": {
     "back": "Bots",
@@ -237,5 +260,91 @@
     "emptyTitle": "This project has no apps of its own yet.",
     "emptyHint": "Copy the template to create the first one:",
     "emptyCommand": "cp -r framework/apps/_template project/apps/my-app"
+  },
+  "observ": {
+    "title": "Observability",
+    "subtitle": "Project conversations, executions and AI usage.",
+    "refresh": "Refresh data",
+    "mock": "This view requires the real stack; no invented consumption is displayed.",
+    "loadError": "The summary could not be loaded. Refresh it through Dagu and check its logs if it fails.",
+    "unknown": "Unknown",
+    "window": "{{from}} → {{to}} · UTC",
+    "collected": "Updated",
+    "stale": "Stale data",
+    "partial": "Partial coverage. Missing sources do not mean zero usage.",
+    "truncated": "Recent history is capped; usage totals cover the UTC month.",
+    "bot": "Bot",
+    "model": "Model / engine",
+    "all": "All",
+    "filterScope": "Filters affect usage; the bot filter also affects conversations. Runs and alerts cover the whole project.",
+    "costs": "Amounts by category",
+    "apiReportedUsd": "API · reported",
+    "subscriptionEquivalentUsd": "Subscription · equivalent",
+    "estimatedApiUsd": "API · estimated",
+    "unclassifiedUsd": "Unclassified",
+    "costNote": "USD reported by the engine, not reconciled against invoices. Subscription equivalents are not extra charges and exclude fixed fees. Cached input is included in total input.",
+    "turns": "Turns / attempts",
+    "input": "Input tokens",
+    "output": "Output tokens",
+    "cache": "Cached input",
+    "coverage": "{{count}} turns or attempts without an amount",
+    "missingTokens": "{{count}} without complete token data",
+    "alerts": "Project advisories",
+    "noAlerts": "No thresholds exceeded in available data.",
+    "alertNote": "Local advisories; no bots are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage.",
+    "usage": "Usage by bot and model",
+    "source": "Source",
+    "empty": "No records for this selection.",
+    "conversations": "Conversations and delegations",
+    "conversationModel": "Conversations can include delegations across models and are filtered by bot only.",
+    "started": "Started",
+    "duration": "Duration",
+    "tools": "Tools",
+    "errors": "Errors",
+    "details": "Native details",
+    "running": "Running",
+    "runs": "Recent executions",
+    "workflow": "Workflow",
+    "status": "Status",
+    "retries": "Retries",
+    "conversation": "Source conversation",
+    "unlinked": "No recorded link",
+    "threadOnly": "Conversation known; turn unknown",
+    "sources": {
+      "ledger": "OMB usage",
+      "traces": "OMB traces",
+      "runs": "Dagu",
+      "harness": "Dagu agent"
+    },
+    "sourceState": {
+      "ok": "Available",
+      "empty": "No records",
+      "unavailable": "Unavailable"
+    },
+    "warning": {
+      "invalidSettings": "Invalid settings; defaults were used.",
+      "invalidLedgerRows": "Some usage records could not be read.",
+      "invalidArtifacts": "Some artifacts could not be read.",
+      "runDetailsUnavailable": "Some run details could not be read."
+    },
+    "alert": {
+      "budget": "Reported API: USD {{value}} · threshold USD {{limit}}",
+      "failures": "{{value}} failures in recent runs · threshold {{limit}}",
+      "longRun": "Run active for {{value}} s · threshold {{limit}} s",
+      "longConversation": "Conversation active for {{value}} s · threshold {{limit}} s"
+    },
+    "statuses": {
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "aborted": "Aborted",
+      "rejected": "Rejected",
+      "running": "Running",
+      "waiting": "Waiting",
+      "queued": "Queued",
+      "not_started": "Not started",
+      "partially_succeeded": "Partially succeeded",
+      "cancelled": "Cancelled",
+      "skipped": "Skipped"
+    }
   }
 }
