@@ -4,6 +4,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ADMIN_PASSWORD FYSO_DATA
 
+node framework/scripts/panel-data.cjs config
+
 if stack_running; then
   echo "Already running. 'mise run status' to inspect, 'mise run down' to stop."
   exit 0

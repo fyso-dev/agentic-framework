@@ -14,11 +14,40 @@
 	}
 }
 
-# Panel (Phase 4 replaces the placeholder with the SPA).
+# Panel files and same-origin Dagu API.
 http://panel.localhost:{$FYSO_HTTP_PORT} {
 	import fyso_login
-	root * {$FYSO_ROOT}/framework/panel-placeholder
-	file_server
+	@config path /config/project.json /config/apps.json
+	handle @config {
+		@read method GET HEAD
+		handle @read {
+			uri strip_prefix /config
+			root * {$FYSO_DATA}/panel
+			file_server
+		}
+		respond 405
+	}
+	handle /config/team.yaml {
+		@read method GET HEAD
+		handle @read {
+			rewrite * /team.yaml
+			root * {$FYSO_ROOT}/project/bots
+			file_server
+		}
+		respond 405
+	}
+	handle /config/* {
+		respond 404
+	}
+	handle_path /api/dagu/* {
+		rewrite * /api/v1{uri}
+		reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT}
+	}
+	handle {
+		root * {$FYSO_PANEL_ROOT}
+		try_files {path} /index.html
+		file_server
+	}
 }
 
 # Dagu: same credentials as the gateway (D19). The browser asks once and
