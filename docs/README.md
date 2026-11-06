@@ -20,8 +20,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D18; D6 and D9 superseded) | [PLAN §2](PLAN.md#2-decisions-log) |
-| Architecture decision records | `adr/` *(starts with Phase 0: `adr/0001-spikes.md`)* |
+| Decisions log (D1–D21; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
 *How the pieces fit together.*
@@ -51,8 +51,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Phase | Goal | Status |
 |---|---|---|
-| 0 | Spikes: verify the unknowns | ⏳ next |
-| 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ⬜ not started |
+| 0 | Spikes: verify the unknowns | ✅ done · [ADR 0001](adr/0001-spikes.md) |
+| 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ⏳ next |
 | 2 | Bots: team file, auth, Dagu MCP | ⬜ not started |
 | 3 | Snapshot and replicate | ⬜ not started |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ⬜ not started · 🎨 design spec v2 ready for Claude Design |
@@ -76,6 +76,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | The user already runs Dagu (`:18083`, coordinator `:50055`) and OMB (`:8799`, `:8800`, `:8810`, `:8811`). Isolation rules and port blocks were added; spikes use blocks 8410, 8500 and 8600 (8700 has a port in use) |
 | 2026-11-05 | Reuse review: Dagu ships `harness.run` (runs Claude Code / Codex), `chat.completion` and Git Sync. herdr leaves the runtime and stays as a dev tool (D15); fnox enters Phase 0 (D16) |
 | 2026-11-05 | The panel becomes a customization layer over OMB for the person setting up the project. Chat removed (D13, D14). Panel spec v2 |
-| 2026-11-05 | Spike `omb` done (branch `spike/omb`, pending merge): env vars reach the `claude` child (a bad `CLAUDE_CODE_OAUTH_TOKEN` breaks bots, no fallback); team export → apply round-trips with `No changes.`; `--dry-run --json` is a stable preview; memory restores by bot name. OMB needs Node ≥ 24 |
+| 2026-11-05 | Spike `omb` done: env vars reach the `claude` child (a bad `CLAUDE_CODE_OAUTH_TOKEN` breaks bots, no fallback); team export → apply round-trips with `No changes.`; `--dry-run --json` is a stable preview; memory restores by bot name. OMB needs Node ≥ 24 |
 | 2026-11-05 | Extensibility accepted (D17): extensions are Copier templates filling fixed slots; NetBird documented as the reference example, not built |
 | 2026-11-05 | Multi-host accepted (D18): a host is an SSH alias; Dagu distributed workers + OMB "bring your own VPS" computers; state stays on the control host |
+| 2026-11-05 | **Phase 0 closed** ([ADR 0001](adr/0001-spikes.md)). All four spike branches merged. New decisions: D19 (Dagu basic auth with Caddy's credentials, since proxy auth needs a paid SSO license), D20 (sops + age), D21 (pinned tested versions) |

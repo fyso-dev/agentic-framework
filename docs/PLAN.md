@@ -22,7 +22,7 @@ A reusable, versioned template for agentic projects. Each project gets:
 | One entry point, routing, login | **Caddy** |
 | Run all processes natively | **process-compose** |
 | Pinned tool versions, env, tasks | **mise** |
-| Encrypted secrets in git | **sops + age** (or **fnox**, decided in Phase 0) |
+| Encrypted secrets in git | **sops + age** (fnox kept as a later option) |
 | Create projects and update them from the template | **Copier** |
 | Secret scanning before commits | **gitleaks** |
 | PRs | **gh** |
@@ -53,6 +53,9 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D15 | **The Builder runs coding agents with Dagu `harness.run`**, not herdr. herdr is a development tool only |
 | D16 | **fnox is evaluated against sops** in Phase 0; the winner becomes the secrets tool |
 | D17 | **Extensions are Copier templates that fill fixed slots.** Bot tools are **MCP servers**, bot skills are **Agent Skills** (`SKILL.md`), and bot packs use the **OMB team package** format. NetBird is documented as the reference example; it is not built for now. See §12 |
+| D19 | **Dagu login = basic auth with the same credentials as Caddy**, Dagu bound to `127.0.0.1`. Trusted-header proxy auth needs a paid Dagu SSO license (spike `gateway`). The browser asks once; Caddy validates and forwards the same `Authorization` header |
+| D20 | **D16 resolved: sops + age.** Both passed a real round trip through mise; sops is more mature. fnox stays an option for 1Password/Vault later (spike `tooling`) |
+| D21 | **Pinned, tested versions:** Dagu `2.24.0`, OpenMausBot `0.1.140`, Node `24`. Policy: pin releases at least a week old, and re-run the spike checks before bumping |
 | D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
 
 ## 3. Architecture
@@ -77,7 +80,7 @@ Append-only. A superseded decision stays, marked with what replaced it.
 
 - **There is no backend to write.**
   - **Caddy** handles the routing (one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server) and the login (`basic_auth`). It also serves the project's config files read-only to the panel, and passes Dagu API calls through.
-  - **Dagu login:** Caddy forwards the authenticated user in a header that Dagu trusts (proxy auth), so Dagu needs no second login.
+  - **Dagu login (D19):** Dagu uses basic auth with the same `admin` credentials as Caddy and listens only on `127.0.0.1`. The browser asks once and Caddy forwards the same header, so there is no second prompt and Dagu cannot be reached without going through Caddy.
   - **OMB** keeps its own device pairing and opens in a new tab.
   - **Every panel action is a Dagu workflow** started with parameters. Dagu does the work, keeps the logs and allows retries. The same workflows run from the terminal with `mise run …`.
 - **OMB and Dagu are coupled in only one place:** OMB reaches Dagu through Dagu's built-in MCP server (`.mcp.json` in the bot `cwd`).
@@ -94,6 +97,11 @@ A project must never touch the user's own Dagu or OMB, nor another project's. Ev
 | herdr (dev only) | Its own named session: `herdr --session <name>` | its own socket | Never drive the user's default session |
 
 **What is shared on purpose:** the `claude` / `codex` CLI logins (the subscription). Bot transcripts and memory stay inside `.data/omb`.
+
+**Environment hygiene (spikes `omb`, `harness`):**
+- **OMB:** every variable in the `openmausbot serve` environment reaches the bots' `claude` processes, and bots have a shell. Start `serve` with only the secrets bots may see.
+- **Dagu:** start it with a cleared environment (`HOME`, `PATH`, locale and `DAGU_*` only). Subscription logins reach the CLIs through `HOME` (macOS keychain, `~/.codex/auth.json`), not through env vars.
+- **"Is this our instance?"** check: `openmausbot doctor --json` returns `server.environmentId`, which must match `<data-dir>/environment-id`.
 
 **Port block.** Each project gets a base port from Copier (`port_base`, default `8400`) and fixed offsets:
 
@@ -158,14 +166,16 @@ Adding an app means copying `framework/apps/_template`.
 
 One Dagu DAG, `snapshot`, runs **every hour**, on demand from the panel, and **before every apply** from the customization layer. It skips the commit when nothing changed. Steps:
 
-1. `openmausbot team export` → `project/bots/` (bots tuned in the OMB UI).
-2. Copy each bot's memory folder (`MEMORY.md`, topics, logs) → `state/memory/<bot-name>/`.
+1. `openmausbot team export` → `project/bots/` (bots tuned in the OMB UI). The export always includes OMB's default `MausBot`, so `team.yaml` lists it too (with `computer: off`).
+2. Copy each bot's memory folder (`MEMORY.md`, topics, logs) → `state/memory/<bot-name>/`, mapping botId → name with `openmausbot bots --json`. Daily logs (`memory/log/`) quote the start of user messages, so they always go through gitleaks.
 3. `project/workflows/` already holds what Dagu edited, so there is nothing to export.
 4. `gitleaks protect --staged` → `git commit -m "snapshot: <date>"` → `git push` if a remote is set.
 
 No PRs and no branches for snapshots. The only PRs are the Builder's code changes (§7).
 
-**Replicating a project** is `git clone` → `mise install` → `mise run up`. On a fresh data directory, `up` runs `team apply` and `restore-memory`, which copies `state/memory/<bot-name>/` back by bot name. Everything comes back.
+**Replicating a project** is `git clone` → `mise install` → `mise run up`. On a fresh data directory, `up` runs, in this order: `team apply`, then `restore-memory` (copies `state/memory/<bot-name>/` back by bot name; OMB re-indexes memory files on its own), then the bots may take turns. Bots, memory and workflows come back. **Chat history is not replicated.**
+
+**Workflows alternative:** Dagu Git Sync can commit and push edits made in its UI (spike `tooling`). It is not needed while `project/workflows/` is the DAGs dir inside the repo, but it is the option if Dagu ever runs against a separate clone.
 
 ## 7. Bots
 
@@ -175,12 +185,20 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 | **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
 | **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
-**`dev-task`** is a Dagu DAG built only from existing pieces:
+**`dev-task`** is a Dagu DAG built only from existing pieces (verified in spike `harness`):
 
-1. `git worktree add` on a `feat/<issue>` branch.
-2. A `harness.run` step runs Claude Code or Codex in that worktree with the issue as its task.
-3. Project checks.
-4. `gh pr create`.
+1. `action: git.worktree.add` on a `feat/<issue>` branch (`base` must be a branch name, not `HEAD`).
+2. `action: harness.run` runs Claude Code (`claude -p`) or Codex (`codex exec`) in that worktree, with the issue as its task:
+   - `working_dir` is built from env vars (e.g. `${REPO}/.data/wt/${DAG_RUN_ID}`). `${steps.*}` and `${params.*}` are **not** resolved there, and fail silently.
+   - The safety flags are pinned in the DAG: Claude `permission-mode` + `allowed-tools`; Codex `sandbox` + `approval_policy="never"`; always `timeout_sec`.
+   - Never `bare: true` for Claude, because it skips the keychain login.
+3. **Change gate:** fail if the worktree has no diff. A refused permission still exits 0.
+4. Project checks.
+5. `gh pr create`, then `action: git.worktree.remove`.
+
+Notes:
+- The agent's final text becomes the step output and a run artifact. Run and step status are live, but stdout appears only when the step ends.
+- The agents load the user's own CLI config (Claude MCP servers and plugins, Codex hooks and skills). Limiting that for the Builder (`--strict-mcp-config`, Codex `ignore-user-config`) is a Phase 5 task, after checking that the logins survive it.
 
 A human reviews and merges. The Builder never touches `main`. In the template repo, the Builder extends the framework itself.
 
@@ -190,6 +208,7 @@ A human reviews and merges. The Builder never touches `main`. In the template re
   - `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, stored in the secrets file (or `claude /login` once).
   - `codex login --device-auth`.
   - `openmausbot engine set … --only-claude-api` for API keys.
+- **Token caveat (spike `omb`):** `CLAUDE_CODE_OAUTH_TOKEN` takes precedence over the keychain login. An expired or wrong token breaks every Claude bot; there is no fallback. `doctor` must test it.
 - **`mise run doctor`** runs the tools' own checks: `claude auth status`, `codex login status`, `openmausbot doctor`, and Dagu `/api/v1/health`. On a non-localhost domain, it also fails when the password is still `admin`. Its result is also a Dagu workflow output, which the panel's checklist reads.
 - **VPS:** the same stack, native, with process-compose under systemd as an unprivileged user. Subscriptions are used only through the official CLIs; projects that serve third parties use API keys.
 
@@ -219,7 +238,7 @@ A small Vite + React SPA served by Caddy at `panel.<host>`. It is for **the pers
 
 ## 10. Phases
 
-### Phase 0 — Spikes (throwaway)
+### Phase 0 — Spikes ✅ done — see [adr/0001-spikes.md](adr/0001-spikes.md)
 1. Does OMB pass `CLAUDE_CODE_OAUTH_TOKEN` (any env var) to `claude`?
 2. Can mise pin `dagu`, `process-compose`, `openmausbot`, `caddy`, `sops`, `fnox` and `gitleaks`?
 3. Can Dagu `harness.run` run Claude Code and Codex on a subscription, inside a given worktree directory, and return the result?
@@ -271,7 +290,9 @@ Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunne
 |---|---|
 | OMB and Dagu release very often | Pin versions in `mise.toml`; upgrade deliberately with the CI smoke test |
 | Two places configure bots (panel and OMB UI) | Panel = structure, OMB = tuning; snapshot before every apply (D13 rule 4) |
-| `harness.run` does not cover the Builder's needs | Fall back to an OMB bot with a worktree `cwd`; herdr stays available as a dev tool |
+| ~~`harness.run` does not cover the Builder's needs~~ | Closed: verified in spike `harness` |
+| A coding agent "succeeds" without doing anything (refusal exits 0) | Change gate in `dev-task` |
+| mise installs only passed with signature checks disabled, inside Codex's sandbox | Phase 1 re-installs with full verification outside any sandbox before adopting the pins |
 | Subscription limits shared by all bots | Mix models per bot; send the chatty ones to API keys |
 | Secrets in memory or commits | OMB redaction + gitleaks before every snapshot commit |
 | `admin/admin` exposed on a server | `doctor` fails on a public domain if the password was not changed |
