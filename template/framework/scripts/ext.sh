@@ -93,8 +93,18 @@ case "$action" in
       wt=$(mktemp -d)
       git worktree add -q --detach "$wt" HEAD >&2
       trap 'git worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
+      # A relative local source (../fyso-ext-foo) means the project root, not the worktree.
+      src=$(sed -n 's/^_src_path: //p' "$answers")
+      if [[ $src == .* && -d $src ]]; then
+        sed -i.bak "s#^_src_path: .*#_src_path: $(cd "$src" && pwd)#" "$wt/$answers" && rm -f "$wt/$answers.bak"
+        git -C "$wt" commit -q -m "tmp: absolute extension source" -- "$answers" >&2
+      fi
       (cd "$wt" && copier update --trust --defaults --answers-file "$answers" >&2)
       version=$(read_version "$wt/$answers")
+      if [[ $src == .* && -d $src ]]; then
+        sed -i.bak "s#^_src_path: .*#_src_path: $src#" "$wt/$answers" && rm -f "$wt/$answers.bak"
+        git -C "$wt" reset -q --soft HEAD~1
+      fi
       git -C "$wt" add -A >&2
       git -C "$wt" diff --cached --quiet || git -C "$wt" commit -q -m "ext: update $id ${version}" >&2
       git merge -q --ff-only "$(git -C "$wt" rev-parse HEAD)" >&2 \
