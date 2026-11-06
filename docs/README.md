@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D16; D6 and D9 superseded) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D18; D6 and D9 superseded) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | `adr/` *(starts with Phase 0: `adr/0001-spikes.md`)* |
 
 ## Layer 2 — Architecture
@@ -43,6 +43,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
+| Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
+| Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
 ## Layer 4 — Execution
 *What is being built, in what order, and where it stands.*
@@ -56,6 +58,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ⬜ not started · 🎨 design spec v2 ready for Claude Design |
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ⬜ not started |
 | 6 | Deploy and template lifecycle | ⬜ not started |
+| 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ⬜ not started |
+| 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
@@ -69,3 +73,6 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | The user already runs Dagu (`:18083`, coordinator `:50055`) and OMB (`:8799`, `:8800`, `:8810`, `:8811`). Isolation rules and port blocks were added; spikes use blocks 8410, 8500 and 8600 (8700 has a port in use) |
 | 2026-11-05 | Reuse review: Dagu ships `harness.run` (runs Claude Code / Codex), `chat.completion` and Git Sync. herdr leaves the runtime and stays as a dev tool (D15); fnox enters Phase 0 (D16) |
 | 2026-11-05 | The panel becomes a customization layer over OMB for the person setting up the project. Chat removed (D13, D14). Panel spec v2 |
+| 2026-11-05 | Spike `omb` done (branch `spike/omb`, pending merge): env vars reach the `claude` child (a bad `CLAUDE_CODE_OAUTH_TOKEN` breaks bots, no fallback); team export → apply round-trips with `No changes.`; `--dry-run --json` is a stable preview; memory restores by bot name. OMB needs Node ≥ 24 |
+| 2026-11-05 | Extensibility accepted (D17): extensions are Copier templates filling fixed slots; NetBird documented as the reference example, not built |
+| 2026-11-05 | Multi-host accepted (D18): a host is an SSH alias; Dagu distributed workers + OMB "bring your own VPS" computers; state stays on the control host |

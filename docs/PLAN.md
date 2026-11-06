@@ -52,6 +52,8 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D14 | **No chat in the panel.** Users chat in OMB's own UI. The Bot API is not used for now |
 | D15 | **The Builder runs coding agents with Dagu `harness.run`**, not herdr. herdr is a development tool only |
 | D16 | **fnox is evaluated against sops** in Phase 0; the winner becomes the secrets tool |
+| D17 | **Extensions are Copier templates that fill fixed slots.** Bot tools are **MCP servers**, bot skills are **Agent Skills** (`SKILL.md`), and bot packs use the **OMB team package** format. NetBird is documented as the reference example; it is not built for now. See §12 |
+| D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
 
 ## 3. Architecture
 
@@ -255,6 +257,14 @@ The `setup-*` workflows, setup checklist, bots form with dry-run preview, launch
 VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.
 **Exit:** `copier update` vN → vN+1 applies cleanly to a sample project.
 
+### Phase 7 — Extensions
+Slot conventions, the `framework/extensions/_template` Copier template, a minimal sample extension used as a test fixture, and the panel's Extensions view. NetBird stays documented (§12.1) but is not built.
+**Exit:** `copier copy` of the sample extension adds a working, health-checked tool to a project, and `copier update` upgrades it.
+
+### Phase 8 — Multi-host
+Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunnel, the Dagu worker service, OMB self-hosted VPS computers, and the per-host doctor.
+**Exit:** a second VPS joins with `mise run host:add`; a DAG pinned to its label runs there with its logs visible on the control host, and a bot uses it as its computer.
+
 ## 11. Risks
 
 | Risk | Mitigation |
@@ -266,3 +276,146 @@ VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.
 | Secrets in memory or commits | OMB redaction + gitleaks before every snapshot commit |
 | `admin/admin` exposed on a server | `doctor` fails on a public domain if the password was not changed |
 | Hourly commits add noise to history | Commit only when something changed; squash or filter later if it bothers |
+
+## 12. Extensibility (D17)
+
+Two kinds of extension, and both reuse existing mechanisms. Nothing here needs a plugin loader.
+
+### 12.1 New tools and services (e.g. NetBird)
+
+**An extension is a small Copier template**, kept in its own repo (e.g. `fyso-ext-netbird`). It is applied on top of a project:
+
+```sh
+copier copy gh:fyso/ext-netbird . --answers-file .copier-answers.netbird.yml   # install
+copier update --answers-file .copier-answers.netbird.yml                       # upgrade
+```
+
+Copier natively supports several templates per project, each with its own answers file. The set of `.copier-answers.*.yml` files therefore **is** the list of installed extensions, already versioned in git. No registry is needed.
+
+Each extension drops files into **fixed slots**. Each slot is read by a tool that already merges multiple files:
+
+| Slot | File the extension adds | Read by |
+|---|---|---|
+| Tool versions, env, tasks | `.config/mise/conf.d/<ext>.toml` *(to verify)* | mise |
+| Processes | `extensions/<ext>/process.yaml` | process-compose (multiple `-f`) |
+| Routes | `extensions/<ext>/Caddyfile` | Caddy (`import extensions/*/Caddyfile`) |
+| Panel tile | `extensions/<ext>/app.yaml` | panel launcher |
+| Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` (runs each one) |
+| Secrets it needs | `extensions/<ext>/secrets.yaml` (names only) | panel checklist + doctor |
+| Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu |
+| Reusable workflow steps | A **Dagu third-party action** (`action: owner/repo@version`, a repo with a `dagu-action.yaml` manifest), published by the extension | Dagu (Dagu also ships these to distributed workers) |
+| Bot tools | an MCP server entry (§12.2) | OMB / Claude Code |
+| Bot know-how | `extensions/<ext>/skills/<name>/SKILL.md` | OMB (team file `skills:`) |
+
+`framework/extensions/_template` is the Copier template for writing new extensions. It works like `apps/_template`, one level up. Removal is manual: delete the slot files and the answers file. Copier has no uninstall.
+
+**Worked example: NetBird.** NetBird is a WireGuard mesh VPN, here for private remote access to a project.
+- **Simplest variant:** NetBird's hosted control plane plus the client. Self-hosting its management server is a later option.
+- **Files:**
+  - `conf.d/netbird.toml` pins the `netbird` client;
+  - `secrets.yaml` declares `NETBIRD_SETUP_KEY`;
+  - `process.yaml` runs `netbird up` with the setup key;
+  - `doctor.sh` runs `netbird status`;
+  - `app.yaml` is a tile linking to the NetBird dashboard;
+  - the Caddyfile snippet binds the gateway to the NetBird interface instead of a public address;
+  - an optional `netbird-ops` skill teaches the Run Operator how to check peers.
+
+### 12.2 Bot capabilities
+
+Use the standards OMB, Claude Code and Codex already support, in this order of preference:
+
+| Need | Existing mechanism | Where it lives |
+|---|---|---|
+| Connect a SaaS app (Gmail, GitHub, Slack…) | **Composio**, built into OMB | OMB UI; no files |
+| A tool for an external system | **An existing MCP server**, found in the official MCP Registry or the vendor's own | Project `.mcp.json` (the bot `cwd`); per-bot selection with the team file `tools: { allow: [mcp:<server>:*] }` |
+| A tool with no MCP server yet | Wrap the system's CLI/API as a small MCP server, as the extension's custom code | Shipped by an extension |
+| Procedural know-how ("how we deploy", "how to write a Dagu DAG") | **Agent Skills** (`SKILL.md` folders), an open format shared by OMB, Claude Code and Codex | `project/bots/skills/`, or shipped by extensions; listed per bot in `team.yaml` |
+| A whole set of bots | **OMB team packages** (Markdown + YAML frontmatter, BotMRR / `openmausbot-teams` format), or our `team.yaml` | `project/bots/` |
+
+Rules:
+- Prefer an existing MCP server or skill over writing one.
+- Pin external skills and MCP servers to a version or commit, never to `latest`.
+- MCP tools keep OMB's approval cards. The `team.yaml` `tools` selection limits which bots see which servers.
+- Skills from outside the project go through OMB's built-in scan (it switches off suspicious skills) and a human review before they are enabled.
+
+### 12.3 To verify (before Phase 7)
+
+1. Does mise load project-level `conf.d/*.toml` fragments, and from which path?
+2. Does Dagu read DAGs from subdirectories, or is the `ext-<ext>-` filename prefix needed?
+3. Does an MCP server exist for NetBird (official or community), or would the extension wrap its API?
+4. Is there a CLI to install Agent Skills from a catalog that we can pin, or are skills copied by git commit?
+5. How does Copier behave when several templates touch the same file (for example `.gitignore`)? Slots must avoid shared files.
+
+## 13. Multi-host (D18)
+
+**Maximum simplification: a host is an SSH alias.** The control host is the project; every other host is only a place to **run** things. Each tool reaches it with its own native mechanism, and **SSH is the only link between hosts**: no mesh, no open ports, no cluster software.
+
+### 13.1 Topology
+
+```
+            Control host (the whole project, as today)
+  ┌─────────────────────────────────────────────────────────┐
+  │ Caddy · panel · OMB · Dagu server · git · snapshot      │
+  │                                                         │
+  │ process-compose keeps one `ssh -N -R` tunnel per host ───┼──┐
+  └─────────────────────────────────────────────────────────┘  │  SSH only
+                                                               ▼  (alias in ~/.ssh/config)
+                        Execution host  "vps-eu"   (Linux + SSH + Docker)
+                        ┌───────────────────────────────────────────────┐
+                        │ dagu worker  → coordinator via the tunnel     │  Dagu: runs workflows here,
+                        │               (localhost only, labels: eu)    │        routed by label
+                        │ OMB bot computers (Cua containers)            │  OMB: bots use this machine,
+                        │  ← OMB drives them with `docker -H ssh://`    │       "Bring your own VPS"
+                        └───────────────────────────────────────────────┘
+```
+
+| Tool | Native multi-host mechanism | What runs on the execution host |
+|---|---|---|
+| **Dagu** | **Distributed workers**: they poll the coordinator over outbound gRPC and are routed by labels; logs and status flow back | `dagu worker`, pinned via mise. It reaches the coordinator at `localhost` through the reverse SSH tunnel |
+| **OMB** | **Bring your own VPS**: the agent stays on the control host; OMB gives each bot a managed desktop container on the VPS over `docker -H ssh://<alias>`. It never opens a port and never runs an agent remotely | Docker; OMB manages the containers |
+
+Everything with state stays on the control host: OMB and its data, the Dagu server, git, the snapshot and secrets. Replication (§6) does not change.
+
+### 13.2 Adding a host
+
+```sh
+# 1. once, by hand: an SSH alias that works without a password
+#    (~/.ssh/config: Host vps-eu …; the user is in the docker group on the VPS)
+# 2. declare it
+#    project/config/hosts.yaml:  - { alias: vps-eu, labels: [eu], omb_computer: true }
+# 3. bring it up
+mise run host:add vps-eu
+```
+
+`host:add` is a small glue task that only calls existing tools over SSH:
+1. installs mise and the pinned `dagu` on the host,
+2. starts `dagu worker` as a user service with its labels, pointed at `localhost:<coordinator port>`,
+3. adds the reverse tunnel to the control host's process-compose, restarted automatically if it drops,
+4. checks `docker info` for OMB.
+
+Registering the alias in OMB (Settings → Self-hosted VPS) may stay a manual step; to verify.
+
+Workflows choose the host with Dagu labels (`workerSelector`). Bots choose it with OMB's computer setting, `computer: cloud` with the self-hosted VPS backend.
+
+`mise run doctor` checks, per host: SSH alias reachable, tunnel up, worker visible in Dagu with its labels, and Docker reachable for OMB.
+
+### 13.3 What makes it simple
+
+- **One credential type, SSH,** reused by both tools. OMB already requires it for its VPS feature.
+- **No inbound ports on any host.** The control host dials out over SSH, and the worker reaches the coordinator through that tunnel.
+- **No mesh required.** NetBird or Tailscale (extension, §12.1) become optional, for when hosts cannot be reached over SSH directly.
+- **Execution hosts are disposable.** They hold no project state, so a lost host is re-added with `host:add`.
+
+### 13.4 Deliberately not included
+
+- **No cluster scheduler** (Nomad, k3s, Swarm). Services stay on the control host; only execution spreads. Revisit only if a project must run its own apps on several hosts, with Nomad as the candidate because it runs native processes.
+- **No OMB high availability.** One OMB per project. A failed control host is recovered by replicating from git (§6).
+- **No VPS provisioning.** Creating the server and its SSH access stays manual or uses the provider's CLI.
+- **Coding agents on execution hosts.** `harness.run` on a worker would need a CLI login on that host. By default, agent steps carry the `control` label and run on the control host. If a project needs them elsewhere, it uses API keys there (§8 terms).
+
+### 13.5 To verify (before Phase 8)
+
+1. Dagu worker: env vars, labels, `workerSelector` syntax; a worker reaching the coordinator through a reverse SSH tunnel on localhost.
+2. OMB self-hosted VPS: can the alias be set from a file or CLI, or only in Settings? Requirements on the VPS (x86_64, Docker).
+3. process-compose: is the restart policy enough for the tunnel, or is `autossh` needed?
+4. Do process-compose role fragments work (`-f` per role)?
