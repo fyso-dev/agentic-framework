@@ -1,0 +1,8 @@
+[settings]
+experimental = true
+
+[secrets.fnox]
+
+[tasks.read-fake]
+secrets = ["TOOLING_FAKE_SECRET"]
+run = 'test "$TOOLING_FAKE_SECRET" = tooling-roundtrip-fake-only && echo "fnox env round trip: PASS"'

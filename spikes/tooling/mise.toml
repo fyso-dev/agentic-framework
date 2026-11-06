@@ -1,0 +1,20 @@
+[tools]
+"aqua:dagucloud/dagu" = "2.25.8"
+"aqua:F1bonacc1/process-compose" = "1.124.0"
+"npm:openmausbot" = "0.1.142"
+"aqua:caddyserver/caddy" = "2.11.9"
+"aqua:getsops/sops" = "3.13.3"
+"aqua:FiloSottile/age" = "1.3.2"
+"github:jdx/fnox" = "1.47.0"
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"core:node" = "24.15.0"
+"aqua:pnpm/pnpm" = "12.18.0"
+
+# SPIKE ONLY: macOS sandbox denies Sigstore's native cache; see tooling ADR.
+# Checksums remain enabled. Re-enable these gates before Phase 1 adoption.
+[settings.aqua]
+cosign = false
+github_attestations = false
+
+[settings.npm]
+package_manager = "npm"
