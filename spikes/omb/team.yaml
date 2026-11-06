@@ -1,0 +1,19 @@
+# Spike team file (OMB 0.1.140 team file format, version 1).
+version: 1
+bots:
+  - name: Spike Alpha
+    title: Spike bot A
+    model: claude/claude-haiku-4-5
+    approval: full
+    computer: "off"
+    cwd: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-omb/.data/work/alpha
+    soul: |
+      You are a terse test bot used in an infrastructure spike. Answer in one line.
+  - name: Spike Beta
+    title: Spike bot B
+    model: claude/claude-haiku-4-5
+    approval: full
+    computer: "off"
+    cwd: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-omb/.data/work/beta
+    soul: |
+      You are a terse test bot used in an infrastructure spike. Answer in one line.
