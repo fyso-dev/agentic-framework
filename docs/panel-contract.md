@@ -63,7 +63,7 @@ Output `check`:
 ```ts
 {
   checkedAt: string                  // ISO time
-  engines: Array<{
+  engines: Array<{                   // only engines used by the project's bots, plus claude/claudeApi/codex when ready
     id: string                       // OMB engine instance: "claude" | "claudeApi" | "codex" | …
     label: string                    // "Claude"
     kind: "subscription" | "api"
