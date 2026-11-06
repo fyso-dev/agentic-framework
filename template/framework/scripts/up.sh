@@ -20,11 +20,10 @@ printf 'Starting'
 for _ in $(seq 1 120); do
   if framework/scripts/health.sh caddy 2>/dev/null; then
     printf ' ready.\n\n'
-    # First start on a fresh data dir: create the bots from project/bots/team.yaml.
-    marker="$FYSO_DATA/omb/.fyso-bots-applied"
+    # First start on a fresh data dir: rebuild bots and memory from git.
+    marker="$FYSO_DATA/omb/.fyso-restored"
     if [ ! -f "$marker" ]; then
-      echo "Creating bots from project/bots/team.yaml…"
-      framework/scripts/bots.sh apply && touch "$marker"
+      framework/scripts/restore.sh && touch "$marker"
       echo
     fi
     cat <<MSG

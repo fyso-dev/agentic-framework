@@ -284,9 +284,22 @@ Implementation notes:
 - **Dagu Wiki:** it lives in `project/wiki/` (`DAGU_WIKI_DIR`), not inside the workflows dir.
 - **Deferred to Phase 5:** re-running the `harness.run` spike on Dagu 2.24.0.
 
-### Phase 3 — Snapshot and replicate
+### Phase 3 — Snapshot and replicate ✅ done
 The `snapshot` DAG, `restore-memory`, gitleaks.
 **Exit:** wipe `.data/`, run `mise run up`, and bots, memory and workflows are back.
+
+**Result (2026-11-05):** a bot saved a fact to its memory, and the `fyso-snapshot` workflow (run by Dagu's scheduler) committed `state/bots/team.yaml` and `state/memory/<bot>/` after a gitleaks scan. Then `.data/` was deleted. On the next `mise run up`, the bots were recreated from the snapshot, the memory was restored by bot name, and the bot answered with the saved fact. The workflows were back as well.
+
+Implementation notes:
+- **Framework workflows inside the project:** Dagu reads one DAGs dir and does not follow directory symlinks. Each framework workflow lives in `framework/workflows/` (updated by the template) and is exposed through a **file symlink** `project/workflows/fyso-<name>.yaml`. This needs `DAGU_DAG_DISCOVERY_SYMLINKS=true`, and Copier keeps the links with `_preserve_symlinks: true`. New framework workflows get their link on `copier update`.
+- **Env passed to steps:** Dagu passes only allowlisted env to steps. `DAGU_ENV_PASSTHROUGH_PREFIXES=FYSO_,OPENMAUSBOT_,ALLOW_INSECURE_HTTP` gives the framework workflows the project paths and ports, and no secrets.
+- **Two bot files:**
+  - `state/bots/team.yaml` is the runtime snapshot. Its paths are written back as `${FYSO_ROOT}` and the export timestamp is dropped, so diffs stay quiet.
+  - `project/bots/team.yaml` stays the hand-written structure.
+  - Restore prefers the snapshot, since it is the most complete picture.
+- **`doctor`:** drift against `project/bots/team.yaml` is a warning, not a failure, because tuning in OMB is expected (D13).
+- **`mise run snapshot`:** runs the same steps from the terminal.
+- **To handle in Phase 4:** starting `fyso-snapshot` while another run is active fails (`max_active_runs: 1`), so the panel's "save now" must use Dagu's `enqueue` endpoint. Dagu also queued "catchup" runs for missed hours on a fresh data dir although the DAG sets no `catchup_window`. They are harmless (a snapshot with no changes commits nothing) but unexplained; to verify.
 
 ### Phase 4 — Panel
 The `setup-*` workflows, setup checklist, bots form with dry-run preview, launcher, and the app `_template`.

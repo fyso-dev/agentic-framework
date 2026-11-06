@@ -3,12 +3,14 @@
 #   bots.sh plan   show the changes (dry run)
 #   bots.sh apply  apply them
 #   bots.sh check  exit 1 if the running bots differ from the file (drift)
+# An optional second argument applies another file (restore uses state/bots/team.yaml).
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ROOT FYSO_DATA FYSO_OMB_PORT
 mode="${1:-plan}"
+source_file="${2:-project/bots/team.yaml}"
 rendered="$FYSO_DATA/team.rendered.yaml"
-sed "s|\${FYSO_ROOT}|$FYSO_ROOT|g" project/bots/team.yaml > "$rendered"
+sed "s|\${FYSO_ROOT}|$FYSO_ROOT|g" "$source_file" > "$rendered"
 omb() { openmausbot "$@" --port "$FYSO_OMB_PORT"; }
 case "$mode" in
   plan)  omb team apply "$rendered" --dry-run ;;

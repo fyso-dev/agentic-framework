@@ -77,6 +77,10 @@ run = "framework/scripts/bots.sh check"
 description = "Check and set up the engine logins (Claude, Codex, API keys)"
 run = "framework/scripts/auth.sh"
 
+[tasks.snapshot]
+description = "Save bots, memory and workflows to git now (also runs hourly in Dagu)"
+run = "framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memory && framework/scripts/snapshot.sh commit"
+
 [tasks.doctor]
 description = "Check ports, logins, instances and routes"
 run = "framework/scripts/doctor.sh"
