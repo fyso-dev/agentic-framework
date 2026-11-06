@@ -1,12 +1,15 @@
 // Bots: the list over team.yaml (draft vs file on disk) and the review/apply dialog.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine } from "../api/types";
+import { DAGS, type Engine } from "../api/types";
 import { IconBot, IconPlus } from "../components/Icons";
 import { unappliedCount } from "../components/Layout";
-import { Avatar, Modal } from "../components/ui";
+import { Avatar, External, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
-import type { BotState } from "../lib/team";
+import { splitModel, type BotState } from "../lib/team";
+import { botRoster, versionStatus } from "../lib/botRoster";
+import { useDaguAction } from "../lib/useDaguAction";
+import { ActionStatus, ActionError } from "../components/Action";
 import { useStore } from "../store";
 import { Preview } from "./Preview";
 import { useEngineName } from "./Setup";
@@ -47,6 +50,15 @@ export function Bots({ review }: { review: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const eng = useEngineLabel();
+  const importing = useDaguAction<{botId:string; commit:string}>(s.backend,DAGS.botArchitect,"result");
+  const importBot = async (id:string) => {
+    if (s.draft || importing.phase === "running") return;
+    const result = await importing.start({OP:"import",BOT_ID:id});
+    if (result) s.reload();
+  };
+  const runtime = s.runtimeBots.data ?? null;
+  const runtimeError = s.runtimeBots.status === "error";
+  const rows = botRoster(s.rows, s.mock ? null : runtime);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const unapplied = unappliedCount(s);
   const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
@@ -60,13 +72,29 @@ export function Bots({ review }: { review: boolean }) {
           <h1>{t("bots.title")}</h1>
           <p>{t("bots.subtitle")}</p>
         </div>
-        {s.rows.length > 0 && (
+        {rows.length > 0 && (
           <a href={href.newBot} className="btn btn-md btn-raised">
             <IconPlus size={14} />
             {t("bots.add")}
           </a>
         )}
       </div>
+
+      {s.workingBots.some(bot => bot.name === "Bot Architect") && s.project.data && (
+        <div className="card" style={{padding:16, display:"flex", gap:12, alignItems:"center", flexWrap:"wrap"}}>
+          <p className="grow">{t("bots.architectHint")}</p>
+          <External href={s.project.data.urls.omb} className="btn btn-md btn-pri">{t("bots.architectOpen")}</External>
+        </div>
+      )}
+
+      {!s.mock && <p className="mute">{t("bots.runtimeHint")}</p>}
+      {!s.mock && <p className="note">{t("bots.versionHint")}</p>}
+      {!s.mock && runtimeError && <p role="alert" className="banner banner-down">{t("bots.runtimeError")}</p>}
+
+      {!s.mock && s.botVersioning.status === "error" && <p role="alert" className="banner banner-warn">{t("bots.versionUnavailable")}</p>}
+      {!s.mock && s.botVersioning.data?.projectDirty && <p className="note">{t("bots.importDirtyHint")}</p>}
+      {s.draft && <p className="note">{t("bots.importDraftHint")}</p>}
+      {importing.phase !== "never" && <div className="card" style={{padding:12}}><ActionStatus action={importing} /><ActionError action={importing} /></div>}
 
       {s.team.status === "error" && (
         <div role="alert" className="banner banner-down">
@@ -102,7 +130,7 @@ export function Bots({ review }: { review: boolean }) {
             </li>
           ))}
         </ul>
-      ) : s.rows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="card empty">
           <span aria-hidden="true" className="empty-icon"><IconBot size={22} /></span>
           <p style={{ fontWeight: 700, fontSize: 16 }}>{t("bots.emptyTitle")}</p>
@@ -111,27 +139,34 @@ export function Bots({ review }: { review: boolean }) {
         </div>
       ) : (
         <ul className="card list">
-          {s.rows.map(({ bot, state }) => {
+          {rows.map(row => {
+            const { name, title, model, configuration } = row;
+            const state = configuration?.state ?? "applied";
+            const version = versionStatus(row,s.botVersioning.status === "ok" ? s.botVersioning.data : undefined);
+            const canImport = row.nativeId && !row.ambiguous && !configuration && version !== "project";
+            const { engine, modelId } = splitModel(model);
             const inner = (
               <>
-                <Avatar name={bot.name} />
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <p style={{ fontWeight: 700 }} className="ellipsis">{bot.name}</p>
-                  <p className="mute ellipsis" style={{ fontSize: 13 }}>{bot.title || "—"}</p>
+                <Avatar name={name} />
+                <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+                  <p style={{ fontWeight: 700 }} className="ellipsis">{name}</p>
+                  <p className="mute ellipsis" style={{ fontSize: 13 }}>{title || "—"}</p>
                 </div>
-                <span className="bot-engine"><span className="pill pill-outline">{eng.kind(bot.engine)}</span></span>
-                <span className="bot-model ellipsis" title={bot.model}>{bot.modelId}</span>
-                <span className="bot-state"><BotStatePill state={state} /></span>
-                <span aria-hidden="true" className="chev" style={{ visibility: state === "deleted" ? "hidden" : undefined }}>›</span>
+                <span className="bot-engine"><span className="pill pill-outline">{eng.kind(engine)}</span></span>
+                <span className="bot-model ellipsis" title={model}>{modelId}</span>
+                <span className="bot-state">{state !== "applied" || s.mock ? <BotStatePill state={state} /> : <span className={`pill ${version === "native" ? "pill-warn" : "pill-outline"}`} title={s.botVersioning.data ? `${s.botVersioning.data.commit || ""} · ${s.botVersioning.data.collectedAt}` : undefined}>{t(`bots.version.${version}`)}</span>}</span>
               </>
             );
             return (
-              <li key={`${state}-${bot.index}-${bot.name}`}>
-                {state === "deleted" ? (
-                  <div className="row bot-row is-deleted">{inner}</div>
-                ) : (
-                  <a className="row bot-row" href={href.bot(bot.index)} aria-label={t("bots.edit", { name: bot.name })}>{inner}</a>
-                )}
+              <li key={row.key}>
+                <div className={`row bot-row${state === "deleted" ? " is-deleted" : ""}`} style={{flexWrap:"wrap"}}>
+                  {inner}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",flexBasis:"100%",justifyContent:"flex-end"}}>
+                    {state !== "deleted" && configuration && <a className="btn btn-ghost" href={href.bot(configuration.bot.index)} aria-label={t("bots.edit",{name})}>{t("bots.editAction")}</a>}
+                    {state !== "deleted" && canImport && <button type="button" className="btn btn-pri" disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={() => void importBot(row.nativeId!)} aria-label={t("bots.importNamed",{name})}>{t("bots.import")}</button>}
+                    {s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}
+                  </div>
+                </div>
               </li>
             );
           })}

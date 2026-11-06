@@ -4,7 +4,9 @@ A Fyso Agentic Framework project: OpenMausBot (bots) + Dagu (workflows) behind o
 
 ## Run it
 
-Requirements: [mise](https://mise.jdx.dev). Everything else is pinned in `mise.toml`.
+Requirements: Git, [mise](https://mise.jdx.dev), and authenticated Claude Code / Codex CLIs for the corresponding bots. Framework tools are pinned in `mise.toml`. Initialize and commit this generated project before starting the stack.
+
+[Repository installation guide](https://github.com/fyso-dev/agentic-framework/blob/preview/docs/installation.md) covers generation, prerequisites, updates and recovery.
 
 ```sh
 mise trust && mise install
@@ -50,3 +52,36 @@ the worktree and retain the branch. No code change reaches the base branch.
 
 Claude and Codex must already be installed and signed in on the host. Their user
 configuration can still affect execution (particularly Codex hooks and skills).
+
+## Observe bots and execution
+
+Open **Observabilidad** in the panel. OMB conversations/delegations, Dagu runs and
+structured CLI usage are refreshed every two minutes by `fyso-observability`.
+Use the refresh action for an immediate collection. Configure advisory thresholds
+and custom engine billing categories in `project/observability.json`; null disables
+a threshold. Amounts distinguish reported API USD, subscription equivalents,
+estimates and unknowns. No provider invoice reconciliation or automatic stop is
+implied. Native history lives in `.data`, survives restart and needs a runtime
+backup to survive deletion. It is not included in git memory snapshots.
+
+## Manage bots by conversation
+
+Open OpenMausBot and talk to **Bot Architect**: ask it to create, list, read,
+update or delete a project bot. It previews native OMB changes and applies explicit
+requests through `fyso-bot-architect`, with snapshots and Git commits before/after.
+Ambiguous targets require clarification. Framework/Chief bots cannot be deleted,
+and active bots are not interrupted. New bots default to approval `ask`, computer
+`off`, and this project's root. The existing panel remains available.
+
+For scripts and diagnostics, the same workflow is available as:
+
+```sh
+mise run bots:architect '{"OP":"list"}'
+```
+
+Bot snapshots contain imported skill bundles. Ambient skills discovered in the
+host CLI remain host-owned; they are not copied into project snapshots. Native
+team paths resolve relative to the source file, and instruction placeholders are
+preserved. Known home/project paths are normalized in the versioned memory copy.
+
+The bot list distinguishes definitions committed in the project, profiles saved only in a native snapshot, and bots found only in OpenMausBot. Use **Import and version** to bring a native-only or snapshot-only bot into project configuration without changing its running profile. Apply or discard panel drafts first; the project team file must also be clean in Git.

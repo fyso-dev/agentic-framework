@@ -1,5 +1,5 @@
 # Copier template for a Fyso Agentic Framework project.
-# Create:  uvx copier copy --trust gh:<org>/agentic-framework my-project
+# Create:  uvx copier copy --trust gh:fyso-dev/agentic-framework my-project
 # Update:  uvx copier update --trust
 _min_copier_version: "9.4.0"
 _subdirectory: template
@@ -30,6 +30,9 @@ _message_after_copy: |
 
   Next steps:
     cd {{ _copier_conf.dst_path }}
+    git init -b main
+    git add .
+    git commit -m "chore: initialize Fyso project"
     mise trust && mise install
     mise run setup      # encryption key + secrets file (admin / admin)
     mise run up         # Dagu, OpenMausBot and Caddy

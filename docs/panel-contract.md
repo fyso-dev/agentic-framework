@@ -30,6 +30,10 @@ type App = {
 
 **App health.** The panel probes each app with `fetch(app.url, { mode: "no-cors" })` and shows **ok** if the request resolves, **down** if it rejects, **unknown** until the first probe ends. "Degraded" is not used for now.
 
+### Native live bot roster (D28)
+
+`GET /api/omb/bots` forwards exactly `/api/bots?messages=0` to the project OMB with the server-held session and project basic login. Writes return 405; other `/api/omb/*` paths return 404. This is the native authenticated response, which can include profile and queued-message metadata; no general OMB administration proxy is exposed. The SPA displays only ID, name, title and model. It polls every five seconds without overlapping requests, includes the chief, and marks failed refreshes explicitly. Runtime discovery never rewrites the local draft or `project/bots/team.yaml`. One list joins native IDs with uniquely named configuration entries; unchanged entries use current native display metadata, while pending drafts remain visible. Every bot row offers the OMB gateway link. Configured bots additionally offer an explicit manual edit action, and eligible native-only bots offer import. Actions are sibling controls rather than nested links. Ambiguous names never select an arbitrary form; native edits are versioned through existing snapshots, while Bot Architect writes its selected project entry.
+
 ## 2. Dagu API (through `/api/dagu/`)
 
 Caddy proxies `/api/dagu/*` on the panel origin to Dagu (`/api/v1/*`), so there is no CORS. The panel only uses:
@@ -126,3 +130,31 @@ Skills are out of scope for v1: they are listed read-only. "Uses workflows" maps
 ## 5. i18n
 
 UI strings: `framework/panel/src/locales/{es,en}.json` (D12). Server data (plan lines, Dagu errors) is shown as received.
+
+## 4. Observability (Phase 5.5, D26)
+
+`GET /config/observability.json` serves the private, rebuildable summary emitted
+by `fyso-observability`; POST/PUT/DELETE are rejected. Native record sources,
+UTC-month scope, cost semantics and source availability are specified in
+[observability.md](observability.md). The TypeScript wire shape lives in
+`framework/panel/src/api/observability.ts`.
+
+The screen uses the existing Dagu enqueue/poll flow to refresh the exporter and
+polls the summary every 15 seconds. A summary older than five minutes is stale.
+A 404 is an actionable no-summary state, not zero consumption. Failed source
+reads are explicit; collection does not overwrite previous data on fatal errors.
+Bot/model selectors filter usage, and bot selects conversation roots containing
+that bot. Conversation aggregates retain the entire delegation tree; filtering
+does not allocate shared work by guesswork. Run/alert lists remain project-wide.
+
+Optional native identifiers `SOURCE_THREAD`/`SOURCE_TURN` on `fyso-dev-task` are
+captured as the run's `ORIGIN` JSON output, independently of agent success.
+`harness.run` publishes Claude JSON or Codex JSONL as `agent.txt`; the exporter
+reads only whitelisted usage numbers and never serves that raw artifact. Legacy
+artifacts without structured data retain unknown consumption.
+
+## Bot versioning metadata and import
+
+`GET /config/bot-versioning.json` is an exact read-only Caddy file route. It contains `{collectedAt, commit, bots:[{name,team,project,snapshot}]}`, derived from committed `project/bots/team.yaml` and `state/bots/team.yaml`; no instructions, chat or secret values are exported. The panel polls every five seconds. The file refreshes at startup, snapshot commit, native import and observability collection (two-minute schedule); the commit and collection time identify its evidence. Missing evidence or ambiguous identities produce an unverified label and disable import.
+
+Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract with `{OP:"import",BOT_ID:"<native ID>"}` and returns `{action,botId,name,commit,replayed}`. The panel reloads configuration after success, without resetting a draft. Drafts disable this action until applied or discarded.

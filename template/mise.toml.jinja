@@ -90,3 +90,7 @@ run = "framework/scripts/doctor.sh"
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
 run = "sops edit secrets.enc.yaml"
+
+[tasks."bots:architect"]
+description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
+run = "node framework/scripts/bot-architect.cjs submit"

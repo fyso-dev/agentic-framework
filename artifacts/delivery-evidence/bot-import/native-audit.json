@@ -1,0 +1,12 @@
+{
+  "commit": "e24f507386bc4b736b361de6d2aacfbde3131a87",
+  "nativeProfilesUnchanged": true,
+  "nativeBotCount": 7,
+  "targetInstructionsPreserved": true,
+  "importedSkillCommitted": true,
+  "replayCreatesNoCommit": true,
+  "changedPaths": [
+    "project/bots/imported/fb41c92e-0b60-4e46-aa5a-515c3b712f14/skills/import-skill-verification/import-proof-helper/SKILL.md",
+    "project/bots/team.yaml"
+  ]
+}

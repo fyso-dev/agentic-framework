@@ -35,6 +35,11 @@ case "${1:-}" in
     case "${PROVIDER:-}" in claude|codex) ;; *) fail "PROVIDER must be claude or codex (got '${PROVIDER:-}')" ;; esac
     case "${PUBLISH:-false}" in true|false) ;; *) fail "PUBLISH must be true or false" ;; esac
     git check-ref-format --branch "$BASE" >/dev/null || fail "invalid base branch"
+    # Native identifiers become dedicated Dagu outputs; never parse TASK to correlate.
+    for key in SOURCE_THREAD SOURCE_TURN; do
+      value="${!key:-}"
+      case "$value" in *[!a-zA-Z0-9_-]*) fail "$key contains invalid identifier characters" ;; esac
+    done
     branch="${BRANCH:-}"
     [ -n "$branch" ] || branch="builder/$DAG_RUN_ID"
     case "$branch" in main|master|"$BASE") fail "choose a feature branch" ;; esac

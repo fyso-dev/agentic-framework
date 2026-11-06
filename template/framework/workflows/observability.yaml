@@ -1,0 +1,8 @@
+description: Refresh the private observability summary from native OMB and Dagu records
+schedule: "*/2 * * * *"
+max_active_runs: 1
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: collect
+    run: node framework/scripts/observability.cjs
+    output: SUMMARY

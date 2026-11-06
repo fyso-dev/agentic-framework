@@ -31,6 +31,8 @@ for _ in $(seq 1 120); do
     # Fill the panel's checklist right away (runs in Dagu, in the background).
     curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-setup-check/enqueue" || true
+    curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
+      -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-observability/enqueue" || true
     cat <<MSG
   Panel        http://panel.localhost:$FYSO_HTTP_PORT     (user: $FYSO_ADMIN_USER)
   Dagu         http://dagu.localhost:$FYSO_HTTP_PORT

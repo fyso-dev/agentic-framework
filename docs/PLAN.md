@@ -1,6 +1,6 @@
 # Fyso Agentic Framework — Implementation Plan
 
-Status: **Phases 0–5 locally verified; Phase 5 remote PR deferred by the user** · Updated: 2026-11-06.
+Status: **Local runtime, Builder, observability and Bot Architect verified; remote PR deferred by the user** · Updated: 2026-11-06.
 
 Brand: **Fyso**. "Fyso Agentic Framework" is a working name; the final product name comes later. The panel, the docs and the generated projects use Fyso branding. The panel's visual design is produced in **Claude Design** from [docs/panel-spec.md](panel-spec.md); the implementation follows that design. `@fyso/ui` is not used.
 
@@ -61,6 +61,12 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
 | D24 | **Builder publication is explicit:** `PUBLISH=false` by default; `true` requests push to `origin` and a PR, and publication errors fail the run. Failed worktrees stay available for inspection. This refines §7 without changing snapshot behavior (D5) |
 | D25 | **OMB browser access uses the authenticated gateway.** The packaged 0.1.140 server requires a browser session even on loopback. Caddy obtains a native OMB session with `openmausbot connect`, keeps its token server-side, and injects its bearer after project basic auth. Cross-origin and cross-site API requests are rejected. Supersedes D22; direct CLI access remains project-local |
+| D26 | **Observability before deployment (Phase 5.5):** native OMB usage/traces + Dagu runs remain authoritative. A scheduled read-only Dagu exporter writes a private, rebuildable panel summary. Structured harness output fills the CLI usage gap; API-reported cost, subscription equivalent, estimates and unknown values stay separate. Project-owned thresholds generate local advisory alerts; no external telemetry service or automatic stop |
+| D27 | **Bot CRUD is conversational through Bot Architect.** A single Dagu workflow wraps OMB native partial team plans/apply and exact-ID DELETE (no prune). Plans are private, content-addressed, stale-checked and applied idempotently; snapshots surround mutations. Only the selected bot's project entry changes. The manual panel stays available; default Bot Architect uses Codex subscription |
+
+| D28 | **Panel bot discovery reads the native live roster.** An exact GET-only gateway route forwards OMB `/api/bots?messages=0`; the panel polls every five seconds and includes the chief and OMB-created bots. One list joins the live roster with configuration and pending drafts; discovery never overwrites drafts. This adds visibility, not automatic reconciliation of native profiles into project declarations |
+
+| D29 | **Native import and Git evidence stay explicit.** One bot roster distinguishes committed project declarations, committed native snapshots, and native-only profiles. A GET-only metadata file reports names from Git HEAD, never profile contents. Import uses the existing Bot Architect workflow to export one exact native ID and commit its native profile plus imported skill files, without runtime writes. Dirty project declarations, ambiguous names and local panel drafts block import. Existing defaults are materialized when needed to preserve effective profiles without unwanted inheritance |
 
 ## 3. Architecture
 
@@ -170,10 +176,10 @@ Adding an app means copying `framework/apps/_template`.
 
 One Dagu DAG, `snapshot`, runs **every hour**, on demand from the panel, and **before every apply** from the customization layer. It skips the commit when nothing changed. Steps:
 
-1. `openmausbot team export` → `project/bots/` (bots tuned in the OMB UI). The export always includes OMB's default `MausBot`, so `team.yaml` lists it too (with `computer: off`).
-2. Copy each bot's memory folder (`MEMORY.md`, topics, logs) → `state/memory/<bot-name>/`, mapping botId → name with `openmausbot bots --json`. Daily logs (`memory/log/`) quote the start of user messages, so they always go through gitleaks.
+1. `openmausbot team export` → `state/bots/team.yaml` and required imported skill sidecars (bots tuned in the OMB UI). Ambient native CLI skills remain host-owned and are not copied. The export always includes OMB's default `MausBot`, so `team.yaml` lists it too (with `computer: off`).
+2. Copy each bot's memory folder (`MEMORY.md`, topics, logs) → `state/memory/<bot-name>/`, mapping botId → name with `openmausbot bots --json`. Daily logs (`memory/log/`) quote the start of user messages, so they always go through gitleaks. Known home/project paths are normalized in the versioned copy only.
 3. `project/workflows/` already holds what Dagu edited, so there is nothing to export.
-4. `gitleaks protect --staged` → `git commit -m "snapshot: <date>"` → `git push` if a remote is set.
+4. Staged gitleaks and machine-path checks → `git commit -m "snapshot: <date>"` → `git push` if a remote is set.
 
 No PRs and no branches for snapshots. The only PRs are the Builder's code changes (§7).
 
@@ -187,6 +193,7 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 |---|---|---|
 | **Workflow Architect** | `claude/…` (subscription) | Dagu MCP + skill `dagu-workflows` |
 | **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
+| **Bot Architect** | `codex/gpt-6.1-sol` (subscription) | Native OMB team plans through `fyso-bot-architect` |
 | **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
 **`dev-task`** is a Dagu DAG built only from existing pieces (verified in spike `harness`):
@@ -328,16 +335,33 @@ Deliberate differences from the design (from the SPA build):
 - **"Uses workflows":** it can only be turned on.
 - **File-based instructions:** the form names the file; typing switches the bot to inline instructions.
 - **Fonts:** system fonts (Gilroy was not in the bundle), with JetBrains Mono self-hosted.
-- **Chief bot:** MausBot is hidden from the list.
+- **Chief bot:** MausBot is excluded from manual configuration forms; D28 includes it in the native live roster.
 - **Additions:** a "Descartar cambios" link for the local draft, and a mobile ⋯ menu for language and theme.
 
 The built `dist/` is committed (~0.5 MB), so generated projects need no Node build step. Mock mode (`?mock`) is for panel development.
 
-### Phase 5 — Builder (dogfooding) — local delivery complete; remote PR deferred
+### Phase 5 — Builder (dogfooding) — local delivery complete; remote Builder acceptance pending
 `dev-task` with `harness.run` and the Builder bot.
 
-Local implementation and evidence: [Phase 5 Builder](adr/phase-5-builder.md). Codex completed the full local flow on Dagu 2.24.0; Claude hit its subscription limit. The generated stack passed `mise run doctor`. The user requested the commit and explicitly deferred configuring a remote. Local delivery is complete; the original remote PR acceptance below is deferred until a remote exists.
-**Original remote exit:** the Builder ships a real small issue to the template repo through a PR. **Current local scope:** verified coding-agent change → checks → feature-branch commit, with publication deferred by the user.
+Local implementation and evidence: [Phase 5 Builder](adr/phase-5-builder.md). Codex completed the full local flow on Dagu 2.24.0; Claude hit its subscription limit. The generated stack passed `mise run doctor`. The user requested the commit and explicitly deferred configuring a remote. Local delivery is complete. The repository was subsequently published in `fyso-dev/agentic-framework` with initial PR #1; the Builder itself has not yet executed a real remote publication acceptance run.
+**Original remote exit:** the Builder ships a real small issue to the template repo through a PR. **Current local scope:** verified coding-agent change → checks → feature-branch commit, with the original user deferral recorded. The remote now exists; automated Builder publication acceptance remains pending.
+
+### Phase 5.5 — Bot observability — verified locally
+Conversation activity, delegation, execution history and AI usage on one read-only
+panel screen. See [observability.md](observability.md) for sources, costs,
+correlation, advisory alerts and verification requirements.
+Verified implementation and evidence: [delivery record](../artifacts/delivery-evidence/observability/README.md).
+**Exit:** a real conversation and a correlated dev-task expose their own usage,
+failures and timing, without duplicate spend; unknown cost remains unknown;
+restart preserves source history; partial/unavailable sources are explicit.
+
+### Phase 5.6 — Conversational Bot Architect — verified locally
+A bot manages project bot profiles using OMB's native team format through a Dagu
+workflow, with snapshots and versioned project config. See [bot-architect.md](bot-architect.md).
+Verified implementation and independent audit: [delivery evidence](../artifacts/delivery-evidence/bot-architect/README.md).
+**Exit:** real conversational create/read/update/delete of a disposable bot,
+unrelated bots unchanged, target restore from versioned config proven, regression
+checks and `mise run doctor` green.
 
 ### Phase 6 — Deploy and template lifecycle
 VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.

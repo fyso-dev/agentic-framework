@@ -5,7 +5,7 @@ import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
-import { IconApps, IconBot, IconChecklist, IconMoon, IconSun } from "./Icons";
+import { IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
@@ -134,10 +134,11 @@ export function TopBar(props: ThemeProps) {
   );
 }
 
-type NavItem = { id: "setup" | "bots" | "apps"; href: string; icon: typeof IconBot };
+type NavItem = { id: "setup" | "bots" | "apps" | "observability"; href: string; icon: typeof IconBot };
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
+  { id: "observability", href: href.observability, icon: IconWorkflow },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
@@ -151,6 +152,7 @@ export function SideNav({ route }: { route: Route }) {
   const down = downApps(s);
   const counts: Record<NavItem["id"], ReactNode> = {
 
+    observability: null,
     setup: loadingSteps(s) ? null : (
       <span className="nav-count" style={{ color: open === 0 ? "var(--ok)" : s.anyFailed ? "var(--down)" : "var(--warn)", fontWeight: 600 }}>
         {s.stepsDone}/4
@@ -158,7 +160,7 @@ export function SideNav({ route }: { route: Route }) {
     ),
     bots: unapplied > 0
       ? <span className="pill pill-warn">{t("nav.unapplied", { count: unapplied })}</span>
-      : <span className="nav-count">{s.workingBots.length}</span>,
+      : <span className="nav-count">{!s.mock && s.runtimeBots.data ? s.runtimeBots.data.length : s.workingBots.length}</span>,
     apps: down > 0
       ? <span className="nav-count" style={{ color: "var(--warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
       : <span className="nav-count">{s.apps.data?.length ?? ""}</span>,
@@ -181,6 +183,7 @@ export function BottomNav({ route }: { route: Route }) {
   const s = useStore();
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const badges: Record<NavItem["id"], [number, string]> = {
+    observability: [0, "badge"],
     setup: [open, s.anyFailed ? "badge" : "badge badge-warn"],
     bots: [unappliedCount(s), "badge badge-warn"],
     apps: [downApps(s), "badge"],
