@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "sample": {"type": "http", "url": "http://127.0.0.1:${FYSO_EXT_SAMPLE_PORT}/mcp"}
+  }
+}

@@ -4,6 +4,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ADMIN_PASSWORD FYSO_DATA
 
+node framework/scripts/mcp-config.cjs
+node framework/scripts/extensions.cjs check
 node framework/scripts/panel-data.cjs config
 
 if stack_running; then
@@ -16,7 +18,7 @@ for p in $(block_ports); do port_in_use "$p" && busy+=("$p"); done
 [ ${#busy[@]} -eq 0 ] || fail "ports in use: ${busy[*]}. Another program (or project) uses this block; change port_base."
 
 mkdir -p "$FYSO_DATA/logs"
-pc up --detached --config process-compose.yaml >>"$FYSO_DATA/logs/up.log" 2>&1
+pc up --detached >>"$FYSO_DATA/logs/up.log" 2>&1
 
 printf 'Starting'
 for _ in $(seq 1 120); do

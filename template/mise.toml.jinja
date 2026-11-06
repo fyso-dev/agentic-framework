@@ -53,15 +53,15 @@ run = "framework/scripts/up.sh"
 
 [tasks.down]
 description = "Stop every process of this project"
-run = "process-compose down --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh down"
 
 [tasks.status]
 description = "Show the state of each process"
-run = "process-compose process list --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh process list"
 
 [tasks.logs]
 description = "Follow the logs of one process: mise run logs <dagu|omb|caddy>"
-run = "process-compose process logs --follow --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh process logs --follow"
 
 [tasks."bots:plan"]
 description = "Show how project/bots/team.yaml would change the bots"
@@ -94,3 +94,19 @@ run = "sops edit secrets.enc.yaml"
 [tasks."bots:architect"]
 description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
 run = "node framework/scripts/bot-architect.cjs submit"
+
+[tasks."ext:add"]
+description = "Add project extensions"
+run = "framework/scripts/ext.sh add"
+
+[tasks."ext:update"]
+description = "Update project extensions"
+run = "framework/scripts/ext.sh update"
+
+[tasks."ext:list"]
+description = "List project extensions"
+run = "framework/scripts/ext.sh list"
+
+[tasks."ext:remove"]
+description = "Remove project extensions"
+run = "framework/scripts/ext.sh remove"

@@ -1,0 +1,4 @@
+http://sample.localhost:{$FYSO_HTTP_PORT} {
+    import fyso_login
+    reverse_proxy 127.0.0.1:{$FYSO_EXT_SAMPLE_PORT}
+}

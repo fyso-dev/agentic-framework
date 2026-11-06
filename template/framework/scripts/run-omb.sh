@@ -9,7 +9,7 @@ require_env FYSO_DATA FYSO_OMB_PORT FYSO_OMB_WEBHOOK_PORT FYSO_HTTP_PORT FYSO_DA
 mkdir -p "$FYSO_DATA/omb" "$FYSO_DATA/npm-cache"
 bot_env=()
 while IFS='=' read -r name _; do
-  [[ $name == BOT_* ]] && bot_env+=("$name=${!name}")
+  [[ $name == BOT_* || $name == FYSO_EXT_*_PORT ]] && bot_env+=("$name=${!name}")
 done < <(env)
 clean_exec \
   ${bot_env[@]+"${bot_env[@]}"} \

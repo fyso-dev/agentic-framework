@@ -14,7 +14,12 @@ openmausbot connect "http://127.0.0.1:$FYSO_OMB_PORT" --port "$FYSO_OMB_PORT" \
 omb_token=$(cat "$FYSO_DATA/caddy/omb-session")
 [ -n "$omb_token" ] || fail "OpenMausBot did not issue a gateway session"
 hash=$(caddy hash-password --plaintext "$FYSO_ADMIN_PASSWORD")
+extension_env=()
+while IFS='=' read -r name _; do
+  [[ $name != FYSO_EXT_*_PORT ]] || extension_env+=("$name=${!name}")
+done < <(env)
 clean_exec \
+  ${extension_env[@]+"${extension_env[@]}"} \
   XDG_DATA_HOME="$FYSO_DATA/caddy" XDG_CONFIG_HOME="$FYSO_DATA/caddy" \
   FYSO_ROOT="$FYSO_ROOT" FYSO_DATA="$FYSO_DATA" FYSO_PANEL_ROOT="$panel_root" \
   FYSO_ADMIN_USER="$FYSO_ADMIN_USER" FYSO_ADMIN_HASH="$hash" \

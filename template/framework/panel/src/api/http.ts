@@ -1,6 +1,6 @@
 // Real backend: read-only files under /config/ and the Dagu API under /api/dagu/,
 // both served by Caddy on the panel origin (contract §1, §2).
-import type { App, Backend, Project, Run } from "./types";
+import type { App, Extension, Backend, Project, Run } from "./types";
 
 export class HttpError extends Error {
   constructor(
@@ -54,6 +54,7 @@ export const httpBackend: Backend = {
   getProject: () => json<Project>("config/project.json"),
   getTeam: async () => (await request("config/team.yaml")).text(),
   getApps: () => json<App[]>("config/apps.json"),
+  getExtensions: () => json<Extension[]>("config/extensions.json"),
 
   async enqueue(dag, params) {
     const body = params ? { params: JSON.stringify(params) } : {};

@@ -1,6 +1,8 @@
-// Apps launcher: framework apps (Dagu, OpenMausBot) and the project's own apps, with health.
+// Apps launcher: framework apps (Dagu, OpenMausBot), the project's own apps and the
+// apps added by extensions, with health. Installed extensions are listed read-only
+// (docs/extensions-contract.md §5): installing and upgrading are terminal tasks.
 import { useTranslation } from "react-i18next";
-import type { App, Health } from "../api/types";
+import type { App, Extension, Health } from "../api/types";
 import { AppIcon } from "../components/Icons";
 import { CopyLine } from "../components/ui";
 import { localized } from "../lib/i18n";
@@ -95,6 +97,75 @@ function Skeleton() {
   );
 }
 
+function ExtensionRow({ ext }: { ext: Extension }) {
+  const { t, i18n } = useTranslation();
+  const missing = ext.secrets.filter((x) => x.required && !x.set);
+  const parts = [
+    ext.mcpServers.length > 0 && t("ext.mcp", { count: ext.mcpServers.length }),
+    ext.workflows.length > 0 && t("ext.workflows", { count: ext.workflows.length }),
+    ext.skills.length > 0 && t("ext.skills", { count: ext.skills.length }),
+  ].filter(Boolean);
+  return (
+    <li className="row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <p className="grow ellipsis">
+          <strong className="mono">{ext.id}</strong>{" "}
+          <span className="mute">· {ext.version ?? t("ext.noVersion")} · <span className="mono">{ext.src}</span></span>
+        </p>
+        {missing.length > 0 ? (
+          <span className="pill pill-down"><span aria-hidden="true" className="glyph">×</span>{t("ext.missing", { count: missing.length })}</span>
+        ) : (
+          <span className="pill pill-ok"><span aria-hidden="true" className="glyph">✓</span>{t("ext.ready")}</span>
+        )}
+      </div>
+      {parts.length > 0 && <p className="mute">{parts.join(" · ")}</p>}
+      {ext.secrets.length > 0 && (
+        <ul className="chips" aria-label={t("ext.secrets")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {ext.secrets.map((x) => {
+            const desc = x.description ? localized(i18n.language, x.description, x.description_i18n) : undefined;
+            const state = x.set ? t("ext.secretSet") : x.required ? t("ext.secretMissing") : t("ext.secretOptional");
+            return (
+              <li key={x.name} className={`chip mono ${x.set ? "ok" : x.required ? "bad" : ""}`} title={desc}>
+                {x.name} <span className="sr-only">{state}</span><span aria-hidden="true">{x.set ? " ✓" : x.required ? " ×" : " ○"}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {missing.length > 0 && <CopyLine text="mise run secrets" />}
+    </li>
+  );
+}
+
+function Extensions() {
+  const { t } = useTranslation();
+  const s = useStore();
+  const list = s.extensions.data ?? [];
+  return (
+    <section aria-label={t("ext.title")} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h2 className="section-title">{t("ext.title")} {s.extensions.status === "ok" && <span>{list.length}</span>}</h2>
+      {s.extensions.status === "loading" ? (
+        <Skeleton />
+      ) : s.extensions.status === "error" ? (
+        <div role="alert" className="banner banner-down">
+          <p className="grow"><strong style={{ color: "var(--down)" }}>{t("common.loadError", { what: "extensions.json" })}</strong> {s.extensions.error}</p>
+        </div>
+      ) : list.length > 0 ? (
+        <>
+          <ul className="card list">{list.map((e) => <ExtensionRow key={e.id} ext={e} />)}</ul>
+          <p className="mute">{t("ext.manage")}</p>
+          <CopyLine text="mise run ext:update" />
+        </>
+      ) : (
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10, padding: 18 }}>
+          <p><strong>{t("ext.emptyTitle")}</strong> <span className="mute">{t("ext.emptyHint")}</span></p>
+          <CopyLine text={t("ext.emptyCommand")} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Apps() {
   const { t } = useTranslation();
   const s = useStore();
@@ -102,6 +173,7 @@ export function Apps() {
   const groups: { id: App["group"]; title: string; apps: App[] }[] = [
     { id: "framework", title: t("apps.framework"), apps: apps.filter((a) => a.group === "framework") },
     { id: "project", title: s.project.data?.name ?? t("apps.project"), apps: apps.filter((a) => a.group === "project") },
+    { id: "extension", title: t("apps.extension"), apps: apps.filter((a) => a.group === "extension") },
   ];
   return (
     <main className="page page-wide">
@@ -131,7 +203,8 @@ export function Apps() {
             </div>
           ) : null}
         </section>
-      ))}
+      )).filter((_, i) => i < 2 || groups[i].apps.length > 0)}
+      <Extensions />
     </main>
   );
 }

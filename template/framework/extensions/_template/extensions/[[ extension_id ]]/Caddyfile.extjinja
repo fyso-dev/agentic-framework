@@ -1,0 +1,4 @@
+http://[[ extension_id ]].localhost:{$FYSO_HTTP_PORT} {
+    import fyso_login
+    reverse_proxy 127.0.0.1:{$FYSO_EXT_[[ extension_id | upper | replace('-', '_') ]]_PORT}
+}
