@@ -333,16 +333,16 @@ Deliberate differences from the design (from the SPA build):
 - **"Uses workflows":** it can only be turned on.
 - **File-based instructions:** the form names the file; typing switches the bot to inline instructions.
 - **Fonts:** system fonts (Gilroy was not in the bundle), with JetBrains Mono self-hosted.
-- **Chief bot:** MausBot is hidden from the list.
+- **Chief bot:** MausBot is excluded from manual configuration forms; D28 includes it in the native live roster.
 - **Additions:** a "Descartar cambios" link for the local draft, and a mobile ⋯ menu for language and theme.
 
 The built `dist/` is committed (~0.5 MB), so generated projects need no Node build step. Mock mode (`?mock`) is for panel development.
 
-### Phase 5 — Builder (dogfooding) — local delivery complete; remote PR deferred
+### Phase 5 — Builder (dogfooding) — local delivery complete; remote Builder acceptance pending
 `dev-task` with `harness.run` and the Builder bot.
 
-Local implementation and evidence: [Phase 5 Builder](adr/phase-5-builder.md). Codex completed the full local flow on Dagu 2.24.0; Claude hit its subscription limit. The generated stack passed `mise run doctor`. The user requested the commit and explicitly deferred configuring a remote. Local delivery is complete; the original remote PR acceptance below is deferred until a remote exists.
-**Original remote exit:** the Builder ships a real small issue to the template repo through a PR. **Current local scope:** verified coding-agent change → checks → feature-branch commit, with publication deferred by the user.
+Local implementation and evidence: [Phase 5 Builder](adr/phase-5-builder.md). Codex completed the full local flow on Dagu 2.24.0; Claude hit its subscription limit. The generated stack passed `mise run doctor`. The user requested the commit and explicitly deferred configuring a remote. Local delivery is complete. The repository was subsequently published in `fyso-dev/agentic-framework` with initial PR #1; the Builder itself has not yet executed a real remote publication acceptance run.
+**Original remote exit:** the Builder ships a real small issue to the template repo through a PR. **Current local scope:** verified coding-agent change → checks → feature-branch commit, with the original user deferral recorded. The remote now exists; automated Builder publication acceptance remains pending.
 
 ### Phase 5.5 — Bot observability — verified locally
 Conversation activity, delegation, execution history and AI usage on one read-only

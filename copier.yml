@@ -30,6 +30,9 @@ _message_after_copy: |
 
   Next steps:
     cd {{ _copier_conf.dst_path }}
+    git init -b main
+    git add .
+    git commit -m "chore: initialize Fyso project"
     mise trust && mise install
     mise run setup      # encryption key + secrets file (admin / admin)
     mise run up         # Dagu, OpenMausBot and Caddy

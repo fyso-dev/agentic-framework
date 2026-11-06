@@ -22,7 +22,7 @@ gh auth setup-git
 Generate a **new project directory**, rather than running services from the template checkout:
 
 ```sh
-uvx copier==9.19.1 copy --trust --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --vcs-ref=preview \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 ```
@@ -34,7 +34,7 @@ Copier asks for the project name, slug, first port and administrator name. With 
 For repeatable generation without prompts:
 
 ```sh
-uvx copier==9.19.1 copy --trust --defaults --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=preview \
   --data project_name="My project" --data project_slug=my-project \
   --data port_base=8420 --data admin_user=admin \
   gh:fyso-dev/agentic-framework my-project
@@ -100,7 +100,7 @@ Commit the project's intended changes first and keep a backup. Stop its stack be
 
 ```sh
 mise run down
-uvx copier==9.19.1 update --trust --vcs-ref=preview
+uvx --from copier==9.19.1 copier update --trust --vcs-ref=preview
 # Inspect the diff and resolve any Copier conflicts before continuing.
 mise trust
 mise install
@@ -137,3 +137,7 @@ A fresh `.data/` restores versioned bots and memory from `state/` when available
 | Gateway briefly unavailable after restart | Wait for Caddy startup, then rerun `mise run doctor`; inspect `mise run logs caddy` if it persists |
 
 See the [documentation index](README.md) for contracts, phase status and recorded limitations.
+
+## Recorded verification
+
+The [repository installation proof](../artifacts/delivery-evidence/repository-install/README.md) records a real GitHub generation and first startup with all doctor checks passing. Native tools were already cached on the verification host; this does not certify empty-host downloads or remote deployment.

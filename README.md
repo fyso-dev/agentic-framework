@@ -13,7 +13,7 @@ Requires Git, [mise](https://mise.jdx.dev), [uv](https://docs.astral.sh/uv/) and
 ```sh
 gh auth login
 gh auth setup-git
-uvx copier==9.19.1 copy --trust --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --vcs-ref=preview \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 git init -b main

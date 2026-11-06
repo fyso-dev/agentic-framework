@@ -60,7 +60,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 2 | Bots: team file, auth, Dagu MCP | ✅ done |
 | 3 | Snapshot and replicate | ✅ done |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ✅ done |
-| 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote PR deferred by the user |
+| 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote Builder acceptance pending |
 | 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
@@ -102,3 +102,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | Native bot discovery (D28): the panel now polls the project OMB roster, including its chief and bots created in the native UI. Manual configuration drafts remain separate and preserved. [Evidence](../artifacts/delivery-evidence/bot-discovery/README.md) |
 
 | 2026-11-06 | Initial private publication in `fyso-dev/agentic-framework`; repository installation guide uses the explicit `preview` branch pending PR review. Full Phase 6 lifecycle acceptance remains pending. |
+
+| 2026-11-06 | [Repository install proof](../artifacts/delivery-evidence/repository-install/README.md): generated directly from GitHub with Copier 9.19.1, initialized Git, installed/resolved pinned tools, encrypted secrets, started isolated services and passed doctor. Fixture stopped afterward. |
