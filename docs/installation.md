@@ -22,19 +22,19 @@ gh auth setup-git
 Generate a **new project directory**, rather than running services from the template checkout:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 ```
 
-`preview` contains the initial published delivery while its PR awaits review. The explicit ref avoids silently selecting an older release. Only trust a template whose repository and revision you have reviewed: Copier can execute template tasks.
+`main` contains the reviewed initial delivery. The explicit ref avoids silently selecting an older release. Only trust a template whose repository and revision you have reviewed: Copier can execute template tasks.
 
 Copier asks for the project name, slug, first port and administrator name. With defaults, the login name is `admin` and the panel uses port 8400. For another instance, use an unused multiple of ten such as 8420. The startup script checks the project's ports before starting services.
 
 For repeatable generation without prompts:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=main \
   --data project_name="My project" --data project_slug=my-project \
   --data port_base=8420 --data admin_user=admin \
   gh:fyso-dev/agentic-framework my-project
@@ -100,7 +100,7 @@ Commit the project's intended changes first and keep a backup. Stop its stack be
 
 ```sh
 mise run down
-uvx --from copier==9.19.1 copier update --trust --vcs-ref=preview
+uvx --from copier==9.19.1 copier update --trust --vcs-ref=main
 # Inspect the diff and resolve any Copier conflicts before continuing.
 mise trust
 mise install
