@@ -1,0 +1,10 @@
+# AGENTS.md — {{ project_name }}
+
+A project generated from the Fyso Agentic Framework template. Read README.md first.
+
+- **Principle:** orchestrate existing software; never reinvent; keep it simple.
+- **Change `project/`, not `framework/`.** `framework/` is replaced by `copier update`.
+- **Isolation:** never connect to another Dagu or OpenMausBot on this machine. Every `openmausbot` CLI call targets this project (`OPENMAUSBOT_URL` is set by mise; never drop it, or it reaches the desktop app on 8799).
+- **Secrets** live only in `secrets.enc.yaml` (sops + age). Never commit plaintext secrets. Variables named `BOT_*` are the only secrets bots can see.
+- **Language:** code, comments, commits and docs in English; UI copy through i18n.
+- **Verify** with `mise run doctor` before calling something done.

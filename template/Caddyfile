@@ -1,0 +1,41 @@
+# Gateway (PLAN §3, D10, D11, D19). Values come from the environment set by
+# framework/scripts/run-caddy.sh. One subdomain per app.
+{
+	admin localhost:{$FYSO_CADDY_ADMIN_PORT}
+	auto_https off
+	# Local by default; a server sets FYSO_BIND (e.g. 0.0.0.0) and a real domain.
+	default_bind {$FYSO_BIND:127.0.0.1}
+	storage file_system {$FYSO_DATA}/caddy
+}
+
+(fyso_login) {
+	basic_auth {
+		{$FYSO_ADMIN_USER} {$FYSO_ADMIN_HASH}
+	}
+}
+
+# Panel (Phase 4 replaces the placeholder with the SPA).
+http://panel.localhost:{$FYSO_HTTP_PORT} {
+	import fyso_login
+	root * {$FYSO_ROOT}/framework/panel-placeholder
+	file_server
+}
+
+# Dagu: same credentials as the gateway (D19). The browser asks once and
+# Caddy forwards the same Authorization header; Dagu listens on 127.0.0.1 only.
+http://dagu.localhost:{$FYSO_HTTP_PORT} {
+	import fyso_login
+	reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT}
+}
+
+# OpenMausBot keeps its own device pairing (no gateway login on top: its own
+# auth would clash with basic auth). Locally, open it directly on
+# http://127.0.0.1:{$FYSO_OMB_PORT}, where no pairing is needed.
+http://omb.localhost:{$FYSO_HTTP_PORT} {
+	reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
+		flush_interval -1
+	}
+}
+
+# Project apps and extensions add their own routes here.
+import {$FYSO_ROOT}/project/apps/*/Caddyfile

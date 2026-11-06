@@ -1,0 +1,55 @@
+# Copier template for a Fyso Agentic Framework project.
+# Create:  uvx copier copy --trust gh:<org>/agentic-framework my-project
+# Update:  uvx copier update --trust
+_min_copier_version: "9.4.0"
+_subdirectory: template
+_answers_file: .copier-answers.yml
+_templates_suffix: .jinja
+
+# Files owned by the project: created once, never overwritten by `copier update`.
+_skip_if_exists:
+  - "project/**"
+  - "state/**"
+  - ".sops.yaml"
+  - "secrets.enc.yaml"
+
+_message_after_copy: |
+  Project created in {{ _copier_conf.dst_path }}.
+
+  Next steps:
+    cd {{ _copier_conf.dst_path }}
+    mise trust && mise install
+    mise run setup      # encryption key + secrets file (admin / admin)
+    mise run up         # Dagu, OpenMausBot and Caddy
+
+  Then open http://panel.localhost:{{ port_base }}
+
+project_name:
+  type: str
+  help: Project name (shown in the panel)
+  default: Fyso project
+
+project_slug:
+  type: str
+  help: Short identifier (lowercase, digits, dashes)
+  default: "{{ project_name | lower | replace(' ', '-') }}"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9-]{1,30}$')) %}
+    Use 2-31 lowercase letters, digits or dashes, starting with a letter.
+    {% endif %}
+
+port_base:
+  type: int
+  help: >-
+    First port of this project's block of 10 (PLAN §3.1). Pick a block not used
+    by another project. Never 8799/18799/28799 (OpenMausBot desktop) or 8080.
+  default: 8400
+  validator: >-
+    {% if port_base < 1024 or port_base > 65520 or port_base % 10 != 0 %}
+    Use a multiple of 10 between 1030 and 65520.
+    {% endif %}
+
+admin_user:
+  type: str
+  help: Login user for the gateway and Dagu (the password lives in secrets.enc.yaml)
+  default: admin

@@ -56,6 +56,8 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D19 | **Dagu login = basic auth with the same credentials as Caddy**, Dagu bound to `127.0.0.1`. Trusted-header proxy auth needs a paid Dagu SSO license (spike `gateway`). The browser asks once; Caddy validates and forwards the same `Authorization` header |
 | D20 | **D16 resolved: sops + age.** Both passed a real round trip through mise; sops is more mature. fnox stays an option for 1Password/Vault later (spike `tooling`) |
 | D21 | **Pinned, tested versions:** Dagu `2.24.0`, OpenMausBot `0.1.140`, Node `24`. Policy: pin releases at least a week old, and re-run the spike checks before bumping |
+| D22 | **OMB is not behind the gateway login.** Its own device pairing protects it, and a basic-auth header could clash with its own auth. Locally the panel links to `http://127.0.0.1:<omb port>`, where OMB trusts the owner and no pairing is needed |
+| D23 | **Local by default:** Caddy binds `127.0.0.1` unless `FYSO_BIND` is set (a server). `admin/admin` is never reachable from the LAN by accident |
 | D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
 
 ## 3. Architecture
@@ -252,9 +254,22 @@ A small Vite + React SPA served by Caddy at `panel.<host>`. It is for **the pers
 
 **Exit:** `docs/adr/0001-spikes.md` and this plan updated.
 
-### Phase 1 — Run it
+### Phase 1 — Run it ✅ done
 `copier.yml`, `mise.toml`, `process-compose.yaml`, `Caddyfile` with `admin/admin`, secrets init, `mise run up/down/doctor`.
 **Exit:** after `copier copy` → `mise install` → `mise run up`, the Dagu and OMB UIs open behind one login.
+
+**Result (2026-11-05):** `uvx copier copy` → `mise install` (8 tools, ~2 min, **full signature verification on**) → `mise run setup` → `mise run up` (ready in ~30 s, ~6 s warm) → `mise run doctor` all green. Verified:
+- **Gateway:** panel and Dagu return 401 without login and 200 with it, and the Dagu API works through the gateway with one login.
+- **Instance:** OMB is confirmed as the project's own (`environmentId`).
+- **Ports:** only the project's block is used; the user's Dagu on `:50055` is untouched.
+- **Workflows:** a workflow ran via the API with params and outputs.
+- **Updates:** `copier update` applied a framework change and left `project/` and `secrets.enc.yaml` intact.
+
+Implementation notes:
+- **process-compose socket:** it lives in `/tmp/fyso-<slug>-<port>.sock`, because Unix socket paths are limited to ~104 characters on macOS.
+- **Clean environments:** each process starts through a script that clears the environment. OMB only gets `BOT_*` secrets.
+- **Secrets file:** mise tolerates a missing `secrets.enc.yaml` before `setup` runs.
+- **Redaction:** mise redacts any value equal to a secret in task output, so `admin` shows as `[redacted]` while the password is still the default (cosmetic).
 
 ### Phase 2 — Bots
 The team file with the 3 bots (the Builder inactive until Phase 5), `mise run auth`, Dagu MCP and the `dagu-workflows` skill.
