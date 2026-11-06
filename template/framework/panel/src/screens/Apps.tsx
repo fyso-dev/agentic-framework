@@ -1,11 +1,15 @@
 // Apps launcher: framework apps (Dagu, OpenMausBot), the project's own apps and the
 // apps added by extensions, with health. Installed extensions are listed read-only
-// (docs/extensions-contract.md §5): installing and upgrading are terminal tasks.
+// (docs/extensions-contract.md §5); the marketplace (§8) installs and upgrades them
+// through the fyso-ext-catalog and fyso-ext-install workflows. Removing stays a terminal task.
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { App, Extension, Health } from "../api/types";
-import { AppIcon } from "../components/Icons";
-import { CopyLine } from "../components/ui";
+import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
+import { ActionButton, ActionError, ActionStatus } from "../components/Action";
+import { AppIcon, Spinner } from "../components/Icons";
+import { CopyLine, External } from "../components/ui";
 import { localized } from "../lib/i18n";
+import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { useStore } from "../store";
 
 const host = (url: string) => {
@@ -166,6 +170,133 @@ function Extensions() {
   );
 }
 
+function MarketRow({ entry, install, target, onInstall }: {
+  entry: MarketplaceEntry;
+  install: Action<ExtInstallResult>;
+  target: string | null;
+  onInstall: (entry: MarketplaceEntry) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const mine = target === entry.id;
+  const busy = install.phase === "running";
+  const name = localized(lang, entry.name, entry.name_i18n);
+  const description = localized(lang, entry.description, entry.description_i18n);
+  let control;
+  if (mine && busy) {
+    control = (
+      <span className="action-status is-running" role="status">
+        <Spinner />{entry.installed ? t("market.updating") : t("market.installing")}
+      </span>
+    );
+  } else if (!entry.latest) {
+    control = <span className="pill pill-unk">{t("market.noTags")}</span>;
+  } else if (entry.installed && !entry.update) {
+    control = <span className="pill pill-ok"><span aria-hidden="true" className="glyph">✓</span>{t("market.installed", { version: entry.version ?? "" })}</span>;
+  } else {
+    control = (
+      <button type="button" className={`btn ${entry.update ? "btn-ghost" : "btn-pri"}`} disabled={busy} onClick={() => onInstall(entry)}>
+        {entry.update ? t("market.update", { version: entry.latest }) : t("market.install", { version: entry.latest })}
+      </button>
+    );
+  }
+  return (
+    <li className="row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <p className="ellipsis"><strong>{name}</strong> <span className="mute">· {description}</span></p>
+          <p className="mute ellipsis">
+            <span className="mono">{entry.id}</span> · {t("market.from", { catalog: entry.catalog })}
+            {entry.homepage && <> · <External href={entry.homepage}>{host(entry.homepage)}</External></>}
+          </p>
+        </div>
+        {control}
+      </div>
+      {entry.tags.length > 0 && (
+        <ul className="chips" aria-label={t("market.tags")} style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {entry.tags.map((tag) => <li key={tag} className="chip">{tag}</li>)}
+        </ul>
+      )}
+      {entry.error && <p className="app-note is-down">{entry.error}</p>}
+      {mine && <ActionError action={install as Action<unknown>} />}
+      {mine && install.phase === "ok" && install.output && (
+        <div role="status" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <p className="mute">{t("market.done", { id: install.output.id, version: install.output.version ?? "", commit: install.output.commit })}</p>
+          <CopyLine text="mise run secrets" />
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** `v1.2.0` → [1, 2, 0]; null for refs that are not versions (same rule as marketplace.cjs). */
+function versionOf(ref: string | null): number[] | null {
+  const m = /^v?(\d+(?:\.\d+)*)(?:-|$)/.exec(ref ?? "");
+  return m ? m[1].split(".").map(Number) : null;
+}
+function newer(latest: string | null, current: string | null): boolean {
+  const a = versionOf(latest), b = versionOf(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d) return d > 0;
+  }
+  return false;
+}
+
+function Market() {
+  const { t } = useTranslation();
+  const s = useStore();
+  const catalog = useDaguAction<Catalog>(s.backend, DAGS.extCatalog, "catalog", { loadLast: true });
+  const install = useDaguAction<ExtInstallResult>(s.backend, DAGS.extInstall, "result");
+  const [target, setTarget] = useState<string | null>(null);
+  const data = catalog.output;
+  // Install state comes from extensions.json (always current), not from the last catalog read.
+  const local = new Map((s.extensions.data ?? []).map((e) => [e.id, e.version]));
+  const entries = (data?.extensions ?? []).map((e): MarketplaceEntry => {
+    if (s.extensions.status !== "ok") return e;
+    const version = local.get(e.id) ?? null;
+    return { ...e, installed: local.has(e.id), version, update: local.has(e.id) && newer(e.latest, version) };
+  });
+  const onInstall = async (entry: MarketplaceEntry) => {
+    setTarget(entry.id);
+    const result = await install.start({ ID: entry.id, MODE: entry.installed ? "update" : "add" });
+    if (result) {
+      s.reload();
+      void catalog.start();
+    }
+  };
+  return (
+    <section aria-label={t("market.title")} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h2 className="section-title">{t("market.title")} {data && <span>{data.extensions.length}</span>}</h2>
+      <div className="card action">
+        <div className="action-head">
+          <p className="grow mute ellipsis">
+            {data ? t("market.catalogs", { names: data.catalogs.map((c) => c.name).join(", ") }) : t("market.never")}
+          </p>
+          <ActionStatus action={catalog as Action<unknown>} />
+          <ActionButton action={catalog as Action<unknown>} label={t("market.refresh")} busyLabel={t("market.refreshing")} onRun={() => void catalog.start()} />
+        </div>
+        <ActionError action={catalog as Action<unknown>} />
+      </div>
+      {data?.catalogs.filter((c) => c.error).map((c) => (
+        <div key={c.source} role="alert" className="banner banner-down">
+          <p className="grow">{t("market.catalogError", { name: c.name, error: c.error })}</p>
+        </div>
+      ))}
+      {data && (entries.length > 0 ? (
+        <ul className="card list">
+          {entries.map((e) => <MarketRow key={e.id} entry={e} install={install} target={target} onInstall={onInstall} />)}
+        </ul>
+      ) : (
+        <p className="mute">{t("market.empty")}</p>
+      ))}
+      <p className="mute">{t("market.hint")}</p>
+      <CopyLine text={t("market.hintCommand")} />
+    </section>
+  );
+}
+
 export function Apps() {
   const { t } = useTranslation();
   const s = useStore();
@@ -205,6 +336,7 @@ export function Apps() {
         </section>
       )).filter((_, i) => i < 2 || groups[i].apps.length > 0)}
       <Extensions />
+      <Market />
     </main>
   );
 }

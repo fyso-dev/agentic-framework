@@ -15,9 +15,7 @@ omb_token=$(cat "$FYSO_DATA/caddy/omb-session")
 [ -n "$omb_token" ] || fail "OpenMausBot did not issue a gateway session"
 hash=$(caddy hash-password --plaintext "$FYSO_ADMIN_PASSWORD")
 extension_env=()
-while IFS='=' read -r name _; do
-  [[ $name != FYSO_EXT_*_PORT ]] || extension_env+=("$name=${!name}")
-done < <(env)
+while IFS= read -r line; do extension_env+=("$line"); done < <(ext_port_env)
 clean_exec \
   ${extension_env[@]+"${extension_env[@]}"} \
   XDG_DATA_HOME="$FYSO_DATA/caddy" XDG_CONFIG_HOME="$FYSO_DATA/caddy" \

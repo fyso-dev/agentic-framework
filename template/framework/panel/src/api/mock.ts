@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Extension, type Engine, type Plan, type Project, type Run, type SetupCheck } from "./types";
+import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -114,6 +114,34 @@ function extensions(scenario: Scenario): Extension[] {
   ];
 }
 
+function marketplace(installed: Set<string>, versions: Map<string, string>): Marketplace {
+  const entries: Omit<MarketplaceEntry, "installed" | "version" | "update">[] = [
+    {
+      id: "sample", src: "gh:fyso/ext-sample", catalog: "Fyso", name: "Ejemplo", name_i18n: { en: "Sample" },
+      description: "Sitio estático de ejemplo", description_i18n: { en: "Sample static site" }, tags: ["demo"], latest: "v1.3.0",
+    },
+    {
+      id: "netbird", src: "gh:fyso/fyso-ext-netbird", catalog: "Fyso", name: "NetBird",
+      description: "Red privada entre hosts", description_i18n: { en: "Private network between hosts" },
+      tags: ["network", "multi-host"], homepage: "https://netbird.io", latest: "v0.4.1",
+    },
+    {
+      id: "metabase", src: "gh:acme/fyso-ext-metabase", catalog: "Acme", name: "Metabase",
+      description: "Tableros sobre los datos del proyecto", description_i18n: { en: "Dashboards over project data" },
+      tags: ["data"], latest: null,
+    },
+  ];
+  return {
+    collectedAt: new Date().toISOString(),
+    catalogs: [{ source: "gh:fyso-dev/fyso-extensions", name: "Fyso" }, { source: "gh:acme/fyso-catalog", name: "Acme" }],
+    extensions: entries.map((e) => {
+      const version = versions.get(e.id) ?? null;
+      const on = installed.has(e.id);
+      return { ...e, installed: on, version, update: on && !!e.latest && version !== e.latest };
+    }),
+  };
+}
+
 function apps(scenario: Scenario): App[] {
   const framework: App[] = [
     {
@@ -205,6 +233,8 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   const runs = new Map<string, MockRun>();
   const latest = new Map<string, MockRun>();
   let seq = 0;
+  const installed = new Set(scenario === "empty" ? [] : ["sample"]);
+  const versions = new Map(scenario === "empty" ? [] : [["sample", "v1.2.0"]]);
 
   const check = (): SetupCheck => {
     const count = listedBots(readBots(parseTeam(team))).length;
@@ -274,7 +304,11 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     },
     async getExtensions() {
       await sleep(250);
-      return extensions(scenario);
+      const base = extensions(scenario);
+      const extra = [...installed].filter((id) => !base.some((e) => e.id === id)).map((id): Extension => ({
+        id, src: `gh:fyso/fyso-ext-${id}`, version: versions.get(id) ?? null, apps: [], secrets: [], mcpServers: [], workflows: [], skills: [],
+      }));
+      return [...base.map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
     },
 
     async enqueue(dag, params) {
@@ -311,6 +345,24 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
         case DAGS.snapshot:
           add({ dag, id, createdAt, duration: 2600, outcome: "succeeded", outputs: () => ({ result: "committed 3c81e07" }) });
           break;
+        case DAGS.extCatalog:
+          add({ dag, id, createdAt, duration: 1800, outcome: "succeeded", outputs: () => ({ catalog: JSON.stringify(marketplace(installed, versions)) }) });
+          break;
+        case DAGS.extInstall: {
+          const ext = params?.ID ?? "";
+          const fail = scenario === "failed";
+          const latest = marketplace(installed, versions).extensions.find((e) => e.id === ext)?.latest ?? null;
+          add({
+            dag, id, createdAt, duration: 3800, outcome: fail ? "failed" : "succeeded",
+            error: fail ? "error: the project has uncommitted changes; commit or discard them before upgrading" : undefined,
+            outputs: () => ({ result: JSON.stringify({ id: ext, mode: params?.MODE ?? "add", version: latest, commit: "5e0c1aa" }) }),
+            onDone: () => {
+              installed.add(ext);
+              if (latest) versions.set(ext, latest);
+            },
+          });
+          break;
+        }
         default:
           throw new Error(`mock: unknown DAG ${dag}`);
       }
