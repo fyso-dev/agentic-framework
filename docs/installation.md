@@ -96,6 +96,10 @@ Snapshots version native bot definitions, imported skills and memory; **chat his
 
 ## Update an existing generated project
 
+From the panel or Dagu, run the **`fyso-update`** workflow (params `REF`: a template tag, branch or commit, empty for Copier's latest tag; `SRC`: another Copier source for this run only, such as a local clone when the host cannot read this repository). It runs `copier update` in a clean `git worktree` of the project's `HEAD`, so uncommitted runtime state (bot memory) does not block it, commits the result as one `framework: update <from> -> <to>` commit and fast-forwards the project. A Copier conflict or an edited framework file stops it before anything is applied. It then installs tools, regenerates `.mcp.json` and panel data, loads new process and route fragments and restarts Caddy; changes to Dagu, OpenMausBot or Caddy's own processes need `mise run down && mise run up`. Output: `{from, to, commit, changed}`.
+
+By hand:
+
 Commit the project's intended changes first and keep a backup. Stop its stack before changing framework files:
 
 ```sh
