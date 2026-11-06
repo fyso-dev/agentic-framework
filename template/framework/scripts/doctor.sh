@@ -16,6 +16,14 @@ else
   bad "secrets not loaded: run 'mise run setup', and check your age key"
 fi
 
+echo "Extensions"
+node framework/scripts/extensions.cjs check && ok "extension ports and required secrets" || bad "extension configuration failed"
+for check in extensions/*/doctor.sh; do
+  [ -f "$check" ] || continue
+  framework/scripts/run-ext.sh "$(basename "$(dirname "$check")")" -- bash "$check" \
+    && ok "$check" || bad "$check failed"
+done
+
 echo "Tools"
 for t in dagu openmausbot caddy process-compose sops; do
   command -v "$t" >/dev/null && ok "$t" || bad "$t missing: run 'mise install'"

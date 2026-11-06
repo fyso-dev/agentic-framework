@@ -1,0 +1,7 @@
+# Example slot: customize before publishing.
+description: Check the [[ extension_id ]] extension
+type: graph
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: check
+    command: framework/scripts/run-ext.sh [[ extension_id ]] -- bash extensions/[[ extension_id ]]/doctor.sh

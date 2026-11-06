@@ -1,0 +1,6 @@
+version: "0.5"
+processes:
+  ext-sample:
+    command: framework/scripts/run-ext.sh sample -- miniserve --interfaces 127.0.0.1 --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public
+    readiness_probe:
+      exec: { command: extensions/sample/doctor.sh }

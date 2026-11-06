@@ -1,0 +1,6 @@
+# Example slot: customize before publishing.
+id: [[ extension_id ]]
+name: {es: Ejemplo, en: Sample}
+description: {es: Archivos de ejemplo, en: Sample files}
+icon: workflow
+url: http://[[ extension_id ]].localhost:${FYSO_HTTP_PORT}

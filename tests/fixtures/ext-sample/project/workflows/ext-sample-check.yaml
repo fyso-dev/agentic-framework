@@ -1,0 +1,6 @@
+description: Check the sample extension
+type: graph
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: check
+    command: framework/scripts/run-ext.sh sample -- bash extensions/sample/doctor.sh

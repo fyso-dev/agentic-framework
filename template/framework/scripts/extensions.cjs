@@ -1,0 +1,71 @@
+// Fixed extension slots; no registry or secret values on disk.
+const fs = require('node:fs');
+const {createRequire} = require('node:module');
+const {execFileSync, spawnSync} = require('node:child_process');
+const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
+const read = file => yaml.parse(fs.readFileSync(file, 'utf8'));
+const glob = pattern => [...fs.globSync(pattern)].sort();
+const validId = id => /^[a-z][a-z0-9-]{1,30}$/.test(id);
+function secrets(id) {
+  const file = `extensions/${id}/secrets.yaml`;
+  const entries = fs.existsSync(file) ? read(file) : [];
+  if (!Array.isArray(entries)) throw Error(`${file}: expected a list`);
+  for (const entry of entries) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(entry.name)) throw Error(`${file}: invalid secret name`);
+  }
+  return entries;
+}
+function missing(id, env = process.env) {
+  return secrets(id).filter(s => s.required === true && !env[s.name]).map(s => s.name);
+}
+function inventory(apps, env = process.env) {
+  return glob('.copier-answers.ext-*.yml').map(file => {
+    const id = file.slice('.copier-answers.ext-'.length, -4);
+    if (!validId(id)) throw Error(`Invalid extension id in ${file}`);
+    const answers = read(file);
+    const base = `extensions/${id}`;
+    return {id, src:answers._src_path, version:answers._commit || null,
+      apps:apps.filter(a => a.file === `${base}/app.yaml`).map(a => a.id),
+      secrets:secrets(id).map(s => {
+        const description = typeof s.description === 'string' ? {description:s.description} :
+          s.description ? {description:s.description.es || s.description.en || Object.values(s.description)[0], description_i18n:s.description} : {};
+        return {name:s.name, ...description, required:s.required === true, set:!!env[s.name]};
+      }),
+      mcpServers:fs.existsSync(`${base}/mcp.json`) ? Object.keys(JSON.parse(fs.readFileSync(`${base}/mcp.json`)).mcpServers || {}) : [],
+      workflows:glob(`project/workflows/ext-${id}-*.yaml`).map(f => f.split('/').pop().slice(0,-5)),
+      skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2))};
+  });
+}
+function check(env = process.env) {
+  const errors = [], ports = new Map(), base = Number(env.FYSO_HTTP_PORT);
+  for (const [name, value] of Object.entries(env).filter(([name]) => /^FYSO_EXT_.*_PORT$/.test(name))) {
+    const port = Number(value);
+    if (!/^\d+$/.test(value) || !Number.isInteger(base) || port < base+10 || port > base+19 || port > 65535) errors.push(`${name} must be in extension port block ${base+10}..${Math.min(base+19,65535)}`);
+    if (ports.has(port)) errors.push(`Port collision: ${name} and ${ports.get(port)}`);
+    ports.set(port,name);
+  }
+  for (const file of glob('extensions/*/secrets.yaml')) {
+    const id = file.split('/')[1];
+    for (const name of missing(id,env)) errors.push(`${id}: required secret ${name} is empty`);
+  }
+  return errors;
+}
+function run(id, command) {
+  if (!validId(id) || command.shift() !== '--' || !command.length) throw Error('Usage: run-ext.sh <ext> -- <cmd…>');
+  const absent = missing(id);
+  if (absent.length) throw Error(`${id}: required secret(s) empty: ${absent.join(', ')}`);
+  const names = new Set(['PATH','HOME',...secrets(id).map(s => s.name)]);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => names.has(k) || k.startsWith('FYSO_')));
+  const child = spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});
+  if (child.error) throw child.error;
+  process.exit(child.status ?? 1);
+}
+module.exports = {read, glob, validId, secrets, missing, inventory, check};
+if (require.main === module) {
+  try {
+    if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));
+    else if (process.argv[2] === 'check') {
+      const errors = check(); errors.forEach(e => console.error(e)); process.exitCode = errors.length ? 1 : 0;
+    } else throw Error('Unknown extension operation');
+  } catch (error) { console.error(error.message); process.exitCode = 1; }
+}

@@ -15,13 +15,33 @@ export type App = {
   description_i18n?: Record<string, string>;
   icon: string;
   url: string;
-  group: "framework" | "project";
+  group: "framework" | "project" | "extension";
   enabled: boolean;
   accessNote?: string;
   accessNote_i18n?: Record<string, string>;
 };
 
 export type Health = "ok" | "down" | "unknown";
+
+/** `GET /config/extensions.json`, docs/extensions-contract.md §5. Secret values are never sent. */
+export type ExtensionSecret = {
+  name: string;
+  description?: string;
+  description_i18n?: Record<string, string>;
+  required: boolean;
+  set: boolean;
+};
+
+export type Extension = {
+  id: string;
+  src: string;
+  version: string | null;
+  apps: string[];
+  secrets: ExtensionSecret[];
+  mcpServers: string[];
+  workflows: string[];
+  skills: string[];
+};
 
 export type Engine = {
   id: string;
@@ -84,6 +104,7 @@ export type Backend = {
   getProject(): Promise<Project>;
   getTeam(): Promise<string>;
   getApps(): Promise<App[]>;
+  getExtensions(): Promise<Extension[]>;
   /** Always `enqueue`, never `start` (contract §2). Returns the dagRunId. */
   enqueue(dag: string, params?: Record<string, string>): Promise<string>;
   getRun(dag: string, runId: string): Promise<Run>;
