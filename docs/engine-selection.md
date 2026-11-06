@@ -1,7 +1,7 @@
 # Engine and model selection — open issue
 
 Status: **open**. Requested by the lead on 2026-11-06 while adopting the
-framework for Etendo Next. D30 is the first step; this file tracks the rest.
+framework for Etendo Next. D31 is the first step; this file tracks the rest.
 
 ## Goal
 
@@ -12,7 +12,7 @@ The framework adapts to the AI subscriptions the customer actually has:
 3. Each role has **recommended** models per provider, and changing them is
    just as easy as accepting the recommendation.
 
-## Where it stands (after D30)
+## Where it stands (after D31)
 
 | Capability | Today |
 |---|---|
@@ -62,7 +62,7 @@ The framework adapts to the AI subscriptions the customer actually has:
    pinned OMB version and update the template recommendations.
 8. **Detect at setup.** `mise run setup` could suggest the engine from the
    signed-in CLIs, since a Copier question cannot run commands.
-9. **Decision record.** Add a decision (D31) once the recommendation file
+9. **Decision record.** Add a decision (D32) once the recommendation file
    and switching action are agreed; keep native formats as the contract.
 
 ## Acceptance

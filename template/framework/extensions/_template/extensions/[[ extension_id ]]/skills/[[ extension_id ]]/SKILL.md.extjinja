@@ -1,0 +1,5 @@
+---
+name: [[ extension_id ]]
+description: Inspect [[ extension_id ]] static files
+---
+Read extensions/[[ extension_id ]]/public. Enable this skill explicitly in team.yaml.

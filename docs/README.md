@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D30; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D31; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -49,6 +49,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
+| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data (D30) | [extensions-contract.md](extensions-contract.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
 ## Layer 4 — Execution
@@ -65,7 +66,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
-| 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ⬜ not started |
+| 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -111,7 +112,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | Native bot import (D29): distinguish project/snapshot/native-only definitions using committed Git evidence and import one native profile into project configuration without modifying OMB. [Verified evidence](../artifacts/delivery-evidence/bot-import/README.md). |
 
 | 2026-11-06 | Unified bot actions: every row opens OMB, while configuration edit and native import remain explicit sibling actions. |
-
 | 2026-11-06 | Initial delivery PR #1 merged into `main` (`9847295`). Installation documentation now targets `main`; historical preview evidence retains its original ref. |
+| 2026-11-06 | **Phase 7 done.** Extensions are Copier templates with their own answers file that fill fixed slots ([contract](extensions-contract.md), D30). Verified: mise conf.d, process-compose multi-file merge, Caddy empty-glob import, Dagu recursive discovery (opt-in, kept flat). `.mcp.json` is now generated. Sample v1 → v2 → remove on a live project, doctor green, panel shows extensions. |
 
-| 2026-11-06 | Optional engines (D30): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |
+| 2026-11-06 | Optional engines (D31): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |

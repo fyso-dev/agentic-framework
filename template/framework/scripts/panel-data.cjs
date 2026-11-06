@@ -11,9 +11,13 @@ const usedEngines = team => team.bots.map(b => String(b.model || team.defaults?.
 const urls = {dagu:`http://dagu.localhost:${env.FYSO_HTTP_PORT}`, omb:`http://omb.localhost:${env.FYSO_HTTP_PORT}`};
 if (process.argv[2] === 'config') {
   require('./bot-versioning.cjs').write();
-  const apps = [...fs.globSync('framework/apps/*.yaml'), ...fs.globSync('project/apps/*/app.yaml')].map(file => {
-    const app = read(file);
-    app.group = file.startsWith('framework/') ? 'framework' : 'project';
+  const extensions = require('./extensions.cjs');
+  const appFiles = [...fs.globSync('framework/apps/*.yaml'), ...fs.globSync('project/apps/*/app.yaml'), ...extensions.glob('extensions/*/app.yaml')];
+  const apps = appFiles.map(file => {
+    const substitute = value => typeof value === 'string' ? value.replace(/\$\{(FYSO_[A-Za-z0-9_]+)\}/g, (match,name) => env[name] ?? match) :
+      Array.isArray(value) ? value.map(substitute) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k,v]) => [k,substitute(v)])) : value;
+    const app = file.startsWith('extensions/') ? substitute(read(file)) : read(file);
+    app.group = file.startsWith('framework/') ? 'framework' : file.startsWith('extensions/') ? 'extension' : 'project';
     if (app.group === 'framework') app.url = urls[app.id];
     for (const key of ['name','description','accessNote']) {
       if (app[key] && typeof app[key] === 'object') {
@@ -25,9 +29,11 @@ if (process.argv[2] === 'config') {
   fs.mkdirSync('.data/panel', {recursive:true});
   fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls}));
   fs.writeFileSync('.data/panel/apps.json', JSON.stringify(apps));
+  fs.writeFileSync('.data/panel/extensions.json', JSON.stringify(extensions.inventory(apps.map((app,i) => ({id:app.id,file:appFiles[i]})))));
 } else if (process.argv[2] === 'engines') {
   console.log([...new Set(usedEngines(readTeam()))].join('\n'));
 } else if (process.argv[2] === 'check') {
+  require('./mcp-config.cjs').write();
   const team = readTeam();
   const bots = team.bots.filter(b => b.name !== 'MausBot');
   const models = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));

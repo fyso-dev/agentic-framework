@@ -11,5 +11,14 @@ export default defineConfig({
     emptyOutDir: true,
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 500,
+    // No content hash: `dist/` is committed, so each build overwrites the same
+    // files instead of adding/removing them. Caddy serves them with no-cache.
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name].js",
+        chunkFileNames: "assets/[name].js",
+        assetFileNames: "assets/[name][extname]",
+      },
+    },
   },
 });

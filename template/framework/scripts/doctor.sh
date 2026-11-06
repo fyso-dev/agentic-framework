@@ -16,13 +16,21 @@ else
   bad "secrets not loaded: run 'mise run setup', and check your age key"
 fi
 
+echo "Extensions"
+node framework/scripts/extensions.cjs check && ok "extension ports and required secrets" || bad "extension configuration failed"
+for check in extensions/*/doctor.sh; do
+  [ -f "$check" ] || continue
+  framework/scripts/run-ext.sh "$(basename "$(dirname "$check")")" -- bash "$check" \
+    && ok "$check" || bad "$check failed"
+done
+
 echo "Tools"
 for t in dagu openmausbot caddy process-compose sops; do
   command -v "$t" >/dev/null && ok "$t" || bad "$t missing: run 'mise install'"
 done
 
 echo "Logins"
-# Only engines a bot uses are required; at least one must be signed in (PLAN D30).
+# Only engines a bot uses are required; at least one must be signed in (PLAN D31).
 used=" $(node framework/scripts/panel-data.cjs engines 2>/dev/null | tr '\n' ' ')"
 signed=0
 login() { # <engine> <status command...>

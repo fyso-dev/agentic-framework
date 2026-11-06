@@ -68,7 +68,9 @@ Append-only. A superseded decision stays, marked with what replaced it.
 
 | D29 | **Native import and Git evidence stay explicit.** One bot roster distinguishes committed project declarations, committed native snapshots, and native-only profiles. A GET-only metadata file reports names from Git HEAD, never profile contents. Import uses the existing Bot Architect workflow to export one exact native ID and commit its native profile plus imported skill files, without runtime writes. Dirty project declarations, ambiguous names and local panel drafts block import. Existing defaults are materialized when needed to preserve effective profiles without unwanted inheritance |
 
-| D30 | **Engines are optional; the project picks one.** Copier asks for `engine` (`claude` or `codex`, default `claude`). It sets every bot's model in `project/bots/team.yaml`, the Builder's default `PROVIDER` and `fyso-dev-task`'s default. Doctor fails only when an engine used by a declared bot is not signed in, or when none is; any other engine is an optional warning. Projects switch engines by editing their team file. Refines D27's Codex default for Bot Architect |
+| D30 | **Extension contract (Phase 7) closes the gaps in D17.** Each extension owns its answers file (`_answers_file: .copier-answers.ext-<ext>.yml`) and only the slot paths in [extensions-contract.md](extensions-contract.md); it never edits a file another template owns. `.mcp.json` becomes a generated file (framework + project + extensions sources in git), because a single template-owned file cannot be extended without conflicts and was overwritten by `copier update`. Extension processes start through `run-ext.sh`, which passes only `FYSO_*` and the secret names the extension declares. Extensions use a second port block (`port_base+10…+19`). Thin `mise run ext:*` tasks wrap Copier; the panel lists extensions read-only |
+
+| D31 | **Engines are optional; the project picks one.** Copier asks for `engine` (`claude` or `codex`, default `claude`). It sets every bot's model in `project/bots/team.yaml`, the Builder's default `PROVIDER` and `fyso-dev-task`'s default. Doctor fails only when an engine used by a declared bot is not signed in, or when none is; any other engine is an optional warning. Projects switch engines by editing their team file. Refines D27's Codex default for Bot Architect |
 
 ## 3. Architecture
 
@@ -195,7 +197,7 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 |---|---|---|
 | **Workflow Architect** | project engine, strong model (subscription) | Dagu MCP + skill `dagu-workflows` |
 | **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
-| **Bot Architect** | project engine, strong model (subscription, D30) | Native OMB team plans through `fyso-bot-architect` |
+| **Bot Architect** | project engine, strong model (subscription, D31) | Native OMB team plans through `fyso-bot-architect` |
 | **Builder** | project engine, strong model (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
 **`dev-task`** is a Dagu DAG built only from existing pieces (verified in spike `harness`):
@@ -373,6 +375,15 @@ VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.
 Slot conventions, the `framework/extensions/_template` Copier template, a minimal sample extension used as a test fixture, and the panel's Extensions view. NetBird stays documented (§12.1) but is not built.
 **Exit:** `copier copy` of the sample extension adds a working, health-checked tool to a project, and `copier update` upgrades it.
 
+**Result (2026-11-06):** built against [extensions-contract.md](extensions-contract.md) (D30); Codex built the plumbing, Claude the panel and docs. Verified on a generated project (port block 8650):
+- **Lifecycle:** `mise run ext:add <src> -- --vcs-ref v1` → `ext:update` to v2 → `ext:remove`, with the sample fixture from a tagged local repo (also an automated test).
+- **Runtime:** the sample's process, route and doctor run; `mise run doctor` is green, including the extension checks; the route answers 200 through the gateway.
+- **Generated `.mcp.json`:** it merges the Dagu server with the extension's server and keeps the `${VAR}` placeholders.
+- **Panel:** Apps shows the extension tile with live health, plus an "Installed extensions" list (version, MCP/workflows/skills, secret presence only).
+- **Tests:** Python 16 passed and 13 skipped (stack/fixture opt-in); Node 27 passed; `check-paths` clean.
+
+Fixes found on review: `ext:update` stopped at the second extension because Copier refuses a dirty tree, so it now updates one extension at a time and asks for a commit between them; a Node test hit an untrusted mise conf.d file through the `node` shim.
+
 ### Phase 8 — Multi-host
 Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunnel, the Dagu worker service, OMB self-hosted VPS computers, and the per-host doctor.
 **Exit:** a second VPS joins with `mise run host:add`; a DAG pinned to its label runs there with its logs visible on the control host, and a bot uses it as its computer.
@@ -453,13 +464,16 @@ Rules:
 - MCP tools keep OMB's approval cards. The `team.yaml` `tools` selection limits which bots see which servers.
 - Skills from outside the project go through OMB's built-in scan (it switches off suspicious skills) and a human review before they are enabled.
 
-### 12.3 To verify (before Phase 7)
+### 12.3 Verified before Phase 7 (2026-11-06)
 
-1. Does mise load project-level `conf.d/*.toml` fragments, and from which path?
-2. Does Dagu read DAGs from subdirectories, or is the `ext-<ext>-` filename prefix needed?
-3. Does an MCP server exist for NetBird (official or community), or would the extension wrap its API?
-4. Is there a CLI to install Agent Skills from a catalog that we can pin, or are skills copied by git commit?
-5. How does Copier behave when several templates touch the same file (for example `.gitignore`)? Slots must avoid shared files.
+The exact contract is [extensions-contract.md](extensions-contract.md) (D30). It supersedes the slot table in §12.1 where they differ.
+
+1. **mise conf.d:** yes. mise 2026.11.2 loads `.config/mise/conf.d/*.toml` (env and tasks); each new file needs `mise trust`.
+2. **Dagu subdirectories:** see the contract §6. The `ext-<ext>-` prefix stays until confirmed.
+3. **NetBird MCP:** not checked; NetBird is not built (§12.1).
+4. **Skills catalog CLI:** not needed in v1. Skills ship inside the extension and are enabled per bot by a person.
+5. **Shared files:** avoided by contract. Extensions write only slot paths; ignore rules go in `extensions/<ext>/.gitignore`, and `.mcp.json` is generated.
+6. **Also verified:** process-compose merges several `-f` files and `depends_on` crosses files; Caddy accepts an `import` glob that matches nothing.
 
 ## 13. Multi-host (D18)
 

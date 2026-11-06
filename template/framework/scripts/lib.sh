@@ -28,9 +28,25 @@ block_ports() {
     "$FYSO_DAGU_WORKER_HEALTH_PORT" "$FYSO_OMB_PORT" "$FYSO_OMB_WEBHOOK_PORT" \
     "$FYSO_DAGU_COORDINATOR_PORT" "$FYSO_DAGU_COORDINATOR_HEALTH_PORT" \
     "$FYSO_CADDY_ADMIN_PORT"
+  local name
+  while IFS='=' read -r name _; do
+    [[ $name != FYSO_EXT_*_PORT ]] || printf '%s\n' "${!name}"
+  done < <(env)
 }
 
 # Unix sockets have a ~104-char path limit on macOS, so keep it short.
 PC_SOCKET="/tmp/fyso-${FYSO_PROJECT:-unknown}-${FYSO_HTTP_PORT:-0}.sock"
-pc() { process-compose "$@" --unix-socket "$PC_SOCKET"; }
+pc() {
+  local configs=(-f process-compose.yaml) file
+  for file in project/apps/*/process.yaml extensions/*/process.yaml; do
+    [ ! -f "$file" ] || configs+=(-f "$file")
+  done
+  # Only startup loads configuration. Client commands address that same server;
+  # process-compose 1.124.0 rejects -f for process list/logs and down.
+  if [ "${1:-}" = up ]; then
+    process-compose "${configs[@]}" "$@" --unix-socket "$PC_SOCKET"
+  else
+    process-compose "$@" --unix-socket "$PC_SOCKET"
+  fi
+}
 stack_running() { [ -S "$PC_SOCKET" ] && pc process list >/dev/null 2>&1; }
