@@ -31,6 +31,6 @@ block_ports() {
 }
 
 # Unix sockets have a ~104-char path limit on macOS, so keep it short.
-PC_SOCKET="/tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+PC_SOCKET="/tmp/fyso-${FYSO_PROJECT:-unknown}-${FYSO_HTTP_PORT:-0}.sock"
 pc() { process-compose "$@" --unix-socket "$PC_SOCKET"; }
 stack_running() { [ -S "$PC_SOCKET" ] && pc process list >/dev/null 2>&1; }
