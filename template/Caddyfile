@@ -17,7 +17,7 @@
 # Panel files and same-origin Dagu API.
 http://panel.localhost:{$FYSO_HTTP_PORT} {
 	import fyso_login
-	@config path /config/project.json /config/apps.json
+	@config path /config/project.json /config/apps.json /config/observability.json
 	handle @config {
 		@read method GET HEAD
 		handle @read {
@@ -37,6 +37,20 @@ http://panel.localhost:{$FYSO_HTTP_PORT} {
 		respond 405
 	}
 	handle /config/* {
+		respond 404
+	}
+	# Exact read-only native roster, without conversation history. No generic OMB proxy.
+	handle /api/omb/bots {
+		@rosterRead method GET
+		handle @rosterRead {
+			rewrite * /api/bots?messages=0
+			reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
+				header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
+			}
+		}
+		respond 405
+	}
+	handle /api/omb/* {
 		respond 404
 	}
 	handle_path /api/dagu/* {

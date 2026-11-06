@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D25; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D28; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -37,12 +37,15 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
+| Install from the private GitHub repository: prerequisites, startup, updates and recovery | [installation.md](installation.md) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
+| Conversational Bot Architect: native CRUD, snapshots and target protection | [bot-architect.md](bot-architect.md) |
+| Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
@@ -58,6 +61,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 3 | Snapshot and replicate | ✅ done |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ✅ done |
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote PR deferred by the user |
+| 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
+| 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ⬜ not started |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -89,3 +94,11 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | **Phase 4 done.** Panel SPA (from the Claude Design boards) + plumbing, built in parallel by Claude and Codex against `panel-contract.md`. Verified end to end against the real stack: checklist 4/4, launcher with health, and edit → preview → apply (snapshot commit, then `bots: update from panel`, model changed in OMB) |
 | 2026-11-06 | [Phase 5 Builder](adr/phase-5-builder.md): recovered the interrupted implementation; real Codex → worktree → checks → local commit → cleanup succeeded on Dagu 2.24.0. Generated stack doctor passed. Nine regression tests cover guards and failures. Claude hit its subscription limit. D24 makes remote publication explicit; remote PR acceptance is deferred by the user; local delivery is complete |
 | 2026-11-06 | OMB browser access corrected (D25): the packaged server rejects unpaired browsers even on loopback. Caddy holds a native session behind project login; panel links use the gateway. Verified in Chrome and with real HTTP regressions; `doctor` now checks browser-style access. [Evidence](../artifacts/delivery-evidence/phase-5/README.md) |
+| 2026-11-06 | Observability work started before deployment: reuse native OMB usage/traces and Dagu history; capture structured harness usage separately. [Contract](observability.md) |
+| 2026-11-06 | **Phase 5.5 verified.** Native conversation + delegation, explicit conversation/run linkage, structured Codex usage, restart persistence, browser refresh and guarded summary endpoint. Node 10/Python 16 checks passed; local doctors green. [Evidence](../artifacts/delivery-evidence/observability/README.md) |
+| 2026-11-06 | Bot Architect goal started after observability verification: native partial team plans, exact-ID deletion, snapshots before/after mutations, versioned project configuration and real conversational CRUD proof. [Contract](bot-architect.md) |
+| 2026-11-06 | **Phase 5.6 verified.** Real conversational create/read/update/delete, native Git audit preserving unrelated bots, imported-skill restore, stale/replay/secret/protected guards, and local user installation. Fixed portable native snapshot bundles and relative team references. Final suite: Node 13/Python 21; doctors green. [Evidence](../artifacts/delivery-evidence/bot-architect/README.md) |
+
+| 2026-11-06 | Native bot discovery (D28): the panel now polls the project OMB roster, including its chief and bots created in the native UI. Manual configuration drafts remain separate and preserved. [Evidence](../artifacts/delivery-evidence/bot-discovery/README.md) |
+
+| 2026-11-06 | Initial private publication in `fyso-dev/agentic-framework`; repository installation guide uses the explicit `preview` branch pending PR review. Full Phase 6 lifecycle acceptance remains pending. |

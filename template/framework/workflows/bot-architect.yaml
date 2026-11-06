@@ -1,0 +1,14 @@
+description: Native conversational bot CRUD with preview, exact IDs and versioned snapshots
+type: graph
+max_active_runs: 1
+params:
+  - OP: list
+  - ACTION: ""
+  - BOT_ID: ""
+  - BOT_B64: ""
+  - PLAN_ID: ""
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: operate
+    run: node framework/scripts/bot-architect.cjs
+    output: RESULT

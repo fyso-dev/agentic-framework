@@ -2,7 +2,7 @@
 // two long-lived actions (setup check and snapshot).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LoadedBackend } from "./api";
-import { DAGS, type App, type Backend, type Health, type Project, type SetupCheck } from "./api/types";
+import { DAGS, type App, type Backend, type Health, type Project, type RuntimeBot, type SetupCheck } from "./api/types";
 import { diffBots, listedBots, parseTeam, readBots, type Bot, type BotRow } from "./lib/team";
 import { useDaguAction, type Action } from "./lib/useDaguAction";
 
@@ -16,6 +16,7 @@ export type Store = {
   mock: string | null;
   project: Loadable<Project>;
   team: Loadable<string>;
+  runtimeBots: Loadable<RuntimeBot[]>;
   apps: Loadable<App[]>;
   health: Record<string, Health>;
   reload(): void;
@@ -65,6 +66,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const { backend, mock } = loaded;
   const [project, setProject] = useState<Loadable<Project>>({ status: "loading" });
   const [team, setTeam] = useState<Loadable<string>>({ status: "loading" });
+  const [runtimeBots, setRuntimeBots] = useState<Loadable<RuntimeBot[]>>({ status: "loading" });
   const [apps, setApps] = useState<Loadable<App[]>>({ status: "loading" });
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [draft, setDraftState] = useState<string | null>(null);
@@ -98,6 +100,27 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   }, [backend, loadTeam]);
 
   useEffect(load, [load]);
+
+  // Native discovery is independent of the team-file draft. Failed reads retain
+  // the previous roster with an explicit error; requests never overlap.
+  useEffect(() => {
+    let stopped = false;
+    let pending = false;
+    const refresh = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const data = await backend.getRuntimeBots();
+        if (!stopped) setRuntimeBots({status:"ok", data});
+      } catch (e) {
+        if (!stopped) setRuntimeBots(previous => ({...previous, status:"error", error:message(e)}));
+      } finally { pending = false; }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 5000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [backend]);
+
 
   // Restore a saved draft once project + team are known; drop it if team.yaml changed since.
   useEffect(() => {
@@ -196,7 +219,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
 
 
   const store: Store = {
-    backend, mock, project, team, apps, health, reload: load,
+    backend, mock, project, team, runtimeBots, apps, health, reload: load,
     draft, draftReady, setDraft, workingText,
  baseBots, workingBots, rows, draftChanges,
     check, snapshot, checkData, steps, stepsDone, anyFailed, noData, afterApply,

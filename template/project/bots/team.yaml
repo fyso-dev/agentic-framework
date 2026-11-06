@@ -33,3 +33,9 @@ bots:
     model: claude/claude-sonnet-5
     approval: full             # starts fyso-dev-task through the Dagu MCP without asking
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/builder.md }
+
+  - name: Bot Architect
+    title: Creates and maintains project bots through versioned native plans
+    model: codex/gpt-6.1-sol
+    approval: full
+    soul: { file: ${FYSO_ROOT}/framework/bots/souls/bot-architect.md }

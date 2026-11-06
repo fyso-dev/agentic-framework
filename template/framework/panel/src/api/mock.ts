@@ -12,7 +12,7 @@ const PROJECT: Project = {
   name: "Foo project",
   slug: "foo-project",
   env: "local",
-  urls: { dagu: "http://dagu.localhost:8400", omb: "http://127.0.0.1:8404" },
+  urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -107,8 +107,8 @@ function apps(scenario: Scenario): App[] {
     {
       id: "omb", name: "OpenMausBot", description: "Bots y aprobaciones", description_i18n: { en: "Bots and approvals" },
       icon: "bot", url: PROJECT.urls.omb, group: "framework", enabled: true,
-      accessNote: "Usa su propio acceso: la primera vez pide emparejar el dispositivo",
-      accessNote_i18n: { en: "Uses its own sign-in: the first time it asks to pair the device" },
+      accessNote: "Login del proyecto; no requiere código de emparejamiento",
+      accessNote_i18n: { en: "Project login; no pairing code required" },
     },
   ];
   if (scenario === "empty") return framework;
@@ -235,6 +235,8 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   return {
     initialDraft: scenario === "failed" || scenario === "applyfail" ? DRAFT : null,
 
+    async getRuntimeBots() { return []; },
+    async getObservability() { throw new Error("Observability requires the real stack"); },
     async getProject() {
       await sleep(150);
       return PROJECT;

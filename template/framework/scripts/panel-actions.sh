@@ -13,7 +13,7 @@ if [ -n "${TEAM_B64:-}" ]; then
 else
   cp project/bots/team.yaml "$team"
 fi
-sed "s|\${FYSO_ROOT}|$FYSO_ROOT|g" "$team" > "$tmp/rendered.yaml"
+node framework/scripts/render-team.cjs "$team" "$FYSO_ROOT/project/bots" > "$tmp/rendered.yaml"
 case "${1:-}" in
   plan) omb team apply "$tmp/rendered.yaml" --dry-run --json ;;
   apply)

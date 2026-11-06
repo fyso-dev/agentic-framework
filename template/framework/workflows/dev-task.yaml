@@ -7,6 +7,8 @@ description: Build a task on a new branch with a coding agent (Claude Code or Co
 type: graph
 params:
   - TASK: ""                 # what to change, in plain words (the issue text)
+  - SOURCE_THREAD: ""        # native OMB identifier, never inferred
+  - SOURCE_TURN: ""
   - BRANCH: ""               # empty: builder/<run id>
   - PROVIDER: claude         # claude | codex (their subscription logins; no API key)
   - PUBLISH: "false"         # true only when the person requests a remote PR
@@ -25,8 +27,16 @@ steps:
     outputs:
       - name: branch
 
-  - id: worktree
+  # Scoped step outputs are not included in Dagu's run outputs endpoint.
+  # Capture native correlation metadata explicitly, independent of agent success.
+  - id: context
     depends: [prepare]
+    run: >-
+      node -e 'const e=process.env; console.log(JSON.stringify({thread:e.SOURCE_THREAD||null,turn:e.SOURCE_TURN||null,provider:e.PROVIDER,model:e.MODEL||null}))'
+    output: ORIGIN
+
+  - id: worktree
+    depends: [context]
     action: git.worktree.add
     with:
       branch: ${steps.prepare.outputs.branch}
@@ -61,6 +71,7 @@ steps:
       permission-mode: acceptEdits
       allowed-tools: "Read,Edit,Write,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(ls:*)"
       setting-sources: project
+      output-format: json
       no-session-persistence: true
       tools: "Read,Edit,Write,Glob,Grep,Bash"
       strict-mcp-config: true       # no MCP servers from the user's config
@@ -85,6 +96,7 @@ steps:
       model: ${params.MODEL}
       sandbox: workspace-write
       config: 'approval_policy="never"'
+      json: true
       ephemeral: true
     timeout_sec: 1200
     output: AGENT

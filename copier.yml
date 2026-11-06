@@ -1,5 +1,5 @@
 # Copier template for a Fyso Agentic Framework project.
-# Create:  uvx copier copy --trust gh:<org>/agentic-framework my-project
+# Create:  uvx copier copy --trust gh:fyso-dev/agentic-framework my-project
 # Update:  uvx copier update --trust
 _min_copier_version: "9.4.0"
 _subdirectory: template

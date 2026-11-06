@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Engine } from "../api/types";
 import { IconBot, IconPlus } from "../components/Icons";
 import { unappliedCount } from "../components/Layout";
-import { Avatar, Modal } from "../components/ui";
+import { Avatar, External, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import type { BotState } from "../lib/team";
 import { useStore } from "../store";
@@ -47,6 +47,8 @@ export function Bots({ review }: { review: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const eng = useEngineLabel();
+  const runtime = s.runtimeBots.data ?? null;
+  const runtimeError = s.runtimeBots.status === "error";
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const unapplied = unappliedCount(s);
   const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
@@ -67,6 +69,30 @@ export function Bots({ review }: { review: boolean }) {
           </a>
         )}
       </div>
+
+      {s.workingBots.some(bot => bot.name === "Bot Architect") && s.project.data && (
+        <div className="card" style={{padding:16, display:"flex", gap:12, alignItems:"center", flexWrap:"wrap"}}>
+          <p className="grow">{t("bots.architectHint")}</p>
+          <External href={s.project.data.urls.omb} className="btn btn-md btn-pri">{t("bots.architectOpen")}</External>
+        </div>
+      )}
+
+      {!s.mock && <section aria-label={t("bots.runtimeTitle")} style={{display:"grid", gap:12}}>
+        <h2>{t("bots.runtimeTitle")}</h2>
+        <p className="mute">{t("bots.runtimeHint")}</p>
+        {runtimeError && <p role="alert" className="banner banner-down">{t("bots.runtimeError")}</p>}
+        {runtime === null && !runtimeError && <p role="status">{t("bots.runtimeLoading")}</p>}
+        {runtime?.length === 0 && <p>{t("bots.runtimeEmpty")}</p>}
+        {runtime && runtime.length > 0 && <ul className="card list">{runtime.map(bot => <li key={bot.id}>
+          <div className="row bot-row">
+            <Avatar name={bot.name} />
+            <div className="grow"><p style={{fontWeight:700}}>{bot.name}</p><p className="mute">{bot.title || "—"}</p></div>
+            <span className="bot-model ellipsis">{bot.modelSelection?.model || "—"}</span>
+            {s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}
+          </div>
+        </li>)}</ul>}
+      </section>}
+      <h2>{t("bots.configurationTitle")}</h2>
 
       {s.team.status === "error" && (
         <div role="alert" className="banner banner-down">
