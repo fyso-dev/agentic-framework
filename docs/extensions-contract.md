@@ -1,4 +1,4 @@
-# Extensions contract (Phase 7, D17, D30)
+# Extensions contract (Phase 7, D17, D30, D31)
 
 An **extension** is a small Copier template, applied on top of a generated project, that adds a tool or service by dropping files into **fixed slots**. Each slot is read by software that already merges several files (mise, process-compose, Caddy, Dagu, Claude Code / OMB). There is no plugin loader. This file is the contract between:
 
@@ -11,9 +11,10 @@ An **extension** is a small Copier template, applied on top of a generated proje
 
 | Action | Command | What it runs |
 |---|---|---|
-| Install | `mise run ext:add <src> [-- copier args]` | `copier copy --trust <src> .` then `mise trust` on the new conf.d file, regenerate `.mcp.json` and panel config |
+| Install | `mise run ext:add <id\|src> [-- copier args]` | A bare id is resolved through the catalogs (§8) and pinned to its latest tag. `copier copy --trust <src> . -d extension_port=<first free>` then `mise trust` on the new conf.d file, regenerate `.mcp.json` and panel config |
 | Upgrade | `mise run ext:update [<ext>]` | `copier update --trust --answers-file <f>` for one extension or each `.copier-answers.ext-*.yml`. Copier refuses a dirty tree, so when one upgrade changes files the task stops and asks for a commit before the next |
 | List | `mise run ext:list` | id, source, version (`_commit`) from each answers file |
+| Search | `mise run ext:search [text]` | catalog entries with their latest tag and install state (§8) |
 | Remove | `mise run ext:remove <ext>` | deletes the slot files of §2 and the answers file. Copier has no uninstall |
 
 - Each extension's `copier.yml` sets `_answers_file: .copier-answers.ext-<ext>.yml`. The answers files **are** the list of installed extensions, versioned in git. There is no registry.
@@ -53,7 +54,7 @@ Same shape as `project/apps/*/app.yaml` (panel-contract §1). `url` is required 
 
 ### Ports
 
-The project block (`port_base`…`+8`) is full. Extensions use the **extension block** `port_base + 10` … `port_base + 19`. Each extension asks for its port in its `copier.yml`, with a default read from the project's answers (`_external_data`), and writes it as `FYSO_EXT_<EXT>_PORT` in its conf.d file (`<EXT>` = id in upper case, `-` → `_`). `doctor` fails when two `FYSO_EXT_*_PORT` values collide or fall outside the extension block.
+The project block (`port_base`…`+8`) is full. Extensions use the **extension block** `port_base + 10` … `port_base + 19`. Each extension asks for its port in its `copier.yml` as the question **`extension_port`**, with a default read from the project's answers (`_external_data`), and writes it as `FYSO_EXT_<EXT>_PORT` in its conf.d file. `ext:add` passes the first port of the block that no installed extension uses as `-d extension_port=…`, so a second extension does not collide with the first (`<EXT>` = id in upper case, `-` → `_`). `doctor` fails when two `FYSO_EXT_*_PORT` values collide or fall outside the extension block.
 
 ## 3. Processes and secrets
 
@@ -64,10 +65,12 @@ Every framework process starts from a cleared environment (Phase 1). Extensions 
 version: "0.5"
 processes:
   ext-sample:
-    command: framework/scripts/run-ext.sh sample -- miniserve --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public
+    command: framework/scripts/run-ext.sh sample -- bash -c 'exec miniserve --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public'
     readiness_probe:
-      exec: { command: extensions/sample/doctor.sh }
+      exec: { command: framework/scripts/run-ext.sh sample -- extensions/sample/doctor.sh }
 ```
+
+**Keep `$VARS` away from process-compose's shell.** process-compose stores the command as written and runs it with `bash -c` and the environment of the last `mise run up`. An extension installed from the panel is loaded with `process-compose project update`, so that environment lacks its port and secrets. Put variables in single quotes after `run-ext.sh` (or in a script started by it), and run readiness probes through `run-ext.sh` too.
 
 `run-ext.sh <ext> -- <cmd…>` loads the project's mise environment (Dagu steps run with a cleared one, so ports and secrets would be missing otherwise), then runs `<cmd>` with only `PATH`, `HOME`, `FYSO_*`, and the names listed in `extensions/<ext>/secrets.yaml`. It fails with a clear message when a `required: true` secret is empty. Process names must start with `ext-<ext>`.
 
@@ -98,12 +101,13 @@ type Extension = {
 }
 ```
 
-`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). The panel shows extensions read-only in v1: installing, upgrading and removing are terminal tasks (§1).
+`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). The panel shows installed extensions read-only; installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
 
 ## 6. Known limits (v1)
 
 - **Skills are not enabled automatically.** `team.yaml` belongs to the project. The panel lists an extension's skills; a person (or the Bot Architect) adds them to a bot.
 - **Dagu subdirectories:** supported in 2.24.0 when `DAGU_DAG_DISCOVERY_RECURSIVE=true`; discovery is flat by default. Verified against [store.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store.go) and `TestRecursiveDiscoverySupportsNestedDAGOperations` / the default root-only test in [store_test.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store_test.go). Keep flat prefixed workflow slots in v1.
+- **Hot install reaches OpenMausBot on the next start.** OMB keeps the environment it started with: MCP servers and `BOT_*` secrets of an extension installed from the panel reach bots after `mise run up`. Processes, routes, workflows and panel data load right away.
 - **Removal is manual-ish:** `ext:remove` deletes the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
 
 ## 7. Test fixture and template
@@ -114,3 +118,58 @@ type Extension = {
 Fixture verification: miniserve `0.35.0` is an exact [GitHub release](https://github.com/svenstaro/miniserve/releases/tag/v0.35.0) supported by the aqua registry. Copier `9.19.1` supports `_external_data`; the real lifecycle test reads the project port through it. During update Copier renders the old template in an empty temporary destination, so port validators tolerate absent external project answers there; doctor enforces the installed port range. Extension authoring README files must be excluded from output to preserve project-owned files.
 
 process-compose `1.124.0` accepts `-f` on startup but rejects it for client commands (`process list`, logs, down). All startup fragments are loaded once; status/logs/down target that same project Unix socket.
+
+## 8. Marketplace (D31)
+
+Discovery only: the answers files remain the list of installed extensions. Rationale and the tools compared (Devbox, app stores, Composio alternatives): [ADR 0002](adr/0002-extension-marketplace.md).
+
+### Catalogs
+
+A catalog is a git repo with `marketplace.yaml` at the root:
+
+```yaml
+name: Fyso
+extensions:
+  - id: netbird                        # ^[a-z][a-z0-9-]{1,30}$, the extension id
+    src: gh:fyso-dev/fyso-ext-netbird  # anything Copier and git accept (gh:, URL, path)
+    name: {es: NetBird, en: NetBird}   # string or map of languages
+    description: {es: Red privada entre hosts, en: Private network between hosts}
+    tags: [network]
+    homepage: https://netbird.io       # optional
+```
+
+`project/marketplaces.yaml` (owned by the project) lists catalog sources in order; without it, the official `gh:fyso-dev/fyso-extensions` is used. The first catalog that lists an id wins. A catalog that cannot be read is reported and the others still load. Private catalogs work with the user's git credentials.
+
+**Versions are tags** of the extension repo (`v1.2.0`, `1.2`), read with `git ls-remote --tags`; the highest version-like tag is `latest`. A catalog never stores versions.
+
+### `fyso-ext-catalog` (no params) → output `catalog`
+
+`framework/scripts/marketplace.cjs json`, run by Dagu (it uses the network, so it is not part of `up`):
+
+```ts
+type Marketplace = {
+  collectedAt: string
+  catalogs: { source: string; name: string; error?: string }[]
+  extensions: {
+    id: string; src: string; catalog: string
+    name: string; name_i18n?: Record<string,string>
+    description: string; description_i18n?: Record<string,string>
+    tags: string[]; homepage?: string
+    latest: string | null      // highest version tag; null when the repo has none
+    installed: boolean; version: string | null; update: boolean
+    error?: string             // the repo could not be read
+  }[]
+}
+```
+
+The panel takes `installed`/`version`/`update` from `extensions.json` (always current) and only `latest` from this output.
+
+### `fyso-ext-install` (params `ID`, `MODE` = `add` | `update`) → output `result`
+
+`framework/scripts/ext.sh apply`, run through `mise exec` (Dagu steps start from a cleared environment). `ID` and `MODE` arrive as env vars, never on the command line.
+
+- **add:** `ext:add <id> -- --defaults`, then commit **only** the extension's slots (§2) as `ext: add <id> <version>`. Other uncommitted work is left alone.
+- **update:** a running project always has uncommitted state, and Copier refuses to update a dirty tree. The upgrade runs in a temporary `git worktree` of `HEAD`, is committed there as `ext: update <id> <version>`, and is fast-forwarded into the project. It fails with a clear message only when the extension's own files have local edits.
+- Then `mise install`, and when the stack runs: `process-compose project update` with every fragment and a Caddy restart (`run-caddy.sh` reads extension ports fresh from mise). The panel tolerates the short gateway restart.
+
+Output: `{ id, mode, version: string | null, commit: string }`.

@@ -112,6 +112,10 @@ Steps, in this order (D13 rule 4):
 
 Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
 
+### `fyso-ext-catalog` and `fyso-ext-install` — marketplace (D31)
+
+Read the extension catalogs (output `catalog`) and install or upgrade one extension (params `ID`, `MODE`; output `result`). Shapes and behavior: [extensions-contract.md §8](extensions-contract.md#8-marketplace-d31).
+
 ### `fyso-snapshot` — save now (exists)
 
 Started with `enqueue` and no params. Output `result`: `"no changes"` or `"committed <sha>"`.

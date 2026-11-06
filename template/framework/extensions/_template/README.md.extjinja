@@ -40,9 +40,12 @@ Write **only** these paths. Never edit files another template owns (`mise.toml`,
 - **Run everything through `run-ext.sh`:** `framework/scripts/run-ext.sh [[ extension_id ]] -- <cmd…>`.
   It loads the project's mise env and passes only `PATH`, `HOME`, `FYSO_*` and the
   names in `secrets.yaml`. It refuses to start when a `required: true` secret is empty.
-  Use it in processes and in workflow steps (Dagu runs with a cleared environment).
+  Use it in processes, readiness probes and workflow steps.
+- **Keep `$VARS` in single quotes after `run-ext.sh`** (`-- bash -c 'exec tool --port "$FYSO_EXT_…_PORT"'`).
+  process-compose's own shell has the environment of the last `mise run up`, which
+  lacks this extension right after a panel install.
 - **Ports:** use one port in the project's extension block (`port_base+10` … `+19`),
-  asked in `copier.yml` and exposed as `FYSO_EXT_<EXT>_PORT` (id in upper case,
+  asked in `copier.yml` as the question `extension_port` (the installer fills it with a free port) and exposed as `FYSO_EXT_<EXT>_PORT` (id in upper case,
   `-` → `_`). Listen on `127.0.0.1`; Caddy is the only entry point.
 - **Secrets:** users set values with `mise run secrets` in the project (sops + age).
 - **Pin versions** of every tool in the conf.d file; never `latest`.
@@ -57,6 +60,16 @@ mise run ext:add ../fyso-ext-foo -- --vcs-ref v1
 mise install && mise run up && mise run doctor
 ```
 
-Publish versions as git tags. Projects upgrade with `mise run ext:update [[ extension_id ]]`,
+Publish versions as git tags (`v1.2.0`). To make the extension discoverable, add it to a
+catalog's `marketplace.yaml` (official: `fyso-dev/fyso-extensions`; see the contract §8):
+
+```yaml
+- id: [[ extension_id ]]
+  src: gh:<org>/fyso-ext-[[ extension_id ]]
+  description: {es: …, en: …}
+  tags: []
+```
+
+ Projects upgrade with `mise run ext:update [[ extension_id ]]`,
 list with `mise run ext:list` and uninstall with `mise run ext:remove [[ extension_id ]]`
 (runtime data and secret values are kept).
