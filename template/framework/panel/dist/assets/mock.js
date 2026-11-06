@@ -1,4 +1,4 @@
-import{a as e,i as t,n,r,t as i}from"./index-CX3acZiH.js";var a={name:`Foo project`,slug:`foo-project`,env:`local`,urls:{dagu:`http://dagu.localhost:8400`,omb:`http://omb.localhost:8400`}},o=`# This project's bots, in OpenMausBot's native team file format (PLAN §5).
+import{a as e,i as t,n,r,t as i}from"./index.js";var a={name:`Foo project`,slug:`foo-project`,env:`local`,urls:{dagu:`http://dagu.localhost:8400`,omb:`http://omb.localhost:8400`}},o=`# This project's bots, in OpenMausBot's native team file format (PLAN §5).
 # Fine-tune instructions and memory in OpenMausBot; structure lives here (PLAN D13).
 version: 1
 

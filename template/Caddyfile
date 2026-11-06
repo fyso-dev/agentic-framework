@@ -60,6 +60,8 @@ http://panel.localhost:{$FYSO_HTTP_PORT} {
 	handle {
 		root * {$FYSO_PANEL_ROOT}
 		try_files {path} /index.html
+		# Asset names carry no hash (stable diffs in git), so always revalidate (ETag).
+		header Cache-Control no-cache
 		file_server
 	}
 }
