@@ -108,7 +108,7 @@ type Extension = {
 
 ## 7. Test fixture and template
 
-- `framework/extensions/_template/` — Copier template to start a new extension (`copier copy framework/extensions/_template ../fyso-ext-foo`). It produces a repo with every slot of §2 filled with a commented example.
+- `framework/extensions/_template/` — Copier template to start a new extension (`copier copy framework/extensions/_template ../fyso-ext-foo`). It produces a repo with every slot of §2 filled with a commented example and a `README.md` authoring guide (slots, rules, test and release), which the extension's `copier.yml` excludes from projects. Generated projects document the `ext:*` tasks in their `README.md` and `AGENTS.md`.
 - `tests/fixtures/ext-sample/` — the minimal sample extension (a static file server pinned in its conf.d file, one route, one tile, one doctor, one secret, one MCP entry, one workflow). Tests make a throwaway git repo of it, tag `v1`, install it into a generated project, tag `v2` with a change, and check `ext:update` applies it.
 
 Fixture verification: miniserve `0.35.0` is an exact [GitHub release](https://github.com/svenstaro/miniserve/releases/tag/v0.35.0) supported by the aqua registry. Copier `9.19.1` supports `_external_data`; the real lifecycle test reads the project port through it. During update Copier renders the old template in an empty temporary destination, so port validators tolerate absent external project answers there; doctor enforces the installed port range. Extension authoring README files must be excluded from output to preserve project-owned files.

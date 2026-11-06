@@ -1,0 +1,62 @@
+# [[ extension_id ]] — Fyso extension
+
+A Copier template that adds a tool or service to a Fyso Agentic Framework project by
+filling **fixed slots**. Full contract: [extensions-contract.md](https://github.com/fyso-dev/agentic-framework/blob/main/docs/extensions-contract.md).
+
+This README stays in the extension repo; `copier.yml` excludes it from projects.
+
+## Create
+
+From a generated project:
+
+```bash
+uvx --from copier==9.19.1 copier copy --trust framework/extensions/_template ../fyso-ext-foo -d extension_id=foo
+```
+
+Every slot comes with a commented example (a static `miniserve` site). Replace or
+delete each one; an extension only needs the slots it uses.
+
+## Slots
+
+Write **only** these paths. Never edit files another template owns (`mise.toml`,
+`Caddyfile`, `.gitignore`, `.mcp.json`, `project/bots/team.yaml`…).
+
+| Path | Purpose |
+|---|---|
+| `.config/mise/conf.d/ext-[[ extension_id ]].toml` | Pinned tools, env (`FYSO_EXT_<EXT>_PORT`), tasks |
+| `extensions/[[ extension_id ]]/process.yaml` | process-compose processes, named `ext-[[ extension_id ]]*` |
+| `extensions/[[ extension_id ]]/Caddyfile` | Routes; keep `import fyso_login` |
+| `extensions/[[ extension_id ]]/app.yaml` | Panel tile (`url` is required; `${FYSO_*}` is expanded) |
+| `extensions/[[ extension_id ]]/doctor.sh` | Health check, run by `mise run doctor` and the readiness probe |
+| `extensions/[[ extension_id ]]/secrets.yaml` | Secret **names** and descriptions; never values |
+| `extensions/[[ extension_id ]]/mcp.json` | MCP servers merged into the project's `.mcp.json`; use `${VAR}` placeholders |
+| `extensions/[[ extension_id ]]/skills/<name>/SKILL.md` | Skills; a person adds them to a bot in `team.yaml` |
+| `project/workflows/ext-[[ extension_id ]]-*.yaml` | Dagu workflows (flat, with this prefix) |
+| `extensions/[[ extension_id ]]/.gitignore` | Ignore rules for the slots above |
+| `.data/ext/[[ extension_id ]]/` | Runtime data, never committed |
+
+## Rules
+
+- **Run everything through `run-ext.sh`:** `framework/scripts/run-ext.sh [[ extension_id ]] -- <cmd…>`.
+  It loads the project's mise env and passes only `PATH`, `HOME`, `FYSO_*` and the
+  names in `secrets.yaml`. It refuses to start when a `required: true` secret is empty.
+  Use it in processes and in workflow steps (Dagu runs with a cleared environment).
+- **Ports:** use one port in the project's extension block (`port_base+10` … `+19`),
+  asked in `copier.yml` and exposed as `FYSO_EXT_<EXT>_PORT` (id in upper case,
+  `-` → `_`). Listen on `127.0.0.1`; Caddy is the only entry point.
+- **Secrets:** users set values with `mise run secrets` in the project (sops + age).
+- **Pin versions** of every tool in the conf.d file; never `latest`.
+- **No machine-specific paths;** use `FYSO_ROOT`, `FYSO_DATA` or relative paths.
+
+## Test and release
+
+```bash
+git init && git add . && git commit -m v1 && git tag v1
+# In a generated project with a clean git tree:
+mise run ext:add ../fyso-ext-foo -- --vcs-ref v1
+mise install && mise run up && mise run doctor
+```
+
+Publish versions as git tags. Projects upgrade with `mise run ext:update [[ extension_id ]]`,
+list with `mise run ext:list` and uninstall with `mise run ext:remove [[ extension_id ]]`
+(runtime data and secret values are kept).

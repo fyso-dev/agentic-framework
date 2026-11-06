@@ -29,9 +29,11 @@ mise run up
 | `project/` | this project | bots, workflows, apps — yours to change |
 | `framework/` | template | updated with `uvx copier update --trust`; do not edit |
 | `secrets.enc.yaml` | this project | encrypted with sops + age; edit with `mise run secrets` |
+| `extensions/<ext>/` | extension | installed with `mise run ext:add`; change upstream, not here |
+| `project/mcp.json` | this project | your MCP servers; `.mcp.json` is generated from it, `framework/` and extensions |
 | `.data/` | runtime | data of Dagu, OpenMausBot and Caddy; never committed |
 
-Ports {{ port_base }}–{{ port_base + 9 }} belong to this project. This project never connects to another Dagu or OpenMausBot on the machine.
+Ports {{ port_base }}–{{ port_base + 9 }} belong to this project, and {{ port_base + 10 }}–{{ port_base + 19 }} to its extensions. This project never connects to another Dagu or OpenMausBot on the machine.
 
 ## Build a change
 
@@ -52,6 +54,20 @@ the worktree and retain the branch. No code change reaches the base branch.
 
 Claude and Codex must already be installed and signed in on the host. Their user
 configuration can still affect execution (particularly Codex hooks and skills).
+
+## Extensions
+
+An extension is a Copier template that adds a tool or service (processes, routes, a panel tile, MCP servers, skills, workflows) without editing framework files.
+
+```bash
+mise run ext:add gh:org/fyso-ext-foo -- --vcs-ref v1   # needs a clean git tree
+mise install && mise run up                            # load its tools, processes and routes
+mise run ext:list                                      # id, source, version
+mise run ext:update foo                                # commit after each upgrade
+mise run ext:remove foo                                # keeps .data/ext/foo and secret values
+```
+
+Set the secrets it declares with `mise run secrets`; the panel's Apps page shows which are missing. To write one, start from `framework/extensions/_template` (see its README).
 
 ## Observe bots and execution
 

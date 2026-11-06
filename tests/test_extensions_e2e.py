@@ -42,6 +42,8 @@ class ExtensionsE2E(unittest.TestCase):
             shutil.copy(project / '.copier-answers.yml', starter_project)
             run(*copier, 'copy', '--trust', '--defaults', str(starter), str(starter_project))
             self.assertTrue((starter_project / 'extensions/demo/process.yaml').exists())
+            self.assertIn('# demo — Fyso extension', (starter / 'README.md').read_text())
+            self.assertFalse((starter_project / 'README.md').exists())
             self.assertIn('8410', (starter_project / '.config/mise/conf.d/ext-demo.toml').read_text())
             ext = base / 'ext'
             shutil.copytree(ROOT / 'tests/fixtures/ext-sample', ext)
