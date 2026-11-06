@@ -21,7 +21,7 @@ test('MCP merges framework, project and sorted extensions, preserving placeholde
   put('extensions/sample/mcp.json',JSON.stringify({mcpServers:{sample:{url:'${FYSO_EXT_SAMPLE_PORT}'}}}));
   const result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
   const config=JSON.parse(fs.readFileSync(path.join(root,'.mcp.json')));
-  assert.deepEqual(Object.keys(config.mcpServers),['dagu','project','sample']);
+  assert.deepEqual(Object.keys(config.mcpServers),['dagu','fyso','project','sample']);
   assert.equal(config.mcpServers.project.url,'${TOKEN}');
 }));
 test('MCP duplicate reports both owners and leaves previous output intact',()=>fixture(({root,put,run})=>{

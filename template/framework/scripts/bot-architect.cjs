@@ -140,22 +140,8 @@ async function main(env=process.env) {
 }
 
 async function submit(params,env=process.env) {
-  const name='fyso-bot-architect',base=`http://127.0.0.1:${env.FYSO_DAGU_PORT}/api/v1`;
-  const headers={Authorization:'Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'),'Content-Type':'application/json'};
-  const get=async(url,init)=>{const r=await fetch(url,{headers,signal:AbortSignal.timeout(10000),...init});if(!r.ok)throw new Error(`Dagu request failed (${r.status})`);return r.json();};
-  const started=await get(`${base}/dags/${name}/enqueue`,{method:'POST',body:JSON.stringify({params:JSON.stringify(params)})});
-  for(let n=0;n<180;n++) {
-    let detail;
-    try {detail=(await get(`${base}/dag-runs/${name}/${encodeURIComponent(started.dagRunId)}`)).dagRunDetails;}
-    catch {await new Promise(resolve=>setTimeout(resolve,1000));continue;}
-    if(detail.statusLabel==='succeeded') {
-      const output=(await get(`${base}/dag-runs/${name}/${encodeURIComponent(started.dagRunId)}/outputs`)).outputs.result;
-      return {runId:started.dagRunId,...(typeof output==='string'?JSON.parse(output):output)};
-    }
-    if(['failed','aborted','rejected','cancelled'].includes(detail.statusLabel))throw new Error(`Bot Architect workflow failed: ${started.dagRunId}; read its Dagu logs`);
-    await new Promise(resolve=>setTimeout(resolve,1000));
-  }
-  throw new Error(`workflow still active: ${started.dagRunId}; inspect it in Dagu`);
+  const {runId,output}=await require('./dagu-client.cjs').client(env).run('fyso-bot-architect',params,{output:'RESULT',timeoutMs:180000});
+  return {runId,...output};
 }
 if(require.main===module) {
   (process.argv[2]==='submit'?submit(JSON.parse(process.argv[3]||'{}')):main()).then(r=>console.log(JSON.stringify(r))).catch(e=>{console.error(e.message);process.exitCode=1;});
