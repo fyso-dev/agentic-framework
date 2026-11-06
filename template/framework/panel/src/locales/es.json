@@ -170,7 +170,8 @@
     "importDraftHint": "Aplicá o descartá el borrador antes de importar otro bot.",
     "versionUnavailable": "No se pudo verificar el estado en Git. La importación está deshabilitada.",
     "versionHint": "“En el proyecto” y “En snapshot” indican una definición guardada en el último commit; los cambios posteriores del bot pueden no estar guardados.",
-    "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Commitealos o descartalos antes de importar."
+    "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Commitealos o descartalos antes de importar.",
+    "editAction": "Editar"
   },
   "form": {
     "back": "Bots",

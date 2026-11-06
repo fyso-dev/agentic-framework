@@ -108,3 +108,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | Corrected duplicate bot lists: one native roster with matching configuration actions and pending drafts. Chief/native-only bots remain visible; unchanged stale declarations no longer resurrect native deletions. |
 
 | 2026-11-06 | Native bot import (D29): distinguish project/snapshot/native-only definitions using committed Git evidence and import one native profile into project configuration without modifying OMB. [Verified evidence](../artifacts/delivery-evidence/bot-import/README.md). |
+
+| 2026-11-06 | Unified bot actions: every row opens OMB, while configuration edit and native import remain explicit sibling actions. |

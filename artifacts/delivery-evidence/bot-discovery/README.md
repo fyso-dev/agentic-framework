@@ -20,3 +20,11 @@ The initial capture above exposed both native and configuration lists, duplicati
 ![One unified bot roster](unified-roster.png)
 
 Manual Chrome capture of the corrected local panel. The four native bots appear exactly once. Four new regression cases cover merging, chief/native-only inclusion, pending draft preservation, native deletion, and ambiguous identities. All 17 Node checks passed on pinned Node 24.15.0; TypeScript/Vite build passed.
+
+## Consistent OMB access
+
+All four rows now expose the authenticated OMB gateway link. The three configured bots also expose explicit Edit links; MausBot retains its chief protection. Import remains a separate action for eligible native profiles. Manual Chrome checked each row's link targets and found no nested anchors or console warnings/errors. TypeScript/Vite build and project doctor passed (the existing nonfatal native/project drift warning remains).
+
+![Every bot opens OMB](all-bot-actions.png)
+
+Manual Chrome capture of the user project: one list, four OMB links and three independent configuration edit controls. OMB links open the native app entry point; they do not claim a bot-specific chat route.

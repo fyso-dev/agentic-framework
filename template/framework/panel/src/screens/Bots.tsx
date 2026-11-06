@@ -148,28 +148,25 @@ export function Bots({ review }: { review: boolean }) {
             const inner = (
               <>
                 <Avatar name={name} />
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                   <p style={{ fontWeight: 700 }} className="ellipsis">{name}</p>
                   <p className="mute ellipsis" style={{ fontSize: 13 }}>{title || "—"}</p>
                 </div>
                 <span className="bot-engine"><span className="pill pill-outline">{eng.kind(engine)}</span></span>
                 <span className="bot-model ellipsis" title={model}>{modelId}</span>
                 <span className="bot-state">{state !== "applied" || s.mock ? <BotStatePill state={state} /> : <span className={`pill ${version === "native" ? "pill-warn" : "pill-outline"}`} title={s.botVersioning.data ? `${s.botVersioning.data.commit || ""} · ${s.botVersioning.data.collectedAt}` : undefined}>{t(`bots.version.${version}`)}</span>}</span>
-                <span aria-hidden="true" className="chev" style={{ visibility: state === "deleted" || !configuration ? "hidden" : undefined }}>›</span>
               </>
             );
             return (
               <li key={row.key}>
-                {state === "deleted" ? (
-                  <div className="row bot-row is-deleted">{inner}</div>
-                ) : configuration ? (
-                  <a className="row bot-row" href={href.bot(configuration.bot.index)} aria-label={t("bots.edit", { name })}>{inner}</a>
-                ) : (
-                  <div className="row bot-row" style={{flexWrap:"wrap"}}>{inner}
-                    {canImport && <button type="button" className="btn btn-pri" disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={() => void importBot(row.nativeId!)} aria-label={t("bots.importNamed",{name})}>{t("bots.import")}</button>}
+                <div className={`row bot-row${state === "deleted" ? " is-deleted" : ""}`} style={{flexWrap:"wrap"}}>
+                  {inner}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",flexBasis:"100%",justifyContent:"flex-end"}}>
+                    {state !== "deleted" && configuration && <a className="btn btn-ghost" href={href.bot(configuration.bot.index)} aria-label={t("bots.edit",{name})}>{t("bots.editAction")}</a>}
+                    {state !== "deleted" && canImport && <button type="button" className="btn btn-pri" disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={() => void importBot(row.nativeId!)} aria-label={t("bots.importNamed",{name})}>{t("bots.import")}</button>}
                     {s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}
                   </div>
-                )}
+                </div>
               </li>
             );
           })}
