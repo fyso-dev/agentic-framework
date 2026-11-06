@@ -55,4 +55,4 @@ Sources for the comparison: [TrueFoundry](https://www.truefoundry.com/blog/compo
 - Custom code: `marketplace.cjs` (~140 lines), the `apply`/`search` branches of `ext.sh`, two workflow files and one panel section.
 - Extension authors must keep `$VARS` out of the process-compose shell (single quotes after `run-ext.sh`) and run probes through `run-ext.sh`: process-compose expands commands with the environment of the last `mise run up`, which lacks an extension installed from the panel (contract §3).
 - OpenMausBot keeps the environment of its start: new MCP servers and `BOT_*` secrets from a hot install reach bots after the next `mise run up`.
-- Next: a spike to run Activepieces natively as an extension; a panel search over the MCP Registry.
+- Activepieces spike done: it runs natively and its MCP runs piece actions ([spikes/activepieces.md](spikes/activepieces.md)). Next: build `fyso-ext-activepieces`, and a panel search over the MCP Registry.
