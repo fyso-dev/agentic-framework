@@ -30,6 +30,7 @@ mise run up
 | `framework/` | template | updated with `uvx copier update --trust`; do not edit |
 | `secrets.enc.yaml` | this project | encrypted with sops + age; edit with `mise run secrets` |
 | `extensions/<ext>/` | extension | installed with `mise run ext:add`; change upstream, not here |
+| `project/marketplaces.yaml` | this project | extension catalogs (git repos) shown in the marketplace |
 | `project/mcp.json` | this project | your MCP servers; `.mcp.json` is generated from it, `framework/` and extensions |
 | `.data/` | runtime | data of Dagu, OpenMausBot and Caddy; never committed |
 
@@ -59,8 +60,12 @@ configuration can still affect execution (particularly Codex hooks and skills).
 
 An extension is a Copier template that adds a tool or service (processes, routes, a panel tile, MCP servers, skills, workflows) without editing framework files.
 
+The panel's **Apps → Marketplace** lists the extensions of the catalogs in `project/marketplaces.yaml` and installs or upgrades them without a restart (each change is one commit). From the terminal:
+
 ```bash
-mise run ext:add gh:org/fyso-ext-foo -- --vcs-ref v1   # needs a clean git tree
+mise run ext:search                                    # catalog entries, latest versions
+mise run ext:add foo                                   # by catalog id, latest tag
+mise run ext:add gh:org/fyso-ext-foo -- --vcs-ref v1   # or any Copier source
 mise install && mise run up                            # load its tools, processes and routes
 mise run ext:list                                      # id, source, version
 mise run ext:update foo                                # commit after each upgrade
