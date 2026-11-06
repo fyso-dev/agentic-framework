@@ -33,10 +33,10 @@ Bots consume tools through MCP (`.mcp.json`, team file `tools: allow mcp:<server
 
 | Option | License | Fit |
 |---|---|---|
-| [Official MCP Registry](https://modelcontextprotocol.io/registry) | open; API + `server.json`, designed for subregistries | The catalog of MCP servers. Adding one = an entry in `project/mcp.json`; no extension needed |
-| [Activepieces](https://mcp.so/servers/activepieces) | MIT (Community Edition) | ~760 "pieces" (SaaS connectors with OAuth), each exposed as MCP. The open-source Composio replacement; fits as an **extension** (`fyso-ext-activepieces`). Native run without Docker not yet verified |
-| [ACI.dev](https://mcp.so/servers/aci) | Apache 2.0 | 600+ tools behind one MCP server; 2026 maintenance status not confirmed |
-| [ToolHive](https://github.com/stacklok/toolhive) | Apache 2.0 | Runs MCP servers isolated, but in containers |
+| [Official MCP Registry](https://modelcontextprotocol.io/registry) | open; API + `server.json`, designed for subregistries | **Verified 2026-11-06:** `GET /v0/servers?search=…&version=latest` works; per service 9–43 entries (gmail 22, slack 25, postgres 43), most from third parties (no curation beyond the reverse-DNS namespace, e.g. `io.github.github/…`). Entries declare `packages` (npm → `npx`, pypi → `uvx`, oci → needs Docker, excluded) and `remotes` (streamable-http), with secret variables marked `isSecret`. Adding one = an entry in `project/mcp.json` with `${VAR}` placeholders; no extension needed |
+| [Activepieces](https://mcp.so/servers/activepieces) | MIT (Community Edition) | ~760 "pieces" (SaaS connectors with managed OAuth connections) behind one MCP server (`ap_run_action`). **Verified natively** ([spike](spikes/activepieces.md)). The open-source Composio replacement; fits as an **extension** (`fyso-ext-activepieces`) |
+| [ACI.dev](https://github.com/aipotheosis-labs/aci) | Apache 2.0 | **Rejected (checked 2026-11-06):** the backend requires PropelAuth (proprietary SaaS auth), AWS KMS for credential encryption, an OpenAI key for embeddings and Postgres + pgvector; last functional change August 2025 (only dependency bumps since), last release `v0.0.1-beta.3` (2024) |
+| [ToolHive](https://github.com/stacklok/toolhive) | Apache 2.0 | **Rejected:** active (v0.63.0, 2026-11-06), but runs MCP servers locally only through Docker/Podman or Kubernetes; the framework runs native processes |
 | [Nango](https://nango.dev/docs/guides/platform/self-hosting.md) | Elastic License; free self-host is auth only | Not open source |
 | Metorial, n8n | FSL / fair-code | Not open source |
 
