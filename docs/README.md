@@ -56,8 +56,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ✅ done |
 | 2 | Bots: team file, auth, Dagu MCP | ✅ done |
 | 3 | Snapshot and replicate | ✅ done |
-| 4 | Panel: customization layer (checklist, bots, apps), i18n | 🚧 in progress · SPA built in `template/framework/panel/` (mock mode, `dist/` committed); action workflows and Caddy routes pending |
-| 5 | Builder (dogfooding) with Dagu `harness.run` | ⬜ not started |
+| 4 | Panel: customization layer (checklist, bots, apps), i18n | ✅ done |
+| 5 | Builder (dogfooding) with Dagu `harness.run` | ⏳ next |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ⬜ not started |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -86,3 +86,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | [Phase 4 plumbing](adr/phase-4-plumbing.md): action workflows, read-only configuration and panel gateway; isolated verification recorded in the ADR |
 | 2026-11-05 | **Phase 3 done.** The Dagu-scheduled `fyso-snapshot` commits bots and memory (after gitleaks). Wiping `.data/` and running `up` restores bots, memory (the bot recalled the fact) and workflows. Framework workflows reach Dagu through file symlinks (`DAGU_DAG_DISCOVERY_SYMLINKS`); step env is allowlisted (`DAGU_ENV_PASSTHROUGH_PREFIXES`) |
 | 2026-11-05 | **Phase 4 panel SPA.** Vite + React + TypeScript in `framework/panel/`, coded against [panel-contract.md](panel-contract.md) and the Claude Design boards: checklist, bots (draft → `fyso-bots-plan` → `fyso-bots-apply`), apps with health, one action component for Dagu runs, ES/EN, light/dark, mock mode. `team.yaml` `${VAR}` placeholders are not valid YAML inside flow maps (`soul: { file: ${FYSO_ROOT}/… }`); the panel swaps them for tokens while parsing |
+| 2026-11-05 | **Phase 4 done.** Panel SPA (from the Claude Design boards) + plumbing, built in parallel by Claude and Codex against `panel-contract.md`. Verified end to end against the real stack: checklist 4/4, launcher with health, and edit → preview → apply (snapshot commit, then `bots: update from panel`, model changed in OMB) |
