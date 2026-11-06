@@ -1,0 +1,128 @@
+# Panel ↔ framework contract (Phase 4)
+
+The panel is a static SPA. It has **no backend of its own** (PLAN §9, D13). It reads files that Caddy serves read-only, and it acts by starting Dagu workflows and reading their outputs. This file is the contract between the SPA (`framework/panel/`) and the plumbing (`framework/workflows/`, `framework/scripts/`, `Caddyfile`).
+
+All URLs are relative to the panel origin `http://panel.localhost:<port>`. The browser is already authenticated with basic auth (D11), and Caddy forwards the same `Authorization` header to Dagu (D19).
+
+## 1. Read-only files
+
+| URL | Source | Content |
+|---|---|---|
+| `GET /config/project.json` | written by `up.sh` into `.data/panel/` | `{ "name": "Foo project", "slug": "foo-project", "env": "local" \| "server", "urls": { "dagu": "...", "omb": "..." } }` |
+| `GET /config/team.yaml` | `project/bots/team.yaml` | The OMB team file, as text |
+| `GET /config/apps.json` | written by `up.sh` from built-ins + `project/apps/*/app.yaml` | `App[]`, see below |
+
+```ts
+type App = {
+  id: string
+  name: string                       // already resolved for the default locale
+  name_i18n?: Record<string, string> // optional per-locale names, e.g. { en: "...", es: "..." }
+  description: string
+  description_i18n?: Record<string, string>
+  icon: string                       // generic name: "workflow" | "bot" | "users" | …
+  url: string
+  group: "framework" | "project"
+  enabled: boolean
+  accessNote?: string
+  accessNote_i18n?: Record<string, string>
+}
+```
+
+**App health.** The panel probes each app with `fetch(app.url, { mode: "no-cors" })` and shows **ok** if the request resolves, **down** if it rejects, **unknown** until the first probe ends. "Degraded" is not used for now.
+
+## 2. Dagu API (through `/api/dagu/`)
+
+Caddy proxies `/api/dagu/*` on the panel origin to Dagu (`/api/v1/*`), so there is no CORS. The panel only uses:
+
+| Call | Use |
+|---|---|
+| `POST /api/dagu/dags/{name}/enqueue` with body `{ "params": "<JSON object as string>" }` | Start an action. Returns `{ "dagRunId": "…" }`. **Always `enqueue`, never `start`**: `start` fails while another run is active (Phase 3 finding) |
+| `GET /api/dagu/dag-runs/{name}/{dagRunId}` | Poll the status: `.dagRunDetails.statusLabel` |
+| `GET /api/dagu/dag-runs/{name}/{dagRunId}/outputs` | Results: `.outputs.<key>` (keys are lowercase) |
+| `GET /api/dagu/dags/{name}/dag-runs?limit=1` | Last run of an action (e.g. the last snapshot) |
+
+Status mapping (the action component's 5 states, panel-spec.md):
+
+| Visual | `statusLabel` |
+|---|---|
+| in progress | `running`, `queued`, `waiting` |
+| ok | `succeeded`, `partially_succeeded` |
+| failed | `failed`, `aborted`, `rejected` |
+| never | no run |
+
+"See logs in Dagu" links to `<urls.dagu>/dags/{name}`.
+
+## 3. Action workflows
+
+Each one lives in `framework/workflows/<name>.yaml` and is exposed as `project/workflows/fyso-<name>.yaml` (symlink, see PLAN Phase 3). Its outputs are JSON strings, which the panel parses with `JSON.parse`.
+
+### `fyso-setup-check` — checklist data (no params)
+
+Output `check`:
+
+```ts
+{
+  checkedAt: string                  // ISO time
+  engines: Array<{
+    id: string                       // OMB engine instance: "claude" | "claudeApi" | "codex" | …
+    label: string                    // "Claude"
+    kind: "subscription" | "api"
+    ok: boolean                      // signed in / key configured
+    models: string[]                 // model ids offered by that engine
+    fixHint?: string                 // command to fix, e.g. "claude /login"
+  }>
+  bots: {
+    count: number                    // bots in project/bots/team.yaml (excluding MausBot)
+    pending: number                  // changes `team apply --dry-run` would make (created + changed + deleted)
+    ok: boolean                      // pending === 0
+  }
+  dagu: {
+    ok: boolean                      // the Dagu MCP answers for the bots
+    botsConnected: number            // bots whose cwd has .mcp.json with the dagu server
+  }
+}
+```
+
+The fourth checklist step (last save to git) does not come from here: the panel reads the last `fyso-snapshot` run.
+
+### `fyso-bots-plan` — preview (param `TEAM_B64`)
+
+- `TEAM_B64`: base64 (UTF-8) of the proposed `team.yaml`. Empty means the current file.
+- Nothing is written.
+
+Output `plan` is the `openmausbot team apply --dry-run --json` result as-is:
+
+```ts
+{ plan: string[], created: number, changed: number, unchanged: number, deleted: number, warnings?: unknown[] }
+```
+
+The plan lines are OMB's English prose (spike `omb`). The panel shows them verbatim inside the preview and does not translate them.
+
+### `fyso-bots-apply` — apply (param `TEAM_B64`)
+
+Steps, in this order (D13 rule 4):
+1. Snapshot: export bots and memory and commit them, so tuning done in OMB is kept.
+2. Write `TEAM_B64` to `project/bots/team.yaml`, after validating it with `--dry-run`. If validation fails, nothing is written.
+3. `openmausbot team apply`.
+4. Commit `project/bots/team.yaml` with the message `bots: update from panel`.
+
+Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
+
+### `fyso-snapshot` — save now (exists)
+
+Started with `enqueue` and no params. Output `result`: `"no changes"` or `"committed <sha>"`.
+
+## 4. Editing `team.yaml` in the browser
+
+The panel parses and writes `team.yaml` with the `yaml` package's `Document` API, which **keeps comments and order**. It changes only the fields of the form:
+- `name`
+- `title` (role)
+- `model` (`<engine>/<model>`)
+- `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
+- `tools`
+
+Skills are out of scope for v1: they are listed read-only. "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
+
+## 5. i18n
+
+UI strings: `framework/panel/src/locales/{es,en}.json` (D12). Server data (plan lines, Dagu errors) is shown as received.
