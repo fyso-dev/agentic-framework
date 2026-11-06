@@ -25,6 +25,7 @@ This repo is the **Copier template** of the Fyso Agentic Framework (working name
 - **Ownership (in `template/`):** `framework/**` belongs to the template. `project/**` and `state/**` belong to each generated project and are never overwritten by `copier update`. Do not put project-specific content in `framework/`.
 - **Secrets:** never commit plaintext secrets. Use `sops` + `age` (`secrets.enc.yaml`). The panel never shows secret values.
 - **Versioning:** configuration lives in git. Nothing may hold configuration that cannot be rebuilt from the repo.
+- **Isolation:** never connect to the user's own Dagu, OpenMausBot or herdr session. Use this project's data dirs (`.data/…`), its port block and a named herdr session ([PLAN §3.1](docs/PLAN.md#31-isolation-every-project-runs-its-own-instances)). Every `openmausbot` CLI call must target an explicit `--port`/`OPENMAUSBOT_URL`: without one it auto-discovers the user's desktop app on 8799.
 - **Pin versions** of every tool in `mise.toml`. Upgrade deliberately, never with `latest`.
 - **Git flow:** work on a branch and merge through a PR. Never push to `main` directly. Do not commit, push or open PRs unless asked.
 - **Docs stay current:** when you add a doc, take a decision or change a phase status, update `docs/README.md` in the same change. Record findings in Layer 5.

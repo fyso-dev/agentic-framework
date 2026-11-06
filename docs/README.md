@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D12) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D16; D6 and D9 superseded) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | `adr/` *(starts with Phase 0: `adr/0001-spikes.md`)* |
 
 ## Layer 2 — Architecture
@@ -28,7 +28,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Runtime architecture (Caddy, OMB, Dagu, herdr, panel) | [PLAN §3](PLAN.md#3-architecture) |
+| Runtime architecture (Caddy, OMB, Dagu, panel; herdr as a dev tool) | [PLAN §3](PLAN.md#3-architecture) |
+| Isolation: own instances, data dirs and port blocks | [PLAN §3.1](PLAN.md#31-isolation-every-project-runs-its-own-instances) |
 | Repository layout and ownership (`framework/` vs `project/`, Copier) | [PLAN §4](PLAN.md#4-repository-layout-copier) |
 
 ## Layer 3 — Contracts and specs
@@ -40,8 +41,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
-| Panel behavior and i18n | [PLAN §9](PLAN.md#9-panel-the-only-real-custom-code) |
-| Panel design spec (for Claude Design) | [panel-spec.md](panel-spec.md) |
+| Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
+| Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
 
 ## Layer 4 — Execution
 *What is being built, in what order, and where it stands.*
@@ -52,8 +53,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ⬜ not started |
 | 2 | Bots: team file, auth, Dagu MCP | ⬜ not started |
 | 3 | Snapshot and replicate | ⬜ not started |
-| 4 | Panel: launcher, health, chat, i18n | ⬜ not started · 🎨 design in progress (Claude Design) |
-| 5 | Builder (dogfooding) with herdr | ⬜ not started |
+| 4 | Panel: customization layer (checklist, bots, apps), i18n | ⬜ not started · 🎨 design spec v2 ready for Claude Design |
+| 5 | Builder (dogfooding) with Dagu `harness.run` | ⬜ not started |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -65,3 +66,6 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 |---|---|
 | 2026-11-05 | Research: OMB exposes a team file (`team apply/export`), a Bot API (tool-less turns), MCP servers per bot `cwd`, and memory as Markdown files. Dagu v2 exposes REST `/api/v1`, MCP at `/mcp`, and proxy-header auth |
 | 2026-11-05 | Plan simplified around the principle: custom code reduced to the panel SPA and glue scripts |
+| 2026-11-05 | The user already runs Dagu (`:18083`, coordinator `:50055`) and OMB (`:8799`, `:8800`, `:8810`, `:8811`). Isolation rules and port blocks were added; spikes use blocks 8410, 8500 and 8600 (8700 has a port in use) |
+| 2026-11-05 | Reuse review: Dagu ships `harness.run` (runs Claude Code / Codex), `chat.completion` and Git Sync. herdr leaves the runtime and stays as a dev tool (D15); fnox enters Phase 0 (D16) |
+| 2026-11-05 | The panel becomes a customization layer over OMB for the person setting up the project. Chat removed (D13, D14). Panel spec v2 |

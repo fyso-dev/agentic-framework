@@ -8,7 +8,7 @@ Brand: **Fyso**. "Fyso Agentic Framework" is a working name; the final product n
 
 > **Orchestrate existing software. Never reinvent the wheel. Always feel simple.**
 
-Every piece of this framework is an existing tool, wired together with configuration files and a few small scripts. Custom code is allowed only when no existing tool does the job, and it must stay small: the control panel SPA and some glue scripts. When in doubt, choose the option with fewer moving parts.
+Every piece of this framework is an existing tool, wired together with configuration files and a few small scripts. Custom code is allowed only when no existing tool does the job, and it must stay small: the panel SPA and some glue scripts. When in doubt, choose the option with fewer moving parts.
 
 ## 1. Goal
 
@@ -18,32 +18,40 @@ A reusable, versioned template for agentic projects. Each project gets:
 |---|---|
 | Conversational bots with memory | **OpenMausBot** (OMB) |
 | Workflows, scheduling, run history | **Dagu** |
-| Coding agents on a subscription, in git worktrees | **herdr core** (`herdr server`) |
-| One entry point, routing, login, secret injection | **Caddy** |
+| Coding agents (Claude Code, Codex) run by workflows | **Dagu `harness.run`** |
+| One entry point, routing, login | **Caddy** |
 | Run all processes natively | **process-compose** |
 | Pinned tool versions, env, tasks | **mise** |
-| Encrypted secrets in git | **sops + age** |
+| Encrypted secrets in git | **sops + age** (or **fnox**, decided in Phase 0) |
 | Create projects and update them from the template | **Copier** |
 | Secret scanning before commits | **gitleaks** |
 | PRs | **gh** |
-| Launcher + bot chat (the only real custom code) | small **Vite + React** SPA |
+| Customization layer + launcher (the only real custom code) | small **Vite + React** SPA |
+
+**Development tool, not runtime:** **herdr** is how humans and coordinating agents develop the framework in parallel (Claude and Codex in worktrees). Generated projects do not depend on it.
 
 ## 2. Decisions log
+
+Append-only. A superseded decision stays, marked with what replaced it.
 
 | # | Decision |
 |---|---|
 | D1 | Native runtime: **mise + process-compose**. Docker Compose is optional, for deployment only |
 | D2 | Bots can use **subscription CLIs** and **API keys**, per bot (native OMB team file) |
-| D3 | Secrets: **sops + age**, loaded into the env by mise. No custom secret layer |
-| D4 | **Configure in the apps, the framework records to git.** Dagu UI edits workflows, OMB UI edits bots. A snapshot job saves everything to git |
+| D3 | Secrets: **sops + age**, loaded into the env by mise. No custom secret layer. *Compared with fnox in Phase 0 (D16)* |
+| D4 | **Configure in the apps, the framework records to git.** A snapshot job saves everything to git. *Refined by D13: structural bot config goes through the customization layer* |
 | D5 | Snapshot: **one scheduled commit straight to the current branch, no PRs**. It includes the complete memory folder |
-| D6 | Front chat uses the **OMB Bot API** only. Bot API turns have no tools, so chat consults and does not act |
+| D6 | ~~Front chat uses the OMB Bot API only~~ *Superseded by D14* |
 | D7 | Distribution: **Copier**, semver tags on the template repo |
 | D8 | Initial bots: **Workflow Architect**, **Run Operator**, **Builder** (dogfooding) |
-| D9 | herdr core runs coding agents, invoked from the Dagu `dev-task` workflow |
+| D9 | ~~herdr core runs coding agents from `dev-task`~~ *Superseded by D15* |
 | D10 | One gateway (Caddy) with one subdomain per app. The native OMB and Dagu UIs are first-class apps |
 | D11 | Login: **local `admin` / `admin`** via Caddy basic auth (password from secrets). Extended later with existing tools (Authelia, Pocket ID, oauth2-proxy) |
 | D12 | **Simple i18n from day one**: `i18next` + `react-i18next` with one JSON file per locale (`es` default, `en`). Dates, relative times and numbers use the browser's built-in `Intl` APIs |
+| D13 | **Customization layer over OMB.** The panel is for the person customizing the project; they then use OMB as-is. See §9 for its 4 rules |
+| D14 | **No chat in the panel.** Users chat in OMB's own UI. The Bot API is not used for now |
+| D15 | **The Builder runs coding agents with Dagu `harness.run`**, not herdr. herdr is a development tool only |
+| D16 | **fnox is evaluated against sops** in Phase 0; the winner becomes the secrets tool |
 
 ## 3. Architecture
 
@@ -51,25 +59,51 @@ A reusable, versioned template for agentic projects. Each project gets:
                          Browser
                             │  login: admin / admin (Caddy basic_auth)
                 ┌───────────▼────────────┐
-                │        Caddy           │  routes · login · injects secrets into upstream headers
+                │        Caddy           │  routes · login · read-only config files · Dagu API passthrough
                 └─┬──────────┬─────────┬─┘
       panel.<host> │  dagu.<host> │ omb.<host> │ <app>.<host>
                    ▼          ▼         ▼           ▼
-          Panel SPA       Dagu UI    OMB UI     project apps
-       (launcher + chat)  (native)   (native)   (project/apps/*)
-
-   OpenMausBot ── MCP (/mcp) ──▶ Dagu ── dev-task ──▶ herdr core
+           Panel SPA       Dagu UI    OMB UI     project apps
+      (customization +     (native)   (native)   (project/apps/*)
+          launcher)
+              │ every action = a Dagu workflow (setup-*, snapshot)
+              ▼
+   OpenMausBot ── MCP (/mcp) ──▶ Dagu ── dev-task (harness.run: claude / codex)
                                   │
                                   └── snapshot (hourly) ──▶ git commit (+ push)
 ```
 
-- **Caddy does the server-side work, so there is no backend to write.**
-  - Routing: one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server.
-  - Login: `basic_auth`.
-  - Secrets: Caddy adds the Bot API key as an `Authorization` header on the panel's `/chat` route, so the browser never sees it.
-  - Dagu login: Caddy forwards the authenticated user in a header that Dagu trusts (proxy auth), so Dagu needs no second login.
-  - OMB keeps its own device pairing and opens in a new tab.
-- **OMB and Dagu are coupled in only two places.** OMB reaches Dagu through Dagu's built-in MCP server (`.mcp.json` in the bot `cwd`). Dagu reaches herdr through the `herdr` CLI in DAG steps.
+- **There is no backend to write.**
+  - **Caddy** handles the routing (one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server) and the login (`basic_auth`). It also serves the project's config files read-only to the panel, and passes Dagu API calls through.
+  - **Dagu login:** Caddy forwards the authenticated user in a header that Dagu trusts (proxy auth), so Dagu needs no second login.
+  - **OMB** keeps its own device pairing and opens in a new tab.
+  - **Every panel action is a Dagu workflow** started with parameters. Dagu does the work, keeps the logs and allows retries. The same workflows run from the terminal with `mise run …`.
+- **OMB and Dagu are coupled in only one place:** OMB reaches Dagu through Dagu's built-in MCP server (`.mcp.json` in the bot `cwd`).
+
+### 3.1 Isolation: every project runs its own instances
+
+A project must never touch the user's own Dagu or OMB, nor another project's. Everything is isolated through settings the tools already have, all set in `mise.toml` `[env]`:
+
+| Tool | Data isolation | Port isolation | Trap to avoid |
+|---|---|---|---|
+| Dagu | `DAGU_HOME=.data/dagu`, `DAGU_DAGS_DIR=project/workflows` | `DAGU_PORT`, `DAGU_COORDINATOR_PORT`, `DAGU_COORDINATOR_HEALTH_PORT`, `DAGU_SCHEDULER_PORT`, `DAGU_WORKER_HEALTH_PORT` | The coordinator defaults to `:50055` and collides with any other Dagu |
+| OMB | `openmausbot serve --data-dir .data/omb` | `OMB_PORT`, `OMB_WEBHOOK_PORT` | **The CLI auto-discovers ports 8799/18799/28799**, which are the user's desktop app. Always export `OPENMAUSBOT_URL` / `OMB_PORT`, and never use those ports |
+| Caddy | `.data/caddy` (`XDG_DATA_HOME`/`XDG_CONFIG_HOME`) | Unprivileged HTTP port; `admin localhost:<port>` instead of the default `:2019` | — |
+| herdr (dev only) | Its own named session: `herdr --session <name>` | its own socket | Never drive the user's default session |
+
+**What is shared on purpose:** the `claude` / `codex` CLI logins (the subscription). Bot transcripts and memory stay inside `.data/omb`.
+
+**Port block.** Each project gets a base port from Copier (`port_base`, default `8400`) and fixed offsets:
+
+| Offset | Service | Offset | Service |
+|---|---|---|---|
+| +0 | Caddy (`http://panel.localhost:8400`, `dagu.localhost:8400`, …) | +5 | OMB webhook receiver |
+| +1 | Dagu UI/API | +6 | Dagu coordinator |
+| +2 | Dagu scheduler | +7 | Dagu coordinator health |
+| +3 | Dagu worker health | +8 | Caddy admin |
+| +4 | OMB | +9 | Panel dev server |
+
+Two projects (or a project and its spikes) run side by side by using different blocks. `mise run doctor` checks that the ports are free before `up`, and checks that `OPENMAUSBOT_URL` answers with this project's data dir, not the user's desktop.
 
 ## 4. Repository layout (Copier)
 
@@ -79,15 +113,15 @@ agentic-framework/                    # template repo, tagged vX.Y.Z
 ├── docs/
 ├── tests/                            # renders a project and runs a smoke test (CI)
 └── template/
-    ├── mise.toml.jinja               # pinned tools, sops env, tasks (up, down, doctor, auth, snapshot, restore)
-    ├── process-compose.yaml          # dagu, omb, herdr, caddy, panel  (+ project/apps/*/process.yaml merged)
+    ├── mise.toml.jinja               # pinned tools, secrets env, tasks (up, down, doctor, auth, snapshot, restore)
+    ├── process-compose.yaml          # dagu, omb, caddy, panel  (+ project/apps/*/process.yaml merged)
     ├── Caddyfile                     # core routes  (+ import project/apps/*/Caddyfile)
-    ├── .sops.yaml / secrets.enc.yaml
+    ├── secrets file (sops or fnox)
     ├── .mcp.json                     # Dagu MCP for bots and for humans' agents
     ├── AGENTS.md / CLAUDE.md
     ├── framework/                    # OWNED BY TEMPLATE (updated by copier update)
-    │   ├── panel/                    # Vite + React SPA: launcher + chat
-    │   ├── workflows/                # framework DAGs: snapshot, dev-task
+    │   ├── panel/                    # Vite + React SPA: customization layer + launcher
+    │   ├── workflows/                # framework DAGs: setup-*, snapshot, dev-task
     │   ├── bots/                     # base souls + skills (dagu-workflows, …)
     │   ├── scripts/                  # small glue: restore-memory, doctor checks
     │   └── apps/_template/           # skeleton for a new project app
@@ -113,16 +147,16 @@ Adding an app means copying `framework/apps/_template`.
   - Each bot sets `model: claude/...` (subscription) or `claudeApi/...` (API key).
   - The only processing is `envsubst` for the absolute `cwd`.
 - **Workflows:** plain Dagu YAML in `project/workflows/`, which is Dagu's DAGS_DIR.
-- **Secrets:** `secrets.enc.yaml`, edited with `sops`. mise exports the values as env vars and every tool reads them from there.
+- **Secrets:** an encrypted file edited with `sops` (or `fnox`). mise exports the values as env vars and every tool reads them from there.
 - **Template choices:** `.copier-answers.yml`.
 
 ## 6. Versioning — the simple model
 
-**Rule: configure in the apps; the framework writes it to git.**
+**Rule:** structural bot config comes from the customization layer (git → OMB). Day-to-day tuning happens in the apps and the framework records it (apps → git).
 
-One Dagu DAG, `snapshot`, runs **every hour** and also on demand from the panel. It skips the commit when nothing changed. Steps:
+One Dagu DAG, `snapshot`, runs **every hour**, on demand from the panel, and **before every apply** from the customization layer. It skips the commit when nothing changed. Steps:
 
-1. `openmausbot team export` → `project/bots/` (bots edited in the OMB UI).
+1. `openmausbot team export` → `project/bots/` (bots tuned in the OMB UI).
 2. Copy each bot's memory folder (`MEMORY.md`, topics, logs) → `state/memory/<bot-name>/`.
 3. `project/workflows/` already holds what Dagu edited, so there is nothing to export.
 4. `gitleaks protect --staged` → `git commit -m "snapshot: <date>"` → `git push` if a remote is set.
@@ -133,38 +167,44 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 
 ## 7. Bots
 
-| Bot | Default model | Uses | Bot API |
-|---|---|---|---|
-| **Workflow Architect** | `claude/…` (subscription) | Dagu MCP + skill `dagu-workflows` | no |
-| **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) | **yes**: panel chat |
-| **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` | no |
+| Bot | Default model | Uses |
+|---|---|---|
+| **Workflow Architect** | `claude/…` (subscription) | Dagu MCP + skill `dagu-workflows` |
+| **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
+| **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
-**`dev-task`** is a Dagu DAG built only from existing CLIs:
+**`dev-task`** is a Dagu DAG built only from existing pieces:
 
-1. `herdr worktree create`
-2. `herdr agent start claude` → `agent prompt` with the issue
-3. `agent wait`
-4. Project checks
-5. `gh pr create`
+1. `git worktree add` on a `feat/<issue>` branch.
+2. A `harness.run` step runs Claude Code or Codex in that worktree with the issue as its task.
+3. Project checks.
+4. `gh pr create`.
 
 A human reviews and merges. The Builder never touches `main`. In the template repo, the Builder extends the framework itself.
 
 ## 8. Auth and health checks
 
 - **`mise run auth`** uses the official CLIs:
-  - `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, stored in sops (or `claude /login` once).
+  - `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, stored in the secrets file (or `claude /login` once).
   - `codex login --device-auth`.
   - `openmausbot engine set … --only-claude-api` for API keys.
-- **`mise run doctor`** runs the tools' own checks: `claude auth status`, `codex login status`, `openmausbot doctor`, `herdr status`, Dagu `/api/v1/health`. On a non-localhost domain, it also fails when the password is still `admin`.
+- **`mise run doctor`** runs the tools' own checks: `claude auth status`, `codex login status`, `openmausbot doctor`, and Dagu `/api/v1/health`. On a non-localhost domain, it also fails when the password is still `admin`. Its result is also a Dagu workflow output, which the panel's checklist reads.
 - **VPS:** the same stack, native, with process-compose under systemd as an unprivileged user. Subscriptions are used only through the official CLIs; projects that serve third parties use API keys.
 
-## 9. Panel (the only real custom code)
+## 9. Panel: customization layer + launcher (the only real custom code)
 
-A small Vite + React SPA served by Caddy at `panel.<host>`:
+A small Vite + React SPA served by Caddy at `panel.<host>`. It is for **the person customizing the project**. Everyone else uses OMB and Dagu directly, with everything already set up.
 
-- **Apps:** tiles from `project/apps/*/app.yaml` plus the built-ins (Dagu, OMB), with a green or red dot from each app's health URL. They open in a new tab.
-- **Chat:** with the Run Operator through the Bot API. Caddy injects the key. The panel handles the `200` reply, `202 working` (poll) and `202 needs_approval` (link to OMB).
-- **Status strip:** the last snapshot and a "snapshot now" button, which calls Dagu's start endpoint for `snapshot`.
+**Its 4 rules (D13):**
+1. **It is not a second OMB.** It only handles what OMB cannot know: which bots the project has and on which engine, their Dagu connection, engine auth, isolation and snapshots. It has no chat and no full bot editor.
+2. **It writes to git and applies with the tools' own CLIs** (`team apply`, `engine set`). It has no database.
+3. **Every action is a Dagu workflow** (`setup-bots-apply`, `setup-auth-check`, `snapshot`, …) started with parameters. It reads files through Caddy (read-only) and run results through the Dagu API.
+4. **Snapshot before apply.** Changes made in the OMB UI are exported to git before the layer applies its own, so nothing is lost.
+
+**Screens:**
+- **Setup checklist (home):** engines authenticated, bots applied, bots connected to Dagu, last git save. Each item has its state and a fix action.
+- **Bots:** a simple form over `team.yaml` (name, role, engine, model, base instructions, skills). Saving shows the `team apply --dry-run` plan first, then applies.
+- **Apps:** launcher tiles from `project/apps/*/app.yaml` plus the built-ins (Dagu, OMB), with health. They open in a new tab.
 
 **i18n (D12):**
 - Every UI string is a key in `framework/panel/src/locales/<lang>.json`. Spanish is the default and English ships too.
@@ -173,23 +213,26 @@ A small Vite + React SPA served by Caddy at `panel.<host>`:
 - Adding a language is adding one JSON file.
 - App tiles (`app.yaml`) may declare `name` and `description` per locale, with a fallback to the default.
 
-**What the panel does NOT do:** it does not edit workflows, bots or secrets. The native UIs and `sops` already do that, and the snapshot records it.
+**What the panel does NOT do:** chat, edit workflows, edit secret values, or manage users.
 
 ## 10. Phases
 
 ### Phase 0 — Spikes (throwaway)
-1. Does OMB pass `CLAUDE_CODE_OAUTH_TOKEN` to `claude`?
-2. Can mise pin `dagu`, `herdr`, `process-compose`, `openmausbot`, `caddy`, `sops` and `gitleaks`?
-3. Does `herdr server` run on Linux, and what is its license?
-4. Can a Bot API key be created via CLI? If not, it is a documented manual step.
-5. Does Dagu `/mcp` work from a bot's `.mcp.json`, and does Dagu proxy auth work behind Caddy?
-6. Does the OMB UI work behind Caddy on a subdomain (SSE, cookies on `*.localhost`)?
-7. Does `team export` → `team apply` round-trip with no changes?
-8. Can memory be mapped and restored by bot name?
+1. Does OMB pass `CLAUDE_CODE_OAUTH_TOKEN` (any env var) to `claude`?
+2. Can mise pin `dagu`, `process-compose`, `openmausbot`, `caddy`, `sops`, `fnox` and `gitleaks`?
+3. Can Dagu `harness.run` run Claude Code and Codex on a subscription, inside a given worktree directory, and return the result?
+4. Does Dagu `/mcp` work from a bot's `.mcp.json`, and does Dagu proxy auth work behind Caddy?
+5. Does the OMB UI work behind Caddy on a subdomain (SSE, cookies on `*.localhost`)?
+6. Does `team export` → `team apply` round-trip with no changes, and is `team apply --dry-run` usable as a preview?
+7. Can memory be mapped and restored by bot name?
+8. fnox vs sops: providers, mise integration, maturity. Pick one.
+9. Can Dagu Git Sync publish changes back to git, or only pull?
+10. The panel's no-backend pattern: Caddy serves config files read-only, and the panel starts a Dagu workflow with parameters and reads its outputs.
+
 **Exit:** `docs/adr/0001-spikes.md` and this plan updated.
 
 ### Phase 1 — Run it
-`copier.yml`, `mise.toml`, `process-compose.yaml`, `Caddyfile` with `admin/admin`, sops init, `mise run up/down/doctor`.
+`copier.yml`, `mise.toml`, `process-compose.yaml`, `Caddyfile` with `admin/admin`, secrets init, `mise run up/down/doctor`.
 **Exit:** after `copier copy` → `mise install` → `mise run up`, the Dagu and OMB UIs open behind one login.
 
 ### Phase 2 — Bots
@@ -201,11 +244,11 @@ The `snapshot` DAG, `restore-memory`, gitleaks.
 **Exit:** wipe `.data/`, run `mise run up`, and bots, memory and workflows are back.
 
 ### Phase 4 — Panel
-Launcher, health dots, Bot API chat, snapshot button, and the app `_template`.
-**Exit:** one login gives access to every app and to the chat with the Run Operator.
+The `setup-*` workflows, setup checklist, bots form with dry-run preview, launcher, and the app `_template`.
+**Exit:** a person customizes the bots from the panel, the changes land in git and are applied, and OMB opens with everything set up.
 
 ### Phase 5 — Builder (dogfooding)
-`dev-task` with herdr and the Builder bot.
+`dev-task` with `harness.run` and the Builder bot.
 **Exit:** the Builder ships a real small issue to the template repo through a PR.
 
 ### Phase 6 — Deploy and template lifecycle
@@ -217,7 +260,8 @@ VPS guide, optional `compose.yaml`, Copier `_migrations`, template CI.
 | Risk | Mitigation |
 |---|---|
 | OMB and Dagu release very often | Pin versions in `mise.toml`; upgrade deliberately with the CI smoke test |
-| herdr is macOS-only or not redistributable | The Builder stays local, or falls back to an OMB bot with a worktree `cwd` |
+| Two places configure bots (panel and OMB UI) | Panel = structure, OMB = tuning; snapshot before every apply (D13 rule 4) |
+| `harness.run` does not cover the Builder's needs | Fall back to an OMB bot with a worktree `cwd`; herdr stays available as a dev tool |
 | Subscription limits shared by all bots | Mix models per bot; send the chatty ones to API keys |
 | Secrets in memory or commits | OMB redaction + gitleaks before every snapshot commit |
 | `admin/admin` exposed on a server | `doctor` fails on a public domain if the password was not changed |
