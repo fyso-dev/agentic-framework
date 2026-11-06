@@ -66,6 +66,12 @@ test('remove deletes only named slots, retaining runtime data, secrets and other
   for(const file of ['.data/ext/sample/data','secrets.enc.yaml','extensions/other/app.yaml'])assert.ok(fs.existsSync(path.join(root,file)));
   assert.equal(run(['node','framework/scripts/ext-lifecycle.cjs','remove','../other']).status,1);
 }));
+test('remove keeps workflows of an installed extension whose id extends the removed one',()=>fixture(({root,put,run})=>{
+  for(const file of ['.copier-answers.ext-sample.yml','.copier-answers.ext-sample-other.yml','project/workflows/ext-sample-check.yaml','project/workflows/ext-sample-other-check.yaml'])put(file,'_src_path: x');
+  const result=run(['node','framework/scripts/ext-lifecycle.cjs','remove','sample']);assert.equal(result.status,0,result.stderr);
+  assert.ok(!fs.existsSync(path.join(root,'project/workflows/ext-sample-check.yaml')));
+  assert.ok(fs.existsSync(path.join(root,'project/workflows/ext-sample-other-check.yaml')));
+}));
 test('process-compose startup merges all fragments and clients address the same socket',()=>fixture(({root,put,run})=>{
   put('project/apps/test/process.yaml','');put('extensions/sample/process.yaml','');
   put('bin/process-compose','#!/usr/bin/env bash\nprintf "%s\\n" "$@"\n');fs.chmodSync(path.join(root,'bin/process-compose'),0o755);

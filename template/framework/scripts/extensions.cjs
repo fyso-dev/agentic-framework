@@ -18,6 +18,12 @@ function secrets(id) {
 function missing(id, env = process.env) {
   return secrets(id).filter(s => s.required === true && !env[s.name]).map(s => s.name);
 }
+const installed = () => glob('.copier-answers.ext-*.yml').map(f => f.slice('.copier-answers.ext-'.length, -4));
+// `ext-<id>-*.yaml`, minus files of installed extensions whose id extends <id> (`sample` vs `sample-other`).
+function workflows(id) {
+  const longer = installed().filter(o => o !== id && o.startsWith(`${id}-`));
+  return glob(`project/workflows/ext-${id}-*.yaml`).filter(f => !longer.some(o => f.startsWith(`project/workflows/ext-${o}-`)));
+}
 function inventory(apps, env = process.env) {
   return glob('.copier-answers.ext-*.yml').map(file => {
     const id = file.slice('.copier-answers.ext-'.length, -4);
@@ -32,7 +38,7 @@ function inventory(apps, env = process.env) {
         return {name:s.name, ...description, required:s.required === true, set:!!env[s.name]};
       }),
       mcpServers:fs.existsSync(`${base}/mcp.json`) ? Object.keys(JSON.parse(fs.readFileSync(`${base}/mcp.json`)).mcpServers || {}) : [],
-      workflows:glob(`project/workflows/ext-${id}-*.yaml`).map(f => f.split('/').pop().slice(0,-5)),
+      workflows:workflows(id).map(f => f.split('/').pop().slice(0,-5)),
       skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2))};
   });
 }
@@ -60,7 +66,7 @@ function run(id, command) {
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, glob, validId, secrets, missing, inventory, check};
+module.exports = {read, glob, validId, secrets, missing, workflows, inventory, check};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));

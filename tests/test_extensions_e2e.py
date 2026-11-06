@@ -59,6 +59,15 @@ class ExtensionsE2E(unittest.TestCase):
             run('mise', 'run', 'ext:add', str(ext), '--', '--defaults', '--vcs-ref', 'v1', cwd=project)
             self.assertIn('8410', (project / '.config/mise/conf.d/ext-sample.toml').read_text())
             commit(project, 'install')
+            # Dagu runs workflow steps with a cleared environment (run-dagu.sh): run-ext
+            # must reload the project's mise env to see the extension's port.
+            # Real node first, as under `mise run`; a mise shim would load the env by itself.
+            node_dir = Path(run('mise', 'which', 'node', cwd=project).strip()).parent
+            cleared = subprocess.run(['env', '-i', f"HOME={os.environ['HOME']}", f"PATH={node_dir}:{os.environ['PATH']}",
+                                      f'FYSO_ROOT={project}', 'framework/scripts/run-ext.sh', 'sample', '--',
+                                      'printenv', 'FYSO_EXT_SAMPLE_PORT'],
+                                     cwd=project, text=True, capture_output=True, timeout=120)
+            self.assertEqual(cleared.stdout.strip(), '8410', cleared.stderr)
             page = ext / 'extensions/sample/public/index.html'
             page.write_text('sample v2\n')
             commit(ext, 'v2')

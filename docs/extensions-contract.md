@@ -34,7 +34,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
 | Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person lists them in `team.yaml` (not automatic, see §6) |
-| Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu (flat file; see §6 for subdirectories) |
+| Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu (flat file; see §6 for subdirectories). Files matching a longer installed id (`ext-<ext>-other-*` when `<ext>-other` is installed) belong to that extension |
 | Ignore rules | `extensions/<ext>/.gitignore` | git (nested ignore files) |
 | Runtime data | `.data/ext/<ext>/` | the extension's own process (never committed) |
 
@@ -69,7 +69,7 @@ processes:
       exec: { command: extensions/sample/doctor.sh }
 ```
 
-`run-ext.sh <ext> -- <cmd…>` runs `<cmd>` with only `PATH`, `HOME`, `FYSO_*`, and the names listed in `extensions/<ext>/secrets.yaml`. It fails with a clear message when a `required: true` secret is empty. Process names must start with `ext-<ext>`.
+`run-ext.sh <ext> -- <cmd…>` loads the project's mise environment (Dagu steps run with a cleared one, so ports and secrets would be missing otherwise), then runs `<cmd>` with only `PATH`, `HOME`, `FYSO_*`, and the names listed in `extensions/<ext>/secrets.yaml`. It fails with a clear message when a `required: true` secret is empty. Process names must start with `ext-<ext>`.
 
 ## 4. `.mcp.json` is generated
 
