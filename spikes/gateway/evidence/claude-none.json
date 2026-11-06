@@ -1,0 +1,6 @@
+{
+  "is_error": false,
+  "num_turns": 2,
+  "result": "I listed the DAGs with `dagu_read`. Dagu has only one:\n\n- **gateway-echo** (not suspended)",
+  "permission_denials": []
+}

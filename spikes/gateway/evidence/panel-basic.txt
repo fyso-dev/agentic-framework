@@ -1,0 +1,8 @@
+config GET 200
+config POST 405
+config PUT 405
+config DELETE 405
+start 200 034scDVXVr5Z4O32l2cjYn
+status 200 succeeded
+outputs 200 {'echo': 'gateway-panel-proof'}
+file matches supplied param True

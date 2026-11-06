@@ -1,0 +1,20 @@
+[
+  {
+    "type": "tool_use",
+    "id": "toolu_01VNE3vo6b858nLGR5XhLXvB",
+    "name": "mcp__dagu__dagu_read",
+    "input": {
+      "target": "dags"
+    },
+    "caller": {
+      "type": "direct"
+    }
+  },
+  {
+    "type": "result",
+    "is_error": false,
+    "num_turns": 2,
+    "result": "**Dagu MCP tools:**\n- `mcp__dagu__dagu_read`\n- `mcp__dagu__dagu_change`\n- `mcp__dagu__dagu_execute`\n\n**DAGs:** `dagu_read` with `target=dags` returned one DAG:\n- **gateway-echo**: not suspended. Its latest run (`034sc7C2ZtWj0pldxALRWh`) succeeded on 2026-11-05 at 22:11:24 (-03:00).",
+    "permission_denials": []
+  }
+]

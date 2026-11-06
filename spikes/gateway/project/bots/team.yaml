@@ -1,0 +1,2 @@
+# Read-only gateway fixture; no bots are applied by this spike.
+bots: []

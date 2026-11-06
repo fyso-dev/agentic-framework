@@ -1,0 +1,22 @@
+page 200 X-Frame-Options DENY CSP frame-ancestors 'none'
+asset /assets/index-BmKvJk3H.js 200
+asset /assets/styles-Chs7EqVA.js 200
+asset /assets/styles-Dhftw_bd.css 200
+unpaired /api/bots 403 {"error":"forbidden: this request came through a proxy (pair this device to use the server remotely)"}
+unpaired /api/events 403 {"error":"forbidden: this request came through a proxy (pair this device to use the server remotely)"}
+pairing URL present False hint this server has no public address to put in a link: set OMB_PUBLIC_URL, or open /pair on the address you use and type the code
+exchange 200
+paired API 200 bot count 1
+paired SSE curl exit 28 HTTP/1.1 200 OK
+Cache-Control: no-cache
+Content-Type: text/event-stream
+Date: Fri, 06 Nov 2026 01:15:34 GMT
+Set-Cookie: [redacted]
+Via: 1.1 Caddy
+X-Accel-Buffering: no
+Transfer-Encoding: chunked
+
+data: {"kind":"hello","cursor":"3cf41b36:4","resumed":false}
+
+ curl: (28) Operation timed out after 3003 milliseconds with 62 bytes received
+session revoked 200

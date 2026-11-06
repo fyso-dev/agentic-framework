@@ -1,0 +1,5 @@
+time=2026-11-05T22:13:25.985-03:00 level=INFO msg="Proxy authentication enabled" autoSignup=true defaultRole=viewer skipOrgRoleSync=false
+time=2026-11-05T22:13:25.985-03:00 level=WARN msg="Proxy authentication is configured but currently unavailable because the active license does not enable it"
+time=2026-11-05T22:13:33.897-03:00 level=WARN msg="Proxy login denied" reason=license_unavailable
+time=2026-11-05T22:13:33.899-03:00 level=WARN msg="Proxy login denied" reason=license_unavailable
+builtin proxy panel POST /api/v1/dags/gateway-echo/start: 401

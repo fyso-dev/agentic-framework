@@ -1,0 +1,22 @@
+page 200 X-Frame-Options DENY CSP frame-ancestors 'none'
+asset /assets/index-BmKvJk3H.js 200
+asset /assets/styles-Chs7EqVA.js 200
+asset /assets/styles-Dhftw_bd.css 200
+unpaired /api/bots 403 {"error":"forbidden: this request came through a proxy (pair this device to use the server remotely)"}
+unpaired /api/events 403 {"error":"forbidden: this request came through a proxy (pair this device to use the server remotely)"}
+pairing URL present True hint None
+exchange 200
+paired API 200 bot count 1
+paired SSE curl exit 28 HTTP/1.1 200 OK
+Cache-Control: no-cache
+Content-Type: text/event-stream
+Date: Fri, 06 Nov 2026 01:14:26 GMT
+Set-Cookie: [redacted]
+Via: 1.1 Caddy
+X-Accel-Buffering: no
+Transfer-Encoding: chunked
+
+data: {"kind":"hello","cursor":"39fef0de:4","resumed":false}
+
+ curl: (28) Operation timed out after 3005 milliseconds with 62 bytes received
+session revoked 200
