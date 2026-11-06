@@ -13,6 +13,7 @@ const PROJECT: Project = {
   slug: "foo-project",
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
+  framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -360,6 +361,15 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
               installed.add(ext);
               if (latest) versions.set(ext, latest);
             },
+          });
+          break;
+        }
+        case DAGS.update: {
+          const fail = scenario === "failed";
+          add({
+            dag, id, createdAt, duration: 4200, outcome: fail ? "failed" : "succeeded",
+            error: fail ? "error: the update conflicts with local changes; nothing was applied: ./Caddyfile" : undefined,
+            outputs: () => ({ result: JSON.stringify({ from: "58f57cf", to: "73b74c2", commit: "1dcf4be", changed: true }) }),
           });
           break;
         }

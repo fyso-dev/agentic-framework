@@ -388,5 +388,21 @@
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Tags"
+  },
+  "update": {
+    "title": "Framework",
+    "version": "Version {{commit}}",
+    "unknown": "Unknown version",
+    "ref": "Template version",
+    "refHint": "tag, branch or commit; empty: the latest tag",
+    "advanced": "Alternative source",
+    "src": "Copier source for this update",
+    "srcHint": "for example a local clone, when this host cannot read the repository",
+    "run": "Update",
+    "running": "Updating…",
+    "done": "Updated {{from}} → {{to}} (commit {{commit}}).",
+    "current": "Already up to date ({{to}}).",
+    "hint": "It works on a clean copy of the last commit: your uncommitted changes are left alone, and a conflict stops the update before anything is applied. If Dagu, OpenMausBot or Caddy changed, restart with:",
+    "hintCommand": "mise run down && mise run up"
   }
 }

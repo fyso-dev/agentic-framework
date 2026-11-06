@@ -5,6 +5,8 @@ export type Project = {
   slug: string;
   env: "local" | "server";
   urls: { dagu: string; omb: string };
+  /** Template revision and source from .copier-answers.yml (fyso-update). */
+  framework?: { commit: string | null; src: string | null };
 };
 
 export type App = {
@@ -70,6 +72,8 @@ export type Marketplace = {
 };
 
 /** Output `result` of `fyso-ext-install`. */
+export type UpdateResult = { from: string | null; to: string | null; commit: string | null; changed: boolean };
+
 export type ExtInstallResult = { id: string; mode: "add" | "update"; version: string | null; commit: string };
 
 export type Engine = {
@@ -122,6 +126,7 @@ export const DAGS = {
   snapshot: "fyso-snapshot",
   extCatalog: "fyso-ext-catalog",
   extInstall: "fyso-ext-install",
+  update: "fyso-update",
 } as const;
 
 export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string } };

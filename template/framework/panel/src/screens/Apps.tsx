@@ -2,9 +2,10 @@
 // apps added by extensions, with health. Installed extensions are listed read-only
 // (docs/extensions-contract.md §5); the marketplace (§8) installs and upgrades them
 // through the fyso-ext-catalog and fyso-ext-install workflows. Removing stays a terminal task.
+// The framework itself is updated through fyso-update.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
+import { DAGS, type App, type ExtInstallResult, type UpdateResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
 import { ActionButton, ActionError, ActionStatus } from "../components/Action";
 import { AppIcon, Spinner } from "../components/Icons";
 import { CopyLine, External } from "../components/ui";
@@ -297,6 +298,53 @@ function Market() {
   );
 }
 
+/** Framework update (fyso-update): one commit from a clean worktree; conflicts abort. */
+function FrameworkUpdate() {
+  const { t } = useTranslation();
+  const s = useStore();
+  const update = useDaguAction<UpdateResult>(s.backend, DAGS.update, "result", { loadLast: true });
+  const [ref, setRef] = useState("main");
+  const [src, setSrc] = useState("");
+  const commit = s.project.data?.framework?.commit;
+  const result = update.phase === "ok" ? update.output : undefined;
+  const onRun = async () => {
+    if (await update.start({ REF: ref.trim(), SRC: src.trim() })) s.reload();
+  };
+  return (
+    <section aria-label={t("update.title")} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h2 className="section-title">{t("update.title")}</h2>
+      <div className="card action">
+        <div className="action-head">
+          <p className="grow mute ellipsis">{commit ? t("update.version", { commit }) : t("update.unknown")}</p>
+          <ActionStatus action={update as Action<unknown>} />
+          <ActionButton action={update as Action<unknown>} label={t("update.run")} busyLabel={t("update.running")} onRun={() => void onRun()} />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="update-ref">{t("update.ref")} <span>· {t("update.refHint")}</span></label>
+          <input id="update-ref" className="input" value={ref} autoComplete="off" spellCheck={false}
+            disabled={update.phase === "running"} onChange={(e) => setRef(e.target.value)} />
+        </div>
+        <details>
+          <summary className="mute">{t("update.advanced")}</summary>
+          <div className="field" style={{ marginTop: 8 }}>
+            <label className="label" htmlFor="update-src">{t("update.src")} <span>· {t("update.srcHint")}</span></label>
+            <input id="update-src" className="input" value={src} autoComplete="off" spellCheck={false}
+              placeholder={s.project.data?.framework?.src ?? ""} disabled={update.phase === "running"} onChange={(e) => setSrc(e.target.value)} />
+          </div>
+        </details>
+        {result && (
+          <p role="status">{result.changed
+            ? t("update.done", { from: result.from, to: result.to, commit: result.commit })
+            : t("update.current", { to: result.to })}</p>
+        )}
+        <ActionError action={update as Action<unknown>} />
+      </div>
+      <p className="mute">{t("update.hint")}</p>
+      <CopyLine text={t("update.hintCommand")} />
+    </section>
+  );
+}
+
 export function Apps() {
   const { t } = useTranslation();
   const s = useStore();
@@ -337,6 +385,7 @@ export function Apps() {
       )).filter((_, i) => i < 2 || groups[i].apps.length > 0)}
       <Extensions />
       <Market />
+      <FrameworkUpdate />
     </main>
   );
 }

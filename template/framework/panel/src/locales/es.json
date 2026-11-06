@@ -388,5 +388,21 @@
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commitear, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Etiquetas"
+  },
+  "update": {
+    "title": "Framework",
+    "version": "Versión {{commit}}",
+    "unknown": "Versión desconocida",
+    "ref": "Versión del template",
+    "refHint": "tag, rama o commit; vacío: el último tag",
+    "advanced": "Fuente alternativa",
+    "src": "Fuente de Copier para esta actualización",
+    "srcHint": "por ejemplo un clon local, si este host no puede leer el repositorio",
+    "run": "Actualizar",
+    "running": "Actualizando…",
+    "done": "Actualizado {{from}} → {{to}} (commit {{commit}}).",
+    "current": "Ya estaba al día ({{to}}).",
+    "hint": "Trabaja sobre una copia limpia del último commit: tus cambios sin commitear no se tocan, y un conflicto detiene la actualización sin aplicar nada. Si cambiaron Dagu, OpenMausBot o Caddy, reiniciá con:",
+    "hintCommand": "mise run down && mise run up"
   }
 }
