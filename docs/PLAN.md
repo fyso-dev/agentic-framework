@@ -64,7 +64,7 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D26 | **Observability before deployment (Phase 5.5):** native OMB usage/traces + Dagu runs remain authoritative. A scheduled read-only Dagu exporter writes a private, rebuildable panel summary. Structured harness output fills the CLI usage gap; API-reported cost, subscription equivalent, estimates and unknown values stay separate. Project-owned thresholds generate local advisory alerts; no external telemetry service or automatic stop |
 | D27 | **Bot CRUD is conversational through Bot Architect.** A single Dagu workflow wraps OMB native partial team plans/apply and exact-ID DELETE (no prune). Plans are private, content-addressed, stale-checked and applied idempotently; snapshots surround mutations. Only the selected bot's project entry changes. The manual panel stays available; default Bot Architect uses Codex subscription |
 
-| D28 | **Panel bot discovery reads the native live roster.** An exact GET-only gateway route forwards OMB `/api/bots?messages=0`; the panel polls every five seconds and includes the chief and OMB-created bots. Manual team-file drafts remain separate and are never overwritten by discovery. This adds visibility, not automatic reconciliation of native profiles into project declarations |
+| D28 | **Panel bot discovery reads the native live roster.** An exact GET-only gateway route forwards OMB `/api/bots?messages=0`; the panel polls every five seconds and includes the chief and OMB-created bots. One list joins the live roster with configuration and pending drafts; discovery never overwrites drafts. This adds visibility, not automatic reconciliation of native profiles into project declarations |
 
 ## 3. Architecture
 
