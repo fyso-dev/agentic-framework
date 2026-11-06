@@ -61,6 +61,22 @@ run = "process-compose process list --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_
 description = "Follow the logs of one process: mise run logs <dagu|omb|caddy>"
 run = "process-compose process logs --follow --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
 
+[tasks."bots:plan"]
+description = "Show how project/bots/team.yaml would change the bots"
+run = "framework/scripts/bots.sh plan"
+
+[tasks."bots:apply"]
+description = "Apply project/bots/team.yaml to OpenMausBot"
+run = "framework/scripts/bots.sh apply"
+
+[tasks."bots:check"]
+description = "Fail if the running bots differ from project/bots/team.yaml"
+run = "framework/scripts/bots.sh check"
+
+[tasks.auth]
+description = "Check and set up the engine logins (Claude, Codex, API keys)"
+run = "framework/scripts/auth.sh"
+
 [tasks.doctor]
 description = "Check ports, logins, instances and routes"
 run = "framework/scripts/doctor.sh"

@@ -17,7 +17,9 @@
   <script>
     const port = location.port ? ":" + location.port : "";
     document.getElementById("dagu").href = location.protocol + "//dagu.localhost" + port;
-    document.getElementById("omb").href = location.protocol + "//omb.localhost" + port;
+    // D22: locally, OpenMausBot opens directly on 127.0.0.1 (port base + 4), with no pairing.
+    const ombPort = location.port ? Number(location.port) + 4 : 80;
+    document.getElementById("omb").href = "http://127.0.0.1:" + ombPort;
   </script>
 </body>
 </html>
