@@ -4,6 +4,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ADMIN_PASSWORD FYSO_DATA
 
+node framework/scripts/panel-data.cjs config
+
 if stack_running; then
   echo "Already running. 'mise run status' to inspect, 'mise run down' to stop."
   exit 0
@@ -26,6 +28,9 @@ for _ in $(seq 1 120); do
       framework/scripts/restore.sh && touch "$marker"
       echo
     fi
+    # Fill the panel's checklist right away (runs in Dagu, in the background).
+    curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
+      -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-setup-check/enqueue" || true
     cat <<MSG
   Panel        http://panel.localhost:$FYSO_HTTP_PORT     (user: $FYSO_ADMIN_USER)
   Dagu         http://dagu.localhost:$FYSO_HTTP_PORT

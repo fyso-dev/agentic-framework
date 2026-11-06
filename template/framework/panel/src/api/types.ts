@@ -1,0 +1,105 @@
+// Data shapes from docs/panel-contract.md. Keep in sync with the contract.
+
+export type Project = {
+  name: string;
+  slug: string;
+  env: "local" | "server";
+  urls: { dagu: string; omb: string };
+};
+
+export type App = {
+  id: string;
+  name: string;
+  name_i18n?: Record<string, string>;
+  description: string;
+  description_i18n?: Record<string, string>;
+  icon: string;
+  url: string;
+  group: "framework" | "project";
+  enabled: boolean;
+  accessNote?: string;
+  accessNote_i18n?: Record<string, string>;
+};
+
+export type Health = "ok" | "down" | "unknown";
+
+export type Engine = {
+  id: string;
+  label: string;
+  kind: "subscription" | "api";
+  ok: boolean;
+  models: string[];
+  fixHint?: string;
+};
+
+/** Output `check` of `fyso-setup-check`. */
+export type SetupCheck = {
+  checkedAt: string;
+  engines: Engine[];
+  bots: { count: number; pending: number; ok: boolean };
+  dagu: { ok: boolean; botsConnected: number };
+};
+
+/** Output `plan` of `fyso-bots-plan` (`openmausbot team apply --dry-run --json`). */
+export type Plan = {
+  plan: string[];
+  created: number;
+  changed: number;
+  unchanged: number;
+  deleted: number;
+  warnings?: unknown[];
+};
+
+/** Output `apply` of `fyso-bots-apply`. */
+export type ApplyResult = { created: number; changed: number; deleted: number; commit: string };
+
+/** A Dagu run, reduced to what the panel needs. */
+export type Run = {
+  id: string;
+  statusLabel: string;
+  startedAt?: string;
+  finishedAt?: string;
+  /** First step error reported by Dagu, shown verbatim. */
+  error?: string;
+};
+
+/** Action workflows (contract §3). Dagu DAG names. */
+export const DAGS = {
+  setupCheck: "fyso-setup-check",
+  botsPlan: "fyso-bots-plan",
+  botsApply: "fyso-bots-apply",
+  snapshot: "fyso-snapshot",
+} as const;
+
+export type Backend = {
+  getProject(): Promise<Project>;
+  getTeam(): Promise<string>;
+  getApps(): Promise<App[]>;
+  /** Always `enqueue`, never `start` (contract §2). Returns the dagRunId. */
+  enqueue(dag: string, params?: Record<string, string>): Promise<string>;
+  getRun(dag: string, runId: string): Promise<Run>;
+  getOutputs(dag: string, runId: string): Promise<Record<string, unknown>>;
+  lastRun(dag: string): Promise<Run | null>;
+  probe(url: string): Promise<boolean>;
+};
+
+export type Visual = "never" | "running" | "ok" | "failed";
+
+/** Status mapping from contract §2. */
+export function visualOf(statusLabel: string | undefined): Visual {
+  switch (statusLabel) {
+    case "running":
+    case "queued":
+    case "waiting":
+      return "running";
+    case "succeeded":
+    case "partially_succeeded":
+      return "ok";
+    case "failed":
+    case "aborted":
+    case "rejected":
+      return "failed";
+    default:
+      return "never";
+  }
+}

@@ -301,9 +301,35 @@ Implementation notes:
 - **`mise run snapshot`:** runs the same steps from the terminal.
 - **To handle in Phase 4:** starting `fyso-snapshot` while another run is active fails (`max_active_runs: 1`), so the panel's "save now" must use Dagu's `enqueue` endpoint. Dagu also queued "catchup" runs for missed hours on a fresh data dir although the DAG sets no `catchup_window`. They are harmless (a snapshot with no changes commits nothing) but unexplained; to verify.
 
-### Phase 4 — Panel
+### Phase 4 — Panel ✅ done
 The `setup-*` workflows, setup checklist, bots form with dry-run preview, launcher, and the app `_template`.
 **Exit:** a person customizes the bots from the panel, the changes land in git and are applied, and OMB opens with everything set up.
+
+**Result (2026-11-05):** built in parallel against [panel-contract.md](panel-contract.md). Claude built the SPA from the 17 Claude Design boards; Codex built the workflows, Caddy routes and config files. Verified on a generated project against the real stack:
+- **Checklist:** it shows 4/4 with real data (Claude and Codex signed in, 2 bots applied, bots connected to Dagu, last save in git).
+- **Apps:** the launcher shows Dagu and OMB with live health.
+- **Edit flow, driven in a headless browser:**
+  1. The person edits Run Operator's model.
+  2. The preview shows OMB's plan line.
+  3. "Apply" commits the snapshot first, then `bots: update from panel`.
+  4. OMB shows the new model.
+- **Theming:** ES/EN and light/dark work.
+
+Fixes found by the end-to-end run:
+- **Snapshot at start-up:** a scheduled snapshot that runs while OMB is still starting now retries (`retry_policy`).
+- **Initial checklist:** `up` enqueues `fyso-setup-check`, so the checklist is filled on first open.
+- **Engines:** the check lists only the engines the project's bots use, plus `claude`/`claudeApi`/`codex` when ready. Before, it listed all 26 OMB engines.
+
+Deliberate differences from the design (from the SPA build):
+- **Plan lines:** shown verbatim from OMB (English prose), not as structured diffs.
+- **Skills:** read-only in v1.
+- **"Uses workflows":** it can only be turned on.
+- **File-based instructions:** the form names the file; typing switches the bot to inline instructions.
+- **Fonts:** system fonts (Gilroy was not in the bundle), with JetBrains Mono self-hosted.
+- **Chief bot:** MausBot is hidden from the list.
+- **Additions:** a "Descartar cambios" link for the local draft, and a mobile ⋯ menu for language and theme.
+
+The built `dist/` is committed (~0.5 MB), so generated projects need no Node build step. Mock mode (`?mock`) is for panel development.
 
 ### Phase 5 — Builder (dogfooding)
 `dev-task` with `harness.run` and the Builder bot.
