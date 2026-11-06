@@ -5,6 +5,7 @@ _min_copier_version: "9.4.0"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 _templates_suffix: .jinja
+_preserve_symlinks: true
 
 # Files owned by the project: created once, never overwritten by `copier update`.
 _skip_if_exists:

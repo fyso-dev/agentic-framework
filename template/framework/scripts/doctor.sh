@@ -53,7 +53,7 @@ if stack_running; then
     -H "Host: dagu.localhost:$FYSO_HTTP_PORT" "http://127.0.0.1:$FYSO_HTTP_PORT/api/v1/dags")
   [ "$code" = 200 ] && ok "Dagu API through the gateway with one login" || bad "Dagu through the gateway returned $code"
   framework/scripts/bots.sh check >/dev/null 2>&1 && ok "bots match project/bots/team.yaml" \
-    || bad "bots differ from project/bots/team.yaml (mise run bots:plan)"
+    || warn "bots differ from project/bots/team.yaml (tuned in OpenMausBot? the snapshot records it in state/bots/; 'mise run bots:plan' shows the difference)"
 else
   echo "Ports (stack not running)"
   for p in $(block_ports); do port_in_use "$p" && bad "port $p is in use" || ok "port $p free"; done
