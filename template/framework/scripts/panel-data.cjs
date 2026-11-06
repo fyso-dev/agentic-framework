@@ -22,7 +22,7 @@ if (process.argv[2] === 'config') {
   fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls}));
   fs.writeFileSync('.data/panel/apps.json', JSON.stringify(apps));
 } else if (process.argv[2] === 'check') {
-  const team = read('project/bots/team.yaml');
+  const team = yaml.parse(fs.readFileSync('project/bots/team.yaml', 'utf8').replaceAll('${FYSO_ROOT}', env.FYSO_ROOT));
   const bots = team.bots.filter(b => b.name !== 'MausBot');
   const models = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
   const plan = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
@@ -31,6 +31,11 @@ if (process.argv[2] === 'config') {
     try { return !!JSON.parse(fs.readFileSync(`${cwd}/.mcp.json`)).mcpServers?.dagu; } catch {return false;}
   }).length;
   const pending = plan.created + plan.changed + plan.deleted;
-  const engines = models.engines.map(e => ({id:e.id, label:e.label || e.name || e.id, kind:e.id === 'claude' || e.id === 'codex' ? 'subscription':'api', ok:e.id === 'claude' ? env.FYSO_CLAUDE_OK === 'true' : e.id === 'codex' ? env.FYSO_CODEX_OK === 'true' : !!e.configured, models:(e.models || []).map(m => typeof m === 'string' ? m : m.id), ...(['claude','codex'].includes(e.id) ? {fixHint:e.id === 'claude' ? 'claude /login':'codex login --device-auth'} : {})}));
+  const engines = models.instances.map(e => ({
+    id:e.instanceId, label:e.displayName, kind:e.access === 'subscription' ? 'subscription':'api',
+    ok:e.instanceId === 'claude' ? env.FYSO_CLAUDE_OK === 'true' : e.instanceId === 'codex' ? env.FYSO_CODEX_OK === 'true' : e.snapshot?.state === 'available',
+    models:(e.models?.options || []).map(m => m.id),
+    ...(['claude','codex'].includes(e.instanceId) ? {fixHint:e.instanceId === 'claude' ? 'claude /login':'codex login --device-auth'} : {})
+  }));
   console.log(JSON.stringify({checkedAt:new Date().toISOString(), engines, bots:{count:bots.length,pending,ok:pending===0}, dagu:{ok:env.FYSO_DAGU_OK==='true',botsConnected:connected}}));
 }

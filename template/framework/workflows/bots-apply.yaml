@@ -7,15 +7,15 @@ env:
   - ROOT: ${FYSO_ROOT}
 working_dir: ${ROOT}
 steps:
-  - id: snapshot-bots
+  - id: snapshot_bots
     command: framework/scripts/snapshot.sh bots
-  - id: snapshot-memory
+  - id: snapshot_memory
     command: framework/scripts/snapshot.sh memory
-    depends: [snapshot-bots]
-  - id: snapshot-commit
+    depends: [snapshot_bots]
+  - id: snapshot_commit
     command: framework/scripts/snapshot.sh commit
-    depends: [snapshot-memory]
+    depends: [snapshot_memory]
   - id: apply
     command: framework/scripts/panel-actions.sh apply
-    depends: [snapshot-commit]
+    depends: [snapshot_commit]
     output: APPLY
