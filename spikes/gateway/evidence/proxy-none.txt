@@ -1,0 +1,1 @@
+Error: initialization error: failed to build config: auth.proxy.enabled requires auth.mode to be builtin

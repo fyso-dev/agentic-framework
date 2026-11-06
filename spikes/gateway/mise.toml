@@ -1,0 +1,8 @@
+# Spike-only pins. download.sh installs the release binaries under .data/bin.
+# OMB is launched through npx by omb.sh; do not run mise install for this spike.
+[tools]
+"github:dagucloud/dagu" = "2.24.0"
+"github:caddyserver/caddy" = "2.10.2"
+"npm:openmausbot" = "0.1.140"
+node = "26.5.0"
+"npm:@anthropic-ai/claude-code" = "2.1.318"

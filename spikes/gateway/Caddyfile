@@ -1,0 +1,43 @@
+{
+	admin localhost:8608
+	auto_https off
+}
+(gateway_auth) {
+	basic_auth {
+		admin $2a$14$psP87LHVJH6uwSapBgmyDuSpPTvSmva96.JDxRge9DPwezIQQ7fq2
+	}
+}
+http://dagu.localhost:8600 {
+	import gateway_auth
+	reverse_proxy 127.0.0.1:8601 {
+		header_up Host {upstream_hostport}
+		header_up X-Auth-Request-User {http.auth.user.id}
+		header_up -X-Auth-Request-Groups
+	}
+}
+http://omb.localhost:8600 {
+	import gateway_auth
+	reverse_proxy 127.0.0.1:8604 {
+		flush_interval -1
+	}
+}
+http://panel.localhost:8600 {
+	import gateway_auth
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8601 {
+			header_up Host {upstream_hostport}
+			header_up X-Auth-Request-User {http.auth.user.id}
+			header_up -X-Auth-Request-Groups
+		}
+	}
+	handle /config/team.yaml {
+		@read method GET HEAD
+		handle @read {
+			root * {$GATEWAY_WT}/spikes/gateway/project/bots
+			rewrite * /team.yaml
+			file_server
+		}
+		respond 405
+	}
+	respond 404
+}

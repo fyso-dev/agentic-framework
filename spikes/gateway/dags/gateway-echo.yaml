@@ -1,0 +1,11 @@
+name: gateway-echo
+type: graph
+params:
+  - MESSAGE: default
+steps:
+  - id: write
+    run: |
+      mkdir -p "$DAGU_HOME/spike-output"
+      printenv MESSAGE > "$DAGU_HOME/spike-output/message.txt"
+      printenv MESSAGE
+    output: ECHO

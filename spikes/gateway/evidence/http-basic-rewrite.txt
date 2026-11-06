@@ -1,0 +1,13 @@
+basic-host-rewrite
+dagu.localhost:8600 basic=False / 401 None location=
+dagu.localhost:8600 basic=False /api/v1/dags 401 None location=
+dagu.localhost:8600 basic=False /proxy-login 401 None location=
+dagu.localhost:8600 basic=False /mcp 401 None location=
+dagu.localhost:8600 basic=True / 200 text/html; charset=utf-8 location=  <!DOCTYPE html> <html lang="en">   <head>     <meta charset="UTF-8" />     <meta http-equiv="X-UA-C
+dagu.localhost:8600 basic=True /api/v1/dags 200 application/json location= {"dags":[{"dag":{"labels":[],"name":"gateway-echo","schedule":[],"tags":[]},"errors":[],"fileName":"
+dagu.localhost:8600 basic=True /proxy-login 404 text/plain; charset=utf-8 location= not found
+dagu.localhost:8600 basic=True /mcp 200 application/json location= {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"extensions":{"io.modelcontextprotocol/ui":{"mimeT
+127.0.0.1:8601 basic=False / 200 text/html; charset=utf-8 location=  <!DOCTYPE html> <html lang="en">   <head>     <meta charset="UTF-8" />     <meta http-equiv="X-UA-C
+127.0.0.1:8601 basic=False /api/v1/dags 401 None location=
+127.0.0.1:8601 basic=False /proxy-login 404 text/plain; charset=utf-8 location= not found
+127.0.0.1:8601 basic=False /mcp 401 None location=
