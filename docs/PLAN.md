@@ -271,9 +271,18 @@ Implementation notes:
 - **Secrets file:** mise tolerates a missing `secrets.enc.yaml` before `setup` runs.
 - **Redaction:** mise redacts any value equal to a secret in task output, so `admin` shows as `[redacted]` while the password is still the default (cosmetic).
 
-### Phase 2 — Bots
+### Phase 2 — Bots ✅ done
 The team file with the 3 bots (the Builder inactive until Phase 5), `mise run auth`, Dagu MCP and the `dagu-workflows` skill.
 **Exit:** asking the Architect for a workflow produces a DAG that runs in Dagu.
+
+**Result (2026-11-05):** on the first `mise run up`, the bots are created from `project/bots/team.yaml`. Asked through `openmausbot run`, the Workflow Architect created `project/workflows/disk-report.yaml` with the Dagu MCP, applied it and ran it (`succeeded`). The file lands in the repo, ready to be versioned. `doctor` also checks bot drift (`team apply --check`).
+
+Implementation notes:
+- **No custom skill:** Dagu ships its authoring skill inside the binary and serves it over MCP (`dagu_references`). Bots use Dagu's own reference instead of a copy. This applies the reuse principle.
+- **Paths and cwd:** `team.yaml` uses `${FYSO_ROOT}` for the absolute paths OMB requires; `bots.sh` substitutes it when applying. The bots' `cwd` is the project root, so they load `.mcp.json` (Dagu MCP), which developers' Claude Code also uses.
+- **MausBot:** OMB's default bot is listed in `team.yaml`, so export and apply round-trip.
+- **Dagu Wiki:** it lives in `project/wiki/` (`DAGU_WIKI_DIR`), not inside the workflows dir.
+- **Deferred to Phase 5:** re-running the `harness.run` spike on Dagu 2.24.0.
 
 ### Phase 3 — Snapshot and replicate
 The `snapshot` DAG, `restore-memory`, gitleaks.
@@ -310,6 +319,7 @@ Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunne
 | mise installs only passed with signature checks disabled, inside Codex's sandbox | Phase 1 re-installs with full verification outside any sandbox before adopting the pins |
 | Subscription limits shared by all bots | Mix models per bot; send the chatty ones to API keys |
 | Secrets in memory or commits | OMB redaction + gitleaks before every snapshot commit |
+| Bots can read the Dagu credentials (`DAGU_MCP_AUTH`, the same as the gateway login) | Accepted for local use. Before any server deployment, give bots their own Dagu credential (Dagu `builtin` auth with an MCP-scoped API key) |
 | `admin/admin` exposed on a server | `doctor` fails on a public domain if the password was not changed |
 | Hourly commits add noise to history | Commit only when something changed; squash or filter later if it bothers |
 

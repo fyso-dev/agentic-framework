@@ -53,8 +53,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 |---|---|---|
 | 0 | Spikes: verify the unknowns | ✅ done · [ADR 0001](adr/0001-spikes.md) |
 | 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ✅ done |
-| 2 | Bots: team file, auth, Dagu MCP | ⏳ next |
-| 3 | Snapshot and replicate | ⬜ not started |
+| 2 | Bots: team file, auth, Dagu MCP | ✅ done |
+| 3 | Snapshot and replicate | ⏳ next |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ⬜ not started · 🎨 design spec v2 ready for Claude Design |
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ⬜ not started |
 | 6 | Deploy and template lifecycle | ⬜ not started |
@@ -81,3 +81,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | Multi-host accepted (D18): a host is an SSH alias; Dagu distributed workers + OMB "bring your own VPS" computers; state stays on the control host |
 | 2026-11-05 | **Phase 0 closed** ([ADR 0001](adr/0001-spikes.md)). All four spike branches merged. New decisions: D19 (Dagu basic auth with Caddy's credentials, since proxy auth needs a paid SSO license), D20 (sops + age), D21 (pinned tested versions) |
 | 2026-11-05 | **Phase 1 done.** The template generates a project that installs (signature checks on), sets up secrets and runs Dagu + OMB + Caddy with one login, in ~30 s. New D22 (OMB not behind the gateway login; direct on localhost) and D23 (bind to 127.0.0.1 by default). `copier update` verified |
+| 2026-11-05 | **Phase 2 done.** Bots are created from `team.yaml` on the first start. The Workflow Architect created and ran a workflow through the Dagu MCP. Bots reuse Dagu's built-in skill via MCP (no copy). Known limit: bots can read the Dagu credentials; they need a separate credential before any server deployment |
