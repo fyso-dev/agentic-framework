@@ -3,6 +3,15 @@
 #   mise run bots:plan   # show what would change
 #   mise run bots:apply  # apply it
 # Fine-tune instructions and memory in OpenMausBot; structure lives here (PLAN D13).
+# Models come from the engine chosen at generation (PLAN D32); the other engine
+# stays optional. Change a bot's model here to use another signed-in engine.
+{%- if engine == 'codex' %}
+{%- set strong = 'codex/gpt-6.1-sol' %}
+{%- set fast = 'codex/gpt-5.4-mini' %}
+{%- else %}
+{%- set strong = 'claude/claude-sonnet-5' %}
+{%- set fast = 'claude/claude-haiku-4-5' %}
+{%- endif %}
 version: 1
 
 defaults:
@@ -13,29 +22,29 @@ bots:
   # OpenMausBot's default bot; listed so export → apply round-trips cleanly.
   - name: MausBot
     chief: true
-    model: claude/claude-sonnet-5
+    model: {{ strong }}
     approval: full
 
   - name: Workflow Architect
     title: Designs and fixes Dagu workflows
-    model: claude/claude-sonnet-5
+    model: {{ strong }}
     approval: full             # writes workflows through the Dagu MCP without asking
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }
 
   - name: Run Operator
     title: Watches runs, explains failures, retries
-    model: claude/claude-haiku-4-5
+    model: {{ fast }}
     approval: ask
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/run-operator.md }
 
   - name: Builder
     title: Turns requests into branches and PRs (fyso-dev-task)
-    model: claude/claude-sonnet-5
+    model: {{ strong }}
     approval: full             # starts fyso-dev-task through the Dagu MCP without asking
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/builder.md }
 
   - name: Bot Architect
     title: Creates and maintains project bots through versioned native plans
-    model: codex/gpt-6.1-sol
+    model: {{ strong }}
     approval: full
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/bot-architect.md }

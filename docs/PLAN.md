@@ -71,6 +71,8 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D30 | **Extension contract (Phase 7) closes the gaps in D17.** Each extension owns its answers file (`_answers_file: .copier-answers.ext-<ext>.yml`) and only the slot paths in [extensions-contract.md](extensions-contract.md); it never edits a file another template owns. `.mcp.json` becomes a generated file (framework + project + extensions sources in git), because a single template-owned file cannot be extended without conflicts and was overwritten by `copier update`. Extension processes start through `run-ext.sh`, which passes only `FYSO_*` and the secret names the extension declares. Extensions use a second port block (`port_base+10…+19`). Thin `mise run ext:*` tasks wrap Copier; the panel lists extensions read-only |
 | D31 | **Extension marketplace: catalogs are git repos, versions are tags.** Discovery is a `marketplace.yaml` in a git repo (official: `gh:fyso-dev/fyso-extensions`); `project/marketplaces.yaml` lists the catalogs a project uses. Versions are read live from each extension repo's tags. `ext:search` and `ext:add <id>` resolve ids; the panel installs and upgrades through the `fyso-ext-catalog` and `fyso-ext-install` workflows (install commits only the extension's slots, upgrade runs Copier in a clean worktree and fast-forwards, processes and routes load without a restart). Devbox plugins and self-hosted app stores were compared and do not replace this (Nix / Docker, no catalog or no merge). Bot integrations come from the MCP Registry and from extensions such as Activepieces. [ADR 0002](adr/0002-extension-marketplace.md) |
 
+| D32 | **Engines are optional; the project picks one.** Copier asks for `engine` (`claude` or `codex`, default `claude`). It sets every bot's model in `project/bots/team.yaml`, the Builder's default `PROVIDER` and `fyso-dev-task`'s default. Doctor fails only when an engine used by a declared bot is not signed in, or when none is; any other engine is an optional warning. Projects switch engines by editing their team file. Refines D27's Codex default for Bot Architect |
+
 ## 3. Architecture
 
 ```
@@ -194,10 +196,10 @@ No PRs and no branches for snapshots. The only PRs are the Builder's code change
 
 | Bot | Default model | Uses |
 |---|---|---|
-| **Workflow Architect** | `claude/…` (subscription) | Dagu MCP + skill `dagu-workflows` |
+| **Workflow Architect** | project engine, strong model (subscription) | Dagu MCP + skill `dagu-workflows` |
 | **Run Operator** | `claudeApi/…` (cheap) | Dagu MCP (read, retry, stop) |
-| **Bot Architect** | `codex/gpt-6.1-sol` (subscription) | Native OMB team plans through `fyso-bot-architect` |
-| **Builder** | `claude/…` (subscription) | Dagu MCP (starts `dev-task`), `gh` |
+| **Bot Architect** | project engine, strong model (subscription, D32) | Native OMB team plans through `fyso-bot-architect` |
+| **Builder** | project engine, strong model (subscription) | Dagu MCP (starts `dev-task`), `gh` |
 
 **`dev-task`** is a Dagu DAG built only from existing pieces (verified in spike `harness`):
 
