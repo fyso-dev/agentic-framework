@@ -6,6 +6,17 @@ _subdirectory: template
 _answers_file: .copier-answers.yml
 _templates_suffix: .jinja
 _preserve_symlinks: true
+# Copier's default exclusions, plus the panel's local Node install (dist/ is committed).
+_exclude:
+  - "copier.yaml"
+  - "copier.yml"
+  - "~*"
+  - "*.py[co]"
+  - "__pycache__"
+  - ".git"
+  - ".DS_Store"
+  - ".svn"
+  - "node_modules"
 
 # Files owned by the project: created once, never overwritten by `copier update`.
 _skip_if_exists:
