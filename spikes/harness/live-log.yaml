@@ -1,0 +1,18 @@
+# Phase 0 spike (harness): is agent progress visible while the step runs?
+# Claude's default text mode prints only the final answer at exit, so ask for
+# stream-json: every event is written to the step stdout log as it happens.
+type: graph
+params:
+  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
+working_dir: ${REPO}
+steps:
+  - id: claude_stream
+    action: harness.run
+    with:
+      provider: claude
+      model: haiku
+      prompt: "Using the Read tool, read AGENTS.md and then docs/README.md, then reply with one sentence summarizing the repo. Do not edit anything."
+      allowed-tools: "Read"
+      output-format: stream-json
+      verbose: true
+    timeout_sec: 180

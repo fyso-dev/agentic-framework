@@ -1,0 +1,105 @@
+# Phase 0 spike (harness): failure behavior of harness.run.
+# Every probe uses continue_on.failure so one run shows all outcomes.
+type: graph
+
+params:
+  - REPO: /Users/sebastianbarrozo/Documents/work/skalo/agentic-framework.worktrees/spike-harness
+  - BASE: spike/harness
+  - TASK: "Create a file named HELLO.md in the current directory containing exactly one line: 'hello'. Do nothing else, then stop."
+
+working_dir: ${REPO}
+
+steps:
+  # Which variable NAMES reach a step (values never printed). Proves no API key in env.
+  - id: env_names
+    run: env | cut -d= -f1 | sort | tr '\n' ' '
+
+  - id: wt
+    action: git.worktree.add
+    with:
+      branch: spike/harness-tmp-probe-${context.run.id}
+      create_branch: true
+      base: ${params.BASE}
+      path: .data/wt/probe-${context.run.id}
+
+  # A. Timeout: the provider process is killed and the step exits 124.
+  - id: timeout
+    depends: [wt]
+    working_dir: ${REPO}/.data/wt/probe-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: claude
+      model: haiku
+      prompt: "Count slowly from 1 to 200, one number per line."
+    timeout_sec: 3
+    continue_on:
+      failure: true
+
+  # B. Claude needs a permission it was not given (no acceptEdits, Write not allowed).
+  #    Headless -p cannot prompt, so the tool call is denied.
+  - id: claude_denied
+    depends: [timeout]
+    working_dir: ${REPO}/.data/wt/probe-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: claude
+      model: haiku
+      prompt: ${params.TASK}
+      permission-mode: default
+      allowed-tools: "Read"
+      max-turns: 3
+    timeout_sec: 120
+    continue_on:
+      failure: true
+
+  # C. Codex in a read-only sandbox: the write is refused by the sandbox.
+  - id: codex_readonly
+    depends: [claude_denied]
+    working_dir: ${REPO}/.data/wt/probe-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: codex
+      prompt: ${params.TASK}
+      sandbox: read-only
+      ephemeral: true
+    timeout_sec: 120
+    continue_on:
+      failure: true
+
+  # C2. Same, but pin the approval policy so the user's Codex config (e.g. an
+  #     approvals reviewer that auto-approves escalations) cannot lift the sandbox.
+  #     `config:` becomes `--config approval_policy="never"`.
+  - id: codex_readonly_strict
+    depends: [codex_readonly]
+    working_dir: ${REPO}/.data/wt/probe-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: codex
+      prompt: "Create a file named STRICT.md in the current directory containing exactly one line: 'strict'. Do nothing else, then stop."
+      sandbox: read-only
+      config: 'approval_policy="never"'
+      ephemeral: true
+    timeout_sec: 120
+    continue_on:
+      failure: true
+
+  # D. Provider exits non-zero (unknown model): exit code is passed through.
+  - id: bad_model
+    depends: [codex_readonly_strict]
+    working_dir: ${REPO}/.data/wt/probe-${DAG_RUN_ID}
+    action: harness.run
+    with:
+      provider: claude
+      model: no-such-model-xyz
+      prompt: "Say ok."
+    timeout_sec: 60
+    continue_on:
+      failure: true
+
+  - id: proof
+    depends: [bad_model]
+    run: git -C "${REPO}/.data/wt/probe-${DAG_RUN_ID}" status --porcelain; echo "files-above-if-any"
+
+  - id: exit_codes
+    depends: [proof]
+    run: echo "timeout=${timeout.exit_code} claude_denied=${claude_denied.exit_code} codex_readonly=${codex_readonly.exit_code} codex_readonly_strict=${codex_readonly_strict.exit_code} bad_model=${bad_model.exit_code}"
