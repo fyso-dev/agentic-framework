@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D21; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D23; D6, D9 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -52,8 +52,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Phase | Goal | Status |
 |---|---|---|
 | 0 | Spikes: verify the unknowns | ✅ done · [ADR 0001](adr/0001-spikes.md) |
-| 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ⏳ next |
-| 2 | Bots: team file, auth, Dagu MCP | ⬜ not started |
+| 1 | Run it: mise, process-compose, Caddy, `up/down/doctor` | ✅ done |
+| 2 | Bots: team file, auth, Dagu MCP | ⏳ next |
 | 3 | Snapshot and replicate | ⬜ not started |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ⬜ not started · 🎨 design spec v2 ready for Claude Design |
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ⬜ not started |
@@ -80,3 +80,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-05 | Extensibility accepted (D17): extensions are Copier templates filling fixed slots; NetBird documented as the reference example, not built |
 | 2026-11-05 | Multi-host accepted (D18): a host is an SSH alias; Dagu distributed workers + OMB "bring your own VPS" computers; state stays on the control host |
 | 2026-11-05 | **Phase 0 closed** ([ADR 0001](adr/0001-spikes.md)). All four spike branches merged. New decisions: D19 (Dagu basic auth with Caddy's credentials, since proxy auth needs a paid SSO license), D20 (sops + age), D21 (pinned tested versions) |
+| 2026-11-05 | **Phase 1 done.** The template generates a project that installs (signature checks on), sets up secrets and runs Dagu + OMB + Caddy with one login, in ~30 s. New D22 (OMB not behind the gateway login; direct on localhost) and D23 (bind to 127.0.0.1 by default). `copier update` verified |
