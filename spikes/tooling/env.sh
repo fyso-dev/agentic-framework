@@ -1,0 +1,16 @@
+# Source from the worktree root; no user config or global installations.
+export TOOLING_WT="$PWD"
+export MISE_DATA_DIR="$PWD/.data/mise-data"
+export MISE_CACHE_DIR="$PWD/.data/mise-cache"
+export MISE_STATE_DIR="$PWD/.data/mise-state"
+export MISE_CONFIG_DIR="$PWD/.data/mise-config"
+export MISE_GLOBAL_CONFIG_FILE="$PWD/.data/mise-config/config.toml"
+export npm_config_cache="$PWD/.data/npm-cache"
+export PATH="$PWD/.data/bin:$PATH"
+export XDG_CONFIG_HOME="$PWD/.data/xdg-config"
+export XDG_DATA_HOME="$PWD/.data/xdg-data"
+export XDG_CACHE_HOME="$PWD/.data/xdg-cache"
+export XDG_STATE_HOME="$PWD/.data/xdg-state"
+export FNOX_CONFIG_DIR="$PWD/.data/fnox-config"
+export FNOX_STATE_DIR="$PWD/.data/fnox-state"
+export FNOX_DAEMON=off

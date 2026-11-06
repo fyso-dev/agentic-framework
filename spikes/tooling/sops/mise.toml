@@ -1,0 +1,2 @@
+[env]
+_.file = { path = "secrets.enc.yaml", redact = true }
