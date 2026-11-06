@@ -1,0 +1,29 @@
+# This project's bots, in OpenMausBot's native team file format (PLAN §5).
+# `${FYSO_ROOT}` is replaced with the project's absolute path when applied:
+#   mise run bots:plan   # show what would change
+#   mise run bots:apply  # apply it
+# Fine-tune instructions and memory in OpenMausBot; structure lives here (PLAN D13).
+version: 1
+
+defaults:
+  computer: "off"
+  cwd: ${FYSO_ROOT}            # loads .mcp.json (Dagu MCP) from the project root
+
+bots:
+  # OpenMausBot's default bot; listed so export → apply round-trips cleanly.
+  - name: MausBot
+    chief: true
+    model: claude/claude-sonnet-5
+    approval: full
+
+  - name: Workflow Architect
+    title: Designs and fixes Dagu workflows
+    model: claude/claude-sonnet-5
+    approval: full             # writes workflows through the Dagu MCP without asking
+    soul: { file: ${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }
+
+  - name: Run Operator
+    title: Watches runs, explains failures, retries
+    model: claude/claude-haiku-4-5
+    approval: ask
+    soul: { file: ${FYSO_ROOT}/framework/bots/souls/run-operator.md }

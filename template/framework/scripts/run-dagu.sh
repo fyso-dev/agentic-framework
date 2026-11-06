@@ -7,6 +7,7 @@ mkdir -p "$FYSO_DATA/dagu"
 clean_exec \
   DAGU_HOME="$FYSO_DATA/dagu" \
   DAGU_DAGS_DIR="$FYSO_ROOT/project/workflows" \
+  DAGU_WIKI_DIR="$FYSO_ROOT/project/wiki" \
   DAGU_HOST=127.0.0.1 \
   DAGU_PORT="$FYSO_DAGU_PORT" \
   DAGU_SCHEDULER_PORT="$FYSO_DAGU_SCHEDULER_PORT" \
