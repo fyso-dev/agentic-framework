@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D36; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D37; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -119,3 +119,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **macOS installer prototype (D35, [installer.md](installer.md)).** `Fyso Installer.app` + `.dmg` (21 MB): swiftDialog window, pinned mise bootstrap, Dagu CLI running a workflow generated from the template's tools. Verified end to end from `main` (15 steps, stack up, panel 200) and with a forced failure (plain message, dependants marked not run). Findings: Dagu step ids allow only `_`; `dagu start` exposes per-step state in `status.jsonl`, so no server is needed; swiftDialog 3.x needs macOS 15. Open: Developer ID signing/notarization |
 | 2026-11-06 | **Connect desktop agents (D36).** `mise run agent:connect` adds `fyso-<slug>` to Claude Desktop (JSON merge) and Codex app + CLI (`codex mcp add`), Claude Code CLI optional; the installer ends with a "connect your assistant" screen. Finding: Codex already had a server named `fyso` (Fyso cloud), hence the per-project name; the server started from `/` with a minimal PATH (as desktop apps do) answers `fyso_status` |
 | 2026-11-06 | **New Codex projects failed the setup checklist.** The template gave Run Operator `codex/gpt-5.4-mini`, which Codex no longer offers; OMB rejected the whole team, so no bot was created on first start and the check died with a bare "exit status 1" (engines and Dagu showed failed too). Fast Codex model is now `gpt-6-luna`; the check keeps OMB's error and the panel shows "OpenMausBot rejects the team: …". Existing projects need the model changed in their own `project/bots/team.yaml`, then `mise run bots:apply`. Follow-up: pick models from `openmausbot models` at generation instead of pinning names that providers retire |
+| 2026-11-06 | **Retired models repaired automatically (D37).** `team-models.cjs` + `bots.sh repair` on every `up`; the panel re-reads the last setup check when its tab regains focus (it showed a stale failure after a fix made elsewhere) |
