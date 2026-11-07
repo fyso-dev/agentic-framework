@@ -11,5 +11,7 @@ dir=$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)
 plugin="$PWD/framework/tray/fyso.10s.py"
 chmod +x "$plugin"
 ln -sfn "$plugin" "$dir/fyso.10s.py"
+# Remember this project, so the menu can start it while it is stopped (others appear once they run).
+"$plugin" register "$PWD" || echo "warning: could not remember this project for the Start action." >&2
 open -g 'swiftbar://refreshallplugins'
 echo "Fyso menu bar plugin linked into $dir. Every running project shows up there."

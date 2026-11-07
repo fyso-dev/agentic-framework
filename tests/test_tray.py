@@ -46,9 +46,10 @@ class TrayPluginTests(unittest.TestCase):
         os.makedirs(self.bin)
         mise = os.path.join(self.bin, "mise")
         with open(mise, "w") as f:
-            f.write("#!/bin/sh\nexit 0\n")
+            f.write('#!/bin/sh\nprintf "%s|%s\\n" "$PATH" "$*" >> "$(dirname "$0")/calls"\n')
         os.chmod(mise, os.stat(mise).st_mode | stat.S_IEXEC)
         self.servers = []
+        self.cache = os.path.join(self.work, "cache", "projects.json")
 
     def tearDown(self):
         for server in self.servers:
@@ -85,12 +86,24 @@ class TrayPluginTests(unittest.TestCase):
         sock.bind(os.path.join(self.socks, f"fyso-{slug}-{port}.sock"))
         sock.close()  # the file stays, nobody listens: a crashed stack
 
-    def run_plugin(self):
-        env = {"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", ""),
-               "FYSO_TRAY_SOCKETS": os.path.join(self.socks, "fyso-*.sock"), "FYSO_TRAY_LANG": "en"}
-        out = subprocess.run([sys.executable, PLUGIN], capture_output=True, text=True, env=env, timeout=30)
+    def run_plugin(self, *args, path="/usr/bin:/bin", **extra):
+        env = {"PATH": path, "HOME": os.environ.get("HOME", ""), "FYSO_TRAY_CACHE": self.cache,
+               "FYSO_TRAY_SOCKETS": os.path.join(self.socks, "fyso-*.sock"), "FYSO_TRAY_LANG": "en", **extra}
+        out = subprocess.run([sys.executable, PLUGIN, *args], capture_output=True, text=True, env=env, timeout=30)
         self.assertEqual(out.returncode, 0, out.stderr)
         return out.stdout.splitlines()
+
+    def stop_all(self):
+        for server in self.servers:
+            server.kill()
+            server.wait()
+        self.servers = []
+        for sock in os.listdir(self.socks):
+            os.remove(os.path.join(self.socks, sock))  # process-compose removes its socket on down
+
+    def mise_calls(self):
+        with open(os.path.join(self.bin, "calls")) as f:
+            return [line.rstrip("\n").split("|", 1) for line in f]
 
     def test_none_running(self):
         lines = self.run_plugin()
@@ -109,8 +122,37 @@ class TrayPluginTests(unittest.TestCase):
         self.assertIn(f'--Open folder | bash=/usr/bin/open param1="{root}" terminal=false sfimage=folder', lines)
         stop = [l for l in lines if l.startswith("----Stop Alpha")]
         self.assertEqual(len(stop), 1)
-        # mise comes from the PATH of the running process-compose, not from SwiftBar's minimal PATH.
-        self.assertIn(f'bash="{os.path.join(self.bin, "mise")}" param1=-C param2="{root}" param3=run param4=down', stop[0])
+        self.assertIn(f'bash={PLUGIN} param1=stop param2="{root}"', stop[0])
+        self.assertTrue([l for l in lines if l.startswith("----Restart Alpha")])
+
+    def test_stopped_project_can_be_started_with_the_stack_path(self):
+        root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
+        self.run_plugin()  # seen running: cached
+        self.stop_all()
+        lines = self.run_plugin()
+        self.assertIn("No Fyso projects running | color=gray", lines)
+        self.assertIn("Stopped | color=gray size=12", lines)
+        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray", lines)
+        start = [l for l in lines if l.startswith("--Start |")]
+        self.assertEqual(len(start), 1)
+        self.assertIn(f'param1=start param2="{root}"', start[0])
+        # The action runs mise with the PATH the stack had (mise, claude, codex), not SwiftBar's.
+        self.run_plugin("start", root)
+        self.assertEqual(self.mise_calls(), [[self.bin + os.pathsep + "/usr/bin:/bin", f"-C {root} run up"]])
+        self.run_plugin("forget", root)
+        self.assertNotIn("Stopped | color=gray size=12", self.run_plugin())
+
+    def test_restart_runs_down_then_up(self):
+        root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
+        self.run_plugin()
+        self.run_plugin("restart", root)
+        self.assertEqual([c[1] for c in self.mise_calls()], [f"-C {root} run down", f"-C {root} run up"])
+
+    def test_register_remembers_a_stopped_project(self):
+        root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
+        self.stop_all()
+        self.run_plugin("register", root, path=self.bin + os.pathsep + "/usr/bin:/bin", FYSO_HTTP_PORT="18400")
+        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray", self.run_plugin())
 
     def test_degraded_project(self):
         self.project("beta", 18500, "Beta", [proc("caddy"), proc("omb", ready="Not Ready")])
