@@ -16,6 +16,8 @@ are cached (a rebuildable cache, not configuration) so a stopped one can be star
 again. Standard library only; SwiftBar runs plugins with a minimal PATH. Refreshes
 every 10 s (file name). Menu actions call this file again: fyso.10s.py <action> <root>.
 """
+import contextlib
+import fcntl
 import glob
 import http.client
 import json
@@ -142,7 +144,6 @@ def load_cache():
 
 def save_cache(cache):
     try:
-        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
         tmp = CACHE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(cache, f, indent=1, sort_keys=True)
@@ -151,9 +152,20 @@ def save_cache(cache):
         pass
 
 
+@contextlib.contextmanager
+def cache_edit():
+    """Read-modify-write the cache under a lock: menu refreshes and actions run at the same time,
+    and an unlocked refresh would write back a stale "busy" mark over a finished action."""
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    with open(CACHE + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        cache = load_cache()
+        yield cache
+        save_cache(cache)
+
+
 def projects():
-    found = []
-    cache = load_cache()
+    found, seen = [], {}
     for sock in sorted(glob.glob(SOCKETS)):
         m = re.match(r"fyso-(.+)-(\d+)\.sock$", os.path.basename(sock))
         if not m:
@@ -180,14 +192,20 @@ def projects():
             item["name"] = info.get("name") or slug
             item["apps"] = read_json(os.path.join(root, ".data/panel/apps.json")) or []
             if item["mise"]:
-                cache[root] = dict(cache.get(root, {}), name=item["name"], port=port, mise=item["mise"],
-                                   path=path or os.environ.get("PATH", ""))
-            item["busy"], item["error"] = busy(cache.get(root)), (cache.get(root) or {}).get("error")
+                seen[root] = {"name": item["name"], "port": port, "mise": item["mise"], "path": path or os.environ.get("PATH", "")}
         found.append(item)
+    # Only the fields this refresh owns are written; busy/error belong to running actions.
+    with cache_edit() as cache:
+        for root, fields in seen.items():
+            cache.setdefault(root, {}).update(fields)
+        for root in [r for r in cache if not is_project(r)]:  # folders deleted since
+            del cache[root]
+        snapshot = json.loads(json.dumps(cache))
+    for item in found:
+        if item["root"] in snapshot:
+            item["busy"], item["error"] = busy(snapshot[item["root"]]), snapshot[item["root"]].get("error")
     live = {p["root"] for p in found if p["root"]}
-    cache = {root: c for root, c in cache.items() if is_project(root)}  # folders deleted since
-    save_cache(cache)
-    for root, c in sorted(cache.items(), key=lambda rc: rc[1].get("name", "")):
+    for root, c in sorted(snapshot.items(), key=lambda rc: rc[1].get("name", "")):
         if root not in live:
             found.append({"state": "stopped", "root": root, "name": c.get("name") or os.path.basename(root),
                           "port": c.get("port", ""), "busy": busy(c), "error": c.get("error")})
@@ -270,7 +288,7 @@ def render(items):
         lines.append("---")
         panel = f"http://panel.localhost:{p['port']}"
         if p["state"] != "up":
-            lines.append(f"{esc(p['name'])}  :{p['port']} | sfimage=exclamationmark.triangle sfcolor=orange")
+            lines.append(f"{esc(p['name'])}  :{p['port']} | sfimage=exclamationmark.triangle sfcolor=orange refresh=true")
             lines.append(f"--{T[p['state']]} | color=gray")
             if p["state"] == "stale":
                 lines.append(f"--{T['forget']} | bash=/bin/rm param1=-f param2={q(p['sock'])} terminal=false refresh=true sfimage=trash")
@@ -300,7 +318,7 @@ def render(items):
         lines.append("---")
         lines.append(f"{T['stopped']} | color=gray size=12")
         for p in stopped:
-            lines.append(title_line(p, "circle", "gray"))
+            lines.append(title_line(p, "circle", "gray", " refresh=true"))  # SwiftBar disables rows without an action
             extra, working = status_items(p)
             lines.extend(extra)
             if not working:
@@ -318,27 +336,27 @@ def run_action(name, root):
     """start | stop | restart | forget one cached project. mise runs with the PATH the stack had,
     so processes started from the menu find the same tools as when started from a terminal.
     register (from `mise run tray:install`) caches a project with the caller's PATH."""
-    cache = load_cache()
     root = os.path.realpath(root)
-    if name == "register" and is_project(root) and mise_path(os.environ.get("PATH", "")):
-        info = read_json(os.path.join(root, ".data/panel/project.json")) or {}
-        cache[root] = {"name": info.get("name") or os.path.basename(root), "port": os.environ.get("FYSO_HTTP_PORT", ""),
-                       "mise": mise_path(os.environ.get("PATH", "")), "path": os.environ.get("PATH", "")}
-        save_cache(cache)
-        return 0
-    entry = cache.get(root)
-    if not entry or not is_project(root):
-        return 1
-    if name == "forget":
-        cache.pop(root)
-        save_cache(cache)
-        return 0
     tasks = {"start": ["up"], "stop": ["down"], "restart": ["down", "up"]}.get(name)
-    if not tasks or not os.access(entry.get("mise", ""), os.X_OK):
-        return 1
-    if busy(entry):
-        return 0  # double click: the first action is still running
-    mark(root, busy=name, since=time.time(), error=None)
+    with cache_edit() as cache:
+        if name == "register" and is_project(root) and mise_path(os.environ.get("PATH", "")):
+            info = read_json(os.path.join(root, ".data/panel/project.json")) or {}
+            cache[root] = dict(cache.get(root, {}), name=info.get("name") or os.path.basename(root),
+                               port=os.environ.get("FYSO_HTTP_PORT", ""), mise=mise_path(os.environ.get("PATH", "")),
+                               path=os.environ.get("PATH", ""))
+            return 0
+        entry = dict(cache.get(root) or {})
+        if not entry or not is_project(root):
+            return 1
+        if name == "forget":
+            del cache[root]
+            return 0
+        if not tasks or not os.access(entry.get("mise", ""), os.X_OK):
+            return 1
+        if busy(entry):
+            return 0  # double click: the first action is still running
+        cache[root].update(busy=name, since=time.time(), error=None)
+    refresh()
     env = dict(os.environ, PATH=entry.get("path") or os.environ.get("PATH", ""))
     logs = os.path.join(root, ".data", "logs")
     os.makedirs(logs, exist_ok=True)
@@ -352,18 +370,18 @@ def run_action(name, root):
             if code:
                 failed = task
                 break
-    mark(root, busy=None, since=0, error=failed)
+        log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {name}: exit {code}\n")
+    with cache_edit() as cache:
+        if root in cache:
+            cache[root].update(busy=None, since=0, error=failed)
+    refresh()
     who = entry.get("name") or os.path.basename(root)
     notify(T["failed"].format(name=who, task=failed) if failed else T["done_" + name].format(name=who))
     return code
 
 
-def mark(root, **fields):
-    """Update a cache entry and let SwiftBar show it now, not at the next 10 s refresh."""
-    cache = load_cache()
-    if root in cache:
-        cache[root].update(fields)
-        save_cache(cache)
+def refresh():
+    """Let SwiftBar show the new state now, not at the next 10 s refresh."""
     if not QUIET:
         subprocess.run(["/usr/bin/open", "-g", "swiftbar://refreshallplugins"], timeout=5)
 

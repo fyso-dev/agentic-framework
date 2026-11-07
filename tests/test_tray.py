@@ -132,7 +132,7 @@ class TrayPluginTests(unittest.TestCase):
         lines = self.run_plugin()
         self.assertIn("No Fyso projects running | color=gray", lines)
         self.assertIn("Stopped | color=gray size=12", lines)
-        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray", lines)
+        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray refresh=true", lines)
         start = [l for l in lines if l.startswith("--Start |")]
         self.assertEqual(len(start), 1)
         self.assertIn(f'param1=start param2="{root}"', start[0])
@@ -152,7 +152,7 @@ class TrayPluginTests(unittest.TestCase):
         with open(self.cache, "w") as f:
             json.dump(cache, f)
         lines = self.run_plugin()
-        self.assertIn("Alpha  :18400  · Starting… | sfimage=hourglass sfcolor=orange", lines)
+        self.assertIn("Alpha  :18400  · Starting… | sfimage=hourglass sfcolor=orange refresh=true", lines)
         self.assertIn("--Starting… | color=gray sfimage=hourglass", lines)
         self.assertFalse([l for l in lines if l.startswith("--Start |")])
         self.run_plugin("start", root)  # a second click while busy does nothing
@@ -180,7 +180,7 @@ class TrayPluginTests(unittest.TestCase):
         root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
         self.stop_all()
         self.run_plugin("register", root, path=self.bin + os.pathsep + "/usr/bin:/bin", FYSO_HTTP_PORT="18400")
-        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray", self.run_plugin())
+        self.assertIn("Alpha  :18400 | sfimage=circle sfcolor=gray refresh=true", self.run_plugin())
 
     def test_degraded_project(self):
         self.project("beta", 18500, "Beta", [proc("caddy"), proc("omb", ready="Not Ready")])
@@ -194,7 +194,7 @@ class TrayPluginTests(unittest.TestCase):
         self.stale("gone", 18600)
         lines = self.run_plugin()
         self.assertEqual(lines[0], "1 | sfimage=square.stack.3d.up.fill sfcolor=orange")
-        self.assertIn("gone  :18600 | sfimage=exclamationmark.triangle sfcolor=orange", lines)
+        self.assertIn("gone  :18600 | sfimage=exclamationmark.triangle sfcolor=orange refresh=true", lines)
         self.assertIn("--stale socket (the stack did not shut down cleanly) | color=gray", lines)
         self.assertTrue([l for l in lines if l.startswith("--Remove from menu | bash=/bin/rm param1=-f")])
 
