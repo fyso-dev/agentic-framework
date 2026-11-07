@@ -5,6 +5,7 @@
 # <swiftbar.hideLastUpdated>true</swiftbar.hideLastUpdated>
 # <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
 # <swiftbar.hideSwiftBar>true</swiftbar.hideSwiftBar>
+# <swiftbar.hideAbout>true</swiftbar.hideAbout>
 """SwiftBar plugin (D34): one menu for every Fyso project running on this machine.
 
 Discovery needs no registry: each running stack owns a process-compose socket
