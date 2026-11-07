@@ -101,7 +101,8 @@
       "never_other": "{{count}} bots defined, not checked yet",
       "review": "Review and apply",
       "reviewPlain": "Review and apply",
-      "view": "View bots"
+      "view": "View bots",
+      "invalid": "OpenMausBot rejects the team: {{error}}"
     },
     "dagu": {
       "title": "Bots connected to Dagu",

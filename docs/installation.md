@@ -1,5 +1,7 @@
 # Install from the repository
 
+> **On macOS there is also an installer app** (prototype): `installer/macos/build.sh` builds `Fyso Installer.app`, which does every step below in a friendly window. See [installer.md](installer.md).
+
 ## Requirements
 
 - Git with a configured author name and email. Project initialization and native configuration snapshots create local commits.

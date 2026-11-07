@@ -85,7 +85,8 @@ export type Engine = {
 export type SetupCheck = {
   checkedAt: string;
   engines: Engine[];
-  bots: { count: number; pending: number; ok: boolean };
+  /** `error`: OpenMausBot rejected the team file (e.g. a model the engine no longer offers). */
+  bots: { count: number; pending: number; ok: boolean; error?: string };
   dagu: { ok: boolean; botsConnected: number };
 };
 

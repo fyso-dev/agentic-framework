@@ -78,6 +78,14 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const [draftReady, setDraftReady] = useState(false);
 
   const check = useDaguAction<SetupCheck>(backend, DAGS.setupCheck, "check", { loadLast: true });
+  // A check run elsewhere (CLI, an agent, another tab) shows up when this tab is back in view.
+  const reloadCheck = check.reload;
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") void reloadCheck(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", onVisible); };
+  }, [reloadCheck]);
   const snapshot = useDaguAction<string>(backend, DAGS.snapshot, "result", { loadLast: true });
 
   const loadTeam = useCallback(async () => {

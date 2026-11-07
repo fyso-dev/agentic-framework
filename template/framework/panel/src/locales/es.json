@@ -101,7 +101,8 @@
       "never_other": "{{count}} bots definidos, todavía sin verificar",
       "review": "Revisar y aplicar",
       "reviewPlain": "Revisar y aplicar",
-      "view": "Ver bots"
+      "view": "Ver bots",
+      "invalid": "OpenMausBot rechaza el equipo: {{error}}"
     },
     "dagu": {
       "title": "Bots conectados a Dagu",

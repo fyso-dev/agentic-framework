@@ -40,3 +40,26 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 - `DAGU_MCP_AUTH` from the sops-encrypted login matches the gateway header; Dagu MCP `initialize` → 200. `claude mcp list` in the project shows `dagu` and `fyso`.
 - Tests: `tests/fyso-mcp.test.cjs` (stdio handshake, tool list, workflow params and parsed outputs, failures and bad arguments as tool errors).
 - Not run here: `mise run agent:setup` (downloads the `skills` CLI from npm; run it once per project).
+
+## 3. Connect desktop and CLI agents (D36)
+
+`.mcp.json` only reaches agents opened inside the project folder. To manage a project from **Claude Desktop** or **Codex** anywhere:
+
+```sh
+mise run agent:connect                   # desktop apps found on this Mac (Claude Desktop, Codex)
+mise run agent:connect claude-code       # Claude Code CLI as well (opt-in)
+mise run agent:disconnect                # remove this project's entry
+mise run agent:open [codex|claude-desktop]   # new conversation about this project
+```
+
+`agent:open` uses the apps' own deep links (read from their bundles): **`codex://threads/new?path=<project>&prompt=…`** opens a Codex thread in the project folder; **`claude://claude.ai/new?q=…`** opens a Claude Desktop chat, restarting Claude first when it runs, because it loads MCP servers only at start. The first message is typed in, not sent: it asks to use `fyso-<slug>` starting with `fyso_status`.
+
+| Target | How | Notes |
+|---|---|---|
+| `claude-desktop` | merges `~/Library/Application Support/Claude/claude_desktop_config.json` (keeps other keys, writes `*.fyso-backup`) | no CLI exists for it; restart Claude Desktop |
+| `codex` | `codex mcp add` (the ChatGPT app bundles the Codex CLI) | app and CLI share `~/.codex/config.toml` |
+| `claude-code` | `claude mcp add --scope user` | opt-in |
+
+The entry is named **`fyso-<slug>`**, one per project: a plain `fyso` may already exist (e.g. the Fyso cloud server). It runs `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`, an absolute launcher, because desktop apps start servers with a minimal `PATH` and no project folder. Verified: started that way from `/` with only the system `PATH`, the server answers and `fyso_status` reports the project. Tests: `tests/agent-connect.test.cjs` (fake HOME and CLIs).
+
+The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment.

@@ -125,6 +125,7 @@ function BotsStep() {
   const state = steps.bots;
   let detail: string;
   if (draftChanges > 0) detail = t("setup.bots.changes", { count: draftChanges });
+  else if (checkData?.bots.error) detail = t("setup.bots.invalid", { error: checkData.bots.error });
   else if (checkData) detail = checkData.bots.ok
     ? t("setup.bots.ok", { count: checkData.bots.count })
     : t("setup.bots.changes", { count: checkData.bots.pending });
