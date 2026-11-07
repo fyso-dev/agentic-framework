@@ -33,7 +33,7 @@ titles = {"generate": "Proyecto (plantilla Fyso)", "trust": "Configuración del 
           "tool_openmausbot": "OpenMausBot (bots)", "tool_process_compose": "process-compose", "tool_caddy": "Caddy (acceso web)",
           "tool_sops": "sops (secretos)", "tool_age": "age (cifrado)", "tool_gitleaks": "gitleaks (seguridad)",
           "tool_node": "Node.js", "tool_yaml": "YAML", "tool_cli": "GitHub CLI"}
-order = ["generate", "trust", *sys.argv[1].split(), "git", "setup", "start"]
+order = ["generate", "trust", *sys.argv[1].split(), "setup", "git", "start"]
 for sid in order:
     print(f"{sid}\t{titles.get(sid, sid)}")
 EOF

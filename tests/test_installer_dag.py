@@ -18,14 +18,17 @@ class InstallerDag(unittest.TestCase):
                                  check=True, capture_output=True, text=True).stdout.split()
             text = out.read_text()
         self.assertEqual(len(ids), len(tools))
-        for step in ['generate', 'trust', *ids, 'git', 'setup', 'start']:
+        for step in ['generate', 'trust', *ids, 'setup', 'git', 'start']:
             self.assertRegex(step, r'^[a-zA-Z][a-zA-Z0-9_]*$')  # Dagu step id format
             self.assertIn(f'  - id: {step}\n', text)
         for tool, version in tools:
             self.assertIn(f'install "{tool}@{version}"', text)
-        # npm tools need Node first; setup waits for every tool and git.
+        # npm tools need Node first; setup waits for every tool; the first commit comes
+        # after setup so it includes .sops.yaml and the encrypted secrets.
         self.assertRegex(text, r'id: tool_openmausbot\n    run: .*\n    depends: \[trust, tool_node\]')
-        self.assertIn(f'depends: [git, {", ".join(ids)}]', text)
+        self.assertIn(f'depends: [{", ".join(ids)}]', text)
+        self.assertRegex(text, r'id: git\n    run: >-\n(?:      .*\n)+    depends: \[setup\]')
+        self.assertRegex(text, r'id: start\n    run: .*\n    depends: \[git\]')
         # Parameters reach commands as environment variables, never interpolated.
         self.assertNotIn('${params.', text)
 

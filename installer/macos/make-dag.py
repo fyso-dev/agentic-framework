@@ -62,19 +62,20 @@ for tool, version in tools:
         f"    depends: [{', '.join(deps)}]",
     ]
 lines += [
+    "  - id: setup",
+    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" \"$MISE\" run setup",
+    f"    depends: [{', '.join(ids)}]",
+    # After setup: the first commit must include .sops.yaml and the encrypted secrets.
     "  - id: git",
     "    run: >-",
     "      cd \"$DIR\" && git init -q -b main &&",
     "      { git config user.name >/dev/null || git config user.name \"$GIT_NAME\"; } &&",
     "      { git config user.email >/dev/null || git config user.email \"$GIT_EMAIL\"; } &&",
     "      git add . && git commit -q -m \"chore: initialize Fyso project\"",
-    "    depends: [generate]",
-    "  - id: setup",
-    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" \"$MISE\" run setup",
-    f"    depends: [git, {', '.join(ids)}]",
+    "    depends: [setup]",
     "  - id: start",
     "    run: cd \"$DIR\" && \"$MISE\" run up",
-    "    depends: [setup]",
+    "    depends: [git]",
 ]
 open(out, "w").write("\n".join(lines) + "\n")
 print(" ".join(ids))
