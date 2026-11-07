@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prepare this project for coding agents (D32): install Dagu's own authoring skill,
+# Prepare this project for coding agents (D33): install Dagu's own authoring skill,
 # pinned to the Dagu version of this project, for Claude Code and Codex. The MCP
 # servers (dagu, fyso) already come from .mcp.json; DAGU_MCP_AUTH is set by mise.
 set -euo pipefail

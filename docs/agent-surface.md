@@ -1,4 +1,4 @@
-# Agent surface: the platform MCP and Dagu for coding agents (D32)
+# Agent surface: the platform MCP and Dagu for coding agents (D33)
 
 Two separate things, both available to any MCP client opened in a project (Claude Code, Codex, OpenMausBot bots):
 

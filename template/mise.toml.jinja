@@ -4,7 +4,7 @@ min_version = "2026.10.6"
 
 [tools]
 "aqua:dagucloud/dagu" = "2.24.0"
-"npm:openmausbot" = "0.1.140"
+"npm:openmausbot" = "0.1.141"
 "aqua:F1bonacc1/process-compose" = "1.124.0"
 "aqua:caddyserver/caddy" = "2.11.9"
 "aqua:getsops/sops" = "3.13.3"
@@ -41,7 +41,7 @@ FYSO_CADDY_ADMIN_PORT = "{{ port_base + 8 }}"
 # Every `openmausbot` CLI call targets THIS project's server, never the
 # desktop app it would otherwise auto-discover on 8799.
 # Coding agents opened in this project reach the Dagu MCP of .mcp.json with this header
-# (D32); OpenMausBot sets the same value for bots. Derived, never stored.
+# (D33); OpenMausBot sets the same value for bots. Derived, never stored.
 DAGU_MCP_AUTH = "{% raw %}Basic {{ exec(command='printf %s:%s \"$FYSO_ADMIN_USER\" \"$FYSO_ADMIN_PASSWORD\" | base64 | tr -d \"\\n\"') }}{% endraw %}"
 
 OPENMAUSBOT_URL = "http://127.0.0.1:{{ port_base + 4 }}"

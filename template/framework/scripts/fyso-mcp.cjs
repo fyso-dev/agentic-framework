@@ -1,4 +1,4 @@
-// The platform's own MCP server (D32): typed tools for what the panel does, so an agent
+// The platform's own MCP server (D33): typed tools for what the panel does, so an agent
 // can inspect and configure this project. Every change goes through the same Dagu
 // workflows as the panel; nothing here edits project files directly.
 // Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.

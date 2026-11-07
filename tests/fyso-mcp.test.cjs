@@ -1,4 +1,4 @@
-// The platform MCP server (D32) over stdio against a fake Dagu API.
+// The platform MCP server (D33) over stdio against a fake Dagu API.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const http=require('node:http'), path=require('node:path');

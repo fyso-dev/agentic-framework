@@ -30,15 +30,22 @@ for t in dagu openmausbot caddy process-compose sops; do
 done
 
 echo "Logins"
-if command -v claude >/dev/null; then
-  claude auth status >/dev/null 2>&1 && ok "claude signed in" \
-    || bad "claude is not signed in (or CLAUDE_CODE_OAUTH_TOKEN is invalid): run 'claude' and /login"
-else
-  warn "claude CLI not installed (needed for Claude bots)"
-fi
-if command -v codex >/dev/null; then
-  codex login status >/dev/null 2>&1 && ok "codex signed in" || warn "codex is not signed in (only needed for Codex bots)"
-fi
+# Only engines a bot uses are required; at least one must be signed in (PLAN D32).
+used=" $(node framework/scripts/panel-data.cjs engines 2>/dev/null | tr '\n' ' ')"
+signed=0
+login() { # <engine> <status command...>
+  local engine=$1; shift
+  if command -v "$engine" >/dev/null && "$@" >/dev/null 2>&1; then
+    ok "$engine signed in"; signed=$((signed + 1))
+  elif [[ $used == *" $engine "* ]]; then
+    bad "$engine is not signed in but project/bots/team.yaml uses it: sign in, or move those bots to a signed-in engine"
+  else
+    warn "$engine is not signed in (optional: no bot uses it)"
+  fi
+}
+login claude claude auth status
+login codex codex login status
+[ "$signed" -gt 0 ] || bad "no coding engine is signed in: run 'claude' and /login, or 'codex login --device-auth'"
 
 echo "Isolation"
 [ "${OPENMAUSBOT_URL:-}" = "http://127.0.0.1:$FYSO_OMB_PORT" ] \

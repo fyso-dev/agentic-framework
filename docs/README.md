@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D32; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D33; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -41,6 +41,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
+| Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
@@ -49,7 +50,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace (D30, D31) | [extensions-contract.md](extensions-contract.md) |
-| Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D32) | [agent-surface.md](agent-surface.md) |
+| Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
 ## Layer 4 — Execution
@@ -102,20 +103,15 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Phase 5.5 verified.** Native conversation + delegation, explicit conversation/run linkage, structured Codex usage, restart persistence, browser refresh and guarded summary endpoint. Node 10/Python 16 checks passed; local doctors green. [Evidence](../artifacts/delivery-evidence/observability/README.md) |
 | 2026-11-06 | Bot Architect goal started after observability verification: native partial team plans, exact-ID deletion, snapshots before/after mutations, versioned project configuration and real conversational CRUD proof. [Contract](bot-architect.md) |
 | 2026-11-06 | **Phase 5.6 verified.** Real conversational create/read/update/delete, native Git audit preserving unrelated bots, imported-skill restore, stale/replay/secret/protected guards, and local user installation. Fixed portable native snapshot bundles and relative team references. Final suite: Node 13/Python 21; doctors green. [Evidence](../artifacts/delivery-evidence/bot-architect/README.md) |
-
 | 2026-11-06 | Native bot discovery (D28): the panel now polls the project OMB roster, including its chief and bots created in the native UI. Manual configuration drafts remain separate and preserved. [Evidence](../artifacts/delivery-evidence/bot-discovery/README.md) |
-
 | 2026-11-06 | Initial private publication in `fyso-dev/agentic-framework`; repository installation guide uses the explicit `preview` branch pending PR review. Full Phase 6 lifecycle acceptance remains pending. |
-
 | 2026-11-06 | [Repository install proof](../artifacts/delivery-evidence/repository-install/README.md): generated directly from GitHub with Copier 9.19.1, initialized Git, installed/resolved pinned tools, encrypted secrets, started isolated services and passed doctor. Fixture stopped afterward. |
-
 | 2026-11-06 | Corrected duplicate bot lists: one native roster with matching configuration actions and pending drafts. Chief/native-only bots remain visible; unchanged stale declarations no longer resurrect native deletions. |
-
 | 2026-11-06 | Native bot import (D29): distinguish project/snapshot/native-only definitions using committed Git evidence and import one native profile into project configuration without modifying OMB. [Verified evidence](../artifacts/delivery-evidence/bot-import/README.md). |
-
 | 2026-11-06 | Unified bot actions: every row opens OMB, while configuration edit and native import remain explicit sibling actions. |
 | 2026-11-06 | Initial delivery PR #1 merged into `main` (`9847295`). Installation documentation now targets `main`; historical preview evidence retains its original ref. |
 | 2026-11-06 | **Phase 7 done.** Extensions are Copier templates with their own answers file that fill fixed slots ([contract](extensions-contract.md), D30). Verified: mise conf.d, process-compose multi-file merge, Caddy empty-glob import, Dagu recursive discovery (opt-in, kept flat). `.mcp.json` is now generated. Sample v1 → v2 → remove on a live project, doctor green, panel shows extensions. The extension starter ships an authoring README; generated projects document the `ext:*` tasks. |
 | 2026-11-06 | **Extension marketplace (D31, [ADR 0002](adr/0002-extension-marketplace.md)).** Git catalogs + version tags; `ext:search`, `ext:add <id>`, panel install/upgrade through Dagu. Verified live: install commits only the slots, upgrade from the panel with uncommitted bot state (clean worktree + fast-forward), new process and route loaded without a restart, doctor green. Findings: process-compose runs commands with the environment of `up` (extensions keep `$VARS` in single quotes after `run-ext.sh`); a fresh project is never clean (restore writes `state/`). Devbox plugins (Nix) and Docker app stores do not replace this; bot integrations come from the MCP Registry and Activepieces (next spike) |
 | 2026-11-06 | [Activepieces spike](adr/spikes/activepieces.md): **yes, natively.** Built from the release with bun/node pinned by mise (~3 min, ~3 GB); API ready in 3 s on PGLite + in-memory queue; its MCP (42 tools, OAuth with refresh) ran a piece action (`ap_run_action`) on the native worker. Conditions for the extension: build per version in `.data/ext/`, route without `fyso_login` (MCP OAuth uses `Authorization`), verify the OAuth login path for OMB bots |
-| 2026-11-06 | **Agent surface (D32, [contract](agent-surface.md)).** Own MCP server `fyso` (stdio, no dependencies) with typed tools over the panel workflows; Dagu's MCP and skill for coding agents (`DAGU_MCP_AUTH` derived by mise, `mise run agent:setup`). Verified on Test 1: status, bots list, extension search, bot plan (preview), doctor; Dagu MCP 200; Claude Code lists both servers. Finding: until now a coding agent opened in a project could not use the Dagu MCP because `DAGU_MCP_AUTH` only existed inside OpenMausBot |
+| 2026-11-06 | **Agent surface (D33, [contract](agent-surface.md)).** Own MCP server `fyso` (stdio, no dependencies) with typed tools over the panel workflows; Dagu's MCP and skill for coding agents (`DAGU_MCP_AUTH` derived by mise, `mise run agent:setup`). Verified on Test 1: status, bots list, extension search, bot plan (preview), doctor; Dagu MCP 200; Claude Code lists both servers. Finding: until now a coding agent opened in a project could not use the Dagu MCP because `DAGU_MCP_AUTH` only existed inside OpenMausBot |
+| 2026-11-06 | Optional engines (D32): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |
