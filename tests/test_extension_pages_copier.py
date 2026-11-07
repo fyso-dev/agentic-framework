@@ -9,7 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 class ExtensionPagesCopier(unittest.TestCase):
-    def test_bundled_page_and_starter_generate_independent_page_slots(self):
+    def test_starter_and_independent_extension_generate_page_slots(self):
         if not shutil.which('uvx'):
             self.skipTest('Pinned Copier runner is unavailable')
         with tempfile.TemporaryDirectory(prefix='fyso-page-packaging-') as temporary:
@@ -25,13 +25,10 @@ class ExtensionPagesCopier(unittest.TestCase):
                             ignore=shutil.ignore_patterns('node_modules', '__pycache__'))
             project = base / 'project'
             run(*copier, 'copy', '--trust', '--defaults', str(source), str(project))
-            self.assertTrue((project / 'framework/extensions/biz/copier.yml').is_file())
             self.assertTrue((project / 'framework/panel/dist/assets/extension-sdk.js').is_file())
-            run(*copier, 'copy', '--trust', '--defaults', str(project / 'framework/extensions/biz'), str(project))
-            self.assertTrue((project / 'extensions/biz/pages/overview.yaml').is_file())
-            self.assertTrue((project / 'extensions/biz/panel/index.html').is_file())
-            self.assertTrue((project / 'extensions/biz/panel/main.js').is_file())
-            self.assertFalse((project / 'panel-src').exists())
+            import json
+            self.assertEqual(json.loads((project / 'framework/panel/extension-api.json').read_text())['version'], 1)
+            run(*copier, 'copy', '--trust', '--defaults', str(ROOT / 'tests/fixtures/ext-pages'), str(project))
             starter = base / 'starter'
             run(*copier, 'copy', '--trust', '--defaults', '-d', 'extension_id=demo-pages',
                 str(project / 'framework/extensions/_template'), str(starter))
@@ -47,7 +44,7 @@ class ExtensionPagesCopier(unittest.TestCase):
             (base / 'bin/yaml').symlink_to(yaml_cli)
             result = subprocess.run(['node', '-e',
                 'const x=require("./framework/scripts/extensions.cjs").inventory([]);'
-                'if(x.length!==2||x.some(e=>e.pages.length!==1))process.exit(1)'],
+                'if(x.length!==2||x.reduce((n,e)=>n+e.pages.length,0)!==3)process.exit(1)'],
                 cwd=project, env={**os.environ, 'PATH':str(base / 'bin')+os.pathsep+os.environ['PATH']},
                 capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)

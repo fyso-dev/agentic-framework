@@ -583,3 +583,5 @@ Workflows choose the host with Dagu labels (`workerSelector`). Bots choose it wi
 2. OMB self-hosted VPS: can the alias be set from a file or CLI, or only in Settings? Requirements on the VPS (x86_64, Docker).
 3. process-compose: is the restart policy enough for the tunnel, or is `autossh` needed?
 4. Do process-compose role fragments work (`-f` per role)?
+
+Packaging update (2026-11-07): the Biz implementation described in D39 lives in its own `fyso-dev/fyso-ext-biz` repository and the official catalog; D40 remains generic framework infrastructure. No Biz implementation is bundled in the framework.

@@ -1,3 +1,7 @@
+# Initial extension-pages/Biz validation (historical snapshot)
+
+This evidence records PR #14 before repository extraction. Biz source, tests and the independent release now live in [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz). The framework keeps generic page hosting, SDK, connection hooks, starter and independent page fixtures. Paths and bundled-install commands below describe the original validation snapshot. Current framework packaging tests use only generic fixtures.
+
 # Extension-owned pages and Fyso Biz — local evidence
 
 ## Overview
