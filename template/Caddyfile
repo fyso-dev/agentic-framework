@@ -45,7 +45,13 @@
 			copy_headers Remote-User Remote-Name Remote-Email Remote-Groups
 			header_up User-Agent {fyso_auth_ua}
 		}
-		@upstream not path /api/session /api/session/logout
+		# Only the panel's authority-backed handlers may retain the web session.
+		@upstream {
+			not {
+				host panel.{$FYSO_WEB_DOMAIN}
+				path /api/session /api/session/logout
+			}
+		}
 		request_header @upstream Cookie "(^|;[ \t]*)tinyauth-session-[^=;]+=[^;]*" ""
 	}
 }

@@ -103,7 +103,10 @@ Applications depend only on the existing `fyso_login` snippet and trusted
 `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` headers. Caddy
 removes browser-supplied identity headers and Authorization before consulting
 the authority. It strips the shared web-session cookie before proxying to an
-application. Native app cookies remain intact.
+application. The only cookie-retention exception matches both the canonical panel
+host and its authority-backed `/api/session` or `/api/session/logout` handler.
+The same paths on Dagu, OMB or an extension still strip the web-session cookie.
+Native app cookies remain intact.
 
 Future OAuth/LDAP providers use Tinyauth's native YAML fields, not a new framework
 provider schema. Secret fields can reference `${FYSO_AUTH_<NAME>}` variables from

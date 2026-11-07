@@ -41,11 +41,15 @@ class WebAuthHTTP(unittest.TestCase):
         config = (ROOT / 'template/project/auth/tinyauth.yaml.jinja').read_text().replace('{{ admin_user }}', 'admin')
         # A second local identity has access only to OMB; panel and Dagu remain denied.
         config = config.replace('  omb:\n    users:\n      allow: "admin"', '  omb:\n    users:\n      allow: "admin,viewer"')
+        config += '\n  trustedext:\n    users:\n      allow: admin\n'
         (cls.root / 'project/auth/tinyauth.yaml').write_text(config)
         hashed = subprocess.check_output([os.environ['FYSO_TEST_CADDY'], 'hash-password', '--bcrypt-cost', '4'], input=cls.password.encode()).decode().strip()
         cls.users = f'admin:{hashed},viewer:{hashed}'
         (cls.root / 'project/apps/unconfigured').mkdir()
         (cls.root / 'project/apps/unconfigured/Caddyfile').write_text('http://unconfigured.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {\n import fyso_login\n reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT}\n}\n')
+
+        (cls.root / 'extensions/trustedext').mkdir()
+        (cls.root / 'extensions/trustedext/Caddyfile').write_text('http://trustedext.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {\n import fyso_login\n reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT}\n}\n')
 
         class Echo(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -55,10 +59,13 @@ class WebAuthHTTP(unittest.TestCase):
                     'ombCredential': self.headers.get('Authorization') == 'Bearer fixture-omb-token',
                     'user': self.headers.get('Remote-User'),
                     'groups': self.headers.get('Remote-Groups'),
+                    'nativeCookiePreserved': 'native-app=preserved' in self.headers.get('Cookie', ''),
                     'webCookieLeaked': 'tinyauth-session-' in self.headers.get('Cookie', ''),
                 }).encode()
                 self.send_response(200); self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+            do_POST = do_GET
+
             def log_message(self, *_):
                 pass
         for offset in [1, 4]:
@@ -160,6 +167,21 @@ class WebAuthHTTP(unittest.TestCase):
             self.assertEqual(status, 200)
             data = json.loads(body); self.assertTrue(data[field]); self.assertEqual(data['user'], 'admin')
             self.assertFalse(data['groups']); self.assertFalse(data['webCookieLeaked'])
+
+    def test_03b_authority_paths_do_not_leak_session_cookies_on_application_hosts(self):
+        cookie = self.login() + '; native-app=preserved'
+        for app in ['dagu', 'omb', 'trustedext']:
+            for resource in ['/api/session', '/api/session/logout']:
+                for method in ['GET', 'POST']:
+                    with self.subTest(app=app, path=resource, method=method):
+                        status, _, body = self.request(app, resource, method,
+                            {} if method == 'POST' else None, cookie=cookie,
+                            Origin=f'http://{app}.{self.domain}:{self.port}')
+                        self.assertEqual(status, 200)
+                        data = json.loads(body)
+                        self.assertFalse(data['webCookieLeaked'])
+                        self.assertTrue(data['nativeCookiePreserved'])
+                        self.assertEqual(data['user'], 'admin')
 
     def test_04_session_context_and_logout_revoke_cookie_replay(self):
         cookie = self.login()

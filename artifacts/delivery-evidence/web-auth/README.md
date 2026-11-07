@@ -126,9 +126,22 @@ FYSO_TEST_CADDY="$(mise -C "$FIXTURE" which caddy)" \
 python3 -m unittest discover -s tests -p test_web_auth_http.py -v
 ```
 
-**9 passed.** Actual Caddy 2.11.9 and Tinyauth 5.2.0 run on isolated port block
+**10 passed.** Actual Caddy 2.11.9 and Tinyauth 5.2.0 run on isolated port block
 19800. Upstream echo fixtures test exact credential/header/cookie boundaries.
 The suite stops its processes and removes its temporary data in cleanup.
+
+### PR review regression: authority paths on application hosts
+
+[Review finding](https://github.com/fyso-dev/agentic-framework/pull/15#discussion_r4501971055)
+identified a valid P1: a path-only cookie exception allowed upstream application
+servers to receive the shared session at `/api/session` and `/api/session/logout`.
+The exception now matches both the panel host and its authority-backed paths.
+
+The new executable regression failed before the fix in all **12 cases**:
+GET/POST × both paths × Dagu, OMB and an authorized extension. The full **10-test**
+real Caddy/Tinyauth suite passes after the fix. The regression also asserts that
+native application cookies survive stripping, and the existing positive tests
+confirm panel identity and server-side logout still work.
 
 ### Browser smoke
 
