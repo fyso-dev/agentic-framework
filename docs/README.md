@@ -80,6 +80,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-06 | Shared agent operating context: local guide, MCP initialization and offline `fyso_context`, CLI entry point, desktop prompt and all default bot roles including Chief. Existing project-owned profiles require explicit adoption. See [agent surface](agent-surface.md#shared-operating-context). |
 |---|---|
 | 2026-11-05 | [Phase 0 harness spike](adr/spikes/harness.md): **yes** — Dagu v2.22.4 `harness.run` ran Claude Code and Codex on the subscription logins (no API key) inside throwaway worktrees and returned the result as outputs and artifacts. Caveats for `dev-task`: a denied permission still exits 0 (add a diff gate); the user's CLI config applies (pin the Codex approval policy); stdout is not live; step `working_dir` does not resolve `${steps.*}`. Phase 0 remains open |
 | 2026-11-05 | [Phase 0 tooling spike](adr/spikes/tooling.md): exact mise pins with explicit sandbox verification failures/fallbacks; SOPS and fnox age round trips; Dagu Git Sync API edit → commit/push verified against a local bare repo (local-URL clone limitation). Phase 0 remains open |

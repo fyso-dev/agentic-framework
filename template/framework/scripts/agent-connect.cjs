@@ -110,8 +110,8 @@ function write(file, data) {
 function firstPrompt() {
   const name = process.env.FYSO_PROJECT_NAME || SLUG;
   return process.env.FYSO_LANG === 'en'
-    ? `Use the ${NAME} tools to look at my Fyso project "${name}": start with fyso_status and tell me what I have and what to set up first.`
-    : `Usá las herramientas de ${NAME} para revisar mi proyecto Fyso "${name}": empezá con fyso_status y contame qué tengo y qué conviene configurar primero.`;
+    ? `Use the ${NAME} tools to look at my Fyso project "${name}": read fyso_context, then start with fyso_status and tell me what I have and what to set up first.`
+    : `Usá las herramientas de ${NAME} para revisar mi proyecto Fyso "${name}": leé fyso_context, después empezá con fyso_status y contame qué tengo y qué conviene configurar primero.`;
 }
 // Deep links registered by the apps (read from their bundles): Codex opens a new thread in the
 // project folder with the prompt; Claude Desktop opens a new chat with it. Claude Desktop loads
