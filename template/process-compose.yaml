@@ -5,6 +5,19 @@ log_location: .data/logs/process-compose.log
 log_level: info
 
 processes:
+  web-auth:
+    command: framework/scripts/run-web-auth.sh
+    log_location: .data/logs/web-auth.log
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh web-auth
+      initial_delay_seconds: 1
+      period_seconds: 2
+      failure_threshold: 20
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+
   dagu:
     command: framework/scripts/run-dagu.sh
     log_location: .data/logs/dagu.log
@@ -35,6 +48,8 @@ processes:
     command: framework/scripts/run-caddy.sh
     log_location: .data/logs/caddy.log
     depends_on:
+      web-auth:
+        condition: process_healthy
       dagu:
         condition: process_healthy
       omb:

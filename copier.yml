@@ -35,7 +35,7 @@ _message_after_copy: |
     git add .
     git commit -m "chore: initialize Fyso project"
     mise trust && mise install
-    mise run setup      # encryption key + secrets file (admin / admin)
+    mise run setup      # encryption key + secrets file; choose a local login password
     mise run up         # Dagu, OpenMausBot and Caddy
 
   Then open http://panel.localhost:{{ port_base }}
@@ -67,8 +67,12 @@ port_base:
 
 admin_user:
   type: str
-  help: Login user for the gateway and Dagu (the password lives in secrets.enc.yaml)
+  help: Initial local web administrator (credentials live in secrets.enc.yaml)
   default: admin
+  validator: >-
+    {% if not (admin_user | regex_search('^[a-zA-Z][a-zA-Z0-9_.-]{1,63}$')) %}
+    Use 2-64 ASCII letters, digits, dots, dashes or underscores, starting with a letter.
+    {% endif %}
 
 engine:
   type: str

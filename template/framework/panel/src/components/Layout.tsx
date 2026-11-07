@@ -7,6 +7,7 @@ import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
+import { SessionMenu } from "./SessionMenu";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -129,6 +130,7 @@ export function TopBar(props: ThemeProps) {
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
       )}
+      <SessionMenu />
       <MoreMenu {...props} />
     </header>
   );

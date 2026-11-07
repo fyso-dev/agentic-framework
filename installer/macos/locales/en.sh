@@ -5,7 +5,7 @@ B_CHANGE_FOLDER='Change folder…'; B_CONTINUE='Continue'; B_OPEN_PANEL='Open pa
 B_CONNECT='Connect and open panel'; B_SKIP='Skip'; B_OPEN='Open %s'
 T_APPLE='Apple developer tools (git)'; T_MISE='mise'; T_DAGU='Installation engine (Dagu)'
 T_GITHUB='GitHub account'; T_ENGINE_ANY='AI engine session'; T_ENGINE='%s session'
-L_FORM='### New project\\n\\nWe will create your **Fyso** project on this Mac: bots, workflows and a panel to manage them. We download only what is needed and show you each step.\\n\\n**Created in** `%s`\\n\\nUser and password are for the panel; `admin` / `admin` by default. The port is the first free one: each project uses its own block of 10.'
+L_FORM='### New project\\n\\nWe will create your **Fyso** project on this Mac: bots, workflows and a panel to manage them. We download only what is needed and show you each step.\\n\\n**Created in** `%s`\\n\\nChoose a local web user and a password of 12–72 bytes. One login covers every site in this project. The port is the first free one: each project uses its own block of 10.'
 F_NAME='Project name'; F_ADMIN='Panel user'; F_PASSWORD='Password'; F_PORT='Port'
 F_PORT_ERR='Use a multiple of 10 (8400 8410…)'; F_ENGINE='AI engine you already use'
 L_PORT_BUSY='### Port in use\\n\\nThe block `%s`–`%s` is used by another Fyso project or program. Here is the next free one.'
@@ -46,3 +46,8 @@ STEP_tool_gitleaks='gitleaks (security)'
 STEP_tool_node='Node.js'
 STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
+
+STEP_tool_go='Go (native login build)'
+STEP_tool_pnpm='pnpm (Tinyauth)'
+
+F_PASSWORD_ERR='Use a password of 12–72 bytes'

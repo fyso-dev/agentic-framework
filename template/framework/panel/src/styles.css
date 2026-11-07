@@ -544,3 +544,5 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 .observ-source { display: flex; flex-wrap: wrap; gap: 10px; }
 .observ-empty { padding: 20px; color: var(--mute); }
 .observ-section { display: flex; flex-direction: column; gap: 10px; }
+
+.session-menu { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }

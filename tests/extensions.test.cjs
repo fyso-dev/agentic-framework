@@ -32,9 +32,9 @@ test('MCP duplicate reports both owners and leaves previous output intact',()=>f
 }));
 test('run-ext filters ambient variables and preserves declared multiline secrets and argv',()=>fixture(({put,run})=>{
   put('extensions/sample/secrets.yaml','- name: SAMPLE_TOKEN\n  required: true\n');
-  const result=run(['bash','framework/scripts/run-ext.sh','sample','--',process.execPath,'-e','console.log(JSON.stringify({env:process.env,args:process.argv.slice(1)}))','a b'],{SAMPLE_TOKEN:'private\nvalue',AMBIENT_SECRET:'hidden',FYSO_EXT_SAMPLE_PORT:'19410'});
+  const result=run(['bash','framework/scripts/run-ext.sh','sample','--',process.execPath,'-e','console.log(JSON.stringify({env:process.env,args:process.argv.slice(1)}))','a b'],{SAMPLE_TOKEN:'private\nvalue',AMBIENT_SECRET:'hidden',FYSO_AUTH_USERS:'private-auth-canary',FYSO_AUTH_FUTURE_SECRET:'private-provider-canary',FYSO_EXT_SAMPLE_PORT:'19410'});
   assert.equal(result.status,0,result.stderr);const data=JSON.parse(result.stdout);
-  assert.equal(data.env.SAMPLE_TOKEN,'private\nvalue');assert.equal(data.env.AMBIENT_SECRET,undefined);
+  assert.equal(data.env.SAMPLE_TOKEN,'private\nvalue');assert.equal(data.env.AMBIENT_SECRET,undefined);assert.equal(data.env.FYSO_AUTH_USERS,undefined);assert.equal(data.env.FYSO_AUTH_FUTURE_SECRET,undefined);
   assert.equal(data.env.USER,undefined);assert.equal(data.env.FYSO_EXT_SAMPLE_PORT,'19410');assert.deepEqual(data.args,['a b']);
 }));
 test('run-ext refuses missing required secrets before executing a command',()=>fixture(({root,put,run})=>{

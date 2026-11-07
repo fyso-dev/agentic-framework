@@ -97,9 +97,10 @@ def install(request):
     name = request.get('name', '').strip()
     admin = request.get('admin', 'admin')
     engine = request.get('engine', 'claude')
-    password = request.pop('password', '') or 'admin'
+    password = request.pop('password', '')
     folder = Path(request.get('folder') or '~/Fyso').expanduser()
-    if (not name or any(c in name + str(folder) + password for c in '\r\n\x00')
+    if (not name or not 12 <= len(password.encode('utf-8')) <= 72
+            or any(c in name + str(folder) + password for c in '\r\n\x00')
             or not re.fullmatch('[A-Za-z0-9._-]+', admin) or engine not in ['claude', 'codex']):
         raise ValueError(msg('invalid'))
     # Never put a WSL project on a Windows drive; Unix permissions and keys live in Linux.
@@ -159,7 +160,7 @@ def install(request):
             out.write(str(target) + '\n')
         print(msg('checking'), flush=True)
         run([mise, '-C', target, 'run', 'doctor'], env=env)
-        print(msg('done', folder=target, url=f'http://panel.localhost:{port}', admin=admin), flush=True)
+        print(msg('done', folder=target, url=f'http://panel.{slug}-{port}.localhost:{port}', admin=admin), flush=True)
 
 
 def main():

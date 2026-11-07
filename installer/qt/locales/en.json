@@ -3,7 +3,7 @@
   "unattended": "Install without windows using the supplied arguments",
   "default_name": "My project",
   "folder": "Projects folder",
-  "form": "New Fyso project. Leave fields blank for: My project, admin / admin, Claude Code and the first free port. The selected coding engine must be installed and signed in.",
+  "form": "New Fyso project. Choose a password of 12–72 bytes for the local user. Other defaults are My project, admin, Claude Code and the first free port. The selected coding engine must be installed and signed in.",
   "name": "Project name",
   "admin": "Panel user",
   "password": "Panel password",

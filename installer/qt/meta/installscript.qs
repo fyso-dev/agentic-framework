@@ -36,7 +36,7 @@ function Component() {
         ['name','folder','engine','admin','password','port','distribution'].forEach(function(key) { page[key+'Label'].text = text[key]; });
         page.projectName.text = text.default_name;
         page.projectFolder.text = windows ? '~/Fyso' : installer.value('HomeDir') + '/Fyso';
-        page.panelUser.text = 'admin'; page.panelPassword.text = 'admin'; page.distributionName.text = 'Ubuntu';
+        page.panelUser.text = 'admin'; page.panelPassword.text = ''; page.distributionName.text = 'Ubuntu';
         page.portBase.placeholderText = text.automatic;
         page.help.text = text.help;
         page.distributionName.visible = windows; page.distributionLabel.visible = windows;
@@ -55,7 +55,8 @@ Component.prototype.createOperations = function() {
     var page = component.userInterface('Project');
     var request = {name:page.projectName.text, folder:page.projectFolder.text, engine:page.projectEngine.currentIndex === 1 ? 'codex':'claude',
         admin:page.panelUser.text, password:page.panelPassword.text, port:page.portBase.text, lang:lang};
-    if (!request.name.trim() || !/^[A-Za-z0-9._-]+$/.test(request.admin) ||
+    if (!request.name.trim() || !request.password || request.password.length < 12 ||
+        !/^[a-zA-Z][a-zA-Z0-9_.-]{1,63}$/.test(request.admin) ||
         (request.port && !/^[0-9]+0$/.test(request.port))) throw new Error(text.invalid);
     // UI-only configuration supports test sources without persisting credentials.
     request.source = installer.environmentVariable('FYSO_SOURCE') || 'gh:fyso-dev/agentic-framework';
