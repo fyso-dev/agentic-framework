@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D38, D40; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D41; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -51,7 +51,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
-| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace (D30, D31) | [extensions-contract.md](extensions-contract.md) |
+| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41) | [extensions-contract.md](extensions-contract.md) |
+| Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
@@ -71,7 +72,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 5.7 | Local users and shared web sessions (D40) | ✅ verified locally: native security matrix, generated-stack doctor and real browser SSO · [evidence](../artifacts/delivery-evidence/web-auth/README.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
-| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
+| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz and generic extension pages verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
 | 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
@@ -130,3 +131,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
 | 2026-11-07 | **Local web security (D40).** Replaced browser Basic challenges with native Tinyauth sessions, encrypted local users and explicit app ACLs. Pinned native macOS build and real Caddy/Tinyauth security matrix verified; generated-stack doctor and real Chromium login/navigation/logout passed. Existing Dagu/OMB technical identity limits and remote HTTPS gates are explicit. PR review regression: the session-cookie exception now requires the panel host, with 12 upstream path/method cases reproduced red then verified green. [Contract](web-auth.md) · [Evidence](../artifacts/delivery-evidence/web-auth/README.md). |
 | 2026-11-07 | **D38 implementation in an isolated worktree.** Qt IFW wizard, shared Dagu generator, Linux adapter and Windows/WSL2 adapter with private stdin handoff and host-port inventory. Linux ARM64 native build and authenticated routes passed; doctor reports the fixture's missing Codex login. Windows protocol tests run real PowerShell against a shim; native Windows acceptance is pending. [Build contract](../installer/qt/README.md) · [Evidence](../artifacts/delivery-evidence/installer-cross-platform/README.md). |
+| 2026-11-07 | **Fyso Biz integration (D39), verified locally.** Bundled Copier source and panel tab; live MCP discovery found 70 tools including native objective vision and palancas. Real tab install/reinstall, authenticated doctor and browser smoke verified departments, KPIs, objectives and palancas with the supplied test token; Biz Partner is provisioned idempotently through native Bot Architect; multi-user isolation requires the optional second token. [Contract](fyso-biz.md) · [evidence](../artifacts/delivery-evidence/fyso-biz/README.md). |
+| 2026-11-07 | **Generic extension pages (D41).** Native page registrations and static assets add tabs/pages without core-specific screens. Biz source/locales moved into its own compiled page; an independent plain HTML extension exercises two additional pages. [Contract](extensions-contract.md#9-extension-owned-tabs-and-pages). |
+| 2026-11-07 | **Biz repository extraction.** The framework retains only generic extension pages, SDK and connection hooks. Biz source, bot, workflows, locales and tests moved to [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz), released through tags and discovered through the official git catalog. |
+| 2026-11-07 | **Extension review regressions.** SDK calls use gateway-root URLs independently of nested page assets. Install/update loads tools, processes and routes before idempotent connection hooks; native readiness gates core and owning services. Verified with three Node readiness tests, real Copier/process-compose install and tagged upgrade, and a browser SDK page without a base tag. |
+| 2026-11-07 | **Biz branch integration with local web SSO.** Retained native session login/logout alongside extension navigation and rebuilt the shared panel/SDK assets. Generic extension hosting is D41; D40 retains the already merged authentication decision. Panel build, 22 Node tests, Copier packaging and 11 native Caddy/Tinyauth tests passed, including extension session/ACL/private-slot checks. |

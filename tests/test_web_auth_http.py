@@ -37,6 +37,11 @@ class WebAuthHTTP(unittest.TestCase):
             (cls.root / folder).mkdir(parents=True)
         (cls.root / 'panel/index.html').write_text('<!doctype html><title>Protected panel</title>')
         (cls.root / 'panel/project.json').write_text('{"name":"Security fixture"}')
+        public = cls.root / 'extensions/example-pages/panel'
+        public.mkdir(parents=True)
+        (public / 'index.html').write_text('<!doctype html><title>Extension</title>')
+        (public / 'client.js').write_text('/* extension-owned asset */')
+        (public.parent / 'secrets.yaml').write_text('names: []')
         shutil.copy(Path(os.environ.get('FYSO_TEST_GATEWAY_CONFIG', ROOT / 'template/Caddyfile')), cls.root / 'Caddyfile')
         config = (ROOT / 'template/project/auth/tinyauth.yaml.jinja').read_text().replace('{{ admin_user }}', 'admin')
         # A second local identity has access only to OMB; panel and Dagu remain denied.
@@ -153,6 +158,17 @@ class WebAuthHTTP(unittest.TestCase):
             self.assertNotIn('Www-Authenticate', headers)
             status, headers, _ = self.request(app, '/api/probe', **{'User-Agent':'Mozilla/5.0 Chrome/130.0.0.0'})
             self.assertEqual(status, 401); self.assertNotIn('Www-Authenticate', headers)
+
+    def test_extension_pages_share_sessions_without_exposing_private_slots(self):
+        page = '/extensions/example-pages/panel/index.html'
+        self.assertEqual(self.request('panel', page)[0], 401)
+        cookie = self.login()
+        for path in [page, '/extensions/example-pages/panel/client.js']:
+            self.assertEqual(self.request('panel', path, cookie=cookie)[0], 200)
+        self.assertEqual(self.request('panel', '/extensions/example-pages/secrets.yaml', cookie=cookie)[0], 404)
+        self.assertEqual(self.request('panel', page, 'POST', {}, cookie=cookie,
+            Origin=f'http://panel.{self.domain}:{self.port}')[0], 405)
+        self.assertEqual(self.request('panel', page, cookie=self.login('viewer'))[0], 403)
 
     def test_02_basic_auth_and_forged_identity_do_not_bypass_sessions(self):
         status, _, _ = self.request('panel', '/config/project.json', Authorization=self.dagu_auth,

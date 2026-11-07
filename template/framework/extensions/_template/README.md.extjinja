@@ -77,3 +77,13 @@ catalog's `marketplace.yaml` (official: `fyso-dev/fyso-extensions`; see the cont
  Projects upgrade with `mise run ext:update [[ extension_id ]]`,
 list with `mise run ext:list` and uninstall with `mise run ext:remove [[ extension_id ]]`
 (runtime data and secret values are kept).
+
+## Own tabs and pages
+
+`extensions/<id>/pages/<page>.yaml` registers a localized navigation entry. Its
+`url` names a static HTML file under `extensions/<id>/panel/`. The framework reads
+installed registrations; it never imports extension-specific screens. Multiple
+pages and extensions work without changing the core router. The included native
+HTML example uses the project's theme/language query parameters and its own
+locale files. A React page may optionally import the v1 SDK from
+`/assets/extension-sdk.js`; plain static pages need no JavaScript framework.

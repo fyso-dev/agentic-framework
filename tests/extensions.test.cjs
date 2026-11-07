@@ -83,3 +83,23 @@ test('process-compose startup merges all fragments and clients address the same 
     assert.deepEqual(actual.slice(-2),['--unix-socket','/tmp/fyso-unknown-19400.sock']);
   }
 }));
+
+test('installed extensions register multiple localized static pages without core routes',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-reports.yml','_src_path: fixture\n');
+  put('extensions/reports/pages/overview.yaml','name: {es: Informes, en: Reports}\nurl: /extensions/reports/panel/overview.html\n');
+  put('extensions/reports/pages/history.yaml','name: History\nurl: /extensions/reports/panel/history.html\n');
+  put('extensions/reports/panel/overview.html','<!doctype html><h1>Fixture overview</h1>');
+  put('extensions/reports/panel/history.html','<!doctype html><h1>Fixture history</h1>');
+  const result=run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  assert.equal(result.status,0,result.stderr);const [extension]=JSON.parse(result.stdout);
+  assert.equal(extension.pages.length,2);assert.equal(extension.pages[1].name_i18n.en,'Reports');
+  assert.deepEqual(extension.pages.map(p=>p.id),['history','overview']);
+}));
+test('page registrations cannot expose secret slots or missing public files',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-reports.yml','_src_path: fixture\n');
+  put('extensions/reports/pages/overview.yaml','name: Reports\nurl: /extensions/reports/secrets.yaml\n');
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  let result=invoke();assert.equal(result.status,1);assert.match(result.stderr,/invalid extension page/);
+  put('extensions/reports/pages/overview.yaml','name: Reports\nurl: /extensions/reports/panel/missing.html\n');
+  result=invoke();assert.equal(result.status,1);assert.match(result.stderr,/missing page entry/);
+}));

@@ -390,5 +390,9 @@
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commitear, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Etiquetas"
+  },
+  "extensionPage": {
+    "missing": "La página de la extensión no está instalada.",
+    "loading": "Cargando la página…"
   }
 }

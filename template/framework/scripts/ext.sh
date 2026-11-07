@@ -13,6 +13,15 @@ refresh() {
   mise exec -- node framework/scripts/mcp-config.cjs
   mise exec -- node framework/scripts/panel-data.cjs config
 }
+# Load tools, processes and routes before a hook can contact its own service.
+activate() {
+  MISE_YES=1 mise install >&2
+  if stack_running; then
+    pc project update >&2
+    pc process restart caddy >&2
+    mise exec -- framework/scripts/connect-extensions.sh >&2
+  fi
+}
 case "$action" in
   add)
     # `ext:add <id|src> [-- copier args]`. A bare id comes from the catalogs in
@@ -47,6 +56,7 @@ case "$action" in
     fi
     copier copy --trust "$src" . ${args[@]+"${args[@]}"}
     refresh
+    [[ -n "${EXT_APPLY:-}" ]] || activate
     ;;
   update)
     # `ext:update [ext] [-- copier args]`. Copier refuses to update a dirty tree,
@@ -66,6 +76,7 @@ case "$action" in
       fi
     done
     refresh
+    [[ -n "${EXT_APPLY:-}" ]] || activate
     ;;
   list) node framework/scripts/ext-lifecycle.cjs list ;;
   search) node framework/scripts/marketplace.cjs search "$@" ;;
@@ -101,11 +112,7 @@ case "$action" in
         || fail "uncommitted changes in $id's files block the upgrade; commit or discard them"
       refresh >&2
     fi
-    MISE_YES=1 mise install >&2
-    if stack_running; then
-      pc project update >&2
-      pc process restart caddy >&2
-    fi
+    activate
     node -e 'console.log(JSON.stringify({id:process.argv[1],mode:process.argv[2],version:process.argv[3]||null,commit:process.argv[4]}))' \
       "$id" "$mode" "$version" "$(git rev-parse --short HEAD)"
     ;;

@@ -120,6 +120,20 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 			header_up Authorization "{$FYSO_DAGU_AUTH}"
 		}
 	}
+	# Only extension-owned public page assets are exposed, never other slots.
+	@extensionPage path_regexp extensionPage ^/extensions/[a-z][a-z0-9-]{1,30}/panel/([A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$
+	handle @extensionPage {
+		@extensionRead method GET HEAD
+		handle @extensionRead {
+			root * {$FYSO_ROOT}
+			header Cache-Control no-cache
+			file_server
+		}
+		respond 405
+	}
+	handle /extensions/* {
+		respond 404
+	}
 	handle {
 		root * {$FYSO_PANEL_ROOT}
 		try_files {path} /index.html
