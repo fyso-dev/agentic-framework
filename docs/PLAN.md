@@ -46,18 +46,18 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D8 | Initial bots: **Workflow Architect**, **Run Operator**, **Builder** (dogfooding) |
 | D9 | ~~herdr core runs coding agents from `dev-task`~~ *Superseded by D15* |
 | D10 | One gateway (Caddy) with one subdomain per app. The native OMB and Dagu UIs are first-class apps |
-| D11 | Login: **local `admin` / `admin`** via Caddy basic auth (password from secrets). Extended later with existing tools (Authelia, Pocket ID, oauth2-proxy) |
+| D11 | *Superseded by D40.* Login: **local `admin` / `admin`** via Caddy basic auth (password from secrets). Extended later with existing tools (Authelia, Pocket ID, oauth2-proxy) |
 | D12 | **Simple i18n from day one**: `i18next` + `react-i18next` with one JSON file per locale (`es` default, `en`). Dates, relative times and numbers use the browser's built-in `Intl` APIs |
 | D13 | **Customization layer over OMB.** The panel is for the person customizing the project; they then use OMB as-is. See §9 for its 4 rules |
 | D14 | **No chat in the panel.** Users chat in OMB's own UI. The Bot API is not used for now |
 | D15 | **The Builder runs coding agents with Dagu `harness.run`**, not herdr. herdr is a development tool only |
 | D16 | **fnox is evaluated against sops** in Phase 0; the winner becomes the secrets tool |
 | D17 | **Extensions are Copier templates that fill fixed slots.** Bot tools are **MCP servers**, bot skills are **Agent Skills** (`SKILL.md`), and bot packs use the **OMB team package** format. NetBird is documented as the reference example; it is not built for now. See §12 |
-| D19 | **Dagu login = basic auth with the same credentials as Caddy**, Dagu bound to `127.0.0.1`. Trusted-header proxy auth needs a paid Dagu SSO license (spike `gateway`). The browser asks once; Caddy validates and forwards the same `Authorization` header |
+| D19 | *Browser login superseded by D40; technical Basic auth retained.* **Dagu login = basic auth with the same credentials as Caddy**, Dagu bound to `127.0.0.1`. Trusted-header proxy auth needs a paid Dagu SSO license (spike `gateway`). The browser asks once; Caddy validates and forwards the same `Authorization` header |
 | D20 | **D16 resolved: sops + age.** Both passed a real round trip through mise; sops is more mature. fnox stays an option for 1Password/Vault later (spike `tooling`) |
 | D21 | **Pinned, tested versions:** Dagu `2.24.0`, OpenMausBot `0.1.140`, Node `24`. Policy: pin releases at least a week old, and re-run the spike checks before bumping |
 | D22 | *Superseded by D25.* **OMB is not behind the gateway login.** Its own device pairing protects it, and a basic-auth header could clash with its own auth. Locally the panel links to `http://127.0.0.1:<omb port>`, where OMB trusts the owner and no pairing is needed |
-| D23 | **Local by default:** Caddy binds `127.0.0.1` unless `FYSO_BIND` is set (a server). `admin/admin` is never reachable from the LAN by accident |
+| D23 | *Refined by D40: HTTP startup now rejects non-loopback binding.* **Local by default:** Caddy binds `127.0.0.1` unless `FYSO_BIND` is set (a server). `admin/admin` is never reachable from the LAN by accident |
 | D18 | **Multi-host = a host is an SSH alias.** One control host keeps all state; execution hosts run Dagu workers and OMB bot computers, both reached over SSH. No mesh, no open ports, no cluster scheduler. See §13 |
 | D24 | **Builder publication is explicit:** `PUBLISH=false` by default; `true` requests push to `origin` and a PR, and publication errors fail the run. Failed worktrees stay available for inspection. This refines §7 without changing snapshot behavior (D5) |
 | D25 | **OMB browser access uses the authenticated gateway.** The packaged 0.1.140 server requires a browser session even on loopback. Caddy obtains a native OMB session with `openmausbot connect`, keeps its token server-side, and injects its bearer after project basic auth. Cross-origin and cross-site API requests are rejected. Supersedes D22; direct CLI access remains project-local |
@@ -65,7 +65,7 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D27 | **Bot CRUD is conversational through Bot Architect.** A single Dagu workflow wraps OMB native partial team plans/apply and exact-ID DELETE (no prune). Plans are private, content-addressed, stale-checked and applied idempotently; snapshots surround mutations. Only the selected bot's project entry changes. The manual panel stays available; default Bot Architect uses Codex subscription |
 | D28 | **Panel bot discovery reads the native live roster.** An exact GET-only gateway route forwards OMB `/api/bots?messages=0`; the panel polls every five seconds and includes the chief and OMB-created bots. One list joins the live roster with configuration and pending drafts; discovery never overwrites drafts. This adds visibility, not automatic reconciliation of native profiles into project declarations |
 | D29 | **Native import and Git evidence stay explicit.** One bot roster distinguishes committed project declarations, committed native snapshots, and native-only profiles. A GET-only metadata file reports names from Git HEAD, never profile contents. Import uses the existing Bot Architect workflow to export one exact native ID and commit its native profile plus imported skill files, without runtime writes. Dirty project declarations, ambiguous names and local panel drafts block import. Existing defaults are materialized when needed to preserve effective profiles without unwanted inheritance |
-| D30 | **Extension contract (Phase 7) closes the gaps in D17.** Each extension owns its answers file (`_answers_file: .copier-answers.ext-<ext>.yml`) and only the slot paths in [extensions-contract.md](extensions-contract.md); it never edits a file another template owns. `.mcp.json` becomes a generated file (framework + project + extensions sources in git), because a single template-owned file cannot be extended without conflicts and was overwritten by `copier update`. Extension processes start through `run-ext.sh`, which passes only `FYSO_*` and the secret names the extension declares. Extensions use a second port block (`port_base+10…+19`). Thin `mise run ext:*` tasks wrap Copier; the panel lists extensions read-only |
+| D30 | **Extension contract (Phase 7) closes the gaps in D17.** Each extension owns its answers file (`_answers_file: .copier-answers.ext-<ext>.yml`) and only the slot paths in [extensions-contract.md](extensions-contract.md); it never edits a file another template owns. `.mcp.json` becomes a generated file (framework + project + extensions sources in git), because a single template-owned file cannot be extended without conflicts and was overwritten by `copier update`. Extension processes start through `run-ext.sh`, which passes only `FYSO_*` and the secret names the extension declares (D40 excludes the reserved `FYSO_AUTH_*` namespace). Extensions use a second port block (`port_base+10…+19`). Thin `mise run ext:*` tasks wrap Copier; the panel lists extensions read-only |
 | D31 | **Extension marketplace: catalogs are git repos, versions are tags.** Discovery is a `marketplace.yaml` in a git repo (official: `gh:fyso-dev/fyso-extensions`); `project/marketplaces.yaml` lists the catalogs a project uses. Versions are read live from each extension repo's tags. `ext:search` and `ext:add <id>` resolve ids; the panel installs and upgrades through the `fyso-ext-catalog` and `fyso-ext-install` workflows (install commits only the extension's slots, upgrade runs Copier in a clean worktree and fast-forwards, processes and routes load without a restart). Devbox plugins and self-hosted app stores were compared and do not replace this (Nix / Docker, no catalog or no merge). Bot integrations come from the MCP Registry and from extensions such as Activepieces. [ADR 0002](adr/0002-extension-marketplace.md) |
 | D32 | **Engines are optional; the project picks one.** Copier asks for `engine` (`claude` or `codex`, default `claude`). It sets every bot's model in `project/bots/team.yaml`, the Builder's default `PROVIDER` and `fyso-dev-task`'s default. Doctor fails only when an engine used by a declared bot is not signed in, or when none is; any other engine is an optional warning. Projects switch engines by editing their team file. Refines D27's Codex default for Bot Architect |
 | D33 | **Agent surface: the platform's own MCP server, separate from Dagu's.** `fyso` (stdio, no dependencies, `framework/scripts/fyso-mcp.cjs`) gives agents typed tools for what the panel does (status, checks, bots plan/apply/import, extension search/install, snapshot, observability); every change goes through the same Dagu workflows as the panel. Secrets, extension removal and stack start/stop stay terminal tasks. Separately, coding agents get Dagu's own MCP (`DAGU_MCP_AUTH` derived by mise) and Dagu's own skill pinned to the project's Dagu version (`mise run agent:setup`). [agent-surface.md](agent-surface.md) |
@@ -75,12 +75,14 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D37 | **Bot models follow what each engine offers.** Providers retire model names and OMB then rejects the whole team. `framework/scripts/team-models.cjs` moves a bot whose engine is available but no longer offers its model to that engine's default (from `openmausbot models`), editing only `model:` lines; `bots.sh apply` runs it first and commits the project file, and `mise run up` runs it on every start (also when the stack is already up), so `copier update` + `up` repairs existing projects. Startup applies only a partial team containing live bot names and replacement models; it never replays declaration profiles or recreates missing bots (initial creation belongs to snapshot restore). Engines not signed in are left alone. The template's fast Codex model is `gpt-6-luna` |
 
 | D38 | **Linux graphical installer uses Qt Installer Framework, with Dagu retaining installation orchestration.** Reuse the framework wizard, progress and packaging instead of building a Zenity wizard lifecycle. Share pinned mise tools and the Copier/Dagu flow. Windows is proposed as a native Qt `.exe` delegating the runtime to WSL2 (initially Ubuntu), with explicit prerequisite/restart handling and separate Windows verification. Existing macOS swiftDialog delivery remains in place. Qt maintenance must preserve generated project data and Copier ownership. Linux Qt delivery and Windows support are not yet verified. [installer.md](installer.md#cross-platform-installer-direction--d38) |
+| D40 | **Local users and shared web sessions through native Tinyauth 5.2.0 + Caddy forward_auth.** Human credentials are encrypted native bcrypt entries; new Dagu technical credentials are random and separate. Project-and-port cookie domains isolate installations. App ACLs deny by default; cross-origin writes, identity spoofing and shared-cookie leakage to upstreams are blocked. Native OAuth/LDAP configuration provides future extensibility. Small build/config/user-management glue is allowed; no custom auth implementation or Caddy plugin. Supersedes D11 and the browser-login portion of D19/D25. Local HTTP remains loopback-only; remote HTTPS acceptance remains Phase 6. Native Dagu/OMB user isolation is not implied. [Contract](web-auth.md) |
+
 
 ## 3. Architecture
 
 ```
                          Browser
-                            │  login: admin / admin (Caddy basic_auth)
+                            │  login: local users / shared Tinyauth session
                 ┌───────────▼────────────┐
                 │        Caddy           │  routes · login · read-only config files · Dagu API passthrough
                 └─┬──────────┬─────────┬─┘
@@ -97,9 +99,9 @@ Append-only. A superseded decision stays, marked with what replaced it.
 ```
 
 - **There is no backend to write.**
-  - **Caddy** handles the routing (one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server) and the login (`basic_auth`). It also serves the project's config files read-only to the panel, and passes Dagu API calls through.
-  - **Dagu login (D19):** Dagu uses basic auth with the same `admin` credentials as Caddy and listens only on `127.0.0.1`. The browser asks once and Caddy forwards the same header, so there is no second prompt and Dagu cannot be reached without going through Caddy.
-  - **OMB** opens in a new tab behind project basic auth. Caddy holds its native OMB session (D25); browsers need no pairing code.
+  - **Caddy** handles the routing (one subdomain per app; `*.localhost` in dev, `*.<domain>` with automatic HTTPS on a server) and session authorization (`forward_auth` to native Tinyauth; D40). It also serves the project's config files read-only to the panel, and passes Dagu API calls through.
+  - **Dagu login (D19, D40):** Dagu retains a technical Basic credential on loopback. Caddy injects it after native web-session authorization; browsers never receive it. No licensed native SSO is enabled.
+  - **OMB** opens in a new tab behind the shared web session (D40). Caddy holds its native OMB session (D25); browsers need no pairing code.
   - **Every panel action is a Dagu workflow** started with parameters. Dagu does the work, keeps the logs and allows retries. The same workflows run from the terminal with `mise run …`.
 - **OMB and Dagu are coupled in only one place:** OMB reaches Dagu through Dagu's built-in MCP server (`.mcp.json` in the bot `cwd`).
 
@@ -129,7 +131,7 @@ A project must never touch the user's own Dagu or OMB, nor another project's. Ev
 | +1 | Dagu UI/API | +6 | Dagu coordinator |
 | +2 | Dagu scheduler | +7 | Dagu coordinator health |
 | +3 | Dagu worker health | +8 | Caddy admin |
-| +4 | OMB | +9 | Panel dev server |
+| +4 | OMB | +9 | Native web login (D40) |
 
 Two projects (or a project and its spikes) run side by side by using different blocks. `mise run doctor` checks that the ports are free before `up`, and checks that `OPENMAUSBOT_URL` answers with this project's data dir, not the user's desktop.
 
@@ -222,6 +224,8 @@ Notes:
 A human reviews and merges. The Builder never touches `main`. In the template repo, the Builder extends the framework itself.
 
 ## 8. Auth and health checks
+
+Human web access follows [the local-user and shared-session contract](web-auth.md) (D40). Engine login below is independent.
 
 - **`mise run auth`** uses the official CLIs:
   - `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, stored in the secrets file (or `claude /login` once).
@@ -415,7 +419,7 @@ Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunne
 | Subscription limits shared by all bots | Mix models per bot; send the chatty ones to API keys |
 | Secrets in memory or commits | OMB redaction + gitleaks before every snapshot commit |
 | Bots can read the Dagu credentials (`DAGU_MCP_AUTH`, the same as the gateway login) | Accepted for local use. Before any server deployment, give bots their own Dagu credential (Dagu `builtin` auth with an MCP-scoped API key) |
-| `admin/admin` exposed on a server | `doctor` fails on a public domain if the password was not changed |
+| HTTP web login exposed remotely | Startup rejects non-loopback binding; Phase 6 must verify HTTPS and Secure cookies before remote access |
 | Hourly commits add noise to history | Commit only when something changed; squash or filter later if it bothers |
 
 ## 12. Extensibility (D17)

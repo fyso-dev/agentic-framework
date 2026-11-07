@@ -15,9 +15,12 @@ class ExtensionsE2E(unittest.TestCase):
             self.skipTest('Copier runner (uvx) or mise unavailable')
         with tempfile.TemporaryDirectory(prefix='extensions-') as tmp:
             base = Path(tmp)
+            password_file = base / 'web-password'
+            password_file.write_text('fixture-extension-password-43\n')
+            password_file.chmod(0o600)
             def run(*args, cwd=base):
                 result = subprocess.run(args, cwd=cwd, text=True, capture_output=True,
-                                        env={**os.environ, 'MISE_YES': '1'}, timeout=300)
+                                        env={**os.environ, 'MISE_YES': '1', 'FYSO_INITIAL_PASSWORD_FILE': str(password_file)}, timeout=300)
                 if result.returncode and any(marker in result.stderr.lower() for marker in
                     ['could not resolve host', 'network is unreachable', 'failed to download', 'connection refused']):
                     self.skipTest('Network unavailable while obtaining pinned test tools')

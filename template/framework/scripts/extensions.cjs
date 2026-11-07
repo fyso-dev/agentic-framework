@@ -61,7 +61,7 @@ function run(id, command) {
   const absent = missing(id);
   if (absent.length) throw Error(`${id}: required secret(s) empty: ${absent.join(', ')}`);
   const names = new Set(['PATH','HOME',...secrets(id).map(s => s.name)]);
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => names.has(k) || k.startsWith('FYSO_')));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('FYSO_AUTH_') && (names.has(k) || k.startsWith('FYSO_'))));
   const child = spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);

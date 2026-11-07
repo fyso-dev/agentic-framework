@@ -10,13 +10,13 @@ Requirements: Git, [mise](https://mise.jdx.dev), and authenticated Claude Code /
 
 ```sh
 mise trust && mise install
-mise run setup     # once: your age key + encrypted secrets (login admin / admin)
+mise run setup     # once: age key + encrypted secrets; choose your local login password
 mise run up
 ```
 
 | What | Where |
 |---|---|
-| Panel | http://panel.localhost:{{ port_base }} |
+| Panel | http://panel.{{ project_slug }}-{{ port_base }}.localhost:{{ port_base }} |
 | Dagu (workflows) | http://dagu.localhost:{{ port_base }} |
 | OpenMausBot (bots) | http://omb.localhost:{{ port_base }} (project login, no pairing code) |
 

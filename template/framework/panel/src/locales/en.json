@@ -1,4 +1,5 @@
 {
+  "session": {"logout": "Sign out", "unavailable": "Could not verify the session"},
   "common": {
     "newTab": "(opens in a new tab)",
     "copy": "Copy",

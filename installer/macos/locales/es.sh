@@ -6,7 +6,7 @@ B_CHANGE_FOLDER='Cambiar carpeta…'; B_CONTINUE='Continuar'; B_OPEN_PANEL='Abri
 B_CONNECT='Conectar y abrir panel'; B_SKIP='Omitir'; B_OPEN='Abrir %s'
 T_APPLE='Herramientas de Apple (git)'; T_MISE='mise'; T_DAGU='Motor de instalación (Dagu)'
 T_GITHUB='Cuenta de GitHub'; T_ENGINE_ANY='Sesión del motor de IA'; T_ENGINE='Sesión de %s'
-L_FORM='### Nuevo proyecto\\n\\nVamos a crear tu proyecto **Fyso** en esta Mac: bots, flujos de trabajo y un panel para manejarlos. Descargamos solo lo necesario y te mostramos cada paso.\\n\\n**Se crea en** `%s`\\n\\nUsuario y contraseña son para entrar al panel; por defecto `admin` / `admin`. El puerto es el primero libre: cada proyecto usa un bloque de 10 y no se pisan.'
+L_FORM='### Nuevo proyecto\\n\\nVamos a crear tu proyecto **Fyso** en esta Mac: bots, flujos de trabajo y un panel para manejarlos. Descargamos solo lo necesario y te mostramos cada paso.\\n\\n**Se crea en** `%s`\\n\\nElegí un usuario local y una contraseña de 12–72 bytes. Un solo acceso sirve para todos los sitios del proyecto. El puerto es el primero libre: cada proyecto usa un bloque de 10 y no se pisan.'
 F_NAME='Nombre del proyecto'; F_ADMIN='Usuario del panel'; F_PASSWORD='Contraseña'; F_PORT='Puerto'
 F_PORT_ERR='Usá un múltiplo de 10 (8400 8410…)'; F_ENGINE='Motor de IA que ya usás'
 L_PORT_BUSY='### Puerto en uso\\n\\nEl bloque `%s`–`%s` ya lo usa otro proyecto Fyso u otro programa. Te propongo el siguiente libre.'
@@ -47,3 +47,8 @@ STEP_tool_gitleaks='gitleaks (seguridad)'
 STEP_tool_node='Node.js'
 STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
+
+STEP_tool_go='Go (compilación del acceso web)'
+STEP_tool_pnpm='pnpm (Tinyauth)'
+
+F_PASSWORD_ERR='Usá una contraseña de 12–72 bytes'

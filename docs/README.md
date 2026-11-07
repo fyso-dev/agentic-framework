@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D38; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D38, D40; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -43,6 +43,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
+| Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
@@ -67,6 +68,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote Builder acceptance pending |
 | 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
+| 5.7 | Local users and shared web sessions (D40) | ✅ verified locally: native security matrix, generated-stack doctor and real browser SSO · [evidence](../artifacts/delivery-evidence/web-auth/README.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
@@ -124,3 +126,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Menu bar app (D34).** A SwiftBar plugin instead of a native app: `framework/tray/fyso.10s.py` finds running stacks by their process-compose sockets, reads states over the socket and the project from the socket owner's cwd; `mise run tray:install` links it into SwiftBar. Tests use a fake process-compose on a Unix socket (healthy, degraded, stale, none). Finding: SwiftBar runs plugins with a minimal PATH, so the plugin takes `mise` from the PATH of the running process-compose (started by `mise run up`) instead of hard-coding install locations. Start/restart from the menu (stopped projects come from a cache of projects seen running) run mise with that same PATH, so bots started from the menu still find `claude`/`codex` |
 | 2026-11-07 | PR #11 corrections: installer ES/EN resources include workflow titles; repeated names get distinct project/MCP identifiers. Startup model repair sends only live model changes and preserves native/snapshot fields and deleted bots. Regression checks use isolated fixtures; live installer acceptance remains separate. |
 | 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
+| 2026-11-07 | **Local web security (D40).** Replaced browser Basic challenges with native Tinyauth sessions, encrypted local users and explicit app ACLs. Pinned native macOS build and real Caddy/Tinyauth security matrix verified; generated-stack doctor and real Chromium login/navigation/logout passed. Existing Dagu/OMB technical identity limits and remote HTTPS gates are explicit. [Contract](web-auth.md) · [Evidence](../artifacts/delivery-evidence/web-auth/README.md). |
