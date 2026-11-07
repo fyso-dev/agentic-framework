@@ -27,6 +27,16 @@ STYLE=(--appearance dark --bannerimage "$RES/banner.png" --bannerheight 80 --bac
   --titlefont "colour=#ffffff,weight=bold,size=20,alignment=left" --messagefont "colour=#9c9ba5,size=14")
 
 mkdir -p "$WORK"
+# One installer at a time (they share the window's command file). A stale lock from a
+# crashed run is taken over.
+LOCK="$WORK/running.pid"
+if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
+  "$RES/Dialog.app/Contents/MacOS/Dialog" --title none --message "### Ya hay un instalador abierto\n\nTerminá o cerrá el que está en curso." --button1text "OK" --width 480 --height 200
+  exit 0
+fi
+echo $$ > "$LOCK"
+cleanup() { rm -f "$LOCK" "${PASSWORD_FILE:-}"; [ -n "${DIALOG_PID:-}" ] && kill "$DIALOG_PID" 2>/dev/null; [ -n "${CONNECT_PID:-}" ] && kill "$CONNECT_PID" 2>/dev/null; true; }
+trap cleanup EXIT
 exec >>"$LOG" 2>&1
 echo "=== $(date) Fyso Installer, source $SOURCE@$REF"
 
@@ -183,7 +193,7 @@ RUN="install-$(date +%Y%m%d%H%M%S)"
 # The chosen password travels in a private file that setup reads; it never becomes a
 # Dagu parameter (parameters are stored with the run) and is removed when we exit.
 PASSWORD_FILE="$WORK/initial-password"
-( umask 077; printf '%s\n' "$PASSWORD" > "$PASSWORD_FILE" ); trap 'rm -f "$PASSWORD_FILE"' EXIT
+( umask 077; printf '%s\n' "$PASSWORD" > "$PASSWORD_FILE" )   # removed by cleanup
 DAGU_HOME="$WORK/dagu"
 "$MISE" exec "$DAGU_TOOL" -- dagu start -q --dagu-home "$DAGU_HOME" -r "$RUN" "$RES/fyso-install.yaml" -- \
   "DIR=$DIR" "NAME=$NAME" "SLUG=$SLUG" "PORT=$PORT" "ENGINE=$ENGINE" "SOURCE=$SOURCE" "REF=$REF" \
@@ -249,7 +259,7 @@ CONNECT_OUT="$WORK/connect.out"; : > "$CONNECT_OUT"; CONNECT_PID=""
 if [ ${#boxes[@]} -gt 0 ] && [ "${FYSO_AUTO:-}" != 1 ]; then
   "$DIALOG" "${STYLE[@]}" --title none \
     --message "### Conectá tu asistente\n\nAsí podés manejar **$NAME** desde Claude o Codex: crear bots, instalar extensiones, revisar el estado. Agregamos el servidor \`fyso-$SLUG\` a cada uno; las apps de escritorio lo cargan al reiniciarse." \
-    "${boxes[@]}" --button1text "Conectar y abrir panel" --button2text "Omitir" "${SIZE[@]}" --moveable > "$CONNECT_OUT" &
+    ${boxes[@]+"${boxes[@]}"} --button1text "Conectar y abrir panel" --button2text "Omitir" "${SIZE[@]}" --moveable > "$CONNECT_OUT" &
   CONNECT_PID=$!
   sleep 1; ui "activate:"   # keep the finished progress window in front
 fi
@@ -276,7 +286,7 @@ if [ -n "$primary" ]; then
   extra=(); case " $picks " in *" codex "*" claude-desktop "*|*" claude-desktop "*" codex "*) extra=(--infobuttontext "Abrir Claude") ;; esac
   "$DIALOG" "${STYLE[@]}" --title none \
     --message "### Listo para usar\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')\nAbrimos **$plabel** con una conversación nueva sobre **$NAME**, con un primer pedido escrito: enviálo y te muestra el estado del proyecto.\n\nEl panel sigue en http://panel.localhost:$PORT" \
-    --button1text "Abrir $plabel" --button2text "Abrir panel" "${extra[@]}" "${SIZE[@]}" --moveable
+    --button1text "Abrir $plabel" --button2text "Abrir panel" ${extra[@]+"${extra[@]}"} "${SIZE[@]}" --moveable
   case $? in
     0) "$MISE" -C "$DIR" run agent:open "$primary" ;;
     3) "$MISE" -C "$DIR" run agent:open claude-desktop ;;
