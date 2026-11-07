@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D33; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D34; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -70,6 +70,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
+| 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (plugin output on Test 1; SwiftBar UI pending install) |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -115,3 +116,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | [Activepieces spike](adr/spikes/activepieces.md): **yes, natively.** Built from the release with bun/node pinned by mise (~3 min, ~3 GB); API ready in 3 s on PGLite + in-memory queue; its MCP (42 tools, OAuth with refresh) ran a piece action (`ap_run_action`) on the native worker. Conditions for the extension: build per version in `.data/ext/`, route without `fyso_login` (MCP OAuth uses `Authorization`), verify the OAuth login path for OMB bots |
 | 2026-11-06 | **Agent surface (D33, [contract](agent-surface.md)).** Own MCP server `fyso` (stdio, no dependencies) with typed tools over the panel workflows; Dagu's MCP and skill for coding agents (`DAGU_MCP_AUTH` derived by mise, `mise run agent:setup`). Verified on Test 1: status, bots list, extension search, bot plan (preview), doctor; Dagu MCP 200; Claude Code lists both servers. Finding: until now a coding agent opened in a project could not use the Dagu MCP because `DAGU_MCP_AUTH` only existed inside OpenMausBot |
 | 2026-11-06 | Optional engines (D32): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |
+| 2026-11-06 | **Menu bar app (D34).** A SwiftBar plugin instead of a native app: `framework/tray/fyso.10s.py` finds running stacks by their process-compose sockets, reads states over the socket and the project from the socket owner's cwd; `mise run tray:install` links it into SwiftBar. Tests use a fake process-compose on a Unix socket (healthy, degraded, stale, none). Finding: SwiftBar runs plugins with a minimal PATH, so the plugin takes `mise` from the PATH of the running process-compose (started by `mise run up`) instead of hard-coding install locations |
