@@ -222,7 +222,11 @@ else item $ENGINE_ITEM pending "iniciá sesión: $check"; step_done; fi
 
 mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"
-if [ "$PASSWORD" = admin ]; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"; else pwtext="la que elegiste"; fi
+# Report the login that really works (a template without the password handoff keeps admin).
+login_ok() { curl -s -o /dev/null -w '%{http_code}' -u "$1:$2" "http://panel.localhost:$PORT/" | grep -q 200; }
+if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext="la que elegiste"
+elif login_ok "$ADMIN" admin; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"
+else pwtext="la que elegiste (no pudimos comprobarla)"; fi
 ui "message: ### ¡Listo!\\n\\nTu proyecto **$NAME** está corriendo.\\n\\n**Panel:** http://panel.localhost:$PORT\\n\\n**Usuario:** \`$ADMIN\` · **Contraseña:** $pwtext"
 ui "button1text: Abrir panel"; ui "button1: enable"
 if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; wait "$DIALOG_PID"; echo "done: http://panel.localhost:$PORT"; exit 0; fi
