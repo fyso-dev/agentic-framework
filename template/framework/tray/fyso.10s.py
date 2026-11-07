@@ -25,10 +25,13 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 
 SOCKETS = os.environ.get("FYSO_TRAY_SOCKETS", "/tmp/fyso-*.sock")
 CACHE = os.environ.get("FYSO_TRAY_CACHE", os.path.expanduser("~/Library/Caches/fyso-tray/projects.json"))
 SELF = os.path.abspath(__file__)
+QUIET = os.environ.get("FYSO_TRAY_QUIET") == "1"  # tests: no SwiftBar refresh, no notifications
+BUSY_MAX = 600  # seconds; `mise run up` gives up after 4 minutes
 
 TEXT = {
     "es": {"none": "No hay proyectos Fyso corriendo", "running": "{n} proyecto(s) corriendo", "panel": "Panel",
@@ -36,13 +39,19 @@ TEXT = {
            "stop": "Detener…", "stop_confirm": "Detener {name} (mise run down)",
            "restart": "Reiniciar…", "restart_confirm": "Reiniciar {name} (down + up)",
            "stopped": "Detenidos", "start": "Iniciar", "no_answer": "no responde",
-           "stale": "socket huérfano (el stack se cerró mal)", "forget": "Quitar del menú", "refresh": "Actualizar"},
+           "stale": "socket huérfano (el stack se cerró mal)", "forget": "Quitar del menú", "refresh": "Actualizar",
+           "busy_start": "Iniciando…", "busy_stop": "Deteniendo…", "busy_restart": "Reiniciando…",
+           "done_start": "{name} está corriendo", "done_stop": "{name} se detuvo", "done_restart": "{name} se reinició",
+           "failed": "{name}: falló mise run {task}", "last_failed": "el último intento falló", "log": "Ver registro"},
     "en": {"none": "No Fyso projects running", "running": "{n} project(s) running", "panel": "Panel",
            "processes": "Processes", "folder": "Open folder", "terminal": "Open terminal here",
            "stop": "Stop…", "stop_confirm": "Stop {name} (mise run down)",
            "restart": "Restart…", "restart_confirm": "Restart {name} (down + up)",
            "stopped": "Stopped", "start": "Start", "no_answer": "not answering",
-           "stale": "stale socket (the stack did not shut down cleanly)", "forget": "Remove from menu", "refresh": "Refresh"},
+           "stale": "stale socket (the stack did not shut down cleanly)", "forget": "Remove from menu", "refresh": "Refresh",
+           "busy_start": "Starting…", "busy_stop": "Stopping…", "busy_restart": "Restarting…",
+           "done_start": "{name} is running", "done_stop": "{name} stopped", "done_restart": "{name} restarted",
+           "failed": "{name}: mise run {task} failed", "last_failed": "the last attempt failed", "log": "Show log"},
 }
 
 
@@ -171,15 +180,24 @@ def projects():
             item["name"] = info.get("name") or slug
             item["apps"] = read_json(os.path.join(root, ".data/panel/apps.json")) or []
             if item["mise"]:
-                cache[root] = {"name": item["name"], "port": port, "mise": item["mise"], "path": path or os.environ.get("PATH", "")}
+                cache[root] = dict(cache.get(root, {}), name=item["name"], port=port, mise=item["mise"],
+                                   path=path or os.environ.get("PATH", ""))
+            item["busy"], item["error"] = busy(cache.get(root)), (cache.get(root) or {}).get("error")
         found.append(item)
     live = {p["root"] for p in found if p["root"]}
     cache = {root: c for root, c in cache.items() if is_project(root)}  # folders deleted since
     save_cache(cache)
     for root, c in sorted(cache.items(), key=lambda rc: rc[1].get("name", "")):
         if root not in live:
-            found.append({"state": "stopped", "root": root, "name": c.get("name") or os.path.basename(root), "port": c.get("port", "")})
+            found.append({"state": "stopped", "root": root, "name": c.get("name") or os.path.basename(root),
+                          "port": c.get("port", ""), "busy": busy(c), "error": c.get("error")})
     return found
+
+
+def busy(entry):
+    """Action in progress for a cached project ("start", "stop", "restart"), if recent."""
+    entry = entry or {}
+    return entry.get("busy") if time.time() - entry.get("since", 0) < BUSY_MAX else None
 
 
 def proc_ok(proc):
@@ -214,13 +232,33 @@ def folder_items(root):
             f"--{T['terminal']} | bash=/usr/bin/open param1=-a param2=Terminal param3={q(root)} terminal=false sfimage=terminal"]
 
 
+def status_items(p):
+    """Busy / failed lines under a project; True when an action is running (hide the other actions)."""
+    log = os.path.join(p["root"], ".data", "logs", "tray.log") if p.get("root") else None
+    if p.get("busy"):
+        return [f"--{T['busy_' + p['busy']]} | color=gray sfimage=hourglass"] + (
+            [f"--{T['log']} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text"] if log else []), True
+    if p.get("error") and log:
+        return [f"--{T['last_failed']} | color=red sfimage=exclamationmark.triangle",
+                f"--{T['log']} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text", "-----"], False
+    return [], False
+
+
+def title_line(p, image, color, extra=""):
+    label = f"{esc(p['name'])}  :{p['port']}"
+    if p.get("busy"):
+        return f"{label}  · {T['busy_' + p['busy']]} | sfimage=hourglass sfcolor=orange{extra}"
+    return f"{label} | sfimage={image} sfcolor={color}{extra}"
+
+
 def render(items):
     lines = []
     stopped = [p for p in items if p["state"] == "stopped"]
     items = [p for p in items if p["state"] != "stopped"]
     running = [p for p in items if p["state"] == "up"]
     states = [health(p["procs"]) for p in running]
-    icon_color = "red" if "red" in states else "orange" if "orange" in states or len(running) < len(items) else None
+    icon_color = "red" if "red" in states else "orange" if "orange" in states or len(running) < len(items) \
+        or any(p.get("busy") for p in items + stopped) else None
     title = f"{len(running)}" if running else ""
     lines.append(f"{title} | sfimage=square.stack.3d.up{'.fill' if running else ''}" + (f" sfcolor={icon_color}" if icon_color else ""))
     lines.append("---")
@@ -237,8 +275,9 @@ def render(items):
             if p["state"] == "stale":
                 lines.append(f"--{T['forget']} | bash=/bin/rm param1=-f param2={q(p['sock'])} terminal=false refresh=true sfimage=trash")
             continue
-        color = health(p["procs"])
-        lines.append(f"{esc(p['name'])}  :{p['port']} | href={panel} sfimage=circle.fill sfcolor={color}")
+        lines.append(title_line(p, "circle.fill", health(p["procs"]), f" href={panel}"))
+        extra, working = status_items(p)
+        lines.extend(extra)
         lines.append(f"--{T['panel']} | href={panel} sfimage=rectangle.grid.2x2")
         for app in p["apps"]:
             if app.get("enabled", True) and app.get("url"):
@@ -251,7 +290,7 @@ def render(items):
         if p["root"]:
             lines.append("-----")
             lines.extend(folder_items(p["root"]))
-            if p.get("mise"):
+            if p.get("mise") and not working:
                 name = esc(p["name"])
                 lines.append(f"--{T['restart']} | sfimage=arrow.clockwise.circle")
                 lines.append(f"----{T['restart_confirm'].format(name=name)} | {action('restart', p['root'])} sfimage=arrow.clockwise")
@@ -261,11 +300,15 @@ def render(items):
         lines.append("---")
         lines.append(f"{T['stopped']} | color=gray size=12")
         for p in stopped:
-            lines.append(f"{esc(p['name'])}  :{p['port']} | sfimage=circle sfcolor=gray")
-            lines.append(f"--{T['start']} | {action('start', p['root'])} sfimage=play.fill sfcolor=green")
+            lines.append(title_line(p, "circle", "gray"))
+            extra, working = status_items(p)
+            lines.extend(extra)
+            if not working:
+                lines.append(f"--{T['start']} | {action('start', p['root'])} sfimage=play.fill sfcolor=green")
             lines.extend(folder_items(p["root"]))
-            lines.append("-----")
-            lines.append(f"--{T['forget']} | {action('forget', p['root'])} sfimage=trash")
+            if not working:
+                lines.append("-----")
+                lines.append(f"--{T['forget']} | {action('forget', p['root'])} sfimage=trash")
     lines.append("---")
     lines.append(f"{T['refresh']} | refresh=true sfimage=arrow.clockwise")
     return "\n".join(lines)
@@ -293,18 +336,42 @@ def run_action(name, root):
     tasks = {"start": ["up"], "stop": ["down"], "restart": ["down", "up"]}.get(name)
     if not tasks or not os.access(entry.get("mise", ""), os.X_OK):
         return 1
+    if busy(entry):
+        return 0  # double click: the first action is still running
+    mark(root, busy=name, since=time.time(), error=None)
     env = dict(os.environ, PATH=entry.get("path") or os.environ.get("PATH", ""))
     logs = os.path.join(root, ".data", "logs")
     os.makedirs(logs, exist_ok=True)
+    code, failed = 0, None
     with open(os.path.join(logs, "tray.log"), "a") as log:
         for task in tasks:
-            log.write(f"$ mise run {task}\n")
+            log.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] $ mise run {task}\n")
             log.flush()
             code = subprocess.run([entry["mise"], "-C", root, "run", task], cwd=root, env=env,
                                   stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT).returncode
             if code:
-                return code
-    return 0
+                failed = task
+                break
+    mark(root, busy=None, since=0, error=failed)
+    who = entry.get("name") or os.path.basename(root)
+    notify(T["failed"].format(name=who, task=failed) if failed else T["done_" + name].format(name=who))
+    return code
+
+
+def mark(root, **fields):
+    """Update a cache entry and let SwiftBar show it now, not at the next 10 s refresh."""
+    cache = load_cache()
+    if root in cache:
+        cache[root].update(fields)
+        save_cache(cache)
+    if not QUIET:
+        subprocess.run(["/usr/bin/open", "-g", "swiftbar://refreshallplugins"], timeout=5)
+
+
+def notify(text):
+    if not QUIET:
+        subprocess.run(["/usr/bin/osascript", "-e", "on run argv", "-e", 'display notification (item 1 of argv) with title "Fyso"',
+                        "-e", "end run", text], timeout=5)
 
 
 if __name__ == "__main__":

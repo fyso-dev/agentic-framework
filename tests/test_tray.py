@@ -46,7 +46,7 @@ class TrayPluginTests(unittest.TestCase):
         os.makedirs(self.bin)
         mise = os.path.join(self.bin, "mise")
         with open(mise, "w") as f:
-            f.write('#!/bin/sh\nprintf "%s|%s\\n" "$PATH" "$*" >> "$(dirname "$0")/calls"\n')
+            f.write('#!/bin/sh\nprintf "%s|%s\\n" "$PATH" "$*" >> "$(dirname "$0")/calls"\nexit "${FAKE_MISE_EXIT:-0}"\n')
         os.chmod(mise, os.stat(mise).st_mode | stat.S_IEXEC)
         self.servers = []
         self.cache = os.path.join(self.work, "cache", "projects.json")
@@ -86,11 +86,11 @@ class TrayPluginTests(unittest.TestCase):
         sock.bind(os.path.join(self.socks, f"fyso-{slug}-{port}.sock"))
         sock.close()  # the file stays, nobody listens: a crashed stack
 
-    def run_plugin(self, *args, path="/usr/bin:/bin", **extra):
+    def run_plugin(self, *args, path="/usr/bin:/bin", code=0, **extra):
         env = {"PATH": path, "HOME": os.environ.get("HOME", ""), "FYSO_TRAY_CACHE": self.cache,
-               "FYSO_TRAY_SOCKETS": os.path.join(self.socks, "fyso-*.sock"), "FYSO_TRAY_LANG": "en", **extra}
+               "FYSO_TRAY_SOCKETS": os.path.join(self.socks, "fyso-*.sock"), "FYSO_TRAY_LANG": "en", "FYSO_TRAY_QUIET": "1", **extra}
         out = subprocess.run([sys.executable, PLUGIN, *args], capture_output=True, text=True, env=env, timeout=30)
-        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(out.returncode, code, out.stderr)
         return out.stdout.splitlines()
 
     def stop_all(self):
@@ -116,7 +116,7 @@ class TrayPluginTests(unittest.TestCase):
                                   {"id": "off", "name": "Off", "url": "http://off.localhost:18400", "enabled": False}])
         lines = self.run_plugin()
         self.assertEqual(lines[0], "1 | sfimage=square.stack.3d.up.fill")
-        self.assertIn("Alpha  :18400 | href=http://panel.localhost:18400 sfimage=circle.fill sfcolor=green", lines)
+        self.assertIn("Alpha  :18400 | sfimage=circle.fill sfcolor=green href=http://panel.localhost:18400", lines)
         self.assertIn("--Dagu | href=http://dagu.localhost:18400 sfimage=arrow.up.right.square", lines)
         self.assertFalse([l for l in lines if l.startswith("--Off")])
         self.assertIn(f'--Open folder | bash=/usr/bin/open param1="{root}" terminal=false sfimage=folder', lines)
@@ -142,6 +142,34 @@ class TrayPluginTests(unittest.TestCase):
         self.run_plugin("forget", root)
         self.assertNotIn("Stopped | color=gray size=12", self.run_plugin())
 
+    def test_busy_project_shows_progress_and_hides_actions(self):
+        root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
+        self.run_plugin()
+        self.stop_all()
+        with open(self.cache) as f:
+            cache = json.load(f)
+        cache[root].update(busy="start", since=time.time())
+        with open(self.cache, "w") as f:
+            json.dump(cache, f)
+        lines = self.run_plugin()
+        self.assertIn("Alpha  :18400  · Starting… | sfimage=hourglass sfcolor=orange", lines)
+        self.assertIn("--Starting… | color=gray sfimage=hourglass", lines)
+        self.assertFalse([l for l in lines if l.startswith("--Start |")])
+        self.run_plugin("start", root)  # a second click while busy does nothing
+        self.assertFalse(os.path.exists(os.path.join(self.bin, "calls")))
+
+    def test_failed_start_is_shown_with_its_log(self):
+        root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
+        self.run_plugin()
+        self.stop_all()
+        self.run_plugin("start", root, code=3, FAKE_MISE_EXIT="3")
+        lines = self.run_plugin()
+        self.assertIn("--the last attempt failed | color=red sfimage=exclamationmark.triangle", lines)
+        self.assertTrue([l for l in lines if l.startswith("--Show log |") and "tray.log" in l])
+        self.assertTrue([l for l in lines if l.startswith("--Start |")])
+        with open(os.path.join(root, ".data", "logs", "tray.log")) as f:
+            self.assertIn("$ mise run up", f.read())
+
     def test_restart_runs_down_then_up(self):
         root = self.project("alpha", 18400, "Alpha", [proc("caddy")])
         self.run_plugin()
@@ -158,7 +186,7 @@ class TrayPluginTests(unittest.TestCase):
         self.project("beta", 18500, "Beta", [proc("caddy"), proc("omb", ready="Not Ready")])
         lines = self.run_plugin()
         self.assertEqual(lines[0], "1 | sfimage=square.stack.3d.up.fill sfcolor=orange")
-        self.assertIn("Beta  :18500 | href=http://panel.localhost:18500 sfimage=circle.fill sfcolor=orange", lines)
+        self.assertIn("Beta  :18500 | sfimage=circle.fill sfcolor=orange href=http://panel.localhost:18500", lines)
         self.assertIn("--omb  Running | sfimage=xmark.circle sfcolor=red size=12", lines)
 
     def test_stale_socket_next_to_running_project(self):
