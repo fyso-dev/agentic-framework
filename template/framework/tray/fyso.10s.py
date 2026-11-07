@@ -29,46 +29,47 @@ import subprocess
 import sys
 import time
 
-SOCKETS = os.environ.get("FYSO_TRAY_SOCKETS", "/tmp/fyso-*.sock")
-CACHE = os.environ.get("FYSO_TRAY_CACHE", os.path.expanduser("~/Library/Caches/fyso-tray/projects.json"))
+SOCKETS = os.environ.get('FYSO_TRAY_SOCKETS', "/tmp/fyso-*.sock")
+CACHE = os.environ.get('FYSO_TRAY_CACHE', os.path.expanduser("~/Library/Caches/fyso-tray/projects.json"))
 SELF = os.path.abspath(__file__)
-QUIET = os.environ.get("FYSO_TRAY_QUIET") == "1"  # tests: no SwiftBar refresh, no notifications
+QUIET = os.environ.get('FYSO_TRAY_QUIET') == "1"  # tests: no SwiftBar refresh, no notifications
 BUSY_MAX = 600  # seconds; `mise run up` gives up after 4 minutes
 
-TEXT = {
-    "es": {"none": "No hay proyectos Fyso corriendo", "running": "{n} proyecto(s) corriendo", "panel": "Panel",
-           "processes": "Procesos", "folder": "Abrir carpeta", "terminal": "Abrir terminal aquí",
-           "stop": "Detener…", "stop_confirm": "Detener {name} (mise run down)",
-           "restart": "Reiniciar…", "restart_confirm": "Reiniciar {name} (down + up)",
-           "stopped": "Detenidos", "start": "Iniciar", "no_answer": "no responde",
-           "stale": "socket huérfano (el stack se cerró mal)", "forget": "Quitar del menú", "refresh": "Actualizar",
-           "busy_start": "Iniciando…", "busy_stop": "Deteniendo…", "busy_restart": "Reiniciando…",
-           "done_start": "{name} está corriendo", "done_stop": "{name} se detuvo", "done_restart": "{name} se reinició",
-           "failed": "{name}: falló mise run {task}", "last_failed": "el último intento falló", "log": "Ver registro"},
-    "en": {"none": "No Fyso projects running", "running": "{n} project(s) running", "panel": "Panel",
-           "processes": "Processes", "folder": "Open folder", "terminal": "Open terminal here",
-           "stop": "Stop…", "stop_confirm": "Stop {name} (mise run down)",
-           "restart": "Restart…", "restart_confirm": "Restart {name} (down + up)",
-           "stopped": "Stopped", "start": "Start", "no_answer": "not answering",
-           "stale": "stale socket (the stack did not shut down cleanly)", "forget": "Remove from menu", "refresh": "Refresh",
-           "busy_start": "Starting…", "busy_stop": "Stopping…", "busy_restart": "Restarting…",
-           "done_start": "{name} is running", "done_stop": "{name} stopped", "done_restart": "{name} restarted",
-           "failed": "{name}: mise run {task} failed", "last_failed": "the last attempt failed", "log": "Show log"},
-}
+
+
+LOCALES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "locales")  # real file, not the SwiftBar link
 
 
 def language():
-    if os.environ.get("FYSO_TRAY_LANG") in TEXT:
+    """FYSO_TRAY_LANG, else the first macOS language with a locales/<lang>.json, else es (the default)."""
+    available = {f[:-5] for f in os.listdir(LOCALES) if f.endswith(".json")}
+    if os.environ.get('FYSO_TRAY_LANG') in available:
         return os.environ["FYSO_TRAY_LANG"]
     try:
         out = subprocess.run(["/usr/bin/defaults", "read", "-g", "AppleLanguages"], capture_output=True, text=True, timeout=2).stdout
-        first = re.search(r'\(\s*"?([A-Za-z]{2})', out)  # e.g. ( "es-AR", "en-US" )
-        return "en" if first and first.group(1).lower() == "en" else "es"
+        for code in re.findall(r'"?([A-Za-z]{2})[-_A-Za-z]*"?\s*[,)]', out):  # e.g. ( "es-AR", "en-US" )
+            if code.lower() in available:
+                return code.lower()
     except Exception:
-        return "es"
+        pass
+    return "es"
 
 
-T = TEXT[language()]
+def load_locale(lang):
+    with open(os.path.join(LOCALES, "es.json")) as f:
+        texts = json.load(f)  # missing keys fall back to es
+    if lang != "es":
+        with open(os.path.join(LOCALES, f"{lang}.json")) as f:
+            texts.update(json.load(f))
+    return texts
+
+
+TEXTS = load_locale(language())
+
+
+def t(key, **values):
+    """Translated UI text; {{name}} placeholders as in i18next."""
+    return re.sub(r"\{\{(\w+)\}\}", lambda m: str(values.get(m.group(1), m.group(0))), TEXTS.get(key, key))
 
 
 class UnixHTTP(http.client.HTTPConnection):
@@ -85,8 +86,8 @@ class UnixHTTP(http.client.HTTPConnection):
 def processes(sock):
     conn = UnixHTTP(sock)
     try:
-        conn.request("GET", "/processes")
-        return json.loads(conn.getresponse().read()).get("data") or []
+        conn.request('GET', "/processes")
+        return json.loads(conn.getresponse().read()).get('data') or []
     finally:
         conn.close()
 
@@ -189,10 +190,10 @@ def projects():
             path = stack_path(pid)
             item["mise"] = mise_path(path)
             info = read_json(os.path.join(root, ".data/panel/project.json")) or {}
-            item["name"] = info.get("name") or slug
+            item["name"] = info.get('name') or slug
             item["apps"] = read_json(os.path.join(root, ".data/panel/apps.json")) or []
             if item["mise"]:
-                seen[root] = {"name": item["name"], "port": port, "mise": item["mise"], "path": path or os.environ.get("PATH", "")}
+                seen[root] = {"name": item["name"], "port": port, "mise": item["mise"], "path": path or os.environ.get('PATH', "")}
         found.append(item)
     # Only the fields this refresh owns are written; busy/error belong to running actions.
     with cache_edit() as cache:
@@ -203,26 +204,26 @@ def projects():
         snapshot = json.loads(json.dumps(cache))
     for item in found:
         if item["root"] in snapshot:
-            item["busy"], item["error"] = busy(snapshot[item["root"]]), snapshot[item["root"]].get("error")
+            item["busy"], item["error"] = busy(snapshot[item["root"]]), snapshot[item["root"]].get('error')
     live = {p["root"] for p in found if p["root"]}
-    for root, c in sorted(snapshot.items(), key=lambda rc: rc[1].get("name", "")):
+    for root, c in sorted(snapshot.items(), key=lambda rc: rc[1].get('name', "")):
         if root not in live:
-            found.append({"state": "stopped", "root": root, "name": c.get("name") or os.path.basename(root),
-                          "port": c.get("port", ""), "busy": busy(c), "error": c.get("error")})
+            found.append({"state": "stopped", "root": root, "name": c.get('name') or os.path.basename(root),
+                          "port": c.get('port', ""), "busy": busy(c), "error": c.get('error')})
     return found
 
 
 def busy(entry):
     """Action in progress for a cached project ("start", "stop", "restart"), if recent."""
     entry = entry or {}
-    return entry.get("busy") if time.time() - entry.get("since", 0) < BUSY_MAX else None
+    return entry.get('busy') if time.time() - entry.get('since', 0) < BUSY_MAX else None
 
 
 def proc_ok(proc):
-    status = proc.get("status")
+    status = proc.get('status')
     if status == "Running":
-        return proc.get("is_ready") == "Ready" or not proc.get("has_ready_probe", proc.get("is_ready") == "Ready")
-    return status == "Disabled" or (status == "Completed" and proc.get("exit_code", 0) == 0)
+        return proc.get('is_ready') == "Ready" or not proc.get('has_ready_probe', proc.get('is_ready') == "Ready")
+    return status == "Disabled" or (status == "Completed" and proc.get('exit_code', 0) == 0)
 
 
 def health(procs):
@@ -246,26 +247,26 @@ def action(name, root):
 
 
 def folder_items(root):
-    return [f"--{T['folder']} | bash=/usr/bin/open param1={q(root)} terminal=false sfimage=folder",
-            f"--{T['terminal']} | bash=/usr/bin/open param1=-a param2=Terminal param3={q(root)} terminal=false sfimage=terminal"]
+    return [f"--{t('folder')} | bash=/usr/bin/open param1={q(root)} terminal=false sfimage=folder",
+            f"--{t('terminal')} | bash=/usr/bin/open param1=-a param2=Terminal param3={q(root)} terminal=false sfimage=terminal"]
 
 
 def status_items(p):
     """Busy / failed lines under a project; True when an action is running (hide the other actions)."""
-    log = os.path.join(p["root"], ".data", "logs", "tray.log") if p.get("root") else None
-    if p.get("busy"):
-        return [f"--{T['busy_' + p['busy']]} | color=gray sfimage=hourglass"] + (
-            [f"--{T['log']} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text"] if log else []), True
-    if p.get("error") and log:
-        return [f"--{T['last_failed']} | color=red sfimage=exclamationmark.triangle",
-                f"--{T['log']} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text", "-----"], False
+    log = os.path.join(p["root"], ".data", "logs", "tray.log") if p.get('root') else None
+    if p.get('busy'):
+        return [f"--{t('busy_' + p['busy'])} | color=gray sfimage=hourglass"] + (
+            [f"--{t('log')} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text"] if log else []), True
+    if p.get('error') and log:
+        return [f"--{t('last_failed')} | color=red sfimage=exclamationmark.triangle",
+                f"--{t('log')} | bash=/usr/bin/open param1={q(log)} terminal=false sfimage=doc.text", "-----"], False
     return [], False
 
 
 def title_line(p, image, color, extra=""):
     label = f"{esc(p['name'])}  :{p['port']}"
-    if p.get("busy"):
-        return f"{label}  · {T['busy_' + p['busy']]} | sfimage=hourglass sfcolor=orange{extra}"
+    if p.get('busy'):
+        return f"{label}  · {t('busy_' + p['busy'])} | sfimage=hourglass sfcolor=orange{extra}"
     return f"{label} | sfimage={image} sfcolor={color}{extra}"
 
 
@@ -276,59 +277,59 @@ def render(items):
     running = [p for p in items if p["state"] == "up"]
     states = [health(p["procs"]) for p in running]
     icon_color = "red" if "red" in states else "orange" if "orange" in states or len(running) < len(items) \
-        or any(p.get("busy") for p in items + stopped) else None
+        or any(p.get('busy') for p in items + stopped) else None
     title = f"{len(running)}" if running else ""
     lines.append(f"{title} | sfimage=square.stack.3d.up{'.fill' if running else ''}" + (f" sfcolor={icon_color}" if icon_color else ""))
     lines.append("---")
     if not items:
-        lines.append(f"{T['none']} | color=gray")
+        lines.append(f"{t('none')} | color=gray")
     else:
-        lines.append(f"{T['running'].format(n=len(running))} | color=gray size=12")
+        lines.append(f"{t('running', n=len(running))} | color=gray size=12")
     for p in items:
         lines.append("---")
         panel = f"http://panel.localhost:{p['port']}"
         if p["state"] != "up":
             lines.append(f"{esc(p['name'])}  :{p['port']} | sfimage=exclamationmark.triangle sfcolor=orange refresh=true")
-            lines.append(f"--{T[p['state']]} | color=gray")
+            lines.append(f"--{t(p['state'])} | color=gray")
             if p["state"] == "stale":
-                lines.append(f"--{T['forget']} | bash=/bin/rm param1=-f param2={q(p['sock'])} terminal=false refresh=true sfimage=trash")
+                lines.append(f"--{t('forget')} | bash=/bin/rm param1=-f param2={q(p['sock'])} terminal=false refresh=true sfimage=trash")
             continue
         lines.append(title_line(p, "circle.fill", health(p["procs"]), f" href={panel}"))
         extra, working = status_items(p)
         lines.extend(extra)
-        lines.append(f"--{T['panel']} | href={panel} sfimage=rectangle.grid.2x2")
+        lines.append(f"--{t('panel')} | href={panel} sfimage=rectangle.grid.2x2")
         for app in p["apps"]:
-            if app.get("enabled", True) and app.get("url"):
+            if app.get('enabled', True) and app.get('url'):
                 lines.append(f"--{esc(app.get('name', app.get('id')))} | href={app['url']} sfimage=arrow.up.right.square")
         lines.append("-----")
-        lines.append(f"--{T['processes']} | color=gray size=12")
-        for proc in sorted(p["procs"], key=lambda x: x.get("name", "")):
+        lines.append(f"--{t('processes')} | color=gray size=12")
+        for proc in sorted(p["procs"], key=lambda x: x.get('name', "")):
             mark = "checkmark.circle" if proc_ok(proc) else "xmark.circle"
             lines.append(f"--{esc(proc.get('name'))}  {esc(proc.get('status'))} | sfimage={mark} sfcolor={'green' if mark.startswith('check') else 'red'} size=12")
         if p["root"]:
             lines.append("-----")
             lines.extend(folder_items(p["root"]))
-            if p.get("mise") and not working:
+            if p.get('mise') and not working:
                 name = esc(p["name"])
-                lines.append(f"--{T['restart']} | sfimage=arrow.clockwise.circle")
-                lines.append(f"----{T['restart_confirm'].format(name=name)} | {action('restart', p['root'])} sfimage=arrow.clockwise")
-                lines.append(f"--{T['stop']} | sfimage=stop.circle")
-                lines.append(f"----{T['stop_confirm'].format(name=name)} | {action('stop', p['root'])} sfimage=stop.fill sfcolor=red")
+                lines.append(f"--{t('restart')} | sfimage=arrow.clockwise.circle")
+                lines.append(f"----{t('restart_confirm', name=name)} | {action('restart', p['root'])} sfimage=arrow.clockwise")
+                lines.append(f"--{t('stop')} | sfimage=stop.circle")
+                lines.append(f"----{t('stop_confirm', name=name)} | {action('stop', p['root'])} sfimage=stop.fill sfcolor=red")
     if stopped:
         lines.append("---")
-        lines.append(f"{T['stopped']} | color=gray size=12")
+        lines.append(f"{t('stopped')} | color=gray size=12")
         for p in stopped:
             lines.append(title_line(p, "circle", "gray", " refresh=true"))  # SwiftBar disables rows without an action
             extra, working = status_items(p)
             lines.extend(extra)
             if not working:
-                lines.append(f"--{T['start']} | {action('start', p['root'])} sfimage=play.fill sfcolor=green")
+                lines.append(f"--{t('start')} | {action('start', p['root'])} sfimage=play.fill sfcolor=green")
             lines.extend(folder_items(p["root"]))
             if not working:
                 lines.append("-----")
-                lines.append(f"--{T['forget']} | {action('forget', p['root'])} sfimage=trash")
+                lines.append(f"--{t('forget')} | {action('forget', p['root'])} sfimage=trash")
     lines.append("---")
-    lines.append(f"{T['refresh']} | refresh=true sfimage=arrow.clockwise")
+    lines.append(f"{t('refresh')} | refresh=true sfimage=arrow.clockwise")
     return "\n".join(lines)
 
 
@@ -339,11 +340,11 @@ def run_action(name, root):
     root = os.path.realpath(root)
     tasks = {"start": ["up"], "stop": ["down"], "restart": ["down", "up"]}.get(name)
     with cache_edit() as cache:
-        if name == "register" and is_project(root) and mise_path(os.environ.get("PATH", "")):
+        if name == "register" and is_project(root) and mise_path(os.environ.get('PATH', "")):
             info = read_json(os.path.join(root, ".data/panel/project.json")) or {}
-            cache[root] = dict(cache.get(root, {}), name=info.get("name") or os.path.basename(root),
-                               port=os.environ.get("FYSO_HTTP_PORT", ""), mise=mise_path(os.environ.get("PATH", "")),
-                               path=os.environ.get("PATH", ""))
+            cache[root] = dict(cache.get(root, {}), name=info.get('name') or os.path.basename(root),
+                               port=os.environ.get('FYSO_HTTP_PORT', ""), mise=mise_path(os.environ.get('PATH', "")),
+                               path=os.environ.get('PATH', ""))
             return 0
         entry = dict(cache.get(root) or {})
         if not entry or not is_project(root):
@@ -351,13 +352,13 @@ def run_action(name, root):
         if name == "forget":
             del cache[root]
             return 0
-        if not tasks or not os.access(entry.get("mise", ""), os.X_OK):
+        if not tasks or not os.access(entry.get('mise', ""), os.X_OK):
             return 1
         if busy(entry):
             return 0  # double click: the first action is still running
         cache[root].update(busy=name, since=time.time(), error=None)
     refresh()
-    env = dict(os.environ, PATH=entry.get("path") or os.environ.get("PATH", ""))
+    env = dict(os.environ, PATH=entry.get('path') or os.environ.get('PATH', ""))
     logs = os.path.join(root, ".data", "logs")
     os.makedirs(logs, exist_ok=True)
     code, failed = 0, None
@@ -375,8 +376,8 @@ def run_action(name, root):
         if root in cache:
             cache[root].update(busy=None, since=0, error=failed)
     refresh()
-    who = entry.get("name") or os.path.basename(root)
-    notify(T["failed"].format(name=who, task=failed) if failed else T["done_" + name].format(name=who))
+    who = entry.get('name') or os.path.basename(root)
+    notify(t('failed', name=who, task=failed) if failed else t('done_' + name, name=who))
     return code
 
 

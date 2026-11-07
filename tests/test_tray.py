@@ -199,5 +199,21 @@ class TrayPluginTests(unittest.TestCase):
         self.assertTrue([l for l in lines if l.startswith("--Remove from menu | bash=/bin/rm param1=-f")])
 
 
+class TrayLocaleTests(unittest.TestCase):
+    def test_every_used_key_exists_in_every_locale(self):
+        import re
+        locales = os.path.join(os.path.dirname(PLUGIN), "locales")
+        texts = {f[:-5]: json.load(open(os.path.join(locales, f))) for f in os.listdir(locales) if f.endswith(".json")}
+        self.assertIn("es", texts)
+        with open(PLUGIN) as f:
+            source = f.read()
+        used = set(re.findall(r"\bt\('(\w+)'", source)) - {"busy_", "done_"}  # prefixes, added below
+        used |= {f"busy_{a}" for a in ("start", "stop", "restart")} | {f"done_{a}" for a in ("start", "stop", "restart")}
+        used |= {"stale", "no_answer"}  # t(p['state'])
+        for lang, keys in texts.items():
+            self.assertEqual(set(keys), set(texts["es"]), lang)
+            self.assertFalse(used - set(keys), lang)
+
+
 if __name__ == "__main__":
     unittest.main()
