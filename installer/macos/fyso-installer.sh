@@ -46,6 +46,7 @@ fail() {   # index, short text, message for the person
 default_name="Mi proyecto"
 # FYSO_AUTO=1 (tests): skip the form, take FYSO_NAME / FYSO_FOLDER / FYSO_ENGINE, close at the end.
 REGISTRY="$HOME/Library/Application Support/Fyso/projects.tsv"   # port<TAB>folder of installed projects
+# swiftDialog splits field modifiers on commas: the port regex must not contain any.
 # Port bases already taken, even by stopped projects: the registry, Fyso projects next to
 # the chosen folder (installed by hand), and running stacks' sockets.
 taken_ports() {
@@ -53,7 +54,8 @@ taken_ports() {
   for a in "$FOLDER"/*/.copier-answers.yml; do [ -f "$a" ] && sed -n 's/^port_base: *//p' "$a"; done
   for f in /tmp/fyso-*-*.sock; do [ -e "$f" ] && { f=${f##*-}; echo "${f%.sock}"; }; done
 }
-block_free() {   # $1: port base. Free = not taken by another project and nothing listening on the 10 ports.
+block_free() {   # $1: port base. Free = valid range, not taken by another project, nothing listening.
+  [ "$1" -ge 1024 ] 2>/dev/null && [ $(($1 + 9)) -le 65535 ] || return 1
   case " $(taken_ports | tr '\n' ' ') " in *" $1 "*) return 1 ;; esac
   p=$1; while [ $p -lt $(($1+10)) ]; do lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && return 1; p=$((p+1)); done
 }
@@ -73,7 +75,7 @@ else
       --textfield "Nombre del proyecto,value=$NAME,required" \
       --textfield "Usuario del panel,value=$ADMIN,required" \
       --textfield "Contraseña,secure,value=$PASSWORD,required" \
-      --textfield "Puerto,value=$PORT,required,regex=^[0-9]{4,5}0$,regexerror=Usá un múltiplo de 10 (8400, 8410…)" \
+      --textfield "Puerto,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=Usá un múltiplo de 10 (8400, 8410…)" \
       --selecttitle "Motor de IA que ya usás" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
       --infobuttontext "Cambiar carpeta…" --button1text "Instalar" --button2text "Cancelar" \
       --width 620 --height 600 --moveable)
