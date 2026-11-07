@@ -74,6 +74,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
+| 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -82,6 +83,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-06 | Shared agent operating context: local guide, MCP initialization and offline `fyso_context`, CLI entry point, desktop prompt and all default bot roles including Chief. Existing project-owned profiles require explicit adoption. See [agent surface](agent-surface.md#shared-operating-context). |
 |---|---|
 | 2026-11-05 | [Phase 0 harness spike](adr/spikes/harness.md): **yes** — Dagu v2.22.4 `harness.run` ran Claude Code and Codex on the subscription logins (no API key) inside throwaway worktrees and returned the result as outputs and artifacts. Caveats for `dev-task`: a denied permission still exits 0 (add a diff gate); the user's CLI config applies (pin the Codex approval policy); stdout is not live; step `working_dir` does not resolve `${steps.*}`. Phase 0 remains open |
 | 2026-11-05 | [Phase 0 tooling spike](adr/spikes/tooling.md): exact mise pins with explicit sandbox verification failures/fallbacks; SOPS and fnox age round trips; Dagu Git Sync API edit → commit/push verified against a local bare repo (local-URL clone limitation). Phase 0 remains open |
@@ -127,3 +129,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-07 | PR #11 corrections: installer ES/EN resources include workflow titles; repeated names get distinct project/MCP identifiers. Startup model repair sends only live model changes and preserves native/snapshot fields and deleted bots. Regression checks use isolated fixtures; live installer acceptance remains separate. |
 | 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
 | 2026-11-07 | **Local web security (D40).** Replaced browser Basic challenges with native Tinyauth sessions, encrypted local users and explicit app ACLs. Pinned native macOS build and real Caddy/Tinyauth security matrix verified; generated-stack doctor and real Chromium login/navigation/logout passed. Existing Dagu/OMB technical identity limits and remote HTTPS gates are explicit. [Contract](web-auth.md) · [Evidence](../artifacts/delivery-evidence/web-auth/README.md). |
+| 2026-11-07 | **D38 implementation in an isolated worktree.** Qt IFW wizard, shared Dagu generator, Linux adapter and Windows/WSL2 adapter with private stdin handoff and host-port inventory. Linux ARM64 native build and authenticated routes passed; doctor reports the fixture's missing Codex login. Windows protocol tests run real PowerShell against a shim; native Windows acceptance is pending. [Build contract](../installer/qt/README.md) · [Evidence](../artifacts/delivery-evidence/installer-cross-platform/README.md). |

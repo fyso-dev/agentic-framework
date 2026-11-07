@@ -85,7 +85,9 @@ mise run tray:install          # from any project: one plugin lists them all
 
 ## Work with coding agents
 
-Open Claude Code or Codex in this folder (inside its mise environment: `mise activate` in your shell, or `mise exec -- claude`). The project's `.mcp.json` gives the agent two MCP servers:
+Open Claude Code or Codex in this folder (inside its mise environment: `mise activate` in your shell, or `mise exec -- claude`). Read `framework/agent-context.md` for the shared operating guide. Desktop clients receive it in MCP initialization; `fyso_context` retrieves it even when runtime services are down. Default bots load it from their role instructions, including the Chief. Existing project-owned bot profiles need an explicit update to adopt new role instructions.
+
+The project's `.mcp.json` gives the agent two MCP servers:
 
 - **`fyso`** — this platform: status, checks, bots (plan, then apply), extensions (search, install), snapshots. It runs the same workflows as the panel.
 - **`dagu`** — workflows: design, run and debug them. Install Dagu's own skill once with `mise run agent:setup`.

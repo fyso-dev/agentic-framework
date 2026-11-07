@@ -9,6 +9,7 @@ const {execFileSync} = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const VERSION = '1';
+const context = () => fs.readFileSync(path.join(ROOT, 'framework/agent-context.md'), 'utf8');
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 process.chdir(ROOT);
 
@@ -23,6 +24,12 @@ const obj = (properties = {}, required = []) => ({type: 'object', properties, re
 
 // name → {description, inputSchema, annotations, run(args)}
 const TOOLS = {
+  fyso_context: {
+    description: 'Read the local Fyso operating guide: architecture, ownership, isolation, bot/workflow/code/extension procedures, verification and tool limitations. Available even when the stack is down; read before planning work.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => ({guide: context()}),
+  },
   fyso_status: {
     description: 'Project overview: name and URLs, health of Dagu/OpenMausBot/gateway, apps, installed extensions (with which declared secrets are set, never their values) and how bots are versioned in git. Read-only; start here.',
     inputSchema: obj(),
@@ -62,7 +69,7 @@ const TOOLS = {
     run: ({bot_id}) => architect({OP: 'read', BOT_ID: bot_id}),
   },
   fyso_bot_plan: {
-    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Show the preview to the person and call fyso_bot_apply only after they agree. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"). Delete needs the exact bot_id.',
+    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"). Delete needs the exact bot_id.',
     inputSchema: obj({
       action: str('What to do', {enum: ['create', 'update', 'delete']}),
       bot_id: str('Exact native bot id; required for update and delete'),
@@ -136,7 +143,7 @@ async function handle(msg) {
     case 'initialize': {
       const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
       return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso', version: VERSION},
-        instructions: 'Tools to inspect and configure this Fyso project (bots, extensions, checks, snapshots). Start with fyso_status. Plan before apply for bots. Never ask for or handle secret values: people set them with `mise run secrets`. Removing extensions, starting/stopping the stack and editing secrets are terminal tasks for a person.'};
+        instructions: context()};
     }
     case 'ping': return {};
     case 'tools/list':

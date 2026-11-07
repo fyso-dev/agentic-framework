@@ -193,6 +193,24 @@ results. Panel TypeScript/build, modified shell syntax, Python AST syntax and
 `git diff --check` passed. The extension lifecycle fixture was adapted for explicit
 local login credentials, but its full Git-tag lifecycle was not rerun.
 
+### Main integration checks before PR publication
+
+Recent main changes introduced the shared Qt installer. The security branch now
+preserves those changes and applies the same required local password and canonical
+panel URL contract to its Linux/WSL adapter. The wizard no longer defaults to
+`admin/admin`; invalid passwords fail before creating an installation request.
+
+```sh
+node --test --test-reporter=dot tests/extensions.test.cjs tests/fyso-mcp.test.cjs tests/agent-connect.test.cjs tests/qt-wizard.test.cjs
+python3 -m unittest discover -s tests -p test_qt_installer.py -v
+python3 -m unittest discover -s tests -p test_installer_dag.py -v
+```
+
+**22 Node checks, 11 Qt adapter checks and 3 macOS installer checks passed** after
+integration. These are executable protocol/adapter tests, not native Linux or
+Windows graphical runtime acceptance. The panel build, staged gitleaks scan,
+path check and merge diff check also passed before publication.
+
 ## Scope and limitations
 
 - This is local, isolated acceptance. No release, remote CI, public deployment,
