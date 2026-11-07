@@ -1,0 +1,35 @@
+# Fyso framework operating guide
+
+This is the shared operating context for desktop assistants, coding CLIs and project bots. Follow your role's narrower permissions. Read this before choosing tools; it does not authorize mutations. Reply in the person's language.
+
+## Understand the project
+
+Fyso orchestrates existing software: OpenMausBot owns conversations, bot profiles and memory; Dagu owns workflows, schedules and run history; Caddy owns gateway routing and login; process-compose owns processes; mise owns pinned tools, environment and tasks; Copier owns template generation and updates; sops + age own encrypted secrets. The panel is a customization layer and launcher. Prefer native features and configuration over custom services or new schemas.
+
+Start with `fyso_status` to discover this project's identity, URLs, services, installed apps and extensions. Context explains how things work; status and fresh reads establish what actually exists. Never assume a service is running or infer success from a plan. If unavailable, report the failing service and inspect health/logs before attempting dependent work.
+
+## Ownership and isolation
+
+- `framework/` is template-owned and replaced by Copier updates. Make project changes in `project/`. Framework fixes belong upstream.
+- `project/bots/team.yaml` is the project's native OMB declaration; runtime bots and committed snapshots may differ. List/read native bots before changing them. Import a native-only bot to version it without changing its runtime profile.
+- `project/workflows/` contains project Dagu YAML; `project/apps/*/app.yaml` declares launcher apps; `project/marketplaces.yaml` declares extension catalogs; `project/mcp.json` declares project MCP servers. `.mcp.json` is generated, never edit it directly.
+- `state/` holds versioned snapshots and memory; `.data/` holds local runtime data. Git memory snapshots do not back up native conversation history.
+- Installed extension slots belong to the extension: update upstream and use the extension lifecycle tasks, rather than editing generated slots.
+- Use only this project's instances and mise environment. Never auto-discover OMB: retain `OPENMAUSBOT_URL` or pass the project's explicit `--port`. Never use the host's personal Dagu/OMB or another project's MCP. Desktop servers named `fyso-<slug>` identify separate projects; confirm the target before action.
+
+## Choose the existing operation
+
+- **Bots:** `fyso_bots_list` → `fyso_bot_read` for exact IDs/current fields → `fyso_bot_plan` → inspect preview → `fyso_bot_apply` with the returned plan ID → fresh read/list to verify. Explicit create/update/delete requests authorize the matching plan; exploratory requests authorize preview only. Update only requested fields. Replan stale changes; never force. Protect Chief/framework bots and busy bots. Use actual available model IDs, never guess. CLI equivalent: `mise run bots:architect '<JSON parameters>'`.
+- **Workflows:** use this project's Dagu MCP, read its native reference/skill first, then `dagu_change` preview/apply in `project/workflows/`. Execute only when authorized and safe. CLI agents can install the pinned authoring skill with `mise run agent:setup`. A desktop connection exposes only the platform MCP: if Dagu tools or local files are unavailable, say so and direct the person to Workflow Architect or a project CLI; do not invent platform tools.
+- **Code:** ask Builder or execute `fyso-dev-task` through project Dagu. Supply `TASK` and acceptance criteria, and the configured `PROVIDER`. It uses an isolated worktree, checks changes and produces a local branch/commit. Set `PUBLISH=true` only for an explicitly requested remote PR. Report actual result artifacts; a person reviews and merges. Bots with read-only roles must not edit code themselves.
+- **Extensions/integrations:** search with `fyso_ext_search`, then install/update the requested catalog ID with `fyso_ext_install`. CLI lifecycle: `mise run ext:search`, `ext:add`, `ext:update`, `ext:list`, `ext:remove`. Use existing extensions/MCP/skills before building a custom integration. Inspect declared secret presence, never values.
+- **Diagnosis:** `fyso_check` is the setup checklist; `fyso_doctor` checks the generated runtime; `fyso_observability` reads conversations, execution and usage. Read a failed Dagu step's log before diagnosing. Retry only transient failures. Distinguish reported API costs, subscription equivalents, estimates and unknowns.
+- **Versioning:** `fyso_snapshot` saves bots and memory through the versioned workflow. Bot apply/import and extension install can commit as part of their documented operations. Do not run unrelated commits, pushes, merges or deployments.
+
+## Terminal operations and verification
+
+From the generated project, `mise run status`, `mise run logs <dagu|omb|caddy>` and `mise run doctor` diagnose the stack. Starting/stopping (`mise run up/down`), editing encrypted secrets (`mise run secrets`) and removing extensions remain terminal operations for the person; the platform MCP does not expose them. Never ask for secret values, read decrypted secret files or put credentials in prompts, logs or tracked files. The panel shows presence only.
+
+Keep code, comments and docs in English. UI text uses i18next locales (Spanish default and English). Derive paths from the project/environment; never commit machine-specific paths. Run `mise run doctor` before declaring a generated runtime healthy. Report static checks, tests, runtime checks and unverified behavior separately. A queued run, preview or successful tool transport is not proof of delivery.
+
+For project-specific instructions read `AGENTS.md`, `README.md`, `project/` configuration and relevant installed extension documentation when file access is available. This guide is shipped locally so basic operation never depends on network access to the framework repository.
