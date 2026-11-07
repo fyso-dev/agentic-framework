@@ -107,6 +107,10 @@ run = "framework/scripts/agent-setup.sh"
 description = "Add this project's fyso MCP to Claude Desktop / Codex (default: desktop apps found); also claude-code"
 run = "node framework/scripts/agent-connect.cjs connect"
 
+[tasks."agent:open"]
+description = "Open Codex or Claude Desktop with a new conversation about this project (after agent:connect)"
+run = "node framework/scripts/agent-connect.cjs open"
+
 [tasks."agent:disconnect"]
 description = "Remove this project's fyso MCP from Claude Desktop / Codex / Claude Code"
 run = "node framework/scripts/agent-connect.cjs disconnect"

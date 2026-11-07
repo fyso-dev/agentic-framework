@@ -49,7 +49,10 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 mise run agent:connect                   # desktop apps found on this Mac (Claude Desktop, Codex)
 mise run agent:connect claude-code       # Claude Code CLI as well (opt-in)
 mise run agent:disconnect                # remove this project's entry
+mise run agent:open [codex|claude-desktop]   # new conversation about this project
 ```
+
+`agent:open` uses the apps' own deep links (read from their bundles): **`codex://threads/new?path=<project>&prompt=…`** opens a Codex thread in the project folder; **`claude://claude.ai/new?q=…`** opens a Claude Desktop chat, restarting Claude first when it runs, because it loads MCP servers only at start. The first message is typed in, not sent: it asks to use `fyso-<slug>` starting with `fyso_status`.
 
 | Target | How | Notes |
 |---|---|---|

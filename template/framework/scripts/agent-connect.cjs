@@ -2,6 +2,7 @@
 // so they can configure the project from anywhere, not only inside its folder.
 //
 //   node agent-connect.cjs [connect|disconnect] [claude-desktop] [codex] [claude-code] [--list]
+//   node agent-connect.cjs open [codex|claude-desktop]   (new conversation about this project)
 //
 // Without targets: the desktop apps found on this Mac (Claude Desktop; Codex, whose app and
 // CLI share ~/.codex/config.toml). Claude Code CLI is opt-in. The server is named
@@ -17,6 +18,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const HOME = process.env.HOME || os.homedir();
 const SLUG = process.env.FYSO_PROJECT || path.basename(ROOT);
 const NAME = `fyso-${SLUG}`;
+const OPEN = process.env.FYSO_OPEN || '/usr/bin/open';   // tests replace it
 const CLAUDE_DESKTOP = path.join(HOME, 'Library/Application Support/Claude/claude_desktop_config.json');
 
 function which(cmd) {
@@ -104,7 +106,40 @@ function write(file, data) {
   fs.renameSync(tmp, file);
 }
 
+// First message of a new conversation, typed in but not sent (the person sends it).
+function firstPrompt() {
+  const name = process.env.FYSO_PROJECT_NAME || SLUG;
+  return process.env.FYSO_LANG === 'en'
+    ? `Use the ${NAME} tools to look at my Fyso project "${name}": start with fyso_status and tell me what I have and what to set up first.`
+    : `Usá las herramientas de ${NAME} para revisar mi proyecto Fyso "${name}": empezá con fyso_status y contame qué tengo y qué conviene configurar primero.`;
+}
+// Deep links registered by the apps (read from their bundles): Codex opens a new thread in the
+// project folder with the prompt; Claude Desktop opens a new chat with it. Claude Desktop loads
+// MCP servers only at start, so a running instance is restarted first.
+function openAgent(id) {
+  const q = encodeURIComponent(firstPrompt());
+  if (id === 'codex') {
+    run(OPEN, [`codex://threads/new?path=${encodeURIComponent(ROOT)}&prompt=${q}`]);
+    return 'Codex: new conversation in this project';
+  }
+  if (id === 'claude-desktop') {
+    if (spawnSync('/usr/bin/pgrep', ['-x', 'Claude']).status === 0) {
+      spawnSync('/usr/bin/osascript', ['-e', 'tell application "Claude" to quit']);
+      for (let i = 0; i < 40 && spawnSync('/usr/bin/pgrep', ['-x', 'Claude']).status === 0; i++) spawnSync('/bin/sleep', ['0.25']);
+    }
+    run(OPEN, [`claude://claude.ai/new?q=${q}`]);
+    return 'Claude Desktop: new chat (restarted to load the server)';
+  }
+  throw Error(`cannot open ${id}: use codex or claude-desktop`);
+}
+
 function main(argv) {
+  if (argv[0] === 'open') {
+    const id = argv[1] || ['codex', 'claude-desktop'].find(t => TARGETS[t].found());
+    if (!id) throw Error('no desktop agent found');
+    console.log(`✓ ${openAgent(id)}`);
+    return 0;
+  }
   const action = ['connect', 'disconnect'].includes(argv[0]) ? argv.shift() : 'connect';
   if (argv.includes('--list')) {
     for (const [id, t] of Object.entries(TARGETS)) console.log(`${id}\t${t.found() ? 'found' : 'missing'}\t${t.desktop ? 'desktop' : 'cli'}\t${t.label}`);
@@ -125,4 +160,4 @@ function main(argv) {
 if (require.main === module) {
   try { process.exitCode = main(process.argv.slice(2)); } catch (e) { console.error(e.message); process.exitCode = 1; }
 }
-module.exports = {main, NAME, launcher};
+module.exports = {main, NAME, launcher, firstPrompt};

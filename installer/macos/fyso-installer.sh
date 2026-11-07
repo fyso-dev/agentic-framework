@@ -267,8 +267,21 @@ if [ -n "${picks// /}" ]; then
   connect_out=$("$MISE" -C "$DIR" run agent:connect $picks 2>&1); echo "$connect_out"
 fi
 [ "${FYSO_AUTO:-}" = 1 ] && { echo "done: http://panel.localhost:$PORT"; echo "connect: ${picks:-none}"; exit 0; }
-if [ -n "$connect_out" ]; then
-  "$DIALOG" "${STYLE[@]}" --title none --message "### Asistentes conectados\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" \
-    --button1text "Abrir panel" "${SIZE[@]}" --moveable
+# ---------------------------------------------------------------- 6. Open the assistant
+# Next step after connecting: open the desktop assistant with a new conversation about the
+# project (agent:open: Codex in the project folder; Claude Desktop restarted to load the server).
+open_panel() { open "http://panel.localhost:$PORT"; }
+case " $picks " in *" codex "*) primary=codex; plabel=Codex ;; *" claude-desktop "*) primary=claude-desktop; plabel=Claude ;; *) primary="" ;; esac
+if [ -n "$primary" ]; then
+  extra=(); case " $picks " in *" codex "*" claude-desktop "*|*" claude-desktop "*" codex "*) extra=(--infobuttontext "Abrir Claude") ;; esac
+  "$DIALOG" "${STYLE[@]}" --title none \
+    --message "### Listo para usar\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')\nAbrimos **$plabel** con una conversación nueva sobre **$NAME**, con un primer pedido escrito: enviálo y te muestra el estado del proyecto.\n\nEl panel sigue en http://panel.localhost:$PORT" \
+    --button1text "Abrir $plabel" --button2text "Abrir panel" "${extra[@]}" "${SIZE[@]}" --moveable
+  case $? in
+    0) "$MISE" -C "$DIR" run agent:open "$primary" ;;
+    3) "$MISE" -C "$DIR" run agent:open claude-desktop ;;
+    *) open_panel ;;
+  esac
+else
+  open_panel
 fi
-open "http://panel.localhost:$PORT"
