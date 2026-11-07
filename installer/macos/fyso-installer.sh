@@ -228,6 +228,36 @@ if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext="la qu
 elif login_ok "$ADMIN" admin; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"
 else pwtext="la que elegiste (no pudimos comprobarla)"; fi
 ui "message: ### ¡Listo!\\n\\nTu proyecto **$NAME** está corriendo.\\n\\n**Panel:** http://panel.localhost:$PORT\\n\\n**Usuario:** \`$ADMIN\` · **Contraseña:** $pwtext"
-ui "button1text: Abrir panel"; ui "button1: enable"
-if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; wait "$DIALOG_PID"; echo "done: http://panel.localhost:$PORT"; exit 0; fi
-wait "$DIALOG_PID" && open "http://panel.localhost:$PORT"
+ui "button1text: Continuar"; ui "button1: enable"
+if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; fi
+wait "$DIALOG_PID"
+
+# ---------------------------------------------------------------- 5. Connect agents (D36)
+# Offer the agents found on this Mac: desktop apps checked, Claude Code CLI as an option.
+# Uses the project's own `agent:connect` (templates without it skip this screen).
+connect_out=""
+if [ -f "$DIR/framework/scripts/agent-connect.cjs" ]; then
+  found=$("$MISE" -C "$DIR" exec -- node framework/scripts/agent-connect.cjs --list 2>/dev/null | awk -F'\t' '$2=="found"')
+  if [ -n "$found" ]; then
+    boxes=()
+    while IFS=$'\t' read -r id _ kind label; do
+      boxes+=(--checkbox "{\"label\":\"$label\",\"name\":\"$id\",\"checked\":$( [ "$kind" = desktop ] && echo true || echo false )}")
+    done <<< "$found"
+    if [ "${FYSO_AUTO:-}" = 1 ]; then picks=${FYSO_CONNECT:-}
+    else
+      out=$("$DIALOG" "${STYLE[@]}" --title none \
+        --message "### Conectá tu asistente\n\nAsí podés manejar **$NAME** desde Claude o Codex: crear bots, instalar extensiones, revisar el estado. Agregamos el servidor \`fyso-$SLUG\` a cada uno; las apps de escritorio lo cargan al reiniciarse." \
+        "${boxes[@]}" --button1text "Conectar y abrir panel" --button2text "Omitir" --width 620 --height 440 --moveable)
+      [ $? -eq 0 ] && picks=$(printf '%s\n' "$out" | sed -n 's/^"*\([a-z-]*\)"* : "*true"*$/\1/p' | tr '\n' ' ')
+    fi
+    if [ -n "${picks// /}" ]; then
+      connect_out=$("$MISE" -C "$DIR" run agent:connect $picks 2>&1); echo "$connect_out"
+    fi
+  fi
+fi
+[ "${FYSO_AUTO:-}" = 1 ] && { echo "done: http://panel.localhost:$PORT"; echo "connect: ${picks:-none}"; exit 0; }
+if [ -n "$connect_out" ]; then
+  "$DIALOG" "${STYLE[@]}" --title none --message "### Asistentes conectados\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" \
+    --button1text "Abrir panel" --width 560 --height 320 --moveable
+fi
+open "http://panel.localhost:$PORT"
