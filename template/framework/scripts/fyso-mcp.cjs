@@ -108,7 +108,14 @@ const TOOLS = {
     description: 'Collect bot conversations, workflow execution and AI consumption figures, as shown in the panel\'s Observability page.',
     inputSchema: obj(),
     annotations: {readOnlyHint: true},
-    run: async () => (await dagu().run('fyso-observability', {}, {output: 'SUMMARY', timeoutMs: 300000})).output,
+    // The workflow refreshes .data/panel/observability.json and only prints refresh metadata;
+    // return the collected data itself, as the panel reads it (GET /config/observability.json).
+    async run() {
+      const refresh = (await dagu().run('fyso-observability', {}, {output: 'SUMMARY', timeoutMs: 300000})).output;
+      const data = readJson(path.join(process.env.FYSO_DATA || '.data', 'panel', 'observability.json'));
+      if (!data) throw new Error('fyso-observability succeeded but .data/panel/observability.json is missing');
+      return {refresh, ...data};
+    },
   },
 };
 

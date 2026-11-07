@@ -1,7 +1,7 @@
 // The platform MCP server (D33) over stdio against a fake Dagu API.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const http=require('node:http'), path=require('node:path');
+const http=require('node:http'), path=require('node:path'), fs=require('node:fs'), os=require('node:os');
 const {spawn}=require('node:child_process');
 const server=path.resolve(__dirname,'../template/framework/scripts/fyso-mcp.cjs');
 
@@ -25,8 +25,8 @@ function fakeDagu(outputs) {
   return new Promise(r=>srv.listen(0,'127.0.0.1',()=>r({srv,calls,port:srv.address().port})));
 }
 
-function mcp(port) {
-  const child=spawn(process.execPath,[server],{env:{...process.env,FYSO_DAGU_PORT:String(port),FYSO_ADMIN_USER:'admin',FYSO_ADMIN_PASSWORD:'pw'}});
+function mcp(port,extra={}) {
+  const child=spawn(process.execPath,[server],{env:{...process.env,FYSO_DAGU_PORT:String(port),FYSO_ADMIN_USER:'admin',FYSO_ADMIN_PASSWORD:'pw',...extra}});
   let buf='',seq=0;const waiting=new Map();
   child.stdout.on('data',d=>{buf+=d;for(let i;(i=buf.indexOf('\n'))>=0;){const msg=JSON.parse(buf.slice(0,i));buf=buf.slice(i+1);waiting.get(msg.id)?.(msg);}});
   const call=(method,params)=>new Promise(r=>{const id=++seq;waiting.set(id,r);child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
@@ -79,4 +79,15 @@ test('workflow failures and bad arguments come back as tool errors, not crashes'
     assert.equal(calls.filter(x=>x.dag!=='fyso-snapshot').length,0);
     assert.equal((await c.call('tools/call',{name:'fyso_rm_rf',arguments:{}})).error.code,-32602);
   } finally {c.close();srv.close();}
+});
+
+test('observability returns the collected data the workflow writes, not only its refresh summary',async()=>{
+  const data=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mcp-'));
+  fs.mkdirSync(path.join(data,'panel'));
+  fs.writeFileSync(path.join(data,'panel/observability.json'),JSON.stringify({collectedAt:'t',usage:{totals:{turns:3}},traces:[{id:'x'}],runs:[],alerts:[]}));
+  const {srv,port}=await fakeDagu({'fyso-observability':{summary:JSON.stringify({collectedAt:'t',records:3})}});const c=mcp(port,{FYSO_DATA:data});
+  try {
+    const out=(await c.call('tools/call',{name:'fyso_observability',arguments:{}})).result.structuredContent;
+    assert.deepEqual(out.refresh,{collectedAt:'t',records:3});assert.equal(out.usage.totals.turns,3);assert.deepEqual(out.traces,[{id:'x'}]);
+  } finally {c.close();srv.close();fs.rmSync(data,{recursive:true,force:true});}
 });
