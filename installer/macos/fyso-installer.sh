@@ -16,7 +16,10 @@ SOURCE="${FYSO_SOURCE:-gh:fyso-dev/agentic-framework}"   # overridable for tests
 REF="${FYSO_REF:-main}"
 DAGU_TOOL="aqua:dagucloud/dagu@2.24.0"
 GH_TOOL="aqua:cli/cli@2.95.0"
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# Apps start with a minimal PATH: take the person's login-shell PATH (Homebrew, npm, where
+# claude/codex/mise live) instead of guessing install prefixes.
+login_path=$("${SHELL:-/bin/zsh}" -lc 'printf %s "$PATH"' 2>/dev/null)
+export PATH="$HOME/.local/bin:${login_path:-/usr/bin:/bin:/usr/sbin:/sbin}"
 export MISE_YES=1
 # The panel's look (framework/panel/src/styles.css, dark theme): its top bar as banner,
 # --bg as background, white bold title, --mute message text.
