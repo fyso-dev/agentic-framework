@@ -1,0 +1,4 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-example-pages.yml
+_templates_suffix: .jinja
+_exclude: [copier.yml, .git]

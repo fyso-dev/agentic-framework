@@ -10,14 +10,17 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     assetsInlineLimit: 0,
+    cssCodeSplit: false,
     chunkSizeWarningLimit: 500,
     // No content hash: `dist/` is committed, so each build overwrites the same
     // files instead of adding/removing them. Caddy serves them with no-cache.
     rollupOptions: {
+      preserveEntrySignatures: "strict",
+      input: {index:new URL("./index.html",import.meta.url).pathname,"extension-sdk":new URL("./src/extension-sdk.tsx",import.meta.url).pathname},
       output: {
         entryFileNames: "assets/[name].js",
         chunkFileNames: "assets/[name].js",
-        assetFileNames: "assets/[name][extname]",
+        assetFileNames: asset => asset.names.some(name=>name.endsWith(".css")) ? "assets/panel.css" : "assets/[name][extname]",
       },
     },
   },

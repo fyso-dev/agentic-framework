@@ -30,7 +30,10 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Tools, env, tasks | `.config/mise/conf.d/ext-<ext>.toml` | mise (verified on 2026.11.2: env and tasks load; the file needs `mise trust`) |
 | Processes | `extensions/<ext>/process.yaml` | process-compose: `up.sh` passes one extra `-f` per file (verified: merge works and `depends_on` crosses files) |
 | Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid) |
+| Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
+| Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
+| Connection hook (optional) | `extensions/<ext>/connect.sh` | Runs through `run-ext.sh` after install when running, and on `up` once services are ready; missing secrets defer it. Must be idempotent and preserve unrelated project state |
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
@@ -98,6 +101,7 @@ type Extension = {
   mcpServers: string[]        // server names from its mcp.json
   workflows: string[]         // names of project/workflows/ext-<ext>-*.yaml, without .yaml
   skills: string[]            // folder names under skills/
+  pages: {id: string; name: string; name_i18n?: Record<string,string>; icon?: string; url: string}[]
 }
 ```
 
@@ -173,3 +177,33 @@ The panel takes `installed`/`version`/`update` from `extensions.json` (always cu
 - Then `mise install`, and when the stack runs: `process-compose project update` with every fragment and a Caddy restart (`run-caddy.sh` reads extension ports fresh from mise). The panel tolerates the short gateway restart.
 
 Output: `{ id, mode, version: string | null, commit: string }`.
+
+## 9. Extension-owned tabs and pages
+
+An installed extension may contribute **zero, one or multiple pages**. The framework is a generic host; extension business screens, translations and assets are never imported by the host SPA.
+
+| Slot | Native consumer |
+|---|---|
+| `extensions/<ext>/pages/<page>.yaml` | `extensions.cjs inventory` → `/config/extensions.json` → generic navigation/router |
+| `extensions/<ext>/panel/**` | Caddy's authenticated, read-only static file server, only within the public panel directory |
+
+A declaration reuses app metadata's localized `name`, `icon` and `url` fields:
+
+```yaml
+# extensions/example/pages/overview.yaml
+name: {es: Mi página, en: My page}
+icon: apps
+url: /extensions/example/panel/index.html
+```
+
+The file stem is its page ID and follows the extension ID naming rule. The entry must be an existing `.html` file strictly below the same extension's `panel/` directory. Invalid paths, private slots and missing entries fail configuration generation. Labels may be strings or language maps. The extension inventory adds `pages: {id, name, name_i18n?, icon?, url}[]`; old inventories without this property contribute no pages.
+
+The host derives navigation entries from installed registrations and serves `#/extensions/<ext>/<page>`. It embeds the declared page with a standard same-origin iframe, passing `lang`, `theme` and `page` query parameters. Multiple extensions/pages require no core changes. Removing the extension removes its entries on the next configuration reload. Opening an uninstalled page displays a generic unavailable state. Caddy permits GET/HEAD on public page assets; other extension paths return 404. No new backend or plugin evaluator is involved.
+
+### Optional panel SDK v1
+
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `1`.
+
+The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `useDaguAction`, `ActionButton`, `ActionStatus`, `External` and `RelTime`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. Biz provides a working consumer; the extension starter provides a plain HTML example.
+
+This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.

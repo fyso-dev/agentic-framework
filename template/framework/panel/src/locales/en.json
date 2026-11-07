@@ -389,5 +389,9 @@
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Tags"
+  },
+  "extensionPage": {
+    "missing": "This extension page is not installed.",
+    "loading": "Loading page…"
   }
 }

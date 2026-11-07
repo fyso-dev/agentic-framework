@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D38; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D40; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -48,9 +48,16 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
 | Conversational Bot Architect: native CRUD, snapshots and target protection | [bot-architect.md](bot-architect.md) |
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
+| Skills ecosystem: external foundations, optional packs and deferred evaluation gates (proposal; no adoption decision) | [skills-ecosystem-evaluation.md](skills-ecosystem-evaluation.md) |
+| Simple user capabilities: ready-to-use assistants, reusable tools and skills, user experience and recommended first delivery (product proposal) | [simple-user-capabilities-proposal.md](simple-user-capabilities-proposal.md) |
+| Business and professional needs: 18 use-case scenarios, research, fit and task-first recommendations | [business-professional-use-cases.md](business-professional-use-cases.md) |
+| Simple Experience Reviewer: reusable Markdown agent role for beginner-focused ideas and practical UX review | [agents/simple-experience-reviewer.md](agents/simple-experience-reviewer.md) |
+| Simple experience validation: independent persona walkthroughs, friction and recommendations (documentation review only) | [simple-experience-validation.md](simple-experience-validation.md) |
+| Simple user capabilities: historical EGM round 1 review (target subsequently rewritten; review workflow ended) | [goldfish_review_report.md](goldfish_review_report.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
-| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace (D30, D31) | [extensions-contract.md](extensions-contract.md) |
+| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D40) | [extensions-contract.md](extensions-contract.md) |
+| Fyso Biz: installable extension, extension-owned business page, scoped KPIs/OKRs and objective levers (D39) | [fyso-biz.md](fyso-biz.md) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
@@ -69,7 +76,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
-| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
+| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz integration verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -81,6 +88,13 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 | Date | Entry |
 |---|---|
+| 2026-11-07 | A fresh subagent used the Simple Experience Reviewer and returned a [scenario review](simple-experience-validation.md): prioritize four work tasks, preserve inputs, identify usable outputs and recover without restarting. Incorporated clarifications into the proposal; no user sessions or runtime tests were performed. |
+| 2026-11-07 | Researched [18 everyday business/professional scenarios](business-professional-use-cases.md) and created the [Simple Experience Reviewer](agents/simple-experience-reviewer.md). Proposed first entries now focus on proposals, comparisons, replies and notes; runtime compatibility and observed usability remain unverified. |
+| 2026-11-07 | Made ease of use the central criterion of the [capabilities proposal](simple-user-capabilities-proposal.md): task-first entry, prepared defaults, contextual handoff, clear results and actionable recovery. These are experience requirements, not delivered behavior. |
+| 2026-11-07 | Rewrote the [capabilities proposal](simple-user-capabilities-proposal.md) around concrete user tasks, reusable software and a document-work starting point. The user redirected the earlier review away from controls and pilot planning; its report remains historical. |
+| 2026-11-07 | [EGM review round 1](goldfish_review_report.md) completed with two fresh-context reviewers: 3 Major findings and 1 Nit concerning effective authority, workload limits, resource cost and the intermediate pilot gate. Proposed repairs await a resolution decision; no convergence or runtime validation claimed. |
+| 2026-11-07 | Consolidated the [simple user capabilities proposal](simple-user-capabilities-proposal.md): beginner tasks, native reuse, skill sources, optional tools, research, pilot gates and Elephant Goldfish review configuration. No implementation or Goldfish review has run. |
+| 2026-11-07 | Saved a [skills ecosystem evaluation proposal](skills-ecosystem-evaluation.md): Superpowers, Anthropic Skills, Vercel Agent Skills, skills.sh and the Agent Skills specification. Documentation review only; adoption, packaging and runtime compatibility remain pending. |
 | 2026-11-05 | [Phase 0 harness spike](adr/spikes/harness.md): **yes** — Dagu v2.22.4 `harness.run` ran Claude Code and Codex on the subscription logins (no API key) inside throwaway worktrees and returned the result as outputs and artifacts. Caveats for `dev-task`: a denied permission still exits 0 (add a diff gate); the user's CLI config applies (pin the Codex approval policy); stdout is not live; step `working_dir` does not resolve `${steps.*}`. Phase 0 remains open |
 | 2026-11-05 | [Phase 0 tooling spike](adr/spikes/tooling.md): exact mise pins with explicit sandbox verification failures/fallbacks; SOPS and fnox age round trips; Dagu Git Sync API edit → commit/push verified against a local bare repo (local-URL clone limitation). Phase 0 remains open |
 | 2026-11-05 | [Gateway Phase 0 spike](adr/spikes/gateway.md): cwd Claude MCP works with none/basic auth; Dagu proxy login requires an SSO license and does not authenticate REST/MCP headers; OMB needs pairing, supports proxied SSE, denies framing; panel no-backend flow passes with none/basic auth |
@@ -124,3 +138,6 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Menu bar app (D34).** A SwiftBar plugin instead of a native app: `framework/tray/fyso.10s.py` finds running stacks by their process-compose sockets, reads states over the socket and the project from the socket owner's cwd; `mise run tray:install` links it into SwiftBar. Tests use a fake process-compose on a Unix socket (healthy, degraded, stale, none). Finding: SwiftBar runs plugins with a minimal PATH, so the plugin takes `mise` from the PATH of the running process-compose (started by `mise run up`) instead of hard-coding install locations. Start/restart from the menu (stopped projects come from a cache of projects seen running) run mise with that same PATH, so bots started from the menu still find `claude`/`codex` |
 | 2026-11-07 | PR #11 corrections: installer ES/EN resources include workflow titles; repeated names get distinct project/MCP identifiers. Startup model repair sends only live model changes and preserves native/snapshot fields and deleted bots. Regression checks use isolated fixtures; live installer acceptance remains separate. |
 | 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
+| 2026-11-07 | **Fyso Biz integration (D39), verified locally.** Bundled Copier source and panel tab; live MCP discovery found 70 tools including native objective vision and palancas. Real tab install/reinstall, authenticated doctor and browser smoke verified departments, KPIs, objectives and palancas with the supplied test token; Biz Partner is provisioned idempotently through native Bot Architect; multi-user isolation requires the optional second token. [Contract](fyso-biz.md) · [evidence](../artifacts/delivery-evidence/fyso-biz/README.md). |
+
+| 2026-11-07 | **Generic extension pages (D40).** Native page registrations and static assets add tabs/pages without core-specific screens. Biz source/locales moved into its own compiled page; an independent plain HTML extension exercises two additional pages. [Contract](extensions-contract.md#9-extension-owned-tabs-and-pages). |

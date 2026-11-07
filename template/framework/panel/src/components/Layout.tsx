@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LANGS, setLanguage } from "../lib/i18n";
+import type { Extension } from "../api/types";
+import { localized } from "../lib/i18n";
 import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
@@ -134,7 +136,7 @@ export function TopBar(props: ThemeProps) {
   );
 }
 
-type NavItem = { id: "setup" | "bots" | "apps" | "observability"; href: string; icon: typeof IconBot };
+type NavItem = { id:string; href:string; icon:typeof IconBot; label?:string };
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
@@ -142,11 +144,13 @@ const ITEMS: NavItem[] = [
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
-const section = (r: Route) => (r.name === "bot" ? "bots" : r.name);
+const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:page.icon === "workflow" ? IconWorkflow : IconApps})));
+const section = (r: Route) => r.name === "extension" ? `extension:${r.extensionId}:${r.pageId}` : r.name === "bot" ? "bots" : r.name;
 
 export function SideNav({ route }: { route: Route }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const s = useStore();
+  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
   const down = downApps(s);
@@ -167,10 +171,10 @@ export function SideNav({ route }: { route: Route }) {
   };
   return (
     <nav aria-label={t("nav.label")} className="sidenav">
-      {ITEMS.map(({ id, href: h, icon: Icon }) => (
+      {items.map(({ id, href: h, icon: Icon, label }) => (
         <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
           <Icon />
-          <span className="grow">{t(`nav.${id}`)}</span>
+          <span className="grow">{label ?? t(`nav.${id}`)}</span>
           {counts[id]}
         </a>
       ))}
@@ -179,8 +183,9 @@ export function SideNav({ route }: { route: Route }) {
 }
 
 export function BottomNav({ route }: { route: Route }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const s = useStore();
+  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const badges: Record<NavItem["id"], [number, string]> = {
     observability: [0, "badge"],
@@ -189,16 +194,16 @@ export function BottomNav({ route }: { route: Route }) {
     apps: [downApps(s), "badge"],
   };
   return (
-    <nav aria-label={t("nav.label")} className="bottomnav">
-      {ITEMS.map(({ id, href: h, icon: Icon }) => {
-        const [n, cls] = badges[id];
+    <nav aria-label={t("nav.label")} className="bottomnav" style={{gridTemplateColumns:`repeat(${items.length}, minmax(0, 1fr))`}}>
+      {items.map(({ id, href: h, icon: Icon, label }) => {
+        const [n, cls] = badges[id] ?? [0,"badge"];
         return (
           <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
             <span className="badge-wrap">
               <Icon size={22} />
               {n > 0 && <span className={cls} aria-hidden="true">{n}</span>}
             </span>
-            {t(`nav.${id}`)}
+            {label ?? t(`nav.${id}`)}
             {n > 0 && <span className="sr-only"> ({n})</span>}
           </a>
         );
