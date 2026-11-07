@@ -1,6 +1,6 @@
-# Installer app (macOS first) — D35
+# Installer app — D35, D38
 
-An end-user installer: a disk image with **Fyso Installer.app** to drag to Applications. Opening it shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". Windows and Linux come later; see the end.
+The current macOS prototype provides an end-user installer: a disk image with **Fyso Installer.app** to drag to Applications. Opening it shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". The selected Linux direction and proposed Windows architecture are documented below; neither has completed acceptance testing.
 
 ## Pieces (reused, not built)
 
@@ -43,4 +43,84 @@ UI copy and workflow step titles are bundled from `installer/macos/locales/{es,e
 - **Signing and notarization.** The app is not signed yet. A downloaded copy needs right-click → Open until it is signed with a Developer ID and notarized (`codesign`, `notarytool`). Signing must keep swiftDialog's own signature intact (no `--deep` re-sign).
 - **macOS 13–14.** swiftDialog 3.x needs macOS 15; the 2.5 line supports older systems.
 - **Private template.** The GitHub step disappears if `fyso-dev/agentic-framework` becomes public.
-- **Windows and Linux.** Linux can reuse the same workflow with a terminal or GTK front end; Windows needs WSL2 because the framework scripts are bash.
+- **Linux and Windows delivery.** Follow D38 below. The Linux Zenity experiment was exploratory and has been archived outside the checkout; it is not the selected delivery or proof that Qt installation works.
+
+
+## Cross-platform installer direction — D38
+
+**Decision:** use **Qt Installer Framework** for the Linux graphical installer, reusing
+its wizard, directory selection, progress, error handling and packaging. Keep custom
+code limited to configuration and small adapters to the existing Dagu workflow.
+Zenity was explored but is not the selected approach: individual dialogs still require
+us to implement the wizard lifecycle ourselves.
+
+Qt Installer Framework supports Linux, Windows and macOS. That tool support does not
+establish Fyso runtime compatibility. The existing swiftDialog macOS installer remains
+the verified prototype; replacing it with Qt is a separate future migration.
+
+| Platform | Installer UI | Fyso runtime | Delivery status |
+|---|---|---|---|
+| macOS | Existing swiftDialog app; Qt is a future unification option | Native tools managed by mise | Existing prototype verified as described above; no Qt migration verified |
+| Linux | Qt Installer Framework native graphical wizard | Native Linux tools managed by mise; shared Dagu installation workflow | Approach selected; Qt package, graphical flow and end-to-end installation pending |
+| Windows | Proposed native Qt Installer Framework `.exe` | Shared Linux installation inside WSL2, initially targeting Ubuntu | Architecture proposal; implementation and Windows acceptance pending |
+
+### Shared installation contract
+
+- Qt owns the installer wizard and packaging. Dagu owns dependency installation,
+  project generation, encrypted-secret setup and stack startup. Tool versions remain
+  pinned; no separate installation engine or package manager is introduced.
+- Reuse Copier for project generation and updates. Qt maintenance/uninstallation must
+  not overwrite or recursively remove generated project configuration, state, memory,
+  repositories or age keys. Define those boundaries before enabling maintenance actions.
+- Preserve project isolation: a unique slug and MCP registration, free port blocks,
+  project-local data directories and explicitly targeted OpenMausBot commands.
+- Passwords must not enter process arguments, Dagu parameters, installer metadata or
+  logs. Keep the existing private-file handoff and remove temporary secret files.
+- UI copy must use ES/EN resources with Spanish as the fallback.
+- A failed step must be visible and retain a usable technical log. Cancellation must
+  stop installer-owned work; it must not terminate unrelated projects or erase data.
+- Call installation verified only after the generated project's `mise run doctor`
+  passes and the authenticated panel, Dagu and OpenMausBot routes work. Report missing
+  coding-engine authentication separately; a test stub is not subscription-login proof.
+
+### Windows flow (proposed)
+
+1. Run a native Qt wizard and detect WSL2 and the intended Linux distribution.
+2. When WSL is missing, explain the prerequisite and guide its installation using
+   Microsoft's supported mechanism. Enabling it can require administrator rights and
+   a restart. Resume only after confirming the Linux environment is ready.
+3. Run the shared installation inside the selected distribution. Keep project files,
+   tools, encrypted secrets and keys in its Linux filesystem. Coding-engine CLIs and
+   logins must be available there; Windows-side installations do not prove this.
+4. Verify services inside WSL and browser access from Windows. Validate hostname
+   resolution and port forwarding rather than assuming `*.localhost` behaves identically
+   on every host.
+5. Test desktop-agent integration across the Windows/WSL boundary separately: executable
+   paths and MCP launch commands differ from native Linux and macOS.
+
+Native Windows execution of the current Bash scripts is not part of this proposal.
+WSL detection, restart/resume behavior, paths containing spaces, networking, login,
+repeated installations, cancellation and safe cleanup all require Windows-specific tests.
+
+### Next verification gates
+
+1. Pin a Qt Installer Framework release and validate its build toolchain and generated
+   binaries on each target architecture. Framework availability alone is not a build.
+2. Build and run the Linux wizard with the real shared Dagu workflow in an isolated
+   Linux environment; check success, dependency failure, cancellation, ES/EN, credentials
+   and repeated installations. Require doctor and authenticated route evidence.
+3. Implement the Windows adapter only after defining WSL distribution selection and
+   project/installer ownership. Test both an existing WSL installation and first-time
+   setup with restart on a Windows host.
+4. Record platform-specific evidence before changing any delivery status to verified.
+
+### Upstream references
+
+- [Qt Installer Framework overview](https://doc.qt.io/qtinstallerframework/ifw-overview.html):
+  supported desktop platforms and built-in installation pages.
+- [Qt installer creation](https://doc.qt.io/qtinstallerframework/ifw-creating-installers.html):
+  native configuration and package layout.
+- [Qt installer operations](https://doc.qt.io/qtinstallerframework/operations.html):
+  command execution and installation/uninstallation behavior.
+- [Microsoft: Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install):
+  prerequisites and the supported WSL setup process.
