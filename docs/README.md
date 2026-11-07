@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D35; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D36; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -117,3 +117,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Agent surface (D33, [contract](agent-surface.md)).** Own MCP server `fyso` (stdio, no dependencies) with typed tools over the panel workflows; Dagu's MCP and skill for coding agents (`DAGU_MCP_AUTH` derived by mise, `mise run agent:setup`). Verified on Test 1: status, bots list, extension search, bot plan (preview), doctor; Dagu MCP 200; Claude Code lists both servers. Finding: until now a coding agent opened in a project could not use the Dagu MCP because `DAGU_MCP_AUTH` only existed inside OpenMausBot |
 | 2026-11-06 | Optional engines (D32): Copier `engine` question picks Claude or Codex for every bot, the Builder and `fyso-dev-task`; doctor requires only engines a declared bot uses, and at least one. Verified by generating both variants (rendered models, Builder default, `dev-task` default, doctor login section on a Claude-only host); Node 19/Python 28 (13 skipped) passed. Prompted by Etendo Next, whose host has no Codex login. |
 | 2026-11-06 | **macOS installer prototype (D35, [installer.md](installer.md)).** `Fyso Installer.app` + `.dmg` (21 MB): swiftDialog window, pinned mise bootstrap, Dagu CLI running a workflow generated from the template's tools. Verified end to end from `main` (15 steps, stack up, panel 200) and with a forced failure (plain message, dependants marked not run). Findings: Dagu step ids allow only `_`; `dagu start` exposes per-step state in `status.jsonl`, so no server is needed; swiftDialog 3.x needs macOS 15. Open: Developer ID signing/notarization |
+| 2026-11-06 | **Connect desktop agents (D36).** `mise run agent:connect` adds `fyso-<slug>` to Claude Desktop (JSON merge) and Codex app + CLI (`codex mcp add`), Claude Code CLI optional; the installer ends with a "connect your assistant" screen. Finding: Codex already had a server named `fyso` (Fyso cloud), hence the per-project name; the server started from `/` with a minimal PATH (as desktop apps do) answers `fyso_status` |

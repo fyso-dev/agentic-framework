@@ -22,7 +22,7 @@ The app itself is a folder with an `Info.plist` and a bash script (`fyso-install
 2. **Window** with every item, then: Apple Command Line Tools (`xcode-select --install` when missing, waits for Apple's installer), mise, Dagu, GitHub account.
 3. **Workflow**: the script starts `dagu start` and maps each step's state from the run's `status.jsonl` (4 ok, 1 running, 2 failed, 3 not run) to the window. Parameters reach steps as environment variables.
 4. **Engine session**: checks `claude auth status` / `codex login status`; a missing session is shown as pending, not as a failure.
-5. **Done**: "Abrir panel" opens `http://panel.localhost:<port>`. A failure names the step in plain words and opens the log (`~/Library/Application Support/Fyso/installer/installer.log`) when the window closes.
+5. **Done** shows the panel URL and the login that really works (checked against the panel). **Continuar** leads to **Conectá tu asistente**: the agents found on the Mac as checkboxes (Claude Desktop and Codex checked, Claude Code CLI as an option), applied with the project's `mise run agent:connect` (D36); then the panel opens. A failure names the step in plain words and opens the log (`~/Library/Application Support/Fyso/installer/installer.log`) when the window closes.
 
 The project's own stack keeps running after the installer's Dagu exits (verified).
 
