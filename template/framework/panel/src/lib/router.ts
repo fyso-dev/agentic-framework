@@ -5,12 +5,14 @@ export type Route =
   | { name: "setup" }
   | { name: "bots"; review?: boolean }
   | { name: "bot"; index: number | null }
+  | { name: "extension"; extensionId:string; pageId:string }
   | { name: "apps" }
   | { name: "observability" };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "observability") return { name: "observability" };
+  if (parts[0] === "extensions" && parts[1] && parts[2]) return {name:"extension",extensionId:parts[1],pageId:parts[2]};
   if (parts[0] === "apps") return { name: "apps" };
   if (parts[0] === "bots") {
     if (parts[1] === "review") return { name: "bots", review: true };
@@ -27,6 +29,7 @@ export const href = {
   review: "#/bots/review",
   newBot: "#/bots/new",
   bot: (index: number) => `#/bots/${index}`,
+  extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,
   apps: "#/apps",
   observability: "#/observability",
 };

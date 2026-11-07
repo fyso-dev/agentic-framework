@@ -12,6 +12,7 @@ refresh() {
   # Re-enter mise so newly installed extension variables reach panel generation.
   mise exec -- node framework/scripts/mcp-config.cjs
   mise exec -- node framework/scripts/panel-data.cjs config
+  if stack_running; then mise exec -- framework/scripts/connect-extensions.sh; fi
 }
 case "$action" in
   add)
