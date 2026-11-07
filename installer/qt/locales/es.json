@@ -3,7 +3,7 @@
   "unattended": "Instalar sin ventanas con los argumentos indicados",
   "default_name": "Mi proyecto",
   "folder": "Carpeta de proyectos",
-  "form": "Nuevo proyecto Fyso. Dejá los campos vacíos para usar: Mi proyecto, admin / admin, Claude Code y el primer puerto libre. El motor elegido debe estar instalado y con sesión iniciada.",
+  "form": "Nuevo proyecto Fyso. Elegí una contraseña de 12–72 bytes para el usuario local. Los demás campos usan Mi proyecto, admin, Claude Code y el primer puerto libre. El motor elegido debe estar instalado y con sesión iniciada.",
   "name": "Nombre del proyecto",
   "admin": "Usuario del panel",
   "password": "Contraseña del panel",

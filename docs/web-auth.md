@@ -1,0 +1,168 @@
+# Local users and shared web sessions
+
+## Contract
+
+The framework uses unmodified **Tinyauth 5.2.0** behind Caddy's native
+`forward_auth`. Human users log in once on `auth.<project>-<port>.localhost`;
+the panel, Dagu, OMB and explicitly authorized applications share that session.
+There is no browser HTTP Basic challenge. Unknown applications and users without
+an explicit application allowlist entry are denied.
+
+The login service is project-local, including its SQLite session database,
+ports, cookie domain and runtime files. Different projects do not share identities
+or sessions automatically. The domain includes the port block because browser
+cookies are not isolated by port. Historical `panel.localhost`, `dagu.localhost`
+and `omb.localhost` links redirect to the canonical project domain.
+
+This implementation supports **local loopback HTTP only**. Startup rejects a
+non-loopback `FYSO_BIND`. Remote HTTPS, Secure cookies, domain/certificate ownership
+and trusted remote proxies require Phase 6 acceptance before exposing it remotely.
+Do not bypass that gate by editing the generated runtime file.
+
+## User-visible flow
+
+1. Open the panel. Caddy redirects a browser without a session to the native login
+   screen. API and configuration requests receive 401/403 rather than login HTML.
+2. Enter a local username and password. Tinyauth owns password verification,
+   retry protection and the opaque HttpOnly, SameSite=Lax cookie.
+3. Navigate between authorized applications without another login. The panel
+   displays the authenticated identity and offers **Sign out** (ES/EN).
+4. Sign out from the panel. The native authority deletes the server-side session;
+   replaying the previous cookie fails on every site. Open native application tabs
+   can retain rendered content, but subsequent requests require authentication.
+   Existing long-lived upstream connections are not forcibly terminated by this
+   gateway session change; reconnects require authentication. Immediate stream
+   revocation is not part of the verified contract.
+5. The panel checks its identity on focus and periodically. A changed identity
+   reloads the page instead of retaining the previous user's in-memory state.
+
+Sessions expire after one hour with an eight-hour maximum lifetime in the generated
+native configuration. Five failed attempts lock an account for five minutes.
+TOTP is available natively but is not automatically provisioned or required.
+
+## Configuration and ownership
+
+| File / variable | Owner and purpose |
+|---|---|
+| `project/auth/tinyauth.yaml` | Project-owned native configuration: application ACLs, lifetime, future OAuth/LDAP configuration |
+| `secrets.enc.yaml` → `FYSO_AUTH_USERS` | SOPS-encrypted native `username:bcrypt` entries, comma-separated; optional native TOTP suffix |
+| `FYSO_ADMIN_PASSWORD` | Legacy variable name for Dagu's technical credential; newly generated projects use a random value |
+| `FYSO_AUTH_PORT` | Last port of the core block, `port_base+9`; listener binds to loopback |
+| `.data/web-auth/runtime/` | Private, ignored generated config, session database and native runtime state |
+| `.data/web-auth/bin/` | Rebuildable native binary; no machine-global auth service |
+
+`mise run setup` creates the first human login with a hidden password prompt
+(12–72 bytes), or the installer's private `FYSO_INITIAL_PASSWORD_FILE`. It never
+falls back to `admin/admin`. Initial human passwords and Dagu's new random
+technical password are separate. Existing projects retain their technical
+credential until it is explicitly rotated.
+
+Manage local users while this project's stack is stopped:
+
+```sh
+mise run web-auth:users add alice
+mise run web-auth:users remove alice
+```
+
+`add` also changes an existing user's password. Changes preserve unrelated
+encrypted secrets and invalidate **all** existing web sessions. The bootstrap
+administrator and last local account cannot be removed through this helper.
+Permissions are explicit and separate from account creation. Native Tinyauth
+`users.allow` is a comma-separated **string**, for example:
+
+```yaml
+auth:
+  acls:
+    policy: deny
+apps:
+  panel:
+    users:
+      allow: "admin,alice"
+  omb:
+    users:
+      allow: "admin"
+```
+
+Grant panel or Dagu access only to trusted project operators. Those applications
+can execute privileged project workflows; the gateway does not turn them into
+read-only or tenant-isolated applications.
+
+## Existing-project migration
+
+Stop the project before updating the template and initializing local users. New
+project-owned auth files are created once; later Copier updates preserve them.
+Existing project/extension Caddyfiles and app links must move from `*.localhost`
+to the canonical `*.<slug>-<port>.localhost` domain, and receive explicit native
+ACLs. Those project-owned routes are not overwritten automatically. Only the
+three built-in historical URLs have redirects. Back up the encrypted secrets and
+age key before migration; the old shared password is not imported as a human user.
+
+## Future identity providers
+
+Applications depend only on the existing `fyso_login` snippet and trusted
+`Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` headers. Caddy
+removes browser-supplied identity headers and Authorization before consulting
+the authority. It strips the shared web-session cookie before proxying to an
+application. The only cookie-retention exception matches both the canonical panel
+host and its authority-backed `/api/session` or `/api/session/logout` handler.
+The same paths on Dagu, OMB or an extension still strip the web-session cookie.
+Native app cookies remain intact.
+
+Future OAuth/LDAP providers use Tinyauth's native YAML fields, not a new framework
+provider schema. Secret fields can reference `${FYSO_AUTH_<NAME>}` variables from
+the existing encrypted secrets file. Small startup glue resolves only that prefix
+and writes the native configuration with private permissions. Tinyauth 5.2.0
+selects the first applicable configuration loader, so YAML and environment values
+must not be assumed to merge. Unknown/missing referenced secrets fail startup.
+
+Enabling an external provider must also add its explicit app allowlists, validate
+stable subject/account mapping, callback redirects, logout and group permissions.
+Provider availability is not evidence that those integrations have been tested.
+
+## Native application identity limits
+
+Dagu remains in Basic mode on loopback and receives its **technical** credential
+from Caddy after human authentication. Its licensed trusted-header SSO is not
+enabled. OMB receives its existing native gateway bearer, held server-side.
+Neither credential is sent to the browser or replaced with a user's password.
+
+The shared identity therefore authenticates and authorizes **gateway access**.
+It does not create separate native Dagu/OMB users, enforce per-user bot histories,
+or provide native per-user audit attribution. Passing trusted identity headers
+does not imply these products consume them. Real per-user application isolation
+requires supported upstream identity integration and separate acceptance.
+
+## Native installation and verification
+
+`mise run web-auth:install` builds the unmodified pinned source archive after
+checking its SHA-256. Go and pnpm are pinned in `mise.toml`; frontend and Go
+dependencies use the upstream lockfiles. No Docker, custom auth server or Caddy
+plugin is added. `mise run up` ensures that build exists before starting services.
+
+`mise run doctor` checks the native authority and verifies unauthenticated page/API
+boundaries, including rejection of technical Basic credentials at the browser
+gateway. It does not invent a browser session from a password hash; authenticated
+browser checks are separate evidence.
+
+Regression entry point:
+
+```sh
+FYSO_TEST_TINYAUTH=<explicit-native-binary> \
+FYSO_TEST_CADDY=<explicit-caddy-binary> \
+python3 -m unittest discover -s tests -p test_web_auth_http.py -v
+```
+
+The suite starts isolated real Caddy/Tinyauth processes and echo upstream fixtures.
+It verifies one-session routing, rejected forged identities, technical credential
+replacement, cookie stripping, app ACLs, retry protection, logout replay denial,
+cross-origin requests and authority failure. Real Dagu/OMB and browser evidence
+are reported separately in the [delivery evidence](../artifacts/delivery-evidence/web-auth/README.md).
+
+## Sources
+
+- [Tinyauth pinned source](https://github.com/tinyauthapp/tinyauth/tree/v5.2.0)
+- [Native configuration](https://tinyauth.app/docs/reference/configuration/)
+- [Access controls](https://tinyauth.app/docs/guides/access-controls/)
+- [Future OAuth providers](https://tinyauth.app/docs/guides/other-oauth-providers/)
+- [Caddy forward authentication](https://caddyserver.com/docs/caddyfile/directives/forward_auth)
+- [Existing Dagu/OMB identity findings](adr/spikes/gateway.md)

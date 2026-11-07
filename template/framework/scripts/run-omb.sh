@@ -17,6 +17,6 @@ clean_exec \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" \
   DAGU_MCP_AUTH="Basic $(printf '%s:%s' "$FYSO_ADMIN_USER" "$FYSO_ADMIN_PASSWORD" | base64 | tr -d '\n')" \
   OMB_WEBHOOK_PORT="$FYSO_OMB_WEBHOOK_PORT" \
-  OMB_PUBLIC_URL="http://omb.localhost:$FYSO_HTTP_PORT" \
+  OMB_PUBLIC_URL="http://omb.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT" \
   npm_config_cache="$FYSO_DATA/npm-cache" \
   openmausbot serve --port "$FYSO_OMB_PORT" --data-dir "$FYSO_DATA/omb" --no-pair --no-open

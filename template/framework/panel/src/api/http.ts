@@ -14,6 +14,7 @@ export class HttpError extends Error {
 
 async function request(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, { credentials: "same-origin", cache: "no-store", ...init });
+  if (res.status === 401) window.dispatchEvent(new Event("fyso-session-expired"));
   if (!res.ok) throw new HttpError(res.status, url, await res.text().catch(() => ""));
   return res;
 }

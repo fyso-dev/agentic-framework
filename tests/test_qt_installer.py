@@ -96,6 +96,14 @@ if 'doctor' in args and os.environ.get('FAIL_STEP')=='doctor':sys.exit(1)
         with patch.dict(os.environ,self.env,clear=True),patch.object(installer,'RES',self.root/'assets'):
             installer.install(dict(self.request))
 
+    def test_local_password_is_required_and_validated_before_installation(self):
+        for password in ['', 'short', 'a' * 73]:
+            with self.subTest(length=len(password)):
+                self.request['password'] = password
+                with self.assertRaises(ValueError):
+                    self.run_install()
+                self.assertFalse((self.root/'commands').exists())
+
     def test_secret_is_private_ephemeral_and_never_a_dagu_parameter(self):
         self.run_install()
         commands=(self.root/'commands').read_text()

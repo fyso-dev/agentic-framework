@@ -32,3 +32,10 @@ test('Windows wizard uses native PowerShell/WSL and never persists the password'
 test('invalid form data fails before creating a request file or running operations',()=>{
  const f=setup();f.page.panelUser.text='invalid user';assert.throws(()=>f.run());assert.equal(f.calls.length,0);assert.equal(f.ops.length,0);
 });
+
+test('missing or short local login passwords fail before any request handoff',()=>{
+ for(const password of ['', 'short']){
+  const f=setup();f.page.panelPassword.text=password;
+  assert.throws(()=>f.run());assert.equal(f.calls.length,0);assert.equal(f.ops.length,0);
+ }
+});
