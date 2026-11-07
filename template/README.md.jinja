@@ -74,6 +74,15 @@ mise run ext:remove foo                                # keeps .data/ext/foo and
 
 Set the secrets it declares with `mise run secrets`; the panel's Apps page shows which are missing. To write one, start from `framework/extensions/_template` (see its README).
 
+## Work with coding agents
+
+Open Claude Code or Codex in this folder (inside its mise environment: `mise activate` in your shell, or `mise exec -- claude`). The project's `.mcp.json` gives the agent two MCP servers:
+
+- **`fyso`** — this platform: status, checks, bots (plan, then apply), extensions (search, install), snapshots. It runs the same workflows as the panel.
+- **`dagu`** — workflows: design, run and debug them. Install Dagu's own skill once with `mise run agent:setup`.
+
+Secrets, removing extensions and starting/stopping the stack stay with you in the terminal.
+
 ## Observe bots and execution
 
 Open **Observabilidad** in the panel. OMB conversations/delegations, Dagu runs and
