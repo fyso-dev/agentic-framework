@@ -1,0 +1,15 @@
+# Build dependencies. Qt IFW is installed by its native aqt tool, never a custom downloader.
+[tools]
+"aqua:astral-sh/uv" = "0.5.1"
+
+[env]
+FYSO_IFW_VERSION = "4.7.0"
+FYSO_AQT_VERSION = "3.3.0"
+
+[tasks."ifw:linux"]
+description = "Install pinned Qt Installer Framework (Linux x64 build host)"
+run = "uvx --from aqtinstall==3.3.0 aqt install-tool linux desktop tools_ifw qt.tools.ifw.47 -O .data/qt"
+
+[tasks."ifw:windows"]
+description = "Install pinned Qt Installer Framework (Windows build host)"
+run = "uvx --from aqtinstall==3.3.0 aqt install-tool windows desktop tools_ifw qt.tools.ifw.47 -O .data/qt"

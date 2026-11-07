@@ -61,8 +61,8 @@ the verified prototype; replacing it with Qt is a separate future migration.
 | Platform | Installer UI | Fyso runtime | Delivery status |
 |---|---|---|---|
 | macOS | Existing swiftDialog app; Qt is a future unification option | Native tools managed by mise | Existing prototype verified as described above; no Qt migration verified |
-| Linux | Qt Installer Framework native graphical wizard | Native Linux tools managed by mise; shared Dagu installation workflow | Approach selected; Qt package, graphical flow and end-to-end installation pending |
-| Windows | Proposed native Qt Installer Framework `.exe` | Shared Linux installation inside WSL2, initially targeting Ubuntu | Architecture proposal; implementation and Windows acceptance pending |
+| Linux | Qt Installer Framework native graphical wizard | Native Linux tools managed by mise; shared Dagu installation workflow | Implemented in `installer/qt/`; native ARM64 build and runtime routes tested; engine login and clean-host acceptance pending |
+| Windows | Proposed native Qt Installer Framework `.exe` | Shared Linux installation inside WSL2, initially targeting Ubuntu | Qt package/build recipe and WSL2 adapter implemented; native executable build and Windows-host acceptance pending |
 
 ### Shared installation contract
 
@@ -102,16 +102,24 @@ Native Windows execution of the current Bash scripts is not part of this proposa
 WSL detection, restart/resume behavior, paths containing spaces, networking, login,
 repeated installations, cancellation and safe cleanup all require Windows-specific tests.
 
-### Next verification gates
+### Implementation and verification
 
-1. Pin a Qt Installer Framework release and validate its build toolchain and generated
-   binaries on each target architecture. Framework availability alone is not a build.
-2. Build and run the Linux wizard with the real shared Dagu workflow in an isolated
-   Linux environment; check success, dependency failure, cancellation, ES/EN, credentials
-   and repeated installations. Require doctor and authenticated route evidence.
-3. Implement the Windows adapter only after defining WSL distribution selection and
-   project/installer ownership. Test both an existing WSL installation and first-time
-   setup with restart on a Windows host.
+The implementation, build commands, dependency requirements, ownership boundaries and
+observed limitations are in [installer/qt/README.md](../installer/qt/README.md).
+The existing macOS entry point now delegates to the shared Dagu generator. No macOS
+Qt migration is included.
+
+### Remaining verification gates
+
+1. Qt Installer Framework is pinned to 4.7.0. Validate clean-host dependencies and
+   native binaries on each delivery architecture; the Linux ARM64 test build required
+   isolated compatibility libraries on Ubuntu 24.04.
+2. The Linux wizard ran the real workflow and all three authenticated routes returned
+   200. Doctor reports the fixture's missing Codex login. Complete acceptance with a real
+   engine login; protocol and failure tests do not replace that prerequisite.
+3. Build and run the Windows adapter on Windows. Test an existing WSL2 installation,
+   first-time setup with UAC/restart, native browser routing and actual cancellation.
+   Executing PowerShell with a fake `wsl.exe` is a protocol test only.
 4. Record platform-specific evidence before changing any delivery status to verified.
 
 ### Upstream references

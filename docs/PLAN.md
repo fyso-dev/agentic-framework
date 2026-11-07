@@ -73,7 +73,6 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D35 | **End-user installer: a macOS app that reuses swiftDialog and the Dagu CLI.** `Fyso Installer.app` (drag to Applications) shows a friendly window (swiftDialog, MIT, bundled) listing each dependency; the work is a Dagu workflow generated from the template's pinned tools and run with `dagu start` (no server, no UI), with a pinned mise bootstrap. No custom GUI. Signing/notarization and Windows/Linux are open. [installer.md](installer.md) |
 | D36 | **Desktop agents connect to a project's `fyso` MCP with their own configuration tools.** `mise run agent:connect` registers `fyso-<slug>` (a plain `fyso` may already be another server) launched as `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`: Claude Desktop by merging its JSON (backup kept, no CLI exists), Codex app and CLI through `codex mcp add` (they share `~/.codex/config.toml`), Claude Code CLI as an option through `claude mcp add --scope user`. Desktop apps first; the installer ends with this step. The Dagu MCP stays per project (`.mcp.json`). [agent-surface.md](agent-surface.md#3-connect-desktop-and-cli-agents-d36) |
 | D37 | **Bot models follow what each engine offers.** Providers retire model names and OMB then rejects the whole team. `framework/scripts/team-models.cjs` moves a bot whose engine is available but no longer offers its model to that engine's default (from `openmausbot models`), editing only `model:` lines; `bots.sh apply` runs it first and commits the project file, and `mise run up` runs it on every start (also when the stack is already up), so `copier update` + `up` repairs existing projects. Startup applies only a partial team containing live bot names and replacement models; it never replays declaration profiles or recreates missing bots (initial creation belongs to snapshot restore). Engines not signed in are left alone. The template's fast Codex model is `gpt-6-luna` |
-
 | D38 | **Linux graphical installer uses Qt Installer Framework, with Dagu retaining installation orchestration.** Reuse the framework wizard, progress and packaging instead of building a Zenity wizard lifecycle. Share pinned mise tools and the Copier/Dagu flow. Windows is proposed as a native Qt `.exe` delegating the runtime to WSL2 (initially Ubuntu), with explicit prerequisite/restart handling and separate Windows verification. Existing macOS swiftDialog delivery remains in place. Qt maintenance must preserve generated project data and Copier ownership. Linux Qt delivery and Windows support are not yet verified. [installer.md](installer.md#cross-platform-installer-direction--d38) |
 
 ## 3. Architecture
@@ -398,6 +397,25 @@ Discovery of extensions through git catalogs, install and upgrade from the panel
    **Exit:** installed from the marketplace on a generated project, a bot runs a piece action with a real connection (e.g. Gmail) through MCP, doctor green.
 2. **MCP Registry search in the panel** — search `registry.modelcontextprotocol.io`, show official publishers first, hide `oci` packages (Docker), write the chosen server into `project/mcp.json` with `${VAR}` placeholders for `isSecret` values (bots only see `BOT_*` secrets).
    **Exit:** a server added from the panel appears in the generated `.mcp.json` and a bot can call it after `mise run secrets` and a restart.
+
+### Phase 7.4 — Linux and Windows graphical installers (D38)
+
+Implementation in `installer/qt/`: Qt IFW 4.7.0 wizard and native build recipe, shared
+Dagu workflow, Linux adapter and Windows/WSL2 PowerShell adapter. Local Linux ARM64
+build and real runtime HTTP routes verified; full acceptance remains open because
+no coding engine is authenticated in the fixture. Windows native build, UAC,
+restart/resume, browser routing and real WSL cancellation require a Windows host.
+
+- [x] Shared workflow generation; preserve the existing macOS entry point.
+- [x] Qt wizard, ES/EN copy, private requests and separate helper/project ownership.
+- [x] Linux runtime install and authenticated panel/Dagu/OMB routes in an isolated VM.
+- [x] Windows adapter protocol tests with an executable shim; no production accounts.
+- [ ] Doctor green with a real selected engine login on Linux.
+- [ ] Native Windows executable build and end-to-end WSL2 acceptance.
+- [ ] Clean-host binary dependency acceptance for each supported Linux architecture.
+
+See [installer implementation](../installer/qt/README.md) and
+[delivery evidence](../artifacts/delivery-evidence/installer-cross-platform/README.md).
 
 ### Phase 8 — Multi-host
 Execution hosts (§13): `hosts.yaml`, `mise run host:add`, the reverse SSH tunnel, the Dagu worker service, OMB self-hosted VPS computers, and the per-host doctor.
