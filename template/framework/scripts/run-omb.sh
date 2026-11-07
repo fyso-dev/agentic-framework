@@ -15,7 +15,7 @@ clean_exec \
   ${bot_env[@]+"${bot_env[@]}"} \
   OMB_PORT="$FYSO_OMB_PORT" \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" \
-  DAGU_MCP_AUTH="Basic $(printf '%s:%s' "$FYSO_ADMIN_USER" "$FYSO_ADMIN_PASSWORD" | base64)" \
+  DAGU_MCP_AUTH="Basic $(printf '%s:%s' "$FYSO_ADMIN_USER" "$FYSO_ADMIN_PASSWORD" | base64 | tr -d '\n')" \
   OMB_WEBHOOK_PORT="$FYSO_OMB_WEBHOOK_PORT" \
   OMB_PUBLIC_URL="http://omb.localhost:$FYSO_HTTP_PORT" \
   npm_config_cache="$FYSO_DATA/npm-cache" \

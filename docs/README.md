@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D37; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D38; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -38,7 +38,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Topic | Where |
 |---|---|
 | Install from the private GitHub repository: prerequisites, startup, updates and recovery | [installation.md](installation.md) |
-| End-user installer app (macOS prototype): swiftDialog window, Dagu CLI workflow, one step per dependency (D35) | [installer.md](installer.md) |
+| End-user installer: verified macOS swiftDialog prototype (D35); selected Linux Qt Installer Framework direction and proposed Windows/WSL2 architecture (D38) | [installer.md](installer.md) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
@@ -72,6 +72,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
+| 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -124,3 +125,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Retired models repaired automatically (D37).** `team-models.cjs` + `bots.sh repair` on every `up`; the panel re-reads the last setup check when its tab regains focus (it showed a stale failure after a fix made elsewhere) |
 | 2026-11-06 | **Menu bar app (D34).** A SwiftBar plugin instead of a native app: `framework/tray/fyso.10s.py` finds running stacks by their process-compose sockets, reads states over the socket and the project from the socket owner's cwd; `mise run tray:install` links it into SwiftBar. Tests use a fake process-compose on a Unix socket (healthy, degraded, stale, none). Finding: SwiftBar runs plugins with a minimal PATH, so the plugin takes `mise` from the PATH of the running process-compose (started by `mise run up`) instead of hard-coding install locations. Start/restart from the menu (stopped projects come from a cache of projects seen running) run mise with that same PATH, so bots started from the menu still find `claude`/`codex` |
 | 2026-11-07 | PR #11 corrections: installer ES/EN resources include workflow titles; repeated names get distinct project/MCP identifiers. Startup model repair sends only live model changes and preserves native/snapshot fields and deleted bots. Regression checks use isolated fixtures; live installer acceptance remains separate. |
+| 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
+| 2026-11-07 | **D38 implementation in an isolated worktree.** Qt IFW wizard, shared Dagu generator, Linux adapter and Windows/WSL2 adapter with private stdin handoff and host-port inventory. Linux ARM64 native build and authenticated routes passed; doctor reports the fixture's missing Codex login. Windows protocol tests run real PowerShell against a shim; native Windows acceptance is pending. [Build contract](../installer/qt/README.md) · [Evidence](../artifacts/delivery-evidence/installer-cross-platform/README.md). |
