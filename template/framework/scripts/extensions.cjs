@@ -27,9 +27,9 @@ function workflows(id) {
 function pages(id) {
   return glob(`extensions/${id}/pages/*.yaml`).sort().map(file=>{
     const pageId=file.split('/').pop().slice(0,-5),data=read(file);
-    if(!validId(pageId) || !data || !data.name || typeof data.url!=='string' || !data.url.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.html$/.test(data.url))throw Error(`${file}: invalid extension page`);
-    if(!fs.existsSync('.'+data.url))throw Error(`${file}: missing page entry`);
-    if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw Error(`${file}: invalid page name`);
+    if(!validId(pageId) || !data?.name || typeof data.url!=='string' || !data.url.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.html$/.test(data.url))throw new Error(`${file}: invalid extension page`);
+    if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
+    if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
     const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
     return {id:pageId,...name,url:data.url,icon:data.icon||'apps'};
   });
@@ -72,7 +72,7 @@ function run(id, command) {
   const absent = missing(id);
   if (absent.length) throw Error(`${id}: required secret(s) empty: ${absent.join(', ')}`);
   const names = new Set(['PATH','HOME',...secrets(id).map(s => s.name)]);
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => names.has(k) || k.startsWith('FYSO_')));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('FYSO_AUTH_') && (names.has(k) || k.startsWith('FYSO_'))));
   const child = spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);

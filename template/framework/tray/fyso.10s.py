@@ -288,6 +288,11 @@ def render(items):
     for p in items:
         lines.append("---")
         panel = f"http://panel.localhost:{p['port']}"
+        try:
+            config = read_json(os.path.join(p['root'], '.data/panel/project.json')) or {}
+            panel = config.get('urls', {}).get('panel', panel)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         if p["state"] != "up":
             lines.append(f"{esc(p['name'])}  :{p['port']} | sfimage=exclamationmark.triangle sfcolor=orange refresh=true")
             lines.append(f"--{t(p['state'])} | color=gray")

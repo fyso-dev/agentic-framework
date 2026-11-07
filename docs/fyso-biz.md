@@ -1,5 +1,8 @@
 # Fyso Biz extension
 
+
+This document describes the optional bundled local source preserved by PR #17. The default catalog distribution remains the independently released [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz); preserving this source does not replace its catalog entry or the framework SDK contract. Packaging coverage is in `tests/test_bundled_biz_copier.py`.
+
 Biz is a consumer of the framework's generic [extension pages contract](extensions-contract.md#9-extension-owned-tabs-and-pages), not a screen built into the framework SPA. Its own page source, translations, styles, compiled assets, bot and MCP connection live in `framework/extensions/biz` (the bundled Copier source). Installation writes only that extension's slots.
 
 ## Installation and user flow

@@ -1,3 +1,7 @@
+# Initial extension-pages/Biz validation (historical snapshot)
+
+This evidence records PR #14 before repository extraction. Biz source, tests and the independent release now live in [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz). The framework keeps generic page hosting, SDK, connection hooks, starter and independent page fixtures. Paths and bundled-install commands below describe the original validation snapshot. Current framework packaging tests use only generic fixtures.
+
 # Extension-owned pages and Fyso Biz — local evidence
 
 ## Overview
@@ -145,3 +149,12 @@ Browser tests run headless, one context per command, no retries, against `http:/
 - [Generic page contract](../../../docs/extensions-contract.md#9-extension-owned-tabs-and-pages) · [Biz contract](../../../docs/fyso-biz.md).
 
 After updating the PR branch onto current main, the same 22 tests plus 8 native MCP/Bot Architect compatibility tests passed (30 total). The Copier packaging test also passed again on that final branch. Socket-based MCP tests ran with local-listener permission; an earlier sandbox-only attempt was blocked by EPERM before requests ran.
+
+
+## PR review regression checks — 2026-11-07
+
+The SDK fixture now has its own relative script and no base tag. The browser check loaded configuration from the gateway root, enqueued a mocked Dagu workflow through root API URLs and rendered its output. Three contributed pages navigated successfully, private extension files returned 404, and the browser reported zero page errors. Workflow responses in this regression are mocked; authenticated Biz access is covered separately above.
+
+![Nested SDK page using gateway-root requests](extension-owned-pages.png)
+
+The lifecycle regression used real Copier and process-compose in a temporary project: tagged install and tagged upgrade both started the extension service and waited for its native readiness probe before invoking the connection hook. Tool installation was stubbed at the external boundary. All 22 Node contract tests, the Copier page packaging test, the lifecycle integration test, the panel build and the isolated live project's doctor passed.

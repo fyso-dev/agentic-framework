@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { LANGS, setLanguage } from "../lib/i18n";
+import { LANGS, setLanguage, localized } from "../lib/i18n";
 import type { Extension } from "../api/types";
-import { localized } from "../lib/i18n";
 import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
+import { SessionMenu } from "./SessionMenu";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -131,6 +131,7 @@ export function TopBar(props: ThemeProps) {
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
       )}
+      <SessionMenu />
       <MoreMenu {...props} />
     </header>
   );
@@ -145,7 +146,10 @@ const ITEMS: NavItem[] = [
 ];
 
 const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:page.icon === "workflow" ? IconWorkflow : IconApps})));
-const section = (r: Route) => r.name === "extension" ? `extension:${r.extensionId}:${r.pageId}` : r.name === "bot" ? "bots" : r.name;
+function section(r:Route) {
+  if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
+  return r.name === "bot" ? "bots" : r.name;
+}
 
 export function SideNav({ route }: { route: Route }) {
   const { t, i18n } = useTranslation();

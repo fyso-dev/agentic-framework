@@ -34,6 +34,12 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 - **MCP:** the `dagu` entry of `.mcp.json` (`http://127.0.0.1:${FYSO_DAGU_PORT}/mcp`, header `Authorization: ${DAGU_MCP_AUTH}`). `DAGU_MCP_AUTH` is derived by mise from the project login (`mise.toml`, never stored), so an agent started inside the project's mise environment (`mise activate`, or `mise exec -- claude`) authenticates. OpenMausBot sets the same value for bots. Tools: `dagu_read`, `dagu_execute`, `dagu_change`.
 - **Skill:** `mise run agent:setup` installs Dagu's own `dagu` authoring skill, **pinned to this project's Dagu version**, with the [`skills`](https://github.com/vercel-labs/skills) CLI 1.7.6 (`dagucloud/dagu@v<version> --skill dagu -a claude-code codex --copy`, telemetry off) into `.claude/skills/dagu` and `.agents/skills/dagu`. Those folders are rebuildable and git-ignored. Bots keep reading the same reference over MCP (Phase 2).
 
+## Shared operating context
+
+`template/framework/agent-context.md` is the local, template-owned operating guide: architecture, ownership, isolation, task routing, procedures, verification and desktop tool limitations. The platform MCP includes the guide in `initialize.instructions` and exposes read-only `fyso_context` without Dagu or a running stack. CLI `AGENTS.md`, every default bot soul (including Chief), and desktop opening prompts point to the same guide. Role instructions keep their narrower permissions. No generated configuration or user-home instructions are overwritten.
+
+Copier updates refresh the framework guide. Existing project-owned team declarations and runtime souls are preserved: adopting new role instructions requires an explicit bot update; this change does not silently reapply existing bots. New generated projects include the Chief soul by default.
+
 ## Verification (2026-11-06, Test 1 project)
 
 - `fyso` over stdio, started exactly as `.mcp.json` does: `initialize`; `fyso_status` (services ok, apps, extensions); `fyso_bots_list` (4 native bots); `fyso_ext_search` (official catalog, install state); `fyso_bot_plan` (a "Soporte" bot, preview only, not applied); `fyso_doctor` (all checks passed).
@@ -63,3 +69,7 @@ mise run agent:open [codex|claude-desktop]   # new conversation about this proje
 The entry is named **`fyso-<slug>`**, one per project: a plain `fyso` may already exist (e.g. the Fyso cloud server). It runs `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`, an absolute launcher, because desktop apps start servers with a minimal `PATH` and no project folder. Verified: started that way from `/` with only the system `PATH`, the server answers and `fyso_status` reports the project. Tests: `tests/agent-connect.test.cjs` (fake HOME and CLIs).
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment.
+
+### Shared context verification (2026-11-06)
+
+Nine targeted MCP/agent-connect tests passed, including real stdio initialization and an offline context call with no Dagu fixture, plus fake-home desktop/CLI registration checks. `git diff --check` and the repository path check passed. No desktop app or live bot conversation was exercised. `mise run doctor` is unavailable in the template checkout (no root runtime task); generated-stack doctor acceptance remains unverified.

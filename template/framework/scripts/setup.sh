@@ -14,6 +14,7 @@ else
   echo "✓ Age key found: $key_file"
 fi
 recipient=$(age-keygen -y "$key_file")
+export SOPS_AGE_KEY_FILE="$key_file"
 
 if [ ! -f .sops.yaml ]; then
   cat > .sops.yaml <<YAML
@@ -27,20 +28,17 @@ YAML
 fi
 
 if [ ! -f secrets.enc.yaml ]; then
-  # D11: the gateway and Dagu start with admin / admin. Change it with `mise run secrets`.
-  # The installer app (D35) may hand over a chosen password in a private file; it is
-  # never passed as an argument or kept in Dagu's run data.
-  password=admin
-  if [ -n "${FYSO_INITIAL_PASSWORD_FILE:-}" ] && [ -s "$FYSO_INITIAL_PASSWORD_FILE" ]; then
-    password=$(head -n 1 "$FYSO_INITIAL_PASSWORD_FILE")
-  fi
+  # The legacy ADMIN password is now a technical Dagu credential, not a human login.
+  password=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
   tmp=$(mktemp)
   trap 'rm -f "$tmp"' EXIT
   q="'"; printf "FYSO_ADMIN_PASSWORD: '%s'\n" "${password//$q/$q$q}" > "$tmp"   # YAML single-quoted
   SOPS_AGE_KEY_FILE="$key_file" sops encrypt --filename-override secrets.enc.yaml \
     --input-type yaml --output-type yaml "$tmp" > secrets.enc.yaml
-  if [ "$password" = admin ]; then echo "✓ Created secrets.enc.yaml (login: admin / admin — change it with 'mise run secrets')"
-  else echo "✓ Created secrets.enc.yaml (the chosen login password)"; fi
+  echo "✓ Created secrets.enc.yaml (random technical Dagu credential)"
 else
   echo "✓ secrets.enc.yaml already exists"
 fi
+
+# Local browser users have their own encrypted hashes; existing projects migrate here.
+framework/scripts/web-auth-users.sh init

@@ -2,6 +2,7 @@
 import { createRoot } from 'react-dom/client';
 import { type ComponentType } from 'react';
 import i18next from 'i18next';
+import extensionApi from '../extension-api.json';
 import { loadBackend } from './api';
 import { StoreProvider } from './store';
 import { useTheme } from './lib/theme';
@@ -14,7 +15,7 @@ export { useDaguAction } from './lib/useDaguAction';
 export { useStore } from './store';
 export { ActionButton, ActionStatus } from './components/Action';
 export { External, RelTime } from './components/ui';
-export const PANEL_API_VERSION = 1;
+export const PANEL_API_VERSION = extensionApi.version;
 export async function mountExtensionPage(Page:ComponentType, messages:Record<string,Record<string,unknown>>) {
   for (const [language,resources] of Object.entries(messages)) i18next.addResourceBundle(language,'translation',resources,true,true);
   const loaded=await loadBackend();

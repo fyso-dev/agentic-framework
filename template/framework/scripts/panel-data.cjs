@@ -8,7 +8,8 @@ const env = process.env;
 const readTeam = () => yaml.parse(fs.readFileSync('project/bots/team.yaml', 'utf8').replaceAll('${FYSO_ROOT}', env.FYSO_ROOT));
 // Engines the declared bots run on: the provider prefix of each model.
 const usedEngines = team => team.bots.map(b => String(b.model || team.defaults?.model || '').split('/')[0]).filter(Boolean);
-const urls = {dagu:`http://dagu.localhost:${env.FYSO_HTTP_PORT}`, omb:`http://omb.localhost:${env.FYSO_HTTP_PORT}`};
+const domain = env.FYSO_WEB_DOMAIN || `${env.FYSO_PROJECT}-${env.FYSO_HTTP_PORT}.localhost`;
+const urls = {panel:`http://panel.${domain}:${env.FYSO_HTTP_PORT}`, auth:`http://auth.${domain}:${env.FYSO_HTTP_PORT}`, dagu:`http://dagu.${domain}:${env.FYSO_HTTP_PORT}`, omb:`http://omb.${domain}:${env.FYSO_HTTP_PORT}`};
 if (process.argv[2] === 'config') {
   require('./bot-versioning.cjs').write();
   const extensions = require('./extensions.cjs');

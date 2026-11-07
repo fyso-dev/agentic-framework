@@ -1,4 +1,5 @@
 {
+  "session": {"logout": "Cerrar sesión", "unavailable": "No se pudo verificar la sesión"},
   "common": {
     "newTab": "(se abre en una pestaña nueva)",
     "copy": "Copiar",

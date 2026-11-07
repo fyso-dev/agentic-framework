@@ -91,3 +91,19 @@ test('observability returns the collected data the workflow writes, not only its
     assert.deepEqual(out.refresh,{collectedAt:'t',records:3});assert.equal(out.usage.totals.turns,3);assert.deepEqual(out.traces,[{id:'x'}]);
   } finally {c.close();srv.close();fs.rmSync(data,{recursive:true,force:true});}
 });
+
+// No HTTP fixture: framework guidance must work before Dagu is running.
+test('framework context reaches desktop clients at initialize and remains available offline', async () => {
+  const c = mcp(1);
+  try {
+    const init = (await c.call('initialize', {protocolVersion: '2025-06-18'})).result;
+    assert.match(init.instructions, /Ownership and isolation/);
+    assert.match(init.instructions, /desktop connection exposes only the platform MCP/);
+    const tools = (await c.call('tools/list')).result.tools;
+    assert.equal(tools.find(t => t.name === 'fyso_context').annotations.readOnlyHint, true);
+    const result = (await c.call('tools/call', {name: 'fyso_context', arguments: {}})).result;
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent.guide, init.instructions);
+    assert.match(result.structuredContent.guide, /fyso_bot_plan/);
+  } finally { c.close(); }
+});
