@@ -40,6 +40,10 @@ FYSO_CADDY_ADMIN_PORT = "{{ port_base + 8 }}"
 
 # Every `openmausbot` CLI call targets THIS project's server, never the
 # desktop app it would otherwise auto-discover on 8799.
+# Coding agents opened in this project reach the Dagu MCP of .mcp.json with this header
+# (D33); OpenMausBot sets the same value for bots. Derived, never stored.
+DAGU_MCP_AUTH = "{% raw %}Basic {{ exec(command='printf %s:%s \"$FYSO_ADMIN_USER\" \"$FYSO_ADMIN_PASSWORD\" | base64 | tr -d \"\\n\"') }}{% endraw %}"
+
 OPENMAUSBOT_URL = "http://127.0.0.1:{{ port_base + 4 }}"
 ALLOW_INSECURE_HTTP = "true"
 
@@ -94,6 +98,10 @@ run = "sops edit secrets.enc.yaml"
 [tasks."bots:architect"]
 description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
 run = "node framework/scripts/bot-architect.cjs submit"
+
+[tasks."agent:setup"]
+description = "Install Dagu's authoring skill (pinned to this Dagu) for Claude Code and Codex"
+run = "framework/scripts/agent-setup.sh"
 
 [tasks."ext:add"]
 description = "Add an extension by catalog id or Copier source: mise run ext:add <id|src>"
