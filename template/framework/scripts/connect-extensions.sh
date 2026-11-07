@@ -9,6 +9,6 @@ for hook in extensions/*/connect.sh; do
     printf '%s: connection pending required secrets\n' "$id"
     continue
   fi
-  node framework/scripts/extension-ready.cjs "$id" "$PC_SOCKET"
+  node framework/scripts/extension-ready.cjs "$id" "$PC_SOCKET" "$(command -v process-compose)"
   framework/scripts/run-ext.sh "$id" -- bash "$hook"
 done
