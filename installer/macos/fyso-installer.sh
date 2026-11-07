@@ -18,6 +18,10 @@ DAGU_TOOL="aqua:dagucloud/dagu@2.24.0"
 GH_TOOL="aqua:cli/cli@2.95.0"
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export MISE_YES=1
+# The panel's look (framework/panel/src/styles.css, dark theme): its top bar as banner,
+# --bg as background, white bold title, --mute message text.
+STYLE=(--appearance dark --bannerimage "$RES/banner.png" --bannerheight 80 --background "$RES/background.png"
+  --titlefont "colour=#ffffff,weight=bold,size=20,alignment=left" --messagefont "colour=#9c9ba5,size=14")
 
 mkdir -p "$WORK"
 exec >>"$LOG" 2>&1
@@ -38,31 +42,63 @@ fail() {   # index, short text, message for the person
 # ---------------------------------------------------------------- 1. Welcome form
 default_name="Mi proyecto"
 # FYSO_AUTO=1 (tests): skip the form, take FYSO_NAME / FYSO_FOLDER / FYSO_ENGINE, close at the end.
+REGISTRY="$HOME/Library/Application Support/Fyso/projects.tsv"   # port<TAB>folder of installed projects
+# Port bases already taken, even by stopped projects: the registry, Fyso projects next to
+# the chosen folder (installed by hand), and running stacks' sockets.
+taken_ports() {
+  [ -f "$REGISTRY" ] && while IFS=$'\t' read -r p d; do [ -d "$d" ] && echo "$p"; done < "$REGISTRY"
+  for a in "$FOLDER"/*/.copier-answers.yml; do [ -f "$a" ] && sed -n 's/^port_base: *//p' "$a"; done
+  for f in /tmp/fyso-*-*.sock; do [ -e "$f" ] && { f=${f##*-}; echo "${f%.sock}"; }; done
+}
+block_free() {   # $1: port base. Free = not taken by another project and nothing listening on the 10 ports.
+  case " $(taken_ports | tr '\n' ' ') " in *" $1 "*) return 1 ;; esac
+  p=$1; while [ $p -lt $(($1+10)) ]; do lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && return 1; p=$((p+1)); done
+}
+first_free_block() { b=8400; while [ $b -lt 9900 ] && ! block_free $b; do b=$((b+10)); done; echo $b; }
+short() { case $1 in "$HOME"/*) printf '~/%s' "${1#$HOME/}" ;; *) printf '%s' "$1" ;; esac; }
+NAME=$default_name; FOLDER="$HOME/Fyso"; CHOICE="Claude Code"; ADMIN=admin; PASSWORD=admin; PORT=""
 if [ "${FYSO_AUTO:-}" = 1 ]; then
-  answers=$(printf 'Nombre del proyecto : %s\nCarpeta : %s\nSelectedOption : %s\n' "${FYSO_NAME:-$default_name}" "${FYSO_FOLDER:-$HOME/Fyso}" "${FYSO_ENGINE:-Claude Code}")
+  NAME=${FYSO_NAME:-$NAME}; FOLDER=${FYSO_FOLDER:-$FOLDER}; CHOICE=${FYSO_ENGINE:-$CHOICE}
+  ADMIN=${FYSO_ADMIN:-$ADMIN}; PASSWORD=${FYSO_PASSWORD:-$PASSWORD}; PORT=${FYSO_PORT:-$(first_free_block)}
 else
-answers=$("$DIALOG" --title "Fyso" --icon "SF=shippingbox.fill,colour=#7C3AED" \
-  --message "Vamos a crear tu proyecto **Fyso** en esta Mac: bots, flujos de trabajo y un panel para manejarlos.<br><br>Descargamos solo lo necesario y te mostramos cada paso." \
-  --textfield "Nombre del proyecto,value=$default_name,required" \
-  --textfield "Carpeta,value=$HOME/Fyso,required" \
-  --selecttitle "Motor de IA que ya usás" --selectvalues "Claude Code,Codex" --selectdefault "Claude Code" \
-  --button1text "Instalar" --button2text "Cancelar" --width 560 --height 420 --moveable) || exit 0
+  # One clean form: name and engine as fields; the folder as text plus a button that opens
+  # macOS's own folder picker (it has "New Folder"), so the layout stays two aligned rows.
+  while :; do
+    [ -n "$PORT" ] || PORT=$(first_free_block)
+    answers=$("$DIALOG" "${STYLE[@]}" --title none \
+      --message "### Nuevo proyecto\n\nVamos a crear tu proyecto **Fyso** en esta Mac: bots, flujos de trabajo y un panel para manejarlos. Descargamos solo lo necesario y te mostramos cada paso.\n\n**Se crea en** \`$(short "$FOLDER")\`\n\nUsuario y contraseña son para entrar al panel; por defecto \`admin\` / \`admin\`. El puerto es el primero libre: cada proyecto usa un bloque de 10 y no se pisan." \
+      --textfield "Nombre del proyecto,value=$NAME,required" \
+      --textfield "Usuario del panel,value=$ADMIN,required" \
+      --textfield "Contraseña,secure,value=$PASSWORD,required" \
+      --textfield "Puerto,value=$PORT,required,regex=^[0-9]{4,5}0$,regexerror=Usá un múltiplo de 10 (8400, 8410…)" \
+      --selecttitle "Motor de IA que ya usás" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
+      --infobuttontext "Cambiar carpeta…" --button1text "Instalar" --button2text "Cancelar" \
+      --width 620 --height 600 --moveable)
+    rc=$?
+    field() { printf '%s\n' "$answers" | sed -n "s/^\"*$1\"* : \"*\(.*[^\"]\)\"*$/\1/p" | head -1; }
+    v=$(field "Nombre del proyecto"); [ -n "$v" ] && NAME=$v
+    v=$(field "SelectedOption"); [ -n "$v" ] && CHOICE=$v
+    v=$(field "Usuario del panel"); [ -n "$v" ] && ADMIN=$v
+    v=$(field "Contraseña"); [ -n "$v" ] && PASSWORD=$v
+    v=$(field "Puerto"); [ -n "$v" ] && PORT=$v
+    case $rc in
+      0) block_free "$PORT" && break
+         "$DIALOG" "${STYLE[@]}" --title none --message "### Puerto en uso\n\nEl bloque \`$PORT\`–\`$((PORT+9))\` ya lo usa otro proyecto Fyso u otro programa. Te propongo el siguiente libre." --button1text "Volver" --width 520 --height 300
+         PORT="" ;;
+      3) PORT=""; start=$FOLDER; [ -d "$start" ] || start=$HOME   # the default folder may not exist yet
+         picked=$(osascript -e "POSIX path of (choose folder with prompt \"Elegí dónde crear tu proyecto Fyso\" default location (POSIX file \"$start\"))" 2>/dev/null) \
+           && FOLDER=${picked%/} ;;   # cancel keeps the previous folder
+      *) exit 0 ;;
+    esac
+  done
 fi
-field() { printf '%s\n' "$answers" | sed -n "s/^\"*$1\"* : \"*\(.*[^\"]\)\"*$/\1/p" | head -1; }
-NAME=$(field "Nombre del proyecto"); FOLDER=$(field "Carpeta"); CHOICE=$(field "SelectedOption")
-NAME=${NAME:-$default_name}; FOLDER=${FOLDER:-$HOME/Fyso}
 case $FOLDER in "~"*) FOLDER="$HOME${FOLDER#\~}" ;; esac
+case $ADMIN in *[!A-Za-z0-9._-]*|"") ADMIN=admin ;; esac
+mkdir -p "$FOLDER" || { "$DIALOG" "${STYLE[@]}" --title none --message "### Carpeta no válida\n\nNo pudimos crear \`$FOLDER\`." --button1text "Cerrar"; exit 1; }
 ENGINE=claude; [ "$CHOICE" = "Codex" ] && ENGINE=codex
 SLUG=$(printf '%s' "$NAME" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\{1,\}/-/g; s/^-*//; s/-*$//' | cut -c1-31)
 case $SLUG in [a-z]?*) ;; *) SLUG="fyso-$SLUG"; SLUG=${SLUG%-} ;; esac
 DIR="$FOLDER/$SLUG"; n=2; while [ -e "$DIR" ]; do DIR="$FOLDER/$SLUG-$n"; n=$((n+1)); done
-# First block of ten free ports from 8400 (each project owns one block, PLAN §3.1).
-PORT=8400
-while [ $PORT -lt 9900 ]; do
-  busy=""; p=$PORT; while [ $p -lt $((PORT+10)) ]; do lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && busy=1; p=$((p+1)); done
-  [ -z "$busy" ] && ! ls /tmp/fyso-*-"$PORT".sock >/dev/null 2>&1 && break
-  PORT=$((PORT+10))
-done
 echo "name=$NAME slug=$SLUG dir=$DIR port=$PORT engine=$ENGINE"
 
 # ---------------------------------------------------------------- 2. Progress window
@@ -73,8 +109,8 @@ IDS=("" "" "" "")
 while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.tsv"
 ENGINE_ITEM=${#TITLES[@]}; TITLES+=("Sesión de $( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')")
 args=(); for t in "${TITLES[@]}"; do args+=(--listitem "$t"); done
-"$DIALOG" --title "Instalando Fyso" --icon "SF=shippingbox.fill,colour=#7C3AED" \
-  --message "Preparando **$NAME** en \`$DIR\`" "${args[@]}" \
+"$DIALOG" "${STYLE[@]}" --title none \
+  --message "### Instalando $NAME\n\nEn \`$(short "$DIR")\`" "${args[@]}" \
   --progress ${#TITLES[@]} --commandfile "$CMD" --button1text "Cancelar" \
   --width 620 --height 640 --moveable --ontop &
 DIALOG_PID=$!
@@ -123,7 +159,7 @@ case $SOURCE in
       ui "message: Iniciá sesión en GitHub en la página que se abrió e ingresá este código:<br><br>## $code"
       while kill -0 $GH_PID 2>/dev/null; do sleep 2; cancelled; done
       wait $GH_PID || fail 3 "sin sesión" "No se completó el inicio de sesión en GitHub."
-      ui "message: Preparando **$NAME** en \`$DIR\`"
+      ui "message: ### Instalando $NAME\\n\\nEn \`$(short "$DIR")\`"
     fi
     gh auth setup-git -h github.com
     repo=${SOURCE#gh:}
@@ -135,10 +171,14 @@ step_done
 
 # ---------------------------------------------------------------- 3. The workflow
 RUN="install-$(date +%Y%m%d%H%M%S)"
+# The chosen password travels in a private file that setup reads; it never becomes a
+# Dagu parameter (parameters are stored with the run) and is removed when we exit.
+PASSWORD_FILE="$WORK/initial-password"
+( umask 077; printf '%s\n' "$PASSWORD" > "$PASSWORD_FILE" ); trap 'rm -f "$PASSWORD_FILE"' EXIT
 DAGU_HOME="$WORK/dagu"
 "$MISE" exec "$DAGU_TOOL" -- dagu start -q --dagu-home "$DAGU_HOME" -r "$RUN" "$RES/fyso-install.yaml" -- \
   "DIR=$DIR" "NAME=$NAME" "SLUG=$SLUG" "PORT=$PORT" "ENGINE=$ENGINE" "SOURCE=$SOURCE" "REF=$REF" \
-  "MISE=$MISE" "GIT_NAME=$GIT_NAME" "GIT_EMAIL=$GIT_EMAIL" > "$WORK/dagu.out" 2>&1 &
+  "MISE=$MISE" "GIT_NAME=$GIT_NAME" "GIT_EMAIL=$GIT_EMAIL" "ADMIN=$ADMIN" "PASSWORD_FILE=$PASSWORD_FILE" > "$WORK/dagu.out" 2>&1 &
 DAGU_PID=$!
 # Read each step's state from the run's status file (4 ok, 1 running, 2 failed, 3 skipped, 0 not started).
 states() {
@@ -177,8 +217,10 @@ if [ $ENGINE = codex ]; then check="codex login status"; else check="claude auth
 if command -v "${check%% *}" >/dev/null 2>&1 && $check >/dev/null 2>&1; then item $ENGINE_ITEM success; step_done
 else item $ENGINE_ITEM pending "iniciá sesión: $check"; step_done; fi
 
+mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"
-ui "message: **¡Listo!** Tu proyecto **$NAME** está corriendo.<br><br>Panel: http://panel.localhost:$PORT<br>Usuario: admin · contraseña: admin (cambiala después)."
+if [ "$PASSWORD" = admin ]; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"; else pwtext="la que elegiste"; fi
+ui "message: ### ¡Listo!\\n\\nTu proyecto **$NAME** está corriendo.\\n\\n**Panel:** http://panel.localhost:$PORT\\n\\n**Usuario:** \`$ADMIN\` · **Contraseña:** $pwtext"
 ui "button1text: Abrir panel"; ui "button1: enable"
 if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; wait "$DIALOG_PID"; echo "done: http://panel.localhost:$PORT"; exit 0; fi
 wait "$DIALOG_PID" && open "http://panel.localhost:$PORT"

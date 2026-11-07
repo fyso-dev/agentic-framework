@@ -38,6 +38,21 @@ for sid in order:
     print(f"{sid}\t{titles.get(sid, sid)}")
 EOF
 
+# Brand assets (same look as the panel), rendered from SVG with macOS's own tools.
+R="$APP/Contents/Resources"; tmp=$(mktemp -d)
+# qlmanage silently renders an invalid SVG as a blank image: validate first.
+for f in assets/*.svg; do python3 -c 'import sys,xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])' "$f" || { echo "invalid SVG: $f" >&2; exit 1; }; done
+render() { qlmanage -t -s "$2" -o "$tmp" "assets/$1.svg" >/dev/null 2>&1; mv "$tmp/$1.svg.png" "$R/$1.png"; }
+render banner 1240 && sips -c 160 1240 "$R/banner.png" >/dev/null    # centre band only
+render background 1240
+render logo 1024
+iconset="$tmp/Fyso.iconset"; mkdir "$iconset"
+for s in 16 32 128 256 512; do
+  sips -z $s $s "$R/logo.png" --out "$iconset/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s*2)) $((s*2)) "$R/logo.png" --out "$iconset/icon_${s}x${s}@2x.png" >/dev/null
+done
+iconutil -c icns "$iconset" -o "$R/Fyso.icns"; rm -rf "$tmp"
+
 install -m 755 fyso-installer.sh "$APP/Contents/MacOS/fyso-installer"
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +62,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleDisplayName</key><string>Fyso Installer</string>
   <key>CFBundleIdentifier</key><string>dev.fyso.installer</string>
   <key>CFBundleExecutable</key><string>fyso-installer</string>
+  <key>CFBundleIconFile</key><string>Fyso</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>1</string>
