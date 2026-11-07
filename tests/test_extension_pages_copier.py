@@ -44,7 +44,7 @@ class ExtensionPagesCopier(unittest.TestCase):
             (base / 'bin/yaml').symlink_to(yaml_cli)
             result = subprocess.run(['node', '-e',
                 'const x=require("./framework/scripts/extensions.cjs").inventory([]);'
-                'if(x.length!==2||x.reduce((n,e)=>n+e.pages.length,0)!==3)process.exit(1)'],
+                'if(x.length!==2||x.reduce((n,e)=>n+e.pages.length,0)!==4)process.exit(1)'],
                 cwd=project, env={**os.environ, 'PATH':str(base / 'bin')+os.pathsep+os.environ['PATH']},
                 capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)

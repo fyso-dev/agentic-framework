@@ -33,7 +33,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
 | Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
-| Connection hook (optional) | `extensions/<ext>/connect.sh` | Runs through `run-ext.sh` after install when running, and on `up` once services are ready; missing secrets defer it. Must be idempotent and preserve unrelated project state |
+| Connection hook (optional) | `extensions/<ext>/connect.sh` | Runs through `run-ext.sh` after tools, processes and routes are loaded on install/update when running, and on `up`; native process-compose readiness probes gate the hook; missing secrets defer it. Must be idempotent and preserve unrelated project state |
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
@@ -202,9 +202,11 @@ The host derives navigation entries from installed registrations and serves `#/e
 
 ### Optional panel SDK v1
 
+Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
+
 Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `1`.
 
-The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `useDaguAction`, `ActionButton`, `ActionStatus`, `External` and `RelTime`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
+The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `useDaguAction`, `ActionButton`, `ActionStatus`, `External` and `RelTime`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 
 This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.
 

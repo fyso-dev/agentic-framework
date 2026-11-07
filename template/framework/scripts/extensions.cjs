@@ -25,11 +25,11 @@ function workflows(id) {
   return glob(`project/workflows/ext-${id}-*.yaml`).filter(f => !longer.some(o => f.startsWith(`project/workflows/ext-${o}-`)));
 }
 function pages(id) {
-  return glob(`extensions/${id}/pages/*.yaml`).sort().map(file=>{
+  return glob(`extensions/${id}/pages/*.yaml`).map(file=>{
     const pageId=file.split('/').pop().slice(0,-5),data=read(file);
-    if(!validId(pageId) || !data || !data.name || typeof data.url!=='string' || !data.url.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.html$/.test(data.url))throw Error(`${file}: invalid extension page`);
-    if(!fs.existsSync('.'+data.url))throw Error(`${file}: missing page entry`);
-    if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw Error(`${file}: invalid page name`);
+    if(!validId(pageId) || !data?.name || typeof data.url!=='string' || !data.url.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.html$/.test(data.url))throw new Error(`${file}: invalid extension page`);
+    if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
+    if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
     const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
     return {id:pageId,...name,url:data.url,icon:data.icon||'apps'};
   });
