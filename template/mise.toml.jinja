@@ -91,6 +91,10 @@ run = "framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memor
 description = "Check ports, logins, instances and routes"
 run = "framework/scripts/doctor.sh"
 
+[tasks."tray:install"]
+description = "Show running Fyso projects in the macOS menu bar (needs SwiftBar)"
+run = "framework/scripts/tray-install.sh"
+
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
 run = "sops edit secrets.enc.yaml"

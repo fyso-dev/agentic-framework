@@ -36,6 +36,8 @@ Unattended run for tests (no form; the window closes by itself): `FYSO_AUTO=1 FY
 
 Verified 2026-11-06 on macOS (arm64): from `gh:fyso-dev/agentic-framework@main`, all 15 steps succeeded, the stack answered (panel 200, Dagu/OMB/Caddy ready) and the initial commit used the person's git identity; with an unreachable template, the window marked "Proyecto" failed, its dependants "no se ejecutó", and the installer exited 1. Sizes: app 34 MB, dmg 21 MB (swiftDialog is most of it). Also verified: a custom user and a password with quotes log in (200) while `admin/admin` is refused (401), the password appears nowhere in the installer's Dagu data, and a second project got the next free block (8410) while the first used 8400.
 
+UI copy and workflow step titles are bundled from `installer/macos/locales/{es,en}.sh`. The first macOS preferred language selects English when it starts with `en`; Spanish is the fallback. `FYSO_LANG=es|en` overrides this for verification. Repeated project names receive a unique slug and matching directory suffix, bounded to 31 characters, also checking registered projects and running project sockets.
+
 ## Open items
 
 - **Signing and notarization.** The app is not signed yet. A downloaded copy needs right-click → Open until it is signed with a Developer ID and notarized (`codesign`, `notarytool`). Signing must keep swiftDialog's own signature intact (no `--deep` re-sign).

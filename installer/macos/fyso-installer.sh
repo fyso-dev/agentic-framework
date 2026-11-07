@@ -26,12 +26,19 @@ export MISE_YES=1
 STYLE=(--appearance dark --bannerimage "$RES/banner.png" --bannerheight 80 --background "$RES/background.png"
   --titlefont "colour=#ffffff,weight=bold,size=20,alignment=left" --messagefont "colour=#9c9ba5,size=14")
 
+# UI copy comes from Resources/locales/<lang>.sh (es default, en), picked from macOS's first
+# preferred language. t FORMAT ARGS… fills a printf format from those files.
+lang=$(defaults read -g AppleLanguages 2>/dev/null | sed -n 's/^[^a-zA-Z]*\([a-zA-Z][a-zA-Z]\).*/\1/p' | head -1)
+case ${FYSO_LANG:-$lang} in en*) UI_LANG=en ;; *) UI_LANG=es ;; esac
+. "$RES/locales/$UI_LANG.sh"
+t() { local f=$1; shift; printf "$f" "$@"; }
+
 mkdir -p "$WORK"
 # One installer at a time (they share the window's command file). A stale lock from a
 # crashed run is taken over.
 LOCK="$WORK/running.pid"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
-  "$RES/Dialog.app/Contents/MacOS/Dialog" --title none --message "### Ya hay un instalador abierto\n\nTerminá o cerrá el que está en curso." --button1text "OK" --width 480 --height 200
+  "$RES/Dialog.app/Contents/MacOS/Dialog" --title none --message "$(t "$L_BUSY")" --button1text "$B_OK" --width 480 --height 200
   exit 0
 fi
 echo $$ > "$LOCK"
@@ -46,8 +53,8 @@ dialog_alive() { kill -0 "$DIALOG_PID" 2>/dev/null; }
 fail() {   # index, short text, message for the person
   item "$1" fail "$2"
   echo "failed: ${TITLES[$1]:-step $1}: $2"
-  ui "message: **No se pudo completar la instalación.**<br><br>$3<br><br>Al cerrar te abrimos el registro con el detalle técnico."
-  ui "button1text: Cerrar"; ui "button1: enable"
+  ui "message: $(t "$L_FAILED" "$3")"
+  ui "button1text: $B_CLOSE"; ui "button1: enable"
   if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; wait "$DIALOG_PID" 2>/dev/null; exit 1; fi
   wait "$DIALOG_PID" 2>/dev/null; open -e "$LOG"; exit 1
 }
@@ -57,17 +64,17 @@ fail() {   # index, short text, message for the person
 # "Instalar" closes the form and this window is already there: no gap between screens.
 SIZE=(--width 620 --height 640 --position center)
 : > "$CMD"
-TITLES=("Herramientas de Apple (git)" "mise" "Motor de instalación (Dagu)" "Cuenta de GitHub")
+TITLES=("$T_APPLE" "$T_MISE" "$T_DAGU" "$T_GITHUB")
 IDS=("" "" "" "")
-while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.tsv"
-ENGINE_ITEM=${#TITLES[@]}; TITLES+=("Sesión del motor de IA")
+while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.$UI_LANG.tsv"
+ENGINE_ITEM=${#TITLES[@]}; TITLES+=("$T_ENGINE_ANY")
 "$DIALOG" "${STYLE[@]}" --title none --message " " --progress ${#TITLES[@]} --commandfile "$CMD" \
-  --button1text "Cancelar" "${SIZE[@]}" --moveable &
+  --button1text "$B_CANCEL" "${SIZE[@]}" --moveable &
 DIALOG_PID=$!
 sleep 1
 
 # ---------------------------------------------------------------- 1. Welcome form
-default_name="Mi proyecto"
+default_name=$DEFAULT_NAME
 # FYSO_AUTO=1 (tests): skip the form, take FYSO_NAME / FYSO_FOLDER / FYSO_ENGINE, close at the end.
 REGISTRY="$HOME/Library/Application Support/Fyso/projects.tsv"   # port<TAB>folder of installed projects
 # swiftDialog splits field modifiers on commas: the port regex must not contain any.
@@ -95,27 +102,28 @@ else
   while :; do
     [ -n "$PORT" ] || PORT=$(first_free_block)
     answers=$("$DIALOG" "${STYLE[@]}" --title none \
-      --message "### Nuevo proyecto\n\nVamos a crear tu proyecto **Fyso** en esta Mac: bots, flujos de trabajo y un panel para manejarlos. Descargamos solo lo necesario y te mostramos cada paso.\n\n**Se crea en** \`$(short "$FOLDER")\`\n\nUsuario y contraseña son para entrar al panel; por defecto \`admin\` / \`admin\`. El puerto es el primero libre: cada proyecto usa un bloque de 10 y no se pisan." \
-      --textfield "Nombre del proyecto,value=$NAME,required" \
-      --textfield "Usuario del panel,value=$ADMIN,required" \
-      --textfield "Contraseña,secure,value=$PASSWORD,required" \
-      --textfield "Puerto,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=Usá un múltiplo de 10 (8400, 8410…)" \
-      --selecttitle "Motor de IA que ya usás" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
-      --infobuttontext "Cambiar carpeta…" --button1text "Instalar" --button2text "Cancelar" \
+      --message "$(t "$L_FORM" "$(short "$FOLDER")")" \
+      --textfield "$F_NAME,name=name,value=$NAME,required" \
+      --textfield "$F_ADMIN,name=admin,value=$ADMIN,required" \
+      --textfield "$F_PASSWORD,name=password,secure,value=$PASSWORD,required" \
+      --textfield "$F_PORT,name=port,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=$F_PORT_ERR" \
+      --selecttitle "$F_ENGINE" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
+      --infobuttontext "$B_CHANGE_FOLDER" --button1text "$B_INSTALL" --button2text "$B_CANCEL" \
       "${SIZE[@]}" --ontop --moveable)
     rc=$?
+    # Keys from name= (and swiftDialog's SelectedOption), never the translated labels.
     field() { printf '%s\n' "$answers" | sed -n "s/^\"*$1\"* : \"*\(.*[^\"]\)\"*$/\1/p" | head -1; }
-    v=$(field "Nombre del proyecto"); [ -n "$v" ] && NAME=$v
-    v=$(field "SelectedOption"); [ -n "$v" ] && CHOICE=$v
-    v=$(field "Usuario del panel"); [ -n "$v" ] && ADMIN=$v
-    v=$(field "Contraseña"); [ -n "$v" ] && PASSWORD=$v
-    v=$(field "Puerto"); [ -n "$v" ] && PORT=$v
+    v=$(field name); [ -n "$v" ] && NAME=$v
+    v=$(field SelectedOption); [ -n "$v" ] && CHOICE=$v
+    v=$(field admin); [ -n "$v" ] && ADMIN=$v
+    v=$(field password); [ -n "$v" ] && PASSWORD=$v
+    v=$(field port); [ -n "$v" ] && PORT=$v
     case $rc in
       0) block_free "$PORT" && break
-         "$DIALOG" "${STYLE[@]}" --title none --message "### Puerto en uso\n\nEl bloque \`$PORT\`–\`$((PORT+9))\` ya lo usa otro proyecto Fyso u otro programa. Te propongo el siguiente libre." --button1text "Volver" --width 520 --height 300
+         "$DIALOG" "${STYLE[@]}" --title none --message "$(t "$L_PORT_BUSY" "$PORT" "$((PORT+9))")" --button1text "$B_BACK" --width 520 --height 300
          PORT="" ;;
       3) PORT=""; start=$FOLDER; [ -d "$start" ] || start=$HOME   # the default folder may not exist yet
-         picked=$(osascript -e "POSIX path of (choose folder with prompt \"Elegí dónde crear tu proyecto Fyso\" default location (POSIX file \"$start\"))" 2>/dev/null) \
+         picked=$(osascript -e "POSIX path of (choose folder with prompt \"$F_FOLDER\" default location (POSIX file \"$start\"))" 2>/dev/null) \
            && FOLDER=${picked%/} ;;   # cancel keeps the previous folder
       *) ui "quit:"; exit 0 ;;
     esac
@@ -123,27 +131,40 @@ else
 fi
 case $FOLDER in "~"*) FOLDER="$HOME${FOLDER#\~}" ;; esac
 case $ADMIN in *[!A-Za-z0-9._-]*|"") ADMIN=admin ;; esac
-mkdir -p "$FOLDER" || { "$DIALOG" "${STYLE[@]}" --title none --message "### Carpeta no válida\n\nNo pudimos crear \`$FOLDER\`." --button1text "Cerrar"; exit 1; }
+mkdir -p "$FOLDER" || { "$DIALOG" "${STYLE[@]}" --title none --message "$(t "$L_BAD_FOLDER" "$FOLDER")" --button1text "$B_CLOSE"; exit 1; }
 ENGINE=claude; [ "$CHOICE" = "Codex" ] && ENGINE=codex
 SLUG=$(printf '%s' "$NAME" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\{1,\}/-/g; s/^-*//; s/-*$//' | cut -c1-31)
 case $SLUG in [a-z]?*) ;; *) SLUG="fyso-$SLUG"; SLUG=${SLUG%-} ;; esac
-DIR="$FOLDER/$SLUG"; n=2; while [ -e "$DIR" ]; do DIR="$FOLDER/$SLUG-$n"; n=$((n+1)); done
+# The slug names the project everywhere (FYSO_PROJECT, sockets, the fyso-<slug> MCP entry in
+# desktop agents), so it must be unique among installed and running projects, not only the
+# folder. A repeated name gets -2, -3… on both, within Copier's 31-character slug limit.
+taken_slugs() {
+  [ -f "$REGISTRY" ] && while IFS=$'\t' read -r _ d; do
+    [ -f "$d/.copier-answers.yml" ] && sed -n 's/^project_slug: *//p' "$d/.copier-answers.yml"
+  done < "$REGISTRY"
+  for f in /tmp/fyso-*-*.sock; do [ -e "$f" ] && { f=${f#/tmp/fyso-}; echo "${f%-*}"; }; done
+}
+used_slugs=" $(taken_slugs | tr '\n' ' ') "
+base=$SLUG; n=1; DIR="$FOLDER/$SLUG"
+while [ -e "$DIR" ] || case $used_slugs in *" $SLUG "*) true ;; *) false ;; esac; do
+  n=$((n+1)); suffix="-$n"; SLUG="$(printf '%s' "$base" | cut -c1-$((31 - ${#suffix})))$suffix"; DIR="$FOLDER/$SLUG"
+done
 echo "name=$NAME slug=$SLUG dir=$DIR port=$PORT engine=$ENGINE"
 
 # ---------------------------------------------------------------- 2. Fill the progress window
-TITLES[$ENGINE_ITEM]="Sesión de $( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')"
-ui "message: ### Instalando $NAME\\n\\nEn \`$(short "$DIR")\`"
+TITLES[$ENGINE_ITEM]=$(t "$T_ENGINE" "$( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')")
+ui "message: $(t "$L_INSTALLING" "$NAME" "$(short "$DIR")")"
 for t in "${TITLES[@]}"; do ui "listitem: add, title: $t, status: pending"; done
 ui "activate:"
 done_count=0; step_done() { done_count=$((done_count+1)); ui "progress: $done_count"; }
 cancelled() { dialog_alive || { echo "cancelled by the person"; [ -n "${DAGU_PID:-}" ] && kill "$DAGU_PID" 2>/dev/null; exit 130; }; }
 
 # 2.1 Apple Command Line Tools (git, and the python3 used below)
-item 0 wait "revisando…"
+item 0 wait "$S_CHECKING"
 if ! xcode-select -p >/dev/null 2>&1; then
   xcode-select --install >/dev/null 2>&1
-  item 0 wait "aceptá la instalación en la ventana de Apple"
-  ui "message: Apple está instalando sus herramientas de desarrollo. Aceptá en su ventana; seguimos solos cuando termine."
+  item 0 wait "$S_APPLE"
+  ui "message: $L_APPLE"
   until xcode-select -p >/dev/null 2>&1; do sleep 5; cancelled; done
 fi
 item 0 success; step_done
@@ -151,40 +172,40 @@ if [ -z "$(git config --global user.email 2>/dev/null)" ]; then GIT_NAME=$(id -F
 else GIT_NAME=$(git config --global user.name); GIT_EMAIL=$(git config --global user.email); fi
 
 # 2.2 mise, pinned (Resources/mise-bootstrap.sh is `mise generate install-script`)
-item 1 wait "descargando…"; cancelled
+item 1 wait "$S_DOWNLOADING"; cancelled
 MISE=$(command -v mise || true)
 if [ -z "$MISE" ]; then
-  MISE_INSTALL_PATH="$HOME/.local/bin/mise" sh "$RES/mise-bootstrap.sh" --version || fail 1 "error" "No pudimos descargar mise. Revisá tu conexión a internet."
+  MISE_INSTALL_PATH="$HOME/.local/bin/mise" sh "$RES/mise-bootstrap.sh" --version || fail 1 "$S_ERROR" "$E_MISE"
   MISE="$HOME/.local/bin/mise"
 fi
 item 1 success; step_done
 
 # 2.3 Dagu (runs the rest of the installation)
-item 2 wait "descargando…"; cancelled
-"$MISE" install "$DAGU_TOOL" || fail 2 "error" "No pudimos descargar Dagu. Revisá tu conexión a internet."
+item 2 wait "$S_DOWNLOADING"; cancelled
+"$MISE" install "$DAGU_TOOL" || fail 2 "$S_ERROR" "$E_DAGU"
 item 2 success; step_done
 
 # 2.4 GitHub account: the framework repository is private
-item 3 wait "revisando…"; cancelled
+item 3 wait "$S_CHECKING"; cancelled
 gh() { "$MISE" exec "$GH_TOOL" -- gh "$@"; }
 case $SOURCE in
   gh:*)
-    "$MISE" install "$GH_TOOL" || fail 3 "error" "No pudimos descargar GitHub CLI."
+    "$MISE" install "$GH_TOOL" || fail 3 "$S_ERROR" "$E_GH"
     if ! gh auth status -h github.com >/dev/null 2>&1; then
       out="$WORK/gh-login.out"; : > "$out"
       ( printf '\n' | gh auth login -h github.com -p https -w > "$out" 2>&1 ) & GH_PID=$!
       code=""; for _ in $(seq 1 30); do code=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$out" | head -1); [ -n "$code" ] && break; sleep 1; done
-      item 3 wait "código $code"
-      ui "message: Iniciá sesión en GitHub en la página que se abrió e ingresá este código:<br><br>## $code"
+      item 3 wait "$(t "$S_CODE" "$code")"
+      ui "message: $(t "$L_GH_CODE" "$code")"
       while kill -0 $GH_PID 2>/dev/null; do sleep 2; cancelled; done
-      wait $GH_PID || fail 3 "sin sesión" "No se completó el inicio de sesión en GitHub."
-      ui "message: ### Instalando $NAME\\n\\nEn \`$(short "$DIR")\`"
+      wait $GH_PID || fail 3 "$S_NO_SESSION" "$E_GH_LOGIN"
+      ui "message: $(t "$L_INSTALLING" "$NAME" "$(short "$DIR")")"
     fi
     gh auth setup-git -h github.com
     repo=${SOURCE#gh:}
-    gh repo view "$repo" --json name >/dev/null 2>&1 || fail 3 "sin acceso" "Tu cuenta de GitHub no tiene acceso a **$repo**. Pedile acceso a quien te invitó."
+    gh repo view "$repo" --json name >/dev/null 2>&1 || fail 3 "$S_NO_ACCESS" "$(t "$E_NO_ACCESS" "$repo")"
     item 3 success ;;
-  *) item 3 success "no hace falta" ;;
+  *) item 3 success "$S_NOT_NEEDED" ;;
 esac
 step_done
 
@@ -213,10 +234,10 @@ apply_states() {
     i=4; while [ $i -lt $ENGINE_ITEM ]; do [ "${IDS[$i]}" = "$sid" ] && break; i=$((i+1)); done
     [ $i -lt $ENGINE_ITEM ] || continue
     case $st in
-      1) item $i wait "instalando…" ;;
+      1) item $i wait "$S_INSTALLING" ;;
       4) case " $seen " in *" $sid "*) ;; *) item $i success; step_done; seen="$seen $sid" ;; esac ;;
-      2) item $i fail "falló"; FAILED_STEP=$i; FAILED_ERR=$err ;;
-      3) item $i error "no se ejecutó" ;;
+      2) item $i fail "$S_FAILED"; FAILED_STEP=$i; FAILED_ERR=$err ;;
+      3) item $i error "$S_NOT_RUN" ;;
     esac
   done
 }
@@ -227,23 +248,23 @@ wait $DAGU_PID; rc=$?
 apply_states < <(states)
 if [ $rc -ne 0 ] || [ -n "$FAILED_STEP" ]; then
   echo "step error: ${FAILED_ERR:-dagu exit $rc}"; tail -40 "$WORK/dagu.out"
-  fail "${FAILED_STEP:-4}" "falló" "Falló el paso **${TITLES[${FAILED_STEP:-4}]}**. Probá de nuevo; si vuelve a fallar, mandanos el registro."
+  fail "${FAILED_STEP:-4}" "$S_FAILED" "$(t "$E_STEP" "${TITLES[${FAILED_STEP:-4}]}")"
 fi
 
 # ---------------------------------------------------------------- 4. Coding engine session (optional)
-item $ENGINE_ITEM wait "revisando…"
+item $ENGINE_ITEM wait "$S_CHECKING"
 if [ $ENGINE = codex ]; then check="codex login status"; else check="claude auth status"; fi
 if command -v "${check%% *}" >/dev/null 2>&1 && $check >/dev/null 2>&1; then item $ENGINE_ITEM success; step_done
-else item $ENGINE_ITEM pending "iniciá sesión: $check"; step_done; fi
+else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
 
 mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"
 # Report the login that really works (a template without the password handoff keeps admin).
 login_ok() { curl -s -o /dev/null -w '%{http_code}' -u "$1:$2" "http://panel.localhost:$PORT/" | grep -q 200; }
-if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext="la que elegiste"
-elif login_ok "$ADMIN" admin; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"
-else pwtext="la que elegiste (no pudimos comprobarla)"; fi
-ui "message: ### ¡Listo!\\n\\nTu proyecto **$NAME** está corriendo.\\n\\n**Panel:** http://panel.localhost:$PORT\\n\\n**Usuario:** \`$ADMIN\` · **Contraseña:** $pwtext"
+if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext=$PW_CHOSEN
+elif login_ok "$ADMIN" admin; then pwtext=$PW_ADMIN
+else pwtext=$PW_UNVERIFIED; fi
+ui "message: $(t "$L_DONE" "$NAME" "http://panel.localhost:$PORT" "$ADMIN" "$pwtext")"
 # ---------------------------------------------------------------- 5. Connect agents (D36)
 # Offer the agents found on this Mac: desktop apps checked, Claude Code CLI as an option.
 # The connect screen opens underneath (same size and place) before "Continuar" is enabled,
@@ -252,18 +273,19 @@ boxes=(); found=""
 if [ -f "$DIR/framework/scripts/agent-connect.cjs" ]; then
   found=$("$MISE" -C "$DIR" exec -- node framework/scripts/agent-connect.cjs --list 2>/dev/null | awk -F'\t' '$2=="found"')
   while IFS=$'\t' read -r id _ kind label; do
+    case $id in claude-desktop) label=$A_CLAUDE_DESKTOP ;; codex) label=$A_CODEX ;; claude-code) label=$A_CLAUDE_CODE ;; esac
     [ -n "$id" ] && boxes+=(--checkbox "{\"label\":\"$label\",\"name\":\"$id\",\"checked\":$( [ "$kind" = desktop ] && echo true || echo false )}")
   done <<< "$found"
 fi
 CONNECT_OUT="$WORK/connect.out"; : > "$CONNECT_OUT"; CONNECT_PID=""
 if [ ${#boxes[@]} -gt 0 ] && [ "${FYSO_AUTO:-}" != 1 ]; then
   "$DIALOG" "${STYLE[@]}" --title none \
-    --message "### Conectá tu asistente\n\nAsí podés manejar **$NAME** desde Claude o Codex: crear bots, instalar extensiones, revisar el estado. Agregamos el servidor \`fyso-$SLUG\` a cada uno; las apps de escritorio lo cargan al reiniciarse." \
-    ${boxes[@]+"${boxes[@]}"} --button1text "Conectar y abrir panel" --button2text "Omitir" "${SIZE[@]}" --moveable > "$CONNECT_OUT" &
+    --message "$(t "$L_CONNECT" "$NAME" "$SLUG")" \
+    ${boxes[@]+"${boxes[@]}"} --button1text "$B_CONNECT" --button2text "$B_SKIP" "${SIZE[@]}" --moveable > "$CONNECT_OUT" &
   CONNECT_PID=$!
   sleep 1; ui "activate:"   # keep the finished progress window in front
 fi
-if [ ${#boxes[@]} -gt 0 ]; then ui "button1text: Continuar"; else ui "button1text: Abrir panel"; fi
+if [ ${#boxes[@]} -gt 0 ]; then ui "button1text: $B_CONTINUE"; else ui "button1text: $B_OPEN_PANEL"; fi
 ui "button1: enable"
 if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; fi
 wait "$DIALOG_PID"
@@ -283,10 +305,10 @@ fi
 open_panel() { open "http://panel.localhost:$PORT"; }
 case " $picks " in *" codex "*) primary=codex; plabel=Codex ;; *" claude-desktop "*) primary=claude-desktop; plabel=Claude ;; *) primary="" ;; esac
 if [ -n "$primary" ]; then
-  extra=(); case " $picks " in *" codex "*" claude-desktop "*|*" claude-desktop "*" codex "*) extra=(--infobuttontext "Abrir Claude") ;; esac
+  extra=(); case " $picks " in *" codex "*" claude-desktop "*|*" claude-desktop "*" codex "*) extra=(--infobuttontext "$(t "$B_OPEN" Claude)") ;; esac
   "$DIALOG" "${STYLE[@]}" --title none \
-    --message "### Listo para usar\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')\nAbrimos **$plabel** con una conversación nueva sobre **$NAME**, con un primer pedido escrito: enviálo y te muestra el estado del proyecto.\n\nEl panel sigue en http://panel.localhost:$PORT" \
-    --button1text "Abrir $plabel" --button2text "Abrir panel" ${extra[@]+"${extra[@]}"} "${SIZE[@]}" --moveable
+    --message "$(t "$L_READY" "$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" "$plabel" "$NAME" "http://panel.localhost:$PORT")" \
+    --button1text "$(t "$B_OPEN" "$plabel")" --button2text "$B_OPEN_PANEL" ${extra[@]+"${extra[@]}"} "${SIZE[@]}" --moveable
   case $? in
     0) "$MISE" -C "$DIR" run agent:open "$primary" ;;
     3) "$MISE" -C "$DIR" run agent:open claude-desktop ;;

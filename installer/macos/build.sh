@@ -26,17 +26,17 @@ cp -R "$mnt/Dialog.app" "$APP/Contents/Resources/"; hdiutil detach -quiet "$mnt"
 # Pinned mise bootstrap, the workflow and the window's step titles.
 mise generate install-script -V "$MISE_VERSION" > "$APP/Contents/Resources/mise-bootstrap.sh"
 ids=$(python3 make-dag.py "$ROOT/template/mise.toml.jinja" "$APP/Contents/Resources/fyso-install.yaml")
-python3 - "$ids" > "$APP/Contents/Resources/steps.tsv" <<'EOF'
-import sys
-titles = {"generate": "Proyecto (plantilla Fyso)", "trust": "Configuración del proyecto", "git": "Repositorio git",
-          "setup": "Claves y contraseñas", "start": "Arranque", "tool_dagu": "Dagu (flujos de trabajo)",
-          "tool_openmausbot": "OpenMausBot (bots)", "tool_process_compose": "process-compose", "tool_caddy": "Caddy (acceso web)",
-          "tool_sops": "sops (secretos)", "tool_age": "age (cifrado)", "tool_gitleaks": "gitleaks (seguridad)",
-          "tool_node": "Node.js", "tool_yaml": "YAML", "tool_cli": "GitHub CLI"}
-order = ["generate", "trust", *sys.argv[1].split(), "setup", "git", "start"]
-for sid in order:
-    print(f"{sid}\t{titles.get(sid, sid)}")
-EOF
+# Keep copy in the same locale resources used by the runtime window.
+cp -R locales "$APP/Contents/Resources/"
+for lang in es en; do
+  (
+    . "locales/$lang.sh"
+    for sid in generate trust $ids setup git start; do
+      key="STEP_$sid"
+      printf '%s\t%s\n' "$sid" "${!key}"
+    done
+  ) > "$APP/Contents/Resources/steps.$lang.tsv"
+done
 
 # Brand assets (same look as the panel), rendered from SVG with macOS's own tools.
 R="$APP/Contents/Resources"; tmp=$(mktemp -d)

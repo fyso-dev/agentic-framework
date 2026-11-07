@@ -33,5 +33,36 @@ class InstallerDag(unittest.TestCase):
         self.assertNotIn('${params.', text)
 
 
+class InstallerResources(unittest.TestCase):
+    def test_locales_cover_all_workflow_steps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ids = subprocess.check_output([sys.executable, str(ROOT / 'installer/macos/make-dag.py'),
+                                           str(ROOT / 'template/mise.toml.jinja'), str(Path(tmp) / 'dag.yaml')], text=True).split()
+        for lang in ['es', 'en']:
+            script = '. "$1"; shift; for sid; do key="STEP_$sid"; printf "%s\\n" "${!key}"; done'
+            result = subprocess.run(['/bin/bash', '-eu', '-c', script, 'test',
+                                     str(ROOT / f'installer/macos/locales/{lang}.sh'),
+                                     'generate', 'trust', *ids, 'setup', 'git', 'start'], check=True, capture_output=True, text=True)
+            self.assertEqual(len(result.stdout.splitlines()), len(ids) + 5)
+
+    def test_repeated_names_get_unique_bounded_slug_and_directory(self):
+        source = (ROOT / 'installer/macos/fyso-installer.sh').read_text()
+        code = source[source.index('taken_slugs() {'):source.index('echo "name=$NAME')]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            base = 'a' * 31
+            (folder / base).mkdir()
+            registry = folder / 'registry.tsv'
+            installed = folder / 'installed'; installed.mkdir()
+            (installed / '.copier-answers.yml').write_text(f'project_slug: {base[:-2]}-2\n')
+            registry.write_text(f'8400\t{installed}\n')
+            result = subprocess.run(['/bin/bash', '-eu', '-c',
+                'FOLDER=$1; REGISTRY=$2; SLUG=$3; ' + code + '\nprintf "%s\\n%s\\n" "$SLUG" "$DIR"',
+                'test', str(folder), str(registry), base], check=True, capture_output=True, text=True)
+            slug, directory = result.stdout.splitlines()
+            self.assertEqual(slug, base[:-2] + '-3')
+            self.assertEqual(directory, str(folder / slug))
+
+
 if __name__ == '__main__':
     unittest.main()

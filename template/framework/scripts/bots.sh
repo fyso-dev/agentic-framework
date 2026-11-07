@@ -21,15 +21,18 @@ repair_models() {
     git add -- "$1" && git commit -q -m "bots: replace models the engine no longer offers" -m "$changes" -- "$1" >&2 || true
   fi
 }
-[ "$mode" != apply ] || repair_models "$source_file"
+case $mode in apply|repair) repair_models "$source_file" ;; esac
 node framework/scripts/render-team.cjs "$source_file" > "$rendered"
 omb() { openmausbot "$@" --port "$FYSO_OMB_PORT"; }
 case "$mode" in
   plan)  omb team apply "$rendered" --dry-run ;;
   apply) omb team apply "$rendered" ;;
   check) omb team apply "$rendered" --check || { code=$?; [ $code -eq 6 ] && fail "bots differ from project/bots/team.yaml (run 'mise run bots:plan')"; exit $code; } ;;
-  repair)  # only when a model must change; then apply (used by up.sh on every start)
-    [ -n "$(node framework/scripts/team-models.cjs "$source_file" --check)" ] || exit 0
-    exec "$0" apply "$source_file" ;;
+  repair)  # used by up.sh on every start: never replays the whole declaration
+    out="$FYSO_DATA/team-repair"
+    node framework/scripts/team-models.cjs runtime "$rendered" "$out" >&2 || exit 0
+    for f in "$out/models.yaml"; do
+      [ ! -f "$f" ] || omb team apply "$f"
+    done ;;
   *) fail "usage: bots.sh <plan|apply|check|repair>" ;;
 esac
