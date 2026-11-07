@@ -42,6 +42,20 @@ fail() {   # index, short text, message for the person
   wait "$DIALOG_PID" 2>/dev/null; open -e "$LOG"; exit 1
 }
 
+# ---------------------------------------------------------------- 0. Progress window, empty
+# Opened first, empty, at the form's size and place; the form opens on top of it. Pressing
+# "Instalar" closes the form and this window is already there: no gap between screens.
+SIZE=(--width 620 --height 640 --position center)
+: > "$CMD"
+TITLES=("Herramientas de Apple (git)" "mise" "Motor de instalación (Dagu)" "Cuenta de GitHub")
+IDS=("" "" "" "")
+while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.tsv"
+ENGINE_ITEM=${#TITLES[@]}; TITLES+=("Sesión del motor de IA")
+"$DIALOG" "${STYLE[@]}" --title none --message " " --progress ${#TITLES[@]} --commandfile "$CMD" \
+  --button1text "Cancelar" "${SIZE[@]}" --moveable &
+DIALOG_PID=$!
+sleep 1
+
 # ---------------------------------------------------------------- 1. Welcome form
 default_name="Mi proyecto"
 # FYSO_AUTO=1 (tests): skip the form, take FYSO_NAME / FYSO_FOLDER / FYSO_ENGINE, close at the end.
@@ -78,7 +92,7 @@ else
       --textfield "Puerto,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=Usá un múltiplo de 10 (8400, 8410…)" \
       --selecttitle "Motor de IA que ya usás" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
       --infobuttontext "Cambiar carpeta…" --button1text "Instalar" --button2text "Cancelar" \
-      --width 620 --height 600 --moveable)
+      "${SIZE[@]}" --ontop --moveable)
     rc=$?
     field() { printf '%s\n' "$answers" | sed -n "s/^\"*$1\"* : \"*\(.*[^\"]\)\"*$/\1/p" | head -1; }
     v=$(field "Nombre del proyecto"); [ -n "$v" ] && NAME=$v
@@ -93,7 +107,7 @@ else
       3) PORT=""; start=$FOLDER; [ -d "$start" ] || start=$HOME   # the default folder may not exist yet
          picked=$(osascript -e "POSIX path of (choose folder with prompt \"Elegí dónde crear tu proyecto Fyso\" default location (POSIX file \"$start\"))" 2>/dev/null) \
            && FOLDER=${picked%/} ;;   # cancel keeps the previous folder
-      *) exit 0 ;;
+      *) ui "quit:"; exit 0 ;;
     esac
   done
 fi
@@ -106,21 +120,11 @@ case $SLUG in [a-z]?*) ;; *) SLUG="fyso-$SLUG"; SLUG=${SLUG%-} ;; esac
 DIR="$FOLDER/$SLUG"; n=2; while [ -e "$DIR" ]; do DIR="$FOLDER/$SLUG-$n"; n=$((n+1)); done
 echo "name=$NAME slug=$SLUG dir=$DIR port=$PORT engine=$ENGINE"
 
-# ---------------------------------------------------------------- 2. Progress window
-# Items: fixed preparation steps, then the workflow steps (Resources/steps.tsv: id<TAB>title).
-: > "$CMD"
-TITLES=("Herramientas de Apple (git)" "mise" "Motor de instalación (Dagu)" "Cuenta de GitHub")
-IDS=("" "" "" "")
-while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.tsv"
-ENGINE_ITEM=${#TITLES[@]}; TITLES+=("Sesión de $( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')")
-args=(); for t in "${TITLES[@]}"; do args+=(--listitem "$t"); done
-"$DIALOG" "${STYLE[@]}" --title none \
-  --message "### Instalando $NAME\n\nEn \`$(short "$DIR")\`" "${args[@]}" \
-  --progress ${#TITLES[@]} --commandfile "$CMD" --button1text "Cancelar" \
-  --width 620 --height 640 --moveable --ontop &
-DIALOG_PID=$!
-sleep 1
-for i in "${!TITLES[@]}"; do item "$i" pending; done
+# ---------------------------------------------------------------- 2. Fill the progress window
+TITLES[$ENGINE_ITEM]="Sesión de $( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')"
+ui "message: ### Instalando $NAME\\n\\nEn \`$(short "$DIR")\`"
+for t in "${TITLES[@]}"; do ui "listitem: add, title: $t, status: pending"; done
+ui "activate:"
 done_count=0; step_done() { done_count=$((done_count+1)); ui "progress: $done_count"; }
 cancelled() { dialog_alive || { echo "cancelled by the person"; [ -n "${DAGU_PID:-}" ] && kill "$DAGU_PID" 2>/dev/null; exit 130; }; }
 
@@ -230,36 +234,41 @@ if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext="la qu
 elif login_ok "$ADMIN" admin; then pwtext="\`admin\` (cambiala con \`mise run secrets\`)"
 else pwtext="la que elegiste (no pudimos comprobarla)"; fi
 ui "message: ### ¡Listo!\\n\\nTu proyecto **$NAME** está corriendo.\\n\\n**Panel:** http://panel.localhost:$PORT\\n\\n**Usuario:** \`$ADMIN\` · **Contraseña:** $pwtext"
-ui "button1text: Continuar"; ui "button1: enable"
+# ---------------------------------------------------------------- 5. Connect agents (D36)
+# Offer the agents found on this Mac: desktop apps checked, Claude Code CLI as an option.
+# The connect screen opens underneath (same size and place) before "Continuar" is enabled,
+# so closing the progress window reveals it with no gap. Needs the project's agent:connect.
+boxes=(); found=""
+if [ -f "$DIR/framework/scripts/agent-connect.cjs" ]; then
+  found=$("$MISE" -C "$DIR" exec -- node framework/scripts/agent-connect.cjs --list 2>/dev/null | awk -F'\t' '$2=="found"')
+  while IFS=$'\t' read -r id _ kind label; do
+    [ -n "$id" ] && boxes+=(--checkbox "{\"label\":\"$label\",\"name\":\"$id\",\"checked\":$( [ "$kind" = desktop ] && echo true || echo false )}")
+  done <<< "$found"
+fi
+CONNECT_OUT="$WORK/connect.out"; : > "$CONNECT_OUT"; CONNECT_PID=""
+if [ ${#boxes[@]} -gt 0 ] && [ "${FYSO_AUTO:-}" != 1 ]; then
+  "$DIALOG" "${STYLE[@]}" --title none \
+    --message "### Conectá tu asistente\n\nAsí podés manejar **$NAME** desde Claude o Codex: crear bots, instalar extensiones, revisar el estado. Agregamos el servidor \`fyso-$SLUG\` a cada uno; las apps de escritorio lo cargan al reiniciarse." \
+    "${boxes[@]}" --button1text "Conectar y abrir panel" --button2text "Omitir" "${SIZE[@]}" --moveable > "$CONNECT_OUT" &
+  CONNECT_PID=$!
+  sleep 1; ui "activate:"   # keep the finished progress window in front
+fi
+if [ ${#boxes[@]} -gt 0 ]; then ui "button1text: Continuar"; else ui "button1text: Abrir panel"; fi
+ui "button1: enable"
 if [ "${FYSO_AUTO:-}" = 1 ]; then sleep 4; ui "quit:"; fi
 wait "$DIALOG_PID"
 
-# ---------------------------------------------------------------- 5. Connect agents (D36)
-# Offer the agents found on this Mac: desktop apps checked, Claude Code CLI as an option.
-# Uses the project's own `agent:connect` (templates without it skip this screen).
-connect_out=""
-if [ -f "$DIR/framework/scripts/agent-connect.cjs" ]; then
-  found=$("$MISE" -C "$DIR" exec -- node framework/scripts/agent-connect.cjs --list 2>/dev/null | awk -F'\t' '$2=="found"')
-  if [ -n "$found" ]; then
-    boxes=()
-    while IFS=$'\t' read -r id _ kind label; do
-      boxes+=(--checkbox "{\"label\":\"$label\",\"name\":\"$id\",\"checked\":$( [ "$kind" = desktop ] && echo true || echo false )}")
-    done <<< "$found"
-    if [ "${FYSO_AUTO:-}" = 1 ]; then picks=${FYSO_CONNECT:-}
-    else
-      out=$("$DIALOG" "${STYLE[@]}" --title none \
-        --message "### Conectá tu asistente\n\nAsí podés manejar **$NAME** desde Claude o Codex: crear bots, instalar extensiones, revisar el estado. Agregamos el servidor \`fyso-$SLUG\` a cada uno; las apps de escritorio lo cargan al reiniciarse." \
-        "${boxes[@]}" --button1text "Conectar y abrir panel" --button2text "Omitir" --width 620 --height 440 --moveable)
-      [ $? -eq 0 ] && picks=$(printf '%s\n' "$out" | sed -n 's/^"*\([a-z-]*\)"* : "*true"*$/\1/p' | tr '\n' ' ')
-    fi
-    if [ -n "${picks// /}" ]; then
-      connect_out=$("$MISE" -C "$DIR" run agent:connect $picks 2>&1); echo "$connect_out"
-    fi
-  fi
+picks=""; connect_out=""
+if [ "${FYSO_AUTO:-}" = 1 ]; then picks=${FYSO_CONNECT:-}
+elif [ -n "$CONNECT_PID" ]; then
+  wait "$CONNECT_PID" && picks=$(sed -n 's/^"*\([a-z-]*\)"* : "*true"*$/\1/p' "$CONNECT_OUT" | tr '\n' ' ')
+fi
+if [ -n "${picks// /}" ]; then
+  connect_out=$("$MISE" -C "$DIR" run agent:connect $picks 2>&1); echo "$connect_out"
 fi
 [ "${FYSO_AUTO:-}" = 1 ] && { echo "done: http://panel.localhost:$PORT"; echo "connect: ${picks:-none}"; exit 0; }
 if [ -n "$connect_out" ]; then
   "$DIALOG" "${STYLE[@]}" --title none --message "### Asistentes conectados\n\n$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" \
-    --button1text "Abrir panel" --width 560 --height 320 --moveable
+    --button1text "Abrir panel" "${SIZE[@]}" --moveable
 fi
 open "http://panel.localhost:$PORT"

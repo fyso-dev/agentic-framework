@@ -53,7 +53,9 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$iconset" -o "$R/Fyso.icns"; rm -rf "$tmp"
 
-install -m 755 fyso-installer.sh "$APP/Contents/MacOS/fyso-installer"
+# Template ref the app installs from (default main; e.g. INSTALLER_REF=my-branch to test a branch).
+sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/MacOS/fyso-installer"
+chmod 755 "$APP/Contents/MacOS/fyso-installer"
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
