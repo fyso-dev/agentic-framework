@@ -44,7 +44,7 @@ export function App() {
       screen = <Mcp />;
       break;
     case "apps":
-      screen = <Apps />;
+      screen = <Apps tab={route.tab ?? "open"} />;
       break;
     default:
       screen = <Setup />;

@@ -267,7 +267,24 @@
     "emptyTitle": "Este proyecto todavía no tiene apps propias.",
     "emptyHint": "Copia la plantilla para crear la primera:",
     "emptyCommand": "cp -r framework/apps/_template project/apps/mi-app",
-    "extension": "Apps de extensiones"
+    "extension": "Apps de extensiones",
+    "tabOpen": "Abrir",
+    "tabExt": "Extensiones",
+    "updates_one": "{{count}} actualización disponible",
+    "updates_other": "{{count}} actualizaciones disponibles",
+    "openAria": "{{name}}, abrir en una pestaña nueva",
+    "offAria": "{{name}} (apagada)",
+    "healthTip": {
+      "ok": "Funcionando · {{host}}",
+      "down": "No responde en el último chequeo · {{host}}",
+      "unknown": "Sin chequear todavía · {{host}}"
+    },
+    "downFlag": "No responde",
+    "downTip": "Revisa sus registros en Dagu",
+    "offTip": "Se enciende en project/apps",
+    "add": "Crear una app del proyecto",
+    "addTip": "Copia la plantilla: {{command}}",
+    "addCopied": "Comando copiado"
   },
   "observ": {
     "title": "Observabilidad",
@@ -374,7 +391,15 @@
     "manage": "Quitar una extensión se hace desde la terminal. Para actualizar todas:",
     "emptyTitle": "No hay extensiones instaladas.",
     "emptyHint": "Instala una desde el marketplace o desde su repo:",
-    "emptyCommand": "mise run ext:add gh:org/fyso-ext-nombre"
+    "emptyCommand": "mise run ext:add gh:org/fyso-ext-nombre",
+    "installedTitle": "Instaladas",
+    "source": "Origen",
+    "readyTip": "Todos los secretos obligatorios están cargados",
+    "mcpTip": "Servidores MCP",
+    "workflowsTip": "Workflows",
+    "skillsTip": "Skills: actívalas en un bot",
+    "appsTip": "Apps",
+    "versionTip": "Versión instalada"
   },
   "market": {
     "title": "Marketplace",
@@ -394,7 +419,20 @@
     "done": "{{id}} {{version}} quedó instalada en un commit ({{commit}}). Si declara secretos, cárgalos con:",
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commit, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
-    "tags": "Etiquetas"
+    "tags": "Etiquetas",
+    "catalogTitle": "Catálogo",
+    "search": "Buscar",
+    "searchLabel": "Buscar extensiones",
+    "refreshTip": "Actualizar catálogo · {{names}}",
+    "commitTip": "Crea un commit solo con los archivos de la extensión",
+    "site": "Sitio de la extensión",
+    "latestTip": "Última versión publicada",
+    "installedTip": "Instalada {{version}}",
+    "installShort": "Instalar",
+    "installedShort": "Instalada",
+    "noMatch": "Ninguna extensión coincide con la búsqueda.",
+    "terminal": "Desde la terminal",
+    "removeNote": "Quitar una extensión se hace solo desde la terminal."
   },
   "extensionPage": {
     "missing": "La página de la extensión no está instalada.",
@@ -418,7 +456,6 @@
   "connectors": {
     "title": "Conectores",
     "subtitle": "Conecta tus aplicaciones y elige qué bots pueden usarlas.",
-    "manage": "Administrar conectores",
     "refresh": "Actualizar",
     "loading": "Consultando…",
     "apps": "Aplicaciones",
