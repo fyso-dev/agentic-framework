@@ -32,7 +32,7 @@ function HealthLabel({ health }: { health: Health }) {
     );
   const [cls, glyph] = health === "down" ? ["pill-down pill-surface", "×"] : ["pill-unk", "?"];
   return (
-    <span className={`pill ${cls}`} style={health === "down" ? { color: "var(--down)" } : undefined}>
+    <span className={`pill ${cls}`} style={health === "down" ? { color: "var(--fy-down)" } : undefined}>
       <span aria-hidden="true" className="glyph">{glyph}</span>
       {t(`apps.health.${health}`)}
     </span>
@@ -66,7 +66,7 @@ function AppRow({ app }: { app: App }) {
           <span className="pill pill-unk"><span aria-hidden="true" className="glyph">○</span>{t("apps.off")}</span>
         )}
       </span>
-      <span className="app-open" style={app.enabled ? undefined : { color: "var(--mute)" }}>
+      <span className="app-open" style={app.enabled ? undefined : { color: "var(--fy-mute)" }}>
         {app.enabled ? <>{t("apps.open")} <span aria-hidden="true">↗</span></> : t("apps.off")}
       </span>
     </>
@@ -90,12 +90,12 @@ function Skeleton() {
     <ul className="card list" aria-hidden="true">
       {[0, 1].map((i) => (
         <li key={i} className="row app-row fy-sk">
-          <span className="skel" style={{ width: 32, height: 32, borderRadius: 8 }} />
+          <span className="skel" style={{ width: 32, height: 32, borderRadius: "var(--fy-radius-md)" }} />
           <span className="grow" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span className="skel" style={{ width: "40%", height: 10 }} />
             <span className="skel" style={{ width: "25%", height: 8 }} />
           </span>
-          <span className="skel" style={{ width: 64, height: 30, borderRadius: 999 }} />
+          <span className="skel" style={{ width: 64, height: 30, borderRadius: "var(--fy-radius-pill)" }} />
         </li>
       ))}
     </ul>
@@ -153,7 +153,7 @@ function Extensions() {
         <Skeleton />
       ) : s.extensions.status === "error" ? (
         <div role="alert" className="banner banner-down">
-          <p className="grow"><strong style={{ color: "var(--down)" }}>{t("common.loadError", { what: "extensions.json" })}</strong> {s.extensions.error}</p>
+          <p className="grow"><strong style={{ color: "var(--fy-down)" }}>{t("common.loadError", { what: "extensions.json" })}</strong> {s.extensions.error}</p>
         </div>
       ) : list.length > 0 ? (
         <>
@@ -196,7 +196,7 @@ function MarketRow({ entry, install, target, onInstall }: {
     control = <span className="pill pill-ok"><span aria-hidden="true" className="glyph">✓</span>{t("market.installed", { version: entry.version ?? "" })}</span>;
   } else {
     control = (
-      <button type="button" className={`btn ${entry.update ? "btn-ghost" : "btn-pri"}`} disabled={busy} onClick={() => onInstall(entry)}>
+      <button type="button" className={`btn ${entry.update ? "btn-soft" : "btn-pri"}`} disabled={busy} onClick={() => onInstall(entry)}>
         {entry.update ? t("market.update", { version: entry.latest }) : t("market.install", { version: entry.latest })}
       </button>
     );
@@ -317,8 +317,8 @@ export function Apps() {
       </div>
       {s.apps.status === "error" && (
         <div role="alert" className="banner banner-down">
-          <p className="grow"><strong style={{ color: "var(--down)" }}>{t("common.loadError", { what: "apps.json" })}</strong> {s.apps.error}</p>
-          <button type="button" className="btn btn-ghost" onClick={s.reload}>{t("common.retry")}</button>
+          <p className="grow"><strong style={{ color: "var(--fy-down)" }}>{t("common.loadError", { what: "apps.json" })}</strong> {s.apps.error}</p>
+          <button type="button" className="btn btn-sm btn-soft" onClick={s.reload}>{t("common.retry")}</button>
         </div>
       )}
       {groups.map((g) => (

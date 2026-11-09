@@ -14,3 +14,15 @@ test('the bot form versions one connector selection and preserves other profiles
   upsertBot(doc,0,{name:'One',title:'Another title',model:'codex/model',soulText:null,usesWorkflows:true});
   assert.deepEqual(readBots(doc)[0].tools,tools);
 });
+test('the bot detail reads and writes approval, falling back to defaults and to ask',async()=>{
+  const {parseTeam,readBots,upsertBot,serializeTeam}=await import('../template/framework/panel/src/lib/team.ts');
+  const text='version: 1\ndefaults:\n  approval: full\nbots:\n  - name: Inherits\n    model: codex/model\n  - name: Asks\n    model: codex/model\n    approval: ask   # keep this comment\n';
+  const doc=parseTeam(text);
+  assert.deepEqual(readBots(doc).map(b=>b.approval),['full','ask']);
+  assert.equal(readBots(parseTeam('version: 1\nbots:\n  - name: Bare\n    model: codex/model\n'))[0].approval,'ask');
+  upsertBot(doc,1,{name:'Asks',title:'',model:'codex/model',soulText:null,usesWorkflows:false,approval:'full'});
+  assert.equal(readBots(doc)[1].approval,'full');
+  upsertBot(doc,0,{name:'Inherits',title:'',model:'codex/model',soulText:null,usesWorkflows:false});
+  assert.equal(doc.getIn(['bots',0,'approval']),undefined,'omitting approval keeps the inherited default');
+  assert.ok(serializeTeam(doc).includes('# keep this comment'));
+});

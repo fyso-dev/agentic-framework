@@ -633,5 +633,71 @@
     "check": "I authorized my account · check",
     "back": "Return to catalog",
     "checkFailed": "Could not check the connection yet. Select I authorized my account · check to retry."
+  },
+  "detail": {
+    "tabs": "Bot sections",
+    "tab": {
+      "perfil": "Profile",
+      "instrucciones": "Instructions",
+      "conectores": "Connectors"
+    },
+    "hasErrors": "Some fields need review",
+    "chat": "Chat in OpenMausBot",
+    "try": "Try in OpenMausBot",
+    "tip": "Role in one sentence, concrete rules and one example",
+    "addSection": "Add section",
+    "section": {
+      "role": "Role",
+      "rules": "Rules",
+      "tone": "Tone",
+      "examples": "Examples"
+    },
+    "soulPlaceholder": "Describe the bot's role, its rules and one example.",
+    "thinksWith": "Thinks with",
+    "autonomy": "Autonomy",
+    "approval": {
+      "ask": "Asks",
+      "askTip": "Asks for permission before acting",
+      "full": "Alone",
+      "fullTip": "Acts without asking"
+    },
+    "activity": {
+      "title": "Activity",
+      "more": "See more",
+      "window": "From {{from}} to {{to}}",
+      "none": "No observability data yet",
+      "conversations": "Conversations",
+      "tools": "Tools used",
+      "failed": "Conversations with errors",
+      "cost": "Estimated usage"
+    },
+    "meta": {
+      "soul": "Instructions",
+      "inline": "In team.yaml",
+      "default": "Default",
+      "skills": "Skills",
+      "noSkills": "No skills",
+      "commit": "Latest version in the project"
+    },
+    "projectTools": "Project",
+    "projectToolsSub": "Workflows and runs",
+    "appSub": "Connected application",
+    "access": {
+      "read": "Read",
+      "readTip": "Read only",
+      "write": "Write",
+      "writeTip": "Read and write",
+      "full": "Full",
+      "fullTip": "Full access",
+      "partial": "Partial access: kept until you change it",
+      "partialShort": "Partial"
+    },
+    "removeAccess": "Remove access",
+    "addAccess": "Give access to another application",
+    "connectNew": "Connect a new application",
+    "unsaved": "Unsaved",
+    "discard": "Discard",
+    "saveFailed": "Could not save the accesses",
+    "saveTipApps": "Application accesses apply on save; everything else stays pending until “Review and apply”."
   }
 }

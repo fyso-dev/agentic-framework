@@ -1,15 +1,22 @@
-// Bot form: edits one bot of the draft team.yaml (name, role, model, base
-// instructions, "uses workflows"). Saving does not apply; it leaves the change pending.
+// Bot detail (B1.3): one bot in three tabs — Perfil, Instrucciones, Conectores —
+// and one Save for everything. team.yaml fields go to the local draft (applied later
+// with "Revisar y aplicar"); app grants are planned and applied by fyso-app-access.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine } from "../api/types";
-import { BotConnectors } from "../components/BotConnectors";
-import type { ToolScope } from "../lib/connector-access";
-import { Avatar, Modal, Switch } from "../components/ui";
-import { go, href } from "../lib/router";
+import type { Engine, RuntimeBot } from "../api/types";
+import type { Observation } from "../api/observability";
+import { BotAccess, useAppAccess, useMcpInventory, type Level } from "../components/BotAccess";
 import {
-  byteLength, NAME_MAX, parseTeam, removeBot, serializeTeam,
- SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, upsertBot, type Bot,
+  IconAlert, IconArrowUpRight, IconBack, IconBolt, IconBulb, IconChat, IconCommit, IconDoc, IconHand, IconLayers,
+  IconPerson, IconPlay, IconPlug, IconShield, IconSparkle, IconTrash, IconTrend, IconUndo, IconWrench, Spinner,
+} from "../components/Icons";
+import { Avatar, Modal } from "../components/ui";
+import { botActivity } from "../lib/bot-activity";
+import { accessFor, type ToolScope } from "../lib/connector-access";
+import { go, href, type BotTab } from "../lib/router";
+import {
+  byteLength, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
+  SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
 import { BotStatePill } from "./Bots";
@@ -30,65 +37,67 @@ function useEngines(bots: Bot[]): { list: Engine[]; checked: boolean } {
   }, [checkData, bots]);
 }
 
-export function BotForm({ index,focusConnectors }: { index: number | null;focusConnectors?:boolean }) {
-  const s = useStore();
-  const { t } = useTranslation();
-  if (s.team.status !== "ok") return <main className="page page-narrow"><p className="mute">{t("common.loading")}</p></main>;
-  const bot = index === null ? null : s.workingBots.find((b) => b.index === index) ?? null;
-  if (index !== null && !bot) return <NotFound />;
-  return <Form key={index ?? "new"} bot={bot} focusConnectors={focusConnectors} />;
-}
+const SECTIONS = ["role", "rules", "tone", "examples"] as const;
 
-function NotFound() {
-  const { t } = useTranslation();
-  return (
-    <main className="page page-narrow">
-      <p style={{ fontSize: 13 }}><a href={href.bots} style={{ textDecoration: "none" }}>← {t("form.back")}</a></p>
-      <div className="card empty"><p>{t("form.notFound")}</p></div>
-    </main>
-  );
-}
-
-function Form({ bot,focusConnectors }: { bot: Bot | null;focusConnectors?:boolean }) {
+export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null; tab?: BotTab; runtime?: RuntimeBot; observation?: Observation }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const id = useId();
   const engines = useEngines(s.workingBots);
   const row = bot ? s.rows.find((r) => r.bot.index === bot.index && r.state !== "deleted") : undefined;
-  const base = bot ? s.baseBots.find((b) => b.name === bot.name) : undefined;
   const firstOk = engines.list.find((e) => e.ok) ?? engines.list[0];
+  const omb = s.project.data?.urls.omb;
 
-  const [name, setName] = useState(bot?.name ?? "");
-  const [title, setTitle] = useState(bot?.title ?? "");
-  const [engine, setEngine] = useState(bot?.engine || firstOk?.id || "");
-  const [model, setModel] = useState(bot?.modelId || firstOk?.models[0] || "");
-  const initialSoul = bot?.soul.kind === "inline" ? bot.soul.text : "";
-  const [soul, setSoul] = useState(initialSoul);
-  const [uses, setUses] = useState(bot ? bot.usesWorkflows : true);
-  const [connectorScope,setConnectorScope]=useState<ToolScope|undefined>(bot?.tools);
-  const [connectorsChanged,setConnectorsChanged]=useState(false);
-  const matches=bot?(s.runtimeBots.data||[]).filter(native=>native.name===bot.name):[];
-  const runtime=matches.length===1?matches[0]:undefined;
-  useEffect(()=>{if(!connectorsChanged && !s.draft)setConnectorScope(runtime?runtime.toolScope:bot?.tools);},[runtime,connectorsChanged,s.draft,bot?.tools]);
+  const initial = useMemo(() => ({
+    name: bot?.name ?? "",
+    title: bot?.title ?? "",
+    engine: bot?.engine || firstOk?.id || "",
+    model: bot?.modelId || firstOk?.models[0] || "",
+    approval: (bot?.approval ?? "ask") as Approval,
+    soul: bot?.soul.kind === "inline" ? bot.soul.text : "",
+    uses: bot ? bot.usesWorkflows : true,
+  }), [bot?.fingerprint, firstOk?.id]);
+
+  const [current, setTab] = useState<BotTab>(tab ?? "perfil");
+  useEffect(() => { if (tab) setTab(tab); }, [tab]);
+  const pickTab = (next: BotTab) => {
+    setTab(next);
+    history.replaceState(null, "", href.botTab(bot?.index ?? null, next));
+  };
+
+  const [name, setName] = useState(initial.name);
+  const [title, setTitle] = useState(initial.title);
+  const [engine, setEngine] = useState(initial.engine);
+  const [model, setModel] = useState(initial.model);
+  const [approval, setApproval] = useState<Approval>(initial.approval);
+  const [soul, setSoul] = useState(initial.soul);
+  const [uses, setUses] = useState(initial.uses);
+  const [scope, setScope] = useState<ToolScope | undefined>(runtime?.toolScope ?? bot?.tools);
+  const [scopeChanged, setScopeChanged] = useState(false);
+  const [appChanges, setAppChanges] = useState<Record<string, Level>>({});
+  useEffect(() => { if (!scopeChanged && !s.draft) setScope(runtime ? runtime.toolScope : bot?.tools); }, [runtime, scopeChanged, s.draft, bot?.tools]);
+
   const [errors, setErrors] = useState<Errors>({});
-  const [showSummary, setShowSummary] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const soulRef = useRef<HTMLTextAreaElement>(null);
 
-  // On phones the form has its own header and a fixed footer (board 11).
-  useEffect(() => {
-    document.body.classList.add("with-form-foot");
-    return () => document.body.classList.remove("with-form-foot");
-  }, []);
+  const mcp = useMcpInventory(scope, runtime, uses);
+  const apps = useAppAccess(runtime?.id);
 
-  useEffect(()=>{if(focusConnectors){const section=document.getElementById('bot-connectors');section?.focus({preventScroll:true});section?.scrollIntoView({block:'start'});}},[focusConnectors]);
-  const current = engines.list.find((e) => e.id === engine);
+  const currentEngine = engines.list.find((e) => e.id === engine);
   const models = useMemo(() => {
-    const list = current?.models ?? [];
+    const list = currentEngine?.models ?? [];
     return model && !list.includes(model) ? [model, ...list] : list;
-  }, [current, model]);
+  }, [currentEngine, model]);
   const bytes = byteLength(soul);
   const num = new Intl.NumberFormat(i18n.language);
+
+  const teamDirty = !bot || name !== initial.name || title !== initial.title || engine !== initial.engine || model !== initial.model
+    || approval !== initial.approval || soul !== initial.soul || uses !== initial.uses || scopeChanged;
+  const appsDirty = Object.keys(appChanges).length > 0;
+  const dirty = teamDirty || appsDirty;
 
   const nameError = (v: string): string | undefined => {
     const n = v.trim();
@@ -97,35 +106,47 @@ function Form({ bot,focusConnectors }: { bot: Bot | null;focusConnectors?:boolea
     if (s.workingBots.some((b) => b.name === n && b.index !== bot?.index) || (n === "MausBot" && !bot)) return t("form.errNameDup");
     return undefined;
   };
-  const soulError = (len: number) =>
-    len > SOUL_MAX_BYTES ? t("form.errSoulLong", { extra: num.format(len - SOUL_MAX_BYTES) }) : undefined;
+  const soulError = (len: number) => (len > SOUL_MAX_BYTES ? t("form.errSoulLong", { extra: num.format(len - SOUL_MAX_BYTES) }) : undefined);
 
   const pickEngine = (e: Engine) => {
     setEngine(e.id);
     if (!e.models.includes(model)) setModel(e.models[0] ?? "");
   };
 
-  const save = () => {
+  const discard = () => {
+    setName(initial.name); setTitle(initial.title); setEngine(initial.engine); setModel(initial.model);
+    setApproval(initial.approval); setSoul(initial.soul); setUses(initial.uses);
+    setScope(runtime ? runtime.toolScope : bot?.tools); setScopeChanged(false); setAppChanges({});
+    setErrors({}); setSaveFailed(false);
+  };
+
+  const save = async () => {
     const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel") };
     setErrors(next);
-    const count = Object.values(next).filter(Boolean).length;
-    if (count > 0) {
-      setShowSummary(true);
-      requestAnimationFrame(() => summaryRef.current?.focus());
-      return;
+    if (next.name || next.model) { pickTab("perfil"); return; }
+    if (next.soul) { pickTab("instrucciones"); requestAnimationFrame(() => soulRef.current?.focus()); return; }
+    setSaving(true); setSaveFailed(false);
+    let index = bot?.index ?? null;
+    if (teamDirty) {
+      const doc = parseTeam(s.workingText ?? "version: 1\nbots: []\n");
+      const soulChanged = bot?.soul.kind === "file" ? soul.trim() !== "" : soul !== initial.soul;
+      upsertBot(doc, index, {
+        name, title, approval,
+        model: engine ? `${engine}/${model}` : model,
+        soulText: soulChanged ? soul : null,
+        usesWorkflows: uses,
+        ...(scopeChanged ? { tools: scope || {} } : {}),
+      });
+      if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
+      s.setDraft(serializeTeam(doc));
+      setScopeChanged(false);
     }
-    const doc = parseTeam(s.workingText ?? "version: 1\nbots: []\n");
-    const soulChanged = bot?.soul.kind === "file" ? soul.trim() !== "" : soul !== initialSoul;
-    upsertBot(doc, bot?.index ?? null, {
-      name,
-      title,
-      model: engine ? `${engine}/${model}` : model,
-      soulText: soulChanged ? soul : null,
-      usesWorkflows: uses,
-      ...(connectorsChanged?{tools:connectorScope||{}}:{}),
-    });
-    s.setDraft(serializeTeam(doc));
-    go(href.bots);
+    if (appsDirty) {
+      const ok = await apps.save(appChanges);
+      if (ok) setAppChanges({}); else setSaveFailed(true);
+    }
+    setSaving(false);
+    if (!bot && index !== null) go(href.botTab(index, current));
   };
 
   const remove = () => {
@@ -136,173 +157,186 @@ function Form({ bot,focusConnectors }: { bot: Bot | null;focusConnectors?:boolea
     go(href.bots);
   };
 
-  const errorCount = Object.values(errors).filter(Boolean).length;
-  const heading = bot ? bot.name : t("form.newTitle");
-  const bad = engines.list.find((e) => !e.ok);
+  const insertSection = (key: (typeof SECTIONS)[number]) => {
+    const heading = `## ${t(`detail.section.${key}`)}\n`;
+    const el = soulRef.current;
+    const at = el ? el.selectionStart : soul.length;
+    const before = soul.slice(0, at), after = soul.slice(at);
+    const lead = before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "";
+    const text = before + lead + heading + after;
+    setSoul(text);
+    setErrors((x) => ({ ...x, soul: soulError(byteLength(text)) }));
+    requestAnimationFrame(() => { if (el) { const pos = (before + lead + heading).length; el.focus(); el.setSelectionRange(pos, pos); } });
+  };
+
+  const activity = bot && observation ? botActivity(observation, { name: bot.name, id: runtime?.id }) : undefined;
+  const money = (v: number | null) => v === null ? "—" : new Intl.NumberFormat(i18n.language, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(v);
+  const stat = (v: number | undefined) => v === undefined ? "—" : num.format(v);
+  const windowTip = activity ? t("detail.activity.window", { from: activity.from, to: activity.to }) : t("detail.activity.none");
+
+  const connCount = (uses ? 1 : 0)
+    + mcp.rows.filter((r) => accessFor(scope, r.name) !== "none").length
+    + apps.slugs.filter((slug) => (appChanges[slug] ?? apps.level(slug)) !== "off").length;
+  const heading = bot ? bot.name : name.trim() || t("form.newTitle");
+  const commit = s.botVersioning.data?.commit;
+  const soulOver = bytes > SOUL_MAX_BYTES, soulWarn = bytes >= SOUL_WARN_BYTES;
 
   return (
-    <main className="page page-narrow" style={{ gap: 14 }}>
-      <div className="mobile-head">
-        <a href={href.bots} aria-label={t("form.backAria")}>←</a>
-        <h1 className="ellipsis">{heading}</h1>
-        {bot && <button type="button" className="btn btn-text-danger" style={{ height: 36 }} onClick={() => setConfirmDelete(true)}>{t("form.deleteShort")}</button>}
-      </div>
-      <p className="desktop-head" style={{ padding: "0 4px", fontSize: 13 }}>
-        <a href={href.bots} style={{ textDecoration: "none" }}>← {t("form.back")}</a>
-      </p>
-      <div className="desktop-head" style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 4px" }}>
-        <Avatar name={bot ? bot.name : name || "+"} large />
+    <section className="card bd" aria-labelledby={`${id}-h`}>
+      <div className="bd-hero">
+        <a href={href.bots} className="bd-ib bd-back" aria-label={t("form.backAria")}><IconBack size={18} /></a>
+        <span className="bd-ava" aria-hidden="true"><Avatar name={bot ? bot.name : name || "+"} large /></span>
         <div className="grow" style={{ minWidth: 0 }}>
-          <h1 className="h1 ellipsis">{heading}</h1>
-          {row && row.state !== "applied" && <BotStatePill state={row.state} />}
+          <div className="bd-title">
+            <h2 id={`${id}-h`} className="ellipsis">{heading}</h2>
+            {row && row.state !== "applied" && <BotStatePill state={row.state} />}
+          </div>
+          {(bot?.title || title) && <p className="mute ellipsis">{title || bot?.title}</p>}
+        </div>
+        <div className="bd-toolbar">
+          {omb && <a href={omb} target="_blank" rel="noopener noreferrer" className="bd-ib" aria-label={t("detail.chat")} data-tip={t("detail.chat")}><IconChat size={18} /></a>}
+          {bot && omb && <span className="bd-sep" aria-hidden="true" />}
+          {bot && <button type="button" className="bd-ib danger tip-r" aria-label={t("form.delete")} data-tip={t("form.delete")} onClick={() => setConfirmDelete(true)}><IconTrash size={18} /></button>}
         </div>
       </div>
 
-      <form className="form card" noValidate onSubmit={(e) => { e.preventDefault(); save(); }}>
-        {showSummary && errorCount > 0 && (
-          <p ref={summaryRef} tabIndex={-1} role="alert" className="banner banner-down" style={{ margin: "20px 20px 0", color: "var(--down)", fontWeight: 700 }}>
-            × {t("form.errors", { count: errorCount })}
-          </p>
-        )}
-        <div className="form-grid">
-          <div className="field">
-            <label className="label" htmlFor={`${id}-name`}>{t("form.name")}</label>
-            <input
-              id={`${id}-name`}
-              className="input"
-              value={name}
-              maxLength={NAME_MAX + 20}
-              autoComplete="off"
-              aria-invalid={!!errors.name}
-              aria-describedby={errors.name ? `${id}-name-err` : undefined}
-              onChange={(e) => { setName(e.target.value); if (errors.name) setErrors({ ...errors, name: nameError(e.target.value) }); }}
-              onBlur={() => setErrors({ ...errors, name: nameError(name) })}
-            />
-            {errors.name && <p id={`${id}-name-err`} className="field-err">× {errors.name}</p>}
-          </div>
-          <div className="field">
-            <label className="label" htmlFor={`${id}-role`}>{t("form.role")} <span>· {t("form.roleHint")}</span></label>
-            <input id={`${id}-role`} className="input" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))} />
-          </div>
-        </div>
+      <div className="bd-tabs" role="tablist" aria-label={t("detail.tabs")}>
+        {([["perfil", IconPerson], ["instrucciones", IconDoc], ["conectores", IconPlug]] as const).map(([key, Icon]) => (
+          <button key={key} type="button" role="tab" id={`${id}-tab-${key}`} aria-controls={`${id}-panel`} aria-selected={current === key} onClick={() => pickTab(key)}>
+            <Icon size={16} />{t(`detail.tab.${key}`)}
+            {key === "conectores" && <span className="bd-cnt">{connCount}</span>}
+            {key === "perfil" && (errors.name || errors.model) && <span className="bd-errdot" aria-label={t("detail.hasErrors")} />}
+            {key === "instrucciones" && (errors.soul || soulOver) && <span className="bd-errdot" aria-label={t("detail.hasErrors")} />}
+          </button>
+        ))}
+      </div>
 
-        <fieldset className="form-sec">
-          <legend>{t("form.engine")}</legend>
-          <div className="engines" role="radiogroup" aria-label={t("form.engine")}>
-            {engines.list.map((e) => {
-              const on = e.id === engine;
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  className="engine"
-                  disabled={!e.ok && !on}
-                  onClick={() => pickEngine(e)}
-                >
-                  <span>
-                    <strong>{e.label}</strong>
-                    <span className="sub" style={{ display: "block" }}>
-                      {!e.ok ? t("form.unauth") : engines.checked ? t(`bots.kind.${e.kind}`) : t("form.unchecked")}
-                    </span>
-                  </span>
-                  <span aria-hidden="true" className="radio-dot">{on ? "●" : "○"}</span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="hint">
-            {engines.checked ? t("form.engineHint") : t("form.enginesUnchecked")}{" "}
-            {bad && <a href={href.setup}>{t("form.authEngine", { label: bad.label })}</a>}
-            {!engines.checked && <a href={href.setup}>{t("form.verifyEngines")}</a>}
-          </p>
-        </fieldset>
+      <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${current}`}>
+        {current === "perfil" && (
+          <div className="bd-panel">
+            <div className="bd-ident">
+              <div className="field">
+                <label className="label" htmlFor={`${id}-name`}>{t("form.name")}</label>
+                <input id={`${id}-name`} className="input" value={name} maxLength={NAME_MAX + 20} autoComplete="off"
+                  aria-invalid={!!errors.name} aria-describedby={errors.name ? `${id}-name-err` : undefined}
+                  onChange={(e) => { setName(e.target.value); if (errors.name) setErrors({ ...errors, name: nameError(e.target.value) }); }}
+                  onBlur={() => setErrors({ ...errors, name: nameError(name) })} />
+                {errors.name && <p id={`${id}-name-err`} className="field-err">× {errors.name}</p>}
+              </div>
+              <div className="field">
+                <label className="label" htmlFor={`${id}-role`}>{t("form.role")}</label>
+                <input id={`${id}-role`} className="input" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))} />
+              </div>
+            </div>
 
-        <div className="form-sec">
-          <label className="label" htmlFor={`${id}-model`}>{t("form.model")}</label>
-          <select id={`${id}-model`} className="select mono" value={model} onChange={(e) => setModel(e.target.value)} aria-invalid={!!errors.model}>
-            {models.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          {errors.model && <p className="field-err">× {errors.model}</p>}
-          {base && base.model !== `${engine}/${model}` && (
-            <p className="hint">{t("form.before")} <span className="mono">{base.modelId}</span></p>
-          )}
-        </div>
-
-        <div className="form-sec">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-            <label className="label" htmlFor={`${id}-soul`}>{t("form.instructions")} <span>· Markdown</span></label>
-            <span id={`${id}-count`} className={`counter${bytes > SOUL_MAX_BYTES ? " over" : bytes >= SOUL_WARN_BYTES ? " warn" : ""}`}>
-              {t("form.bytes", { used: num.format(bytes), max: num.format(SOUL_MAX_BYTES) })}
-            </span>
-          </div>
-          {bot?.soul.kind === "file" && (
-            <p className="soul-file">
-              <span>
-{t("form.soulFile")} <code>{soulFileLabel(bot.soul.file)}</code></span>
-            </p>
-          )}
-          <textarea
-            id={`${id}-soul`}
-            className="textarea"
-            rows={9}
-            value={soul}
-            placeholder={bot?.soul.kind === "file" ? t("form.soulFilePlaceholder") : undefined}
-            aria-invalid={!!errors.soul || bytes > SOUL_MAX_BYTES}
-            aria-describedby={`${id}-soul-help ${id}-count`}
-            onChange={(e) => { setSoul(e.target.value); setErrors((x) => ({ ...x, soul: soulError(byteLength(e.target.value)) })); }}
-          />
-          {errors.soul ? (
-            <p id={`${id}-soul-help`} className="field-err">× {errors.soul}</p>
-          ) : (
-            <p id={`${id}-soul-help`} className="hint">{t("form.instructionsHint")}</p>
-          )}
-        </div>
-
-        <div className="form-sec" style={{ gap: 2 }}>
-          <p className="label" style={{ marginBottom: 6 }}>{t("form.skills")}</p>
-          {(bot?.skills ?? []).length === 0 ? (
-            <p className="hint" style={{ paddingTop: 8, borderTop: "1px solid var(--line)" }}>{t("form.skillsNone")}</p>
-          ) : (
-            <>
-              {bot!.skills.map((k) => (
-                <div key={k} className="toggle-row">
-                  <p className="grow mono" style={{ fontSize: 13, fontWeight: 600 }}>{k}</p>
-                  <Switch checked label={k} disabled describedBy={`${id}-skills-ro`} />
+            {bot && (
+              <>
+                <div className="bd-stats-head">
+                  <span className="bd-cap" data-tip={windowTip} tabIndex={0}>{t("detail.activity.title")}</span>
+                  <a href={href.observability} className="bd-link">{t("detail.activity.more")}<IconArrowUpRight size={14} /></a>
                 </div>
-              ))}
-              <p id={`${id}-skills-ro`} className="hint" style={{ paddingTop: 6 }}>{t("form.skillsReadOnly")}</p>
-            </>
-          )}
-        </div>
+                <div className="bd-stats">
+                  <div className="bd-stat" data-tip={t("detail.activity.conversations")} tabIndex={0}><span className="bd-chip"><IconChat size={16} /></span><b>{stat(activity?.conversations)}</b><span className="sr-only">{t("detail.activity.conversations")}</span></div>
+                  <div className="bd-stat" data-tip={t("detail.activity.tools")} tabIndex={0}><span className="bd-chip"><IconWrench size={16} /></span><b>{stat(activity?.tools)}</b><span className="sr-only">{t("detail.activity.tools")}</span></div>
+                  <div className="bd-stat" data-tip={t("detail.activity.failed")} tabIndex={0}><span className={`bd-chip${activity?.failed ? " down" : ""}`}><IconAlert size={16} /></span><b>{stat(activity?.failed)}</b><span className="sr-only">{t("detail.activity.failed")}</span></div>
+                  <div className="bd-stat tip-r" data-tip={t("detail.activity.cost")} tabIndex={0}><span className="bd-chip"><IconTrend size={16} /></span><b>{activity ? money(activity.usd) : "—"}</b><span className="sr-only">{t("detail.activity.cost")}</span></div>
+                </div>
+              </>
+            )}
 
-        <BotConnectors scope={connectorScope} runtime={runtime} engine={engine} projectTools={uses} onChange={scope=>{setConnectorScope(scope);setConnectorsChanged(true);}} />
+            <div className="bd-settings">
+              <div className="bd-set">
+                <span className="bd-chip" data-tip={t("detail.thinksWith")} tabIndex={0} aria-label={t("detail.thinksWith")}><IconSparkle size={16} /></span>
+                <select className="bd-sel" aria-label={t("form.engine")} value={engine} onChange={(e) => { const next = engines.list.find((x) => x.id === e.target.value); if (next) pickEngine(next); }}>
+                  {engines.list.map((e) => <option key={e.id} value={e.id} disabled={!e.ok && e.id !== engine}>{e.label}{e.ok ? "" : ` · ${t("form.unauth")}`}</option>)}
+                </select>
+                <select className="bd-sel mono" aria-label={t("form.model")} value={model} aria-invalid={!!errors.model} onChange={(e) => setModel(e.target.value)} style={{ flex: "1 1 auto" }}>
+                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+                {!engines.checked && <a href={href.setup} className="bd-ib warn" aria-label={t("form.verifyEngines")} data-tip={t("form.enginesUnchecked")}><IconAlert size={16} /></a>}
+              </div>
+              <div className="bd-set">
+                <span className="bd-chip" data-tip={t("detail.autonomy")} tabIndex={0} aria-label={t("detail.autonomy")}><IconShield size={16} /></span>
+                <div className="bd-seg" role="group" aria-label={t("detail.autonomy")}>
+                  <button type="button" aria-pressed={approval === "ask"} onClick={() => setApproval("ask")} data-tip={t("detail.approval.askTip")}><IconHand size={16} />{t("detail.approval.ask")}</button>
+                  <button type="button" className="tip-r" aria-pressed={approval === "full"} onClick={() => setApproval("full")} data-tip={t("detail.approval.fullTip")}><IconBolt size={16} />{t("detail.approval.full")}</button>
+                </div>
+              </div>
+            </div>
+            {errors.model && <p className="field-err">× {errors.model}</p>}
 
-        <div className="toggle-box">
-          <div className="grow">
-            <p style={{ fontWeight: 700 }}>{t("form.workflows")}</p>
-            <p id={`${id}-wf`} className="hint">{bot?.usesWorkflows ? t("form.workflowsLocked") : t("form.workflowsHint")}</p>
+            {bot && (
+              <div className="bd-meta">
+                <span className="bd-mchip" data-tip={t("detail.meta.soul")} tabIndex={0}><IconDoc size={14} />{bot.soul.kind === "file" ? soulFileLabel(bot.soul.file).split("/").pop() : t(bot.soul.kind === "inline" ? "detail.meta.inline" : "detail.meta.default")}</span>
+                <span className="bd-mchip" data-tip={bot.skills.length ? t("form.skillsReadOnly") : t("detail.meta.skills")} tabIndex={0}><IconLayers size={14} />{bot.skills.length ? bot.skills.join(", ") : t("detail.meta.noSkills")}</span>
+                {commit && <span className="bd-mchip" data-tip={t("detail.meta.commit")} tabIndex={0}><IconCommit size={14} />{commit.slice(0, 7)}</span>}
+              </div>
+            )}
           </div>
-          <Switch checked={uses} onChange={setUses} label={t("form.workflows")} disabled={bot?.usesWorkflows} describedBy={`${id}-wf`} />
-        </div>
+        )}
 
-        <div className="form-foot">
-          {bot && <button type="button" className="btn btn-md btn-text-danger" onClick={() => setConfirmDelete(true)}>{t("form.delete")}</button>}
-          <span className="note">{t("form.saveNote")}</span>
-          <a href={href.bots} className="btn btn-md btn-ghost">{t("common.cancel")}</a>
-          <button type="submit" className="btn btn-md btn-pri" style={{ padding: "0 18px" }}>{t("form.save")}</button>
+        {current === "instrucciones" && (
+          <div className="bd-panel">
+            <div className={`bd-editor${soulOver ? " is-over" : ""}`}>
+              <div className="bd-editor-bar">
+                {SECTIONS.map((key) => (
+                  <button key={key} type="button" className="bd-sec" data-tip={t("detail.addSection")} onClick={() => insertSection(key)}>+ {t(`detail.section.${key}`)}</button>
+                ))}
+                <span className="grow" />
+                <span className="bd-ib" tabIndex={0} aria-label={t("detail.tip")} data-tip={t("detail.tip")}><IconBulb size={18} /></span>
+                {omb && <a href={omb} target="_blank" rel="noopener noreferrer" className="bd-ib accent tip-r" aria-label={t("detail.try")} data-tip={t("detail.try")}><IconPlay size={16} /></a>}
+              </div>
+              <label htmlFor={`${id}-soul`} className="sr-only">{t("form.instructions")}</label>
+              <textarea ref={soulRef} id={`${id}-soul`} value={soul}
+                placeholder={bot?.soul.kind === "file" ? t("form.soulFilePlaceholder") : t("detail.soulPlaceholder")}
+                aria-invalid={!!errors.soul || soulOver} aria-describedby={`${id}-count${errors.soul ? ` ${id}-soul-err` : ""}`}
+                onChange={(e) => { setSoul(e.target.value); setErrors((x) => ({ ...x, soul: soulError(byteLength(e.target.value)) })); }} />
+              <div className="bd-editor-foot">
+                {bot?.soul.kind === "file" && <span className="bd-mchip" data-tip={t("form.soulFile")} tabIndex={0}><IconDoc size={14} />{soulFileLabel(bot.soul.file)}</span>}
+                <span className="grow" />
+                <span id={`${id}-count`} className={`counter${soulOver ? " over" : soulWarn ? " warn" : ""}`}>{t("form.bytes", { used: num.format(bytes), max: num.format(SOUL_MAX_BYTES) })}</span>
+              </div>
+            </div>
+            {errors.soul && <p id={`${id}-soul-err`} className="field-err" style={{ marginTop: 8 }}>× {errors.soul}</p>}
+          </div>
+        )}
+
+        {current === "conectores" && (
+          <BotAccess
+            scope={scope} onScope={(next) => { setScope(next); setScopeChanged(true); }}
+            uses={uses} onUses={setUses} usesLocked={!!bot?.usesWorkflows}
+            runtime={runtime} botExists={!!bot} mcp={mcp} apps={apps}
+            appChanges={appChanges}
+            onAppChange={(slug, level) => setAppChanges((prev) => {
+              const next = { ...prev };
+              if (level === apps.level(slug)) delete next[slug]; else next[slug] = level;
+              return next;
+            })}
+          />
+        )}
+      </div>
+
+      {(dirty || saving || saveFailed) && (
+        <div role="status" className="bd-savebar">
+          {saveFailed ? <IconAlert size={16} className="bd-savebar-err" /> : <span className="bd-dot" aria-hidden="true" />}
+          <p>{t(saveFailed ? "detail.saveFailed" : bot ? "detail.unsaved" : "form.newTitle")}</p>
+          {bot && <button type="button" className="bd-ib" aria-label={t("detail.discard")} data-tip={t("detail.discard")} onClick={discard} disabled={saving}><IconUndo size={18} /></button>}
+          <button type="button" className="btn btn-pri bd-save" onClick={() => void save()} disabled={saving} aria-busy={saving}
+            data-tip={appsDirty ? t("detail.saveTipApps") : t("form.saveNote")}>
+            {saving && <Spinner />}{t("form.save")}
+          </button>
         </div>
-      </form>
+      )}
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} labelledBy="del-t" className="small" role="alertdialog">
         <div className="modal-head"><h2 id="del-t">{t("form.deleteTitle", { name: bot?.name ?? "" })}</h2></div>
         <div className="modal-body"><p className="mute">{t("form.deleteBody")}</p></div>
         <div className="modal-foot" style={{ justifyContent: "flex-end", borderTop: 0, paddingTop: 0 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>{t("common.cancel")}</button>
+          <button type="button" className="btn btn-soft" onClick={() => setConfirmDelete(false)}>{t("common.cancel")}</button>
           <button type="button" className="btn btn-danger" onClick={remove}>{t("form.delete")}</button>
         </div>
       </Modal>
-    </main>
+    </section>
   );
 }
+

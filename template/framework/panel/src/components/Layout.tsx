@@ -126,7 +126,7 @@ export function TopBar(props: ThemeProps) {
         <ThemeButton {...props} />
       </span>
       {p && (
-        <External href={p.urls.omb} className="btn btn-md btn-pri">
+        <External href={p.urls.omb} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
@@ -164,7 +164,7 @@ export function SideNav({ route }: { route: Route }) {
     connectors: null,
     observability: null,
     setup: loadingSteps(s) ? null : (
-      <span className="nav-count" style={{ color: open === 0 ? "var(--ok)" : s.anyFailed ? "var(--down)" : "var(--warn)", fontWeight: 600 }}>
+      <span className="nav-count" style={{ color: open === 0 ? "var(--fy-ok)" : s.anyFailed ? "var(--fy-down)" : "var(--fy-warn)", fontWeight: 700 }}>
         {s.stepsDone}/4
       </span>
     ),
@@ -172,7 +172,7 @@ export function SideNav({ route }: { route: Route }) {
       ? <span className="pill pill-warn">{t("nav.unapplied", { count: unapplied })}</span>
       : <span className="nav-count">{!s.mock && s.runtimeBots.data ? s.runtimeBots.data.length : s.workingBots.length}</span>,
     apps: down > 0
-      ? <span className="nav-count" style={{ color: "var(--warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
+      ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
       : <span className="nav-count">{s.apps.data?.length ?? ""}</span>,
   };
   return (

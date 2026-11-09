@@ -22,28 +22,26 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   assert.equal(await github.getByRole('button',{name:'Desconectar',exact:true}).count(),0);
   await github.getByRole('button',{name:'Eliminar conexión guardada',exact:true}).waitFor();
   await gmail.getByRole('button',{name:'Agregar cuenta',exact:true}).click();
-  await gmail.getByLabel('Nombrá la cuenta adicional de Gmail',{exact:true}).fill('Trabajo');
+  await gmail.getByLabel('Pon un nombre a la cuenta adicional de Gmail',{exact:true}).fill('Trabajo');
   assert.equal(await github.getByRole('textbox').count(),0);
   await gmail.getByRole('button',{name:'Cancelar',exact:true}).click();
   const folder=path.resolve(__dirname,'../artifacts/delivery-evidence/connector-account-visibility');fs.mkdirSync(folder,{recursive:true});
   await page.locator('#connector-apps').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(folder,'catalog-account-states.png')});
   await page.goto(base+'/?lang=es#/bots');
-  await page.locator('a[href*="section=connectors"]').first().click();
-  const apps=page.getByRole('region',{name:'Aplicaciones',exact:true});
-  await apps.getByText('Gmail',{exact:true}).waitFor();await apps.getByText('GitHub',{exact:true}).waitFor();
-  await apps.locator('summary').click();await apps.getByText(/Los permisos de aplicaciones se guardan por separado/).waitFor();
-  assert.equal(await apps.getByRole('switch').count(),0);
-  await apps.scrollIntoViewIfNeeded();await page.waitForFunction(()=>{const img=document.querySelector('.bot-connected-apps img');return img&&img.complete&&img.naturalWidth>0;});
-  services={gmail:services.gmail};
-  await apps.getByRole('button',{name:'Actualizar aplicaciones',exact:true}).click();
-  await page.waitForFunction(()=>!document.querySelector('.bot-connected-apps')?.textContent?.includes('GitHub'));
-  await apps.screenshot({path:path.join(folder,'bot-connected-apps.png')});
-  await page.setViewportSize({width:390,height:844});await apps.scrollIntoViewIfNeeded();
-  await apps.screenshot({path:path.join(folder,'bot-connected-apps-mobile.png')});
-
+  await page.locator('a.bots-pick[href^="#/bots/"]').first().click();
+  await page.getByRole('tab',{name:/^Conectores/}).click();
+  await page.getByRole('button',{name:'Dar acceso a otra aplicación',exact:true}).click();
+  const picker=page.getByRole('dialog',{name:'Dar acceso a otra aplicación',exact:true});
+  // Only authorized accounts can be granted: the failed GitHub authorization is not offered.
+  await picker.getByRole('button',{name:'Gmail',exact:true}).waitFor({timeout:60000});
+  assert.equal(await picker.getByRole('button',{name:'GitHub',exact:true}).count(),0);
+  await page.waitForFunction(()=>{const img=document.querySelector('.bd-pop img');return img&&img.complete&&img.naturalWidth>0;});
+  const tab=page.locator('.bd');
+  await tab.screenshot({path:path.join(folder,'bot-connected-apps.png')});
+  await page.setViewportSize({width:390,height:844});await tab.scrollIntoViewIfNeeded();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  await apps.screenshot({path:path.join(folder,'bot-connected-apps-mobile.png')});
+  await tab.screenshot({path:path.join(folder,'bot-connected-apps-mobile.png')});
   assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({scope:'local native API presentation fixtures',botAppsVisible:true,failedAccountExplained:true,accountNameInsideApp:true,refresh:true,noAccountOrGrantWrites:true,mobileOverflow:false,pageErrors:0}));
+  console.log(JSON.stringify({scope:'local native API presentation fixtures',botAppsOffered:true,failedAccountNotOffered:true,failedAccountExplained:true,accountNameInsideApp:true,noAccountOrGrantWrites:true,mobileOverflow:false,pageErrors:0}));
  }finally{await browser.close();}
 })().catch(error=>{console.error(error.message.slice(0,300));process.exitCode=1;});

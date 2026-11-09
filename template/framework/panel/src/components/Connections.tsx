@@ -6,6 +6,6 @@ export function Connections() {
   return <section className="card connector-card">
     <h2>{t('connectors.title')}</h2>
     <p className="mute">{t('connectors.subtitle')}</p>
-    <a className="btn btn-ghost" href={href.connectors}>{t('connectors.manage')}</a>
+    <a className="btn btn-soft" href={href.connectors}>{t('connectors.manage')}</a>
   </section>;
 }

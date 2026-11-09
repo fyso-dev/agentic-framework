@@ -17,6 +17,8 @@ export const SOUL_MAX_BYTES = 24000;
 export const SOUL_WARN_BYTES = 22000;
 export const NAME_MAX = 100;
 
+export type Approval = "ask" | "full";
+
 export type Soul = { kind: "inline"; text: string } | { kind: "file"; file: string } | { kind: "none" };
 
 export type Bot = {
@@ -28,6 +30,8 @@ export type Bot = {
   engine: string;
   modelId: string;
   chief: boolean;
+  /** OMB approval mode: ask before acting, or act without asking. */
+  approval: Approval;
   soul: Soul;
   skills: string[];
   usesWorkflows: boolean;
@@ -43,6 +47,8 @@ export type BotInput = {
   /** New inline instructions, or null to keep the current soul untouched. */
   soulText: string | null;
   usesWorkflows: boolean;
+  /** Omit to keep the current value. */
+  approval?: Approval;
   /** Omit to preserve the existing native selection. */
   tools?: ToolScope;
 };
@@ -107,6 +113,7 @@ export function readBots(doc: Document): Bot[] {
 
       ...splitModel(model),
       chief: item.get("chief") === true,
+      approval: (item.has("approval") ? str(item.get("approval")) : str(doc.getIn(["defaults", "approval"]))) === "full" ? "full" : "ask",
       soul: readSoul(item.get("soul", true)),
       skills: readSkills(item.get("skills", true)),
       usesWorkflows: cwd === ROOT_CWD,
@@ -131,6 +138,7 @@ function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
   if (input.title.trim()) map.set("title", input.title.trim());
   else map.delete("title");
   map.set("model", input.model);
+  if (input.approval !== undefined) map.set("approval", input.approval);
   if (input.soulText !== null) {
     if (input.soulText.trim()) map.set("soul", soulNode(doc, input.soulText));
     else map.delete("soul");

@@ -1,10 +1,19 @@
-// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index> · #/bots/review · #/apps
+// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index>[?tab=…] · #/bots/review · #/apps
 import { useEffect, useState } from "react";
+
+export type BotTab = "perfil" | "instrucciones" | "conectores";
+const TABS: BotTab[] = ["perfil", "instrucciones", "conectores"];
+
+function botTab(query: URLSearchParams): BotTab | undefined {
+  const tab = query.get("tab");
+  if (TABS.includes(tab as BotTab)) return tab as BotTab;
+  return query.get("section") === "connectors" ? "conectores" : undefined;
+}
 
 export type Route =
   | { name: "setup" }
-  | { name: "bots"; review?: boolean }
-  | { name: "bot"; index: number | null; connectors?:boolean }
+  | { name: "bots"; review?: boolean; native?: string }
+  | { name: "bot"; index: number | null; tab?: BotTab }
   | { name: "connectors"; botId?:string }
   | { name: "extension"; extensionId:string; pageId:string }
   | { name: "apps" }
@@ -19,9 +28,12 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "apps") return { name: "apps" };
   if (parts[0] === "bots") {
     if (parts[1] === "review") return { name: "bots", review: true };
-    if (parts[1] === "new") return { name: "bot", index: null };
-    if (parts[1] && /^\d+$/.test(parts[1])) return { name: "bot", index: Number(parts[1]),...(new URLSearchParams(query||"").get("section")==="connectors"?{connectors:true}:{}) };
-    return { name: "bots" };
+    const params = new URLSearchParams(query || "");
+    const tab = botTab(params);
+    if (parts[1] === "new") return { name: "bot", index: null, ...(tab ? { tab } : {}) };
+    if (parts[1] && /^\d+$/.test(parts[1])) return { name: "bot", index: Number(parts[1]), ...(tab ? { tab } : {}) };
+    const native = params.get("native");
+    return { name: "bots", ...(native ? { native } : {}) };
   }
   return { name: "setup" };
 }
@@ -32,7 +44,9 @@ export const href = {
   review: "#/bots/review",
   newBot: "#/bots/new",
   bot: (index: number) => `#/bots/${index}`,
-  botConnectors: (index:number) => `#/bots/${index}?section=connectors`,
+  botConnectors: (index:number) => `#/bots/${index}?tab=conectores`,
+  botTab: (index: number | null, tab: BotTab) => `#/bots/${index ?? "new"}?tab=${tab}`,
+  nativeBot: (id: string) => `#/bots?native=${encodeURIComponent(id)}`,
   connectors: "#/connectors",
   connectorsForBot: (id:string) => `#/connectors?bot=${encodeURIComponent(id)}`,
   extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,

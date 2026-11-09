@@ -112,7 +112,7 @@ function EnginesStep() {
       state={state}
       title={t("setup.engines.title")}
       side={<><span className="step-meta"><ActionStatus action={check} /></span>{button()}</>}
-      mobile={failed ? <><External href={logs} className="btn btn-ghost">{t("common.logsShort")} </External>{button()}</> : undefined}
+      mobile={failed ? <><External href={logs} className="btn btn-sm btn-soft">{t("common.logsShort")} </External>{button()}</> : undefined}
     >
       {body}
     </Step>
@@ -132,8 +132,8 @@ function BotsStep() {
   else detail = state === "loading" ? t("common.loading") : t("setup.bots.never", { count: workingBots.length });
   const pending = state === "pending";
   const link = pending
-    ? <a href={href.review} className="btn btn-pri">{t("setup.bots.review")} <span aria-hidden="true">→</span></a>
-    : <a href={href.bots} className="btn btn-ghost">{state === "never" ? t("setup.bots.reviewPlain") : t("setup.bots.view")}</a>;
+    ? <a href={href.review} className="btn btn-sm btn-pri">{t("setup.bots.review")} <span aria-hidden="true">→</span></a>
+    : <a href={href.bots} className="btn btn-sm btn-soft">{state === "never" ? t("setup.bots.reviewPlain") : t("setup.bots.view")}</a>;
   return (
     <Step state={state} title={t("setup.bots.title")} side={link} mobile={pending ? link : undefined}>
       <p className="step-detail">{detail}</p>
@@ -239,7 +239,7 @@ export function Setup() {
           </div>
           {p && (
             <div className="hero-actions">
-              <External href={p.urls.dagu} className="btn btn-lg btn-ghost">{t("setup.openDagu")} </External>
+              <External href={p.urls.dagu} className="btn btn-lg btn-soft">{t("setup.openDagu")} </External>
               <External href={p.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>
             </div>
           )}

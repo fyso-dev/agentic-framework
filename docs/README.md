@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D48; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D49; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -175,3 +175,4 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-09 | PR #19 P1 correction: panel-created MCP definitions now live in project-owned native `project/omb-mcp.json`, with SOPS-only header values and restore before bot selectors. Raw gateway definition writes are blocked; native probes/OAuth remain. [Contract](connectors.md#managed-native-mcp-persistence) · [Real restore proof](../artifacts/delivery-evidence/managed-mcp/README.md). |
 
 | 2026-11-09 | **Langfuse extension (D48), verified locally against a recording server; published as `v0.1.0`.** Generated project (port block 19400), `ext:add` from a local tag, keys through sops, doctor green, scheduled Dagu workflow exported real OMB 0.1.141 traces (9 spans, OTLP v4 header); second run sent nothing. Real data showed Codex shell calls are named by their raw command line: exported as `shell`. Configuration reduced to the Langfuse keys (optional `LANGFUSE_BASE_URL`, default Cloud EU) in secrets; no install questions. Acceptance by a real Langfuse instance pending. [Evidence](../artifacts/delivery-evidence/langfuse/README.md) |
+| 2026-11-09 | Bots redesigned from the Claude Design study "Sensación de simpleza" (B1.3, D49): list + detail in tabs, brand logos, icons with tooltips, one Save. Per-bot activity reuses the observability snapshot; app grants keep the native plan/apply, triggered by Save. |

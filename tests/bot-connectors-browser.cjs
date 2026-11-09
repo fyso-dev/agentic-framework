@@ -18,10 +18,13 @@ async function main(){
   browser=await chromium.launch({headless:true});const context=await browser.newContext({httpCredentials:{username:'admin',password:'admin'},viewport:{width:1440,height:1100}}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.name));
   await page.goto(`${base}/?lang=es#/bots`);
-  await page.getByRole('link',{name:`Conectores de ${name}`,exact:true}).click();
-  const field=page.locator('#bot-connectors'),toggle=field.getByRole('switch',{name:`Permitir ${server}`,exact:true});
-  await toggle.waitFor({timeout:60000});await page.waitForFunction(name=>{const b=document.querySelector(`[aria-label="Permitir ${name}"]`);return b&&!b.disabled;},server);
-  assert.equal(await toggle.getAttribute('aria-checked'),'false');await toggle.click();assert.equal(await toggle.getAttribute('aria-checked'),'true');
+  await page.getByRole('link',{name:`Editar ${name}`,exact:true}).click();
+  await page.getByRole('tab',{name:/^Conectores/}).click();
+  const field=page.locator('.bd'),card=field.locator('.bd-ccard').filter({has:page.getByRole('heading',{name:server,exact:true})});
+  assert.equal(await card.count(),0);
+  await field.getByRole('button',{name:'Dar acceso a otra aplicación',exact:true}).click();
+  const offer=page.getByRole('dialog',{name:'Dar acceso a otra aplicación',exact:true}).getByRole('button',{name:server,exact:true});
+  await offer.waitFor({timeout:60000});await offer.click();await card.waitFor();
   // Changing draft input must not mutate the running bot.
   assert.deepEqual((await native('bots')).bots.find(b=>b.id===id).toolScope,{allow:['native:*']});
   const folder=path.resolve(__dirname,'../artifacts/delivery-evidence/bot-connectors');fs.mkdirSync(folder,{recursive:true});
@@ -29,11 +32,11 @@ async function main(){
   await page.setViewportSize({width:390,height:844});await field.scrollIntoViewIfNeeded();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:path.join(folder,'bot-connectors-mobile.png')});
   await page.setViewportSize({width:1440,height:1100});
   await page.getByRole('button',{name:'Guardar',exact:true}).click();
-  const row=page.getByRole('listitem').filter({has:page.getByRole('link',{name:`Conectores de ${name}`,exact:true})});await row.getByText(`Conectores: ${server}`,{exact:true}).waitFor();
+  await page.getByRole('link',{name:`Editar ${name}`,exact:true}).locator(`[aria-label="Conectores: ${server}"]`).waitFor();
   assert.deepEqual((await native('bots')).bots.find(b=>b.id===id).toolScope,{allow:['native:*']});
   await page.getByRole('link',{name:'Revisar y aplicar',exact:true}).click();
   const apply=page.getByRole('button',{name:'Aplicar cambios',exact:true});await apply.waitFor({timeout:60000});await apply.click();
-  await page.getByText('Aplicado. Ya podés usarlos en OpenMausBot.',{exact:true}).waitFor({timeout:120000});
+  await page.getByText('Aplicado. Ya puedes usarlos en OpenMausBot.',{exact:true}).waitFor({timeout:120000});
   const after=(await native('bots')).bots;assert.deepEqual(after.find(b=>b.id===id).toolScope,{allow:['native:*',`mcp:${server}:*`]});assert.deepEqual(projection(after),before);
   await page.screenshot({path:path.join(folder,'bot-connectors-list.png'),fullPage:true});
   assert.deepEqual(errors,[]);console.log(JSON.stringify({botEntry:true,connectorSelection:true,draftDoesNotMutateRuntime:true,nativePreviewApply:true,unrelatedProfilesPreserved:true,mobileOverflow:false,pageErrors:0,screenshots:3}));

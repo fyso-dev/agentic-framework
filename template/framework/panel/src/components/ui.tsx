@@ -47,7 +47,7 @@ export function CopyLine({ text }: { text: string }) {
   return (
     <div className="copyline">
       <code>{text}</code>
-      <button type="button" className="btn" onClick={copy} aria-live="polite">
+      <button type="button" className="btn btn-sm" onClick={copy} aria-live="polite">
         {copied ? t("common.copied") : t("common.copy")}
       </button>
     </div>
