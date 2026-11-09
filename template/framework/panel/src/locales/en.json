@@ -127,6 +127,9 @@
       "saving": "Saving…",
       "committed": "commit {{sha}}",
       "noChanges": "nothing to save"
+    },
+    "extension": {
+      "failed": "The extension's check failed. Review its configuration: if the keys changed or are examples, enter new ones."
     }
   },
   "bots": {
@@ -373,7 +376,37 @@
     "manage": "Removing an extension is a terminal task. To upgrade all of them:",
     "emptyTitle": "No extensions installed.",
     "emptyHint": "Install one from the marketplace or from its repo:",
-    "emptyCommand": "mise run ext:add gh:org/fyso-ext-name"
+    "emptyCommand": "mise run ext:add gh:org/fyso-ext-name",
+    "setup": {
+      "optional": "optional",
+      "keep": "Set. Leave empty to keep it",
+      "private": "Values are stored encrypted and never shown again.",
+      "save": "Save and verify",
+      "saving": "Saving…",
+      "change": "Change configuration",
+      "ready": "Configuration saved and verified.",
+      "saved": "Configuration saved.",
+      "checkFailed": "Saved, but the extension's check failed. Review the values.",
+      "stillMissing": "Saved, but required values are still missing.",
+      "invalidInput": "Review the values: no line breaks and at most 4096 characters.",
+      "pendingSecrets": "The project's secrets have unsaved changes. Save or discard them and try again.",
+      "busy": "Another configuration is being saved. Try again in a few seconds.",
+      "saveFailed": "Could not save. Nothing was changed.",
+      "notFound": "This extension declares no secrets.",
+      "unavailable": "The setup service is unavailable. Restart the project.",
+      "stepOpen": "Open the keys page and create a new key",
+      "openKeys": "Open {{host}}",
+      "stepCopy": "Copy the block it shows",
+      "stepCopyOne": "Copy the value it shows",
+      "stepPaste": "Paste it here and save",
+      "block": "Paste what you copied",
+      "detected": "Ready to save: {{names}}",
+      "nothingDetected": "No key recognized. Paste the whole block the page shows, or enter the values one by one.",
+      "oneByOne": "Enter the values one by one",
+      "example": "That looks like an example, not your key ({{names}}). Create a new key on the keys page and copy the block shown in the key's dialog: it is shown in full only once."
+    },
+    "run": "Run now",
+    "running": "Running…"
   },
   "market": {
     "title": "Marketplace",
@@ -390,7 +423,7 @@
     "updating": "Upgrading…",
     "installed": "Installed {{version}}",
     "noTags": "No published versions",
-    "done": "{{id}} {{version}} is installed and committed ({{commit}}). If it declares secrets, set them with:",
+    "done": "{{id}} {{version}} is installed and committed ({{commit}}). If it needs keys, set them above, in Installed extensions.",
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Tags"

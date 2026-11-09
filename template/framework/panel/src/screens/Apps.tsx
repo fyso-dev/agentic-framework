@@ -1,8 +1,10 @@
 // Apps launcher: framework apps (Dagu, OpenMausBot), the project's own apps and the
-// apps added by extensions, with health. Installed extensions are listed read-only
-// (docs/extensions-contract.md §5); the marketplace (§8) installs and upgrades them
+// apps added by extensions, with health. Installed extensions are listed with guided
+// setup of their declared secrets (docs/extensions-contract.md §5, D50); the marketplace (§8) installs and upgrades them
 // through the fyso-ext-catalog and fyso-ext-install workflows. Removing stays a terminal task.
 import { Connections } from "../components/Connections";
+import { ExtensionSetup } from "../components/ExtensionSetup";
+import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
@@ -104,10 +106,10 @@ function Skeleton() {
 
 function ExtensionRow({ ext }: { ext: Extension }) {
   const { t, i18n } = useTranslation();
+  const { reload } = useStore();
   const missing = ext.secrets.filter((x) => x.required && !x.set);
   const parts = [
     ext.mcpServers.length > 0 && t("ext.mcp", { count: ext.mcpServers.length }),
-    ext.workflows.length > 0 && t("ext.workflows", { count: ext.workflows.length }),
     ext.skills.length > 0 && t("ext.skills", { count: ext.skills.length }),
   ].filter(Boolean);
   return (
@@ -137,7 +139,12 @@ function ExtensionRow({ ext }: { ext: Extension }) {
           })}
         </ul>
       )}
-      {missing.length > 0 && <CopyLine text="mise run secrets" />}
+      {ext.workflows.length > 0 && (
+        <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+          {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
+        </ul>
+      )}
+      <ExtensionSetup ext={ext} onSaved={reload} />
     </li>
   );
 }
@@ -223,7 +230,6 @@ function MarketRow({ entry, install, target, onInstall }: {
       {mine && install.phase === "ok" && install.output && (
         <div role="status" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <p className="mute">{t("market.done", { id: install.output.id, version: install.output.version ?? "", commit: install.output.commit })}</p>
-          <CopyLine text="mise run secrets" />
         </div>
       )}
     </li>

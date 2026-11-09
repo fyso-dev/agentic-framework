@@ -1,15 +1,16 @@
-// Setup checklist (home): engines, bots applied, bots connected to Dagu, last git save.
+// Setup checklist (home): engines, bots applied, bots connected to Dagu, last git save,
+// plus one step per installed extension that declares setup.yaml (D51).
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine } from "../api/types";
+import type { Engine, Extension } from "../api/types";
 import { ActionButton, ActionError, ActionStatus, useLogsUrl } from "../components/Action";
+import { ExtensionSetup } from "../components/ExtensionSetup";
 import { Spinner } from "../components/Icons";
 import { GlobalState } from "../components/Layout";
 import { CopyLine, External, RelTime } from "../components/ui";
+import { localized } from "../lib/i18n";
 import { href } from "../lib/router";
 import { useStore, type StepState } from "../store";
-
-const TOTAL = 4;
 
 function StepIcon({ state }: { state: StepState }) {
   const glyph = state === "done" ? "✓" : state === "failed" ? "×" : null;
@@ -213,11 +214,31 @@ function GitStep() {
   );
 }
 
+function ExtensionStep({ ext, state }: { ext: Extension; state: StepState }) {
+  const { t, i18n } = useTranslation();
+  const { check, reload } = useStore();
+  const setup = ext.setup!;
+  const title = localized(i18n.language, setup.title, setup.title_i18n);
+  const description = setup.description ? localized(i18n.language, setup.description, setup.description_i18n) : undefined;
+  return (
+    <Step
+      state={state}
+      title={title}
+      side={<span className="step-meta"><ActionStatus action={check} /></span>}
+    >
+      {description && <p className="step-detail">{description}</p>}
+      {state === "failed" && <p role="alert" className="step-error">{t("setup.extension.failed")}</p>}
+      <ExtensionSetup ext={ext} onSaved={() => { reload(); void check.start(); }} />
+    </Step>
+  );
+}
+
 export function Setup() {
   const { t } = useTranslation();
   const s = useStore();
   const p = s.project.data;
   const done = s.stepsDone;
+  const TOTAL = s.stepsTotal;
   const allDone = done === TOTAL;
   const steps = (
     <ol className="steps card">
@@ -225,6 +246,7 @@ export function Setup() {
       <BotsStep />
       <DaguStep />
       <GitStep />
+      {s.extSteps.map(({ ext, state }) => <ExtensionStep key={ext.id} ext={ext} state={state} />)}
     </ol>
   );
 

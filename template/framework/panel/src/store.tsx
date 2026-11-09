@@ -38,7 +38,10 @@ export type Store = {
   /** Latest known check output (from the running/last run). */
   checkData?: SetupCheck;
   steps: Record<StepId, StepState>;
+  /** One step per installed extension with a setup.yaml (D51). */
+  extSteps: { ext: Extension; state: StepState }[];
   stepsDone: number;
+  stepsTotal: number;
   anyFailed: boolean;
   noData: boolean;
   afterApply(): void;
@@ -235,8 +238,16 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
     return { engines, bots, dagu, git };
   }, [check.phase, checkData, draftChanges, snapshot.phase]);
 
-  const values = Object.values(steps);
+  const extSteps = useMemo(() => (extensions.data ?? []).filter((ext) => ext.setup).map((ext) => {
+    const state: StepState = check.phase === "loading" ? "loading"
+      : check.phase === "running" ? "checking"
+      : !checkData ? "never"
+      : checkData.extensions?.find((e) => e.id === ext.id)?.state ?? "never";
+    return { ext, state };
+  }), [extensions.data, check.phase, checkData]);
+  const values = [...Object.values(steps), ...extSteps.map((e) => e.state)];
   const stepsDone = values.filter((s) => s === "done").length;
+  const stepsTotal = values.length;
   const anyFailed = values.includes("failed");
   const noData = check.phase === "never" && snapshot.phase === "never";
 
@@ -252,7 +263,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
     backend, mock, project, team, runtimeBots, botVersioning, apps, extensions, health, reload: load,
     draft, draftReady, setDraft, workingText,
  baseBots, workingBots, rows, draftChanges,
-    check, snapshot, checkData, steps, stepsDone, anyFailed, noData, afterApply,
+    check, snapshot, checkData, steps, extSteps, stepsDone, stepsTotal, anyFailed, noData, afterApply,
   };
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
