@@ -22,7 +22,7 @@ This is a shape example, not a ready-to-run request: confirm required arguments 
 
 ## Execution contract
 
-`node framework/scripts/composio.cjs <request.json>` calls Composio REST v3 with `x-api-key`, explicit connected account, user and tool version. Unknown fields, implicit accounts and `latest` fail. HTTP errors, malformed responses, and tool-level failures exit nonzero. There are no retries. Success prints only the tool's `data` as JSON; Dagu captures stdout. Review data sensitivity before execution. Failure messages omit credentials, request arguments and provider response bodies.
+`node framework/scripts/composio.cjs <request.json>` accepts only JSON files inside `project/composio/` (after resolving symlinks) and calls Composio REST v3 with `x-api-key`, explicit connected account, user and tool version. Unknown fields, implicit accounts and `latest` fail. HTTP errors, malformed responses, and tool-level failures exit nonzero. There are no retries. Success prints only the tool's `data` as JSON; Dagu captures stdout. Review data sensitivity before execution. Failure messages omit credentials, request arguments and provider response bodies.
 
 For dynamic inputs, write JSON using a project script with a JSON serializer; never embed untrusted JSON in a shell command. Provider side effects can succeed before a timeout: resolve the outcome at the provider before retrying. Keep write actions behind explicit user authorization and design provider-specific idempotency where supported.
 

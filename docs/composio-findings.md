@@ -19,3 +19,5 @@ The adapter does not add automatic discovery or OAuth UI. Agents discover schema
 ## Review follow-up
 
 Main was integrated without replacing existing contracts; the Composio decision is D42. The custom age-key path now crosses isolated Dagu startup as `FYSO_COMPOSIO_AGE_KEY_FILE`, including mise-over-SOPS precedence. A regression executes the real startup wrapper with a fake Dagu executable and confirms the key value is not passed. The updated full Node suite passes 58 tests (local socket tests require execution outside the restricted sandbox). Live connector acceptance remains pending.
+
+Sonar follow-up: request-file reads are contained in `project/composio/` after resolving symlinks, with a traversal regression. The API endpoint remains fixed HTTPS, the slug is validated before interpolation, and the secret is sent only as `x-api-key`, never in a URL query. The process PATH comes from the framework’s pinned mise toolchain; no user-supplied executable path is accepted by the adapter. Updated suite: 59 Node tests pass.

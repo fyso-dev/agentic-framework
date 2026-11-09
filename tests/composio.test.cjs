@@ -46,3 +46,19 @@ test('isolated Dagu startup preserves custom age-key paths without passing secre
     assert.match(fs.readFileSync(path.resolve(__dirname,'../template/framework/scripts/composio.cjs'),'utf8'), /SOPS_AGE_KEY_FILE: process.env.FYSO_COMPOSIO_AGE_KEY_FILE/);
   } finally { fs.rmSync(dir,{recursive:true,force:true}); }
 });
+test('request files are contained in project/composio including symlink resolution', () => {
+  const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+  const { requestFile } = require('../template/framework/scripts/composio.cjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(),'composio-path-'));
+  try {
+    fs.mkdirSync(path.join(root,'project/composio'),{recursive:true});
+    const inside=path.join(root,'project/composio/profile.json');
+    fs.writeFileSync(inside,'{}');
+    fs.writeFileSync(path.join(root,'outside.json'),'{}');
+    fs.symlinkSync(path.join(root,'outside.json'),path.join(root,'project/composio/link.json'));
+    assert.equal(requestFile(root,'project/composio/profile.json'),fs.realpathSync(inside));
+    assert.throws(()=>requestFile(root,'outside.json'));
+    assert.throws(()=>requestFile(root,'project/composio/../../outside.json'));
+    assert.throws(()=>requestFile(root,'project/composio/link.json'));
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
