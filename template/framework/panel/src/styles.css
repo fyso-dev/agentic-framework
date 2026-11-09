@@ -943,3 +943,44 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
   .ap-cat-head .ap-cap { width: 100%; }
   .ap-cat-head .grow { display: none; }
 }
+
+/* ── Your AI (project MCP in desktop and CLI agents) ─────────────────────── */
+.as-srv {
+  display: inline-flex; align-items: center; gap: 4px; height: 36px; max-width: 100%; padding: 0 4px 0 14px; border-radius: var(--fy-radius-pill);
+  background: var(--fy-surface); box-shadow: inset 0 0 0 1px var(--fy-line); font-size: 12px; color: var(--fy-text);
+}
+.as-srv .bd-ib { width: 28px; height: 28px; }
+.as-demo { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--fy-radius-pill); background: var(--fy-warn-soft); color: var(--fy-warn); font: 700 11px/1 var(--font-sans); }
+.as-grid { margin-top: 20px; }
+.as-card {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: var(--fy-radius-lg);
+  background: var(--fy-surface); box-shadow: var(--fy-shadow-card), inset 0 0 0 1px var(--fy-edge);
+}
+.as-card.missing { background: transparent; box-shadow: inset 0 0 0 1px var(--fy-line); }
+.as-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.as-card-title { flex: 1 1 auto; min-width: 0; }
+.as-card h3 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.25; }
+.as-card .sub { margin: 2px 0 0; font-size: 12px; color: var(--fy-mute); }
+.as-logo { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--fy-radius-lg); display: inline-flex; align-items: center; justify-content: center; background: var(--fy-accent-soft); color: var(--fy-accent-text); }
+.as-logo.warm { background: #fbeee8; color: #b4441f; }
+.as-logo.ink { background: #26252d; color: #fff; }
+.fy-dark .as-logo.warm { background: rgba(232, 120, 80, .16); color: #f0a07e; }
+.fy-dark .as-logo.ink { background: #3a3942; }
+.as-card.missing .as-logo { background: var(--fy-unk-soft); color: var(--fy-mute); }
+.as-dot { width: 7px; height: 7px; border-radius: var(--fy-radius-pill); background: currentColor; }
+.as-hint { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--fy-mute); }
+.as-remote, .as-try {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; padding: 18px; border-radius: var(--fy-radius-lg);
+  background: var(--fy-surface); box-shadow: var(--fy-shadow-card), inset 0 0 0 1px var(--fy-edge);
+}
+.as-remote h2, .as-try h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.as-remote .as-logo { background: var(--fy-warn-soft); color: var(--fy-warn); }
+.as-remote > .grow, .as-setup > .grow { flex: 1 1 280px; min-width: 0; }
+.as-try-body { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.as-help { margin: 12px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--fy-mute); }
+.as-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 18px; }
+.as-setup h2 { font-size: 15px; font-weight: 700; }
+@media (max-width: 720px) {
+  .as-srv { flex: 1 1 auto; }
+  .as-srv .mono { flex: 1 1 auto; min-width: 0; }
+}

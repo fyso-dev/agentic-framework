@@ -59,7 +59,8 @@ test('Dagu adapter validates parameters and uses native connector in an isolated
   const adapter=path.resolve(__dirname,'../template/framework/scripts/agent-connect-action.cjs');
   const run=(target,mode='connect')=>spawnSync(process.execPath,[adapter],{encoding:'utf8',env:{HOME:home,PATH:`${bin}:/usr/bin:/bin`,FYSO_PROJECT:'demo',MISE_EXE:'/opt/mise',TARGET:target,MODE:mode}});
   assert.equal(run('codex; touch injected').status,1);
-  assert.equal(run('codex','open').status,1);
+  assert.equal(run('codex','delete').status,1);
+  assert.equal(run('claude-code','open').status,1);   // a CLI has no conversation to open
   assert.deepEqual(calls(),[]);
   const connected=run('codex');assert.equal(connected.status,0,connected.stderr);
   assert.equal(JSON.parse(connected.stdout).target,'codex');
@@ -68,4 +69,24 @@ test('Dagu adapter validates parameters and uses native connector in an isolated
   assert.equal(JSON.parse(disconnected.stdout).mode,'disconnect');
   fs.writeFileSync(path.join(bin,'codex'),'#!/bin/sh\nexit 9\n',{mode:0o755});
   assert.equal(run('codex').status,1);
+}));
+
+test('status reports installed and connected agents; the adapter passes it through and opens desktop apps',()=>sandbox(({home,bin,run,desktop,calls})=>{
+  const read=()=>{const r=run('status');assert.equal(r.status,0,r.stderr);return JSON.parse(r.stdout);};
+  let st=read();assert.equal(st.server,'fyso-demo');
+  // Claude Desktop's found() also looks at /Applications, outside the sandbox: only its connection is asserted.
+  assert.deepEqual(st.agents.map(a=>[a.id,a.id==='claude-desktop'?null:a.found,a.connected]),[['claude-desktop',null,false],['codex',true,false],['claude-code',true,false]]);
+  assert.equal(run('connect','claude-desktop').status,0);
+  fs.mkdirSync(path.join(home,'.codex'),{recursive:true});
+  fs.writeFileSync(path.join(home,'.codex/config.toml'),'[mcp_servers.other]\ncommand = "x"\n\n[mcp_servers."fyso-demo"]\ncommand = "y"\n');
+  fs.writeFileSync(path.join(home,'.claude.json'),JSON.stringify({mcpServers:{'fyso-demo-old':{}}}));
+  st=read();assert.deepEqual(st.agents.map(a=>[a.id,a.found,a.connected]),[['claude-desktop',true,true],['codex',true,true],['claude-code',true,false]]);
+  assert.ok(fs.existsSync(desktop));
+  const adapter=path.resolve(__dirname,'../template/framework/scripts/agent-connect-action.cjs');
+  const env={HOME:home,PATH:`${bin}:/usr/bin:/bin`,FYSO_PROJECT:'demo',MISE_EXE:'/opt/mise',FYSO_OPEN:path.join(bin,'open')};
+  const status=spawnSync(process.execPath,[adapter],{encoding:'utf8',env:{...env,MODE:'status'}});
+  assert.equal(status.status,0,status.stderr);
+  const out=JSON.parse(status.stdout);assert.equal(out.mode,'status');assert.equal(out.agents.length,3);
+  const open=spawnSync(process.execPath,[adapter],{encoding:'utf8',env:{...env,MODE:'open',TARGET:'codex'}});
+  assert.equal(open.status,0,open.stderr);assert.match(calls().at(-1),/^open codex:\/\/threads\/new/);
 }));

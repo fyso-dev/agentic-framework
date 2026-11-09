@@ -56,6 +56,7 @@ mise run agent:connect                   # desktop apps found on this Mac (Claud
 mise run agent:connect claude-code       # Claude Code CLI as well (opt-in)
 mise run agent:disconnect                # remove this project's entry
 mise run agent:open [codex|claude-desktop]   # new conversation about this project
+node framework/scripts/agent-connect.cjs status   # JSON: installed and connected, per agent
 ```
 
 `agent:open` uses the apps' own deep links (read from their bundles): **`codex://threads/new?path=<project>&prompt=…`** opens a Codex thread in the project folder; **`claude://claude.ai/new?q=…`** opens a Claude Desktop chat, restarting Claude first when it runs, because it loads MCP servers only at start. The first message is typed in, not sent: it asks to use `fyso-<slug>` starting with `fyso_status`.
@@ -67,6 +68,8 @@ mise run agent:open [codex|claude-desktop]   # new conversation about this proje
 | `claude-code` | `claude mcp add --scope user` | opt-in |
 
 The entry is named **`fyso-<slug>`**, one per project: a plain `fyso` may already exist (e.g. the Fyso cloud server). It runs `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`, an absolute launcher, because desktop apps start servers with a minimal `PATH` and no project folder. Verified: started that way from `/` with only the system `PATH`, the server answers and `fyso_status` reports the project. Tests: `tests/agent-connect.test.cjs` (fake HOME and CLIs).
+
+**From the panel (D52).** *Maneja el proyecto desde tu IA* (`#/mcp`, linked from Setup) runs the same script through the `fyso-agent-connect` workflow: `MODE=status` returns `{server, agents: [{id, label, desktop, found, connected}]}` (connected = `fyso-<slug>` in the Claude Desktop JSON, a `[mcp_servers.<name>]` table in `$CODEX_HOME/config.toml`, or the user-scope `mcpServers` of `~/.claude.json`); `connect`, `disconnect` and `open` (Codex, Claude Desktop) act on one agent. The actions change the Dagu host's apps, so the page shows them only when it is opened through a loopback name; remote access is the planned HTTP MCP with a token (D52).
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment.
 
