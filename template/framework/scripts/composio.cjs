@@ -46,7 +46,7 @@ async function main() {
     const root = resolve(__dirname, '../..');
     key = execFileSync('sops', ['decrypt', '--extract', '["COMPOSIO_API_KEY"]', resolve(root, 'secrets.enc.yaml')], {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-      env: { ...process.env, SOPS_AGE_KEY_FILE: process.env.MISE_SOPS_AGE_KEY_FILE || process.env.SOPS_AGE_KEY_FILE || resolve(process.env.HOME, '.config/mise/age.txt') },
+      env: { ...process.env, SOPS_AGE_KEY_FILE: process.env.FYSO_COMPOSIO_AGE_KEY_FILE || process.env.MISE_SOPS_AGE_KEY_FILE || process.env.SOPS_AGE_KEY_FILE || resolve(process.env.HOME, '.config/mise/age.txt') },
     });
   } catch { throw Error('Cannot decrypt COMPOSIO_API_KEY; configure it with mise run secrets'); }
   const data = await execute(value, key);

@@ -4,7 +4,7 @@ Composio maintains provider credentials and connected accounts. Dagu controls ex
 
 ## Setup
 
-Connect the app in your Composio project and confirm account status/scopes. Add `COMPOSIO_API_KEY` using `mise run secrets`. The key is loaded with SOPS only inside the connector step; it is not added to the Dagu server environment or bot secret allowlist. The host must have access to the project's age key (the setup default or `SOPS_AGE_KEY_FILE`/`MISE_SOPS_AGE_KEY_FILE` when invoking the adapter). Distributed workers are outside this contract.
+Connect the app in your Composio project and confirm account status/scopes. Add `COMPOSIO_API_KEY` using `mise run secrets`. The key is loaded with SOPS only inside the connector step; it is not added to the Dagu server environment or bot secret allowlist. The host must have access to the project's age key (the setup default or `SOPS_AGE_KEY_FILE`/`MISE_SOPS_AGE_KEY_FILE` at project startup). `run-dagu.sh` resolves that path into `FYSO_COMPOSIO_AGE_KEY_FILE`, which survives the existing `FYSO_` step allowlist. Only the key-file path is passed, never its contents. Distributed workers are outside this contract.
 
 Create `project/composio/profile.json` using the verified schema and actual identifiers/version from your account:
 
