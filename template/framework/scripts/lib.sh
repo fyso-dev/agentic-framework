@@ -54,3 +54,6 @@ pc() {
   fi
 }
 stack_running() { [ -S "$PC_SOCKET" ] && pc process list >/dev/null 2>&1; }
+
+# A private Unix socket avoids competing with web-auth for base + 9.
+connector_setup_socket() { printf '/tmp/fyso-connectors-%s.sock\n' "$FYSO_HTTP_PORT"; }

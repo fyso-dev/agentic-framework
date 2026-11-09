@@ -164,3 +164,14 @@ artifacts without structured data retain unknown consumption.
 `GET /config/bot-versioning.json` is an exact read-only Caddy file route. It contains `{collectedAt, commit, bots:[{name,team,project,snapshot}]}`, derived from committed `project/bots/team.yaml` and `state/bots/team.yaml`; no instructions, chat or secret values are exported. The panel polls every five seconds. The file refreshes at startup, snapshot commit, native import and observability collection (two-minute schedule); the commit and collection time identify its evidence. Missing evidence or ambiguous identities produce an unverified label and disable import.
 
 Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract with `{OP:"import",BOT_ID:"<native ID>"}` and returns `{action,botId,name,commit,replayed}`. The panel reloads configuration after success, without resetting a draft. Drafts disable this action until applied or discarded.
+
+
+### Bot form connector selection
+
+`Bot.tools` reads the effective native team-file allow/deny selection, including
+team defaults. `BotInput.tools` is optional: omission preserves the existing YAML
+node. An explicit change writes only that node and preserves other bot fields,
+file references and unrelated profiles. Native draft preview/apply remains the
+existing `fyso-bots-plan` / `fyso-bots-apply` workflow, not an immediate API patch.
+The live native scope is used for initial form visibility when there is no draft;
+subsequent roster polling never overwrites a connector selection the person edited.

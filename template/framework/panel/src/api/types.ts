@@ -128,7 +128,7 @@ export const DAGS = {
   extInstall: "fyso-ext-install",
 } as const;
 
-export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string } };
+export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string };toolScope?:import('../lib/connector-access').ToolScope;mcpServers?:string[]|null };
 
 export type BotVersioning = { collectedAt: string; commit: string | null; projectDirty?: boolean; bots: {name: string; team: string; project: boolean; snapshot: boolean}[] };
 

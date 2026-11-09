@@ -1,0 +1,14 @@
+description: Preview, apply and version native application permissions for one bot
+type: graph
+max_active_runs: 1
+params:
+  - OP: read
+  - BOT_ID: ""
+  - REVISION: ""
+  - CHANGES_B64: ""
+  - PLAN_ID: ""
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: operate
+    run: node framework/scripts/app-access.cjs
+    output: RESULT

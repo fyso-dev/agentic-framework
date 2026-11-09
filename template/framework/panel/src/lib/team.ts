@@ -1,6 +1,7 @@
 // Read and edit OpenMausBot's team file with the `yaml` Document API, which keeps
 // comments and key order (contract §4). Only the form's fields are touched.
 import { Document, isMap, isScalar, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq } from "yaml";
+import type { ToolScope } from './connector-access';
 
 // team.yaml holds `${VAR}` placeholders that the framework substitutes before calling
 // OMB. Inside a YAML flow map (`soul: { file: ${FYSO_ROOT}/… }`) the braces are not
@@ -30,6 +31,7 @@ export type Bot = {
   soul: Soul;
   skills: string[];
   usesWorkflows: boolean;
+  tools?: ToolScope;
   /** Canonical JSON of the bot node, to compare a draft with the file. */
   fingerprint: string;
 };
@@ -41,6 +43,8 @@ export type BotInput = {
   /** New inline instructions, or null to keep the current soul untouched. */
   soulText: string | null;
   usesWorkflows: boolean;
+  /** Omit to preserve the existing native selection. */
+  tools?: ToolScope;
 };
 
 export function parseTeam(text: string): Document {
@@ -94,6 +98,7 @@ export function readBots(doc: Document): Bot[] {
     if (!isMap(item)) return [];
     const model = str(item.get("model"));
     const cwd = item.has("cwd") ? str(item.get("cwd")) : rootCwd;
+    const tools = item.has("tools") ? item.get("tools",true) : doc.getIn(["defaults","tools"],true);
     return [{
       index,
       name: decodeEnv(str(item.get("name"))),
@@ -105,6 +110,7 @@ export function readBots(doc: Document): Bot[] {
       soul: readSoul(item.get("soul", true)),
       skills: readSkills(item.get("skills", true)),
       usesWorkflows: cwd === ROOT_CWD,
+      tools: isMap(tools) ? tools.toJSON() as ToolScope : undefined,
       fingerprint: JSON.stringify(item.toJSON()),
     }];
   });
@@ -120,6 +126,7 @@ function soulNode(doc: Document, text: string): Scalar {
 }
 
 function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
+  if(input.tools!==undefined)map.set('tools',doc.createNode(input.tools));
   map.set("name", input.name.trim());
   if (input.title.trim()) map.set("title", input.title.trim());
   else map.delete("title");

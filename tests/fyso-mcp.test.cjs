@@ -41,9 +41,19 @@ test('handshake and tool list follow MCP',async()=>{
     assert.equal(init.result.protocolVersion,'2025-06-18');assert.equal(init.result.serverInfo.name,'fyso');assert.ok(init.result.capabilities.tools);
     c.notify('notifications/initialized');
     const names=(await c.call('tools/list')).result.tools.map(t=>t.name);
-    for(const n of ['fyso_status','fyso_check','fyso_doctor','fyso_bots_list','fyso_bot_plan','fyso_bot_apply','fyso_ext_search','fyso_ext_install','fyso_snapshot'])assert.ok(names.includes(n),n);
+    for(const n of ['fyso_status','fyso_check','fyso_doctor','fyso_connections','fyso_bots_list','fyso_bot_plan','fyso_bot_apply','fyso_ext_search','fyso_ext_install','fyso_snapshot'])assert.ok(names.includes(n),n);
     assert.equal((await c.call('ping')).result&&true,true);
     assert.equal((await c.call('nope/method')).error.code,-32601);
+  } finally {c.close();srv.close();}
+});
+
+test('connection discovery uses the same native architect workflow as the panel',async()=>{
+  const catalog={servers:[{name:'dagu',enabled:null,portable:true,verification:'not-tested'}]};
+  const {srv,calls,port}=await fakeDagu({'fyso-bot-architect':{result:JSON.stringify(catalog)}});const c=mcp(port);
+  try {
+    const response=(await c.call('tools/call',{name:'fyso_connections',arguments:{}})).result;
+    assert.deepEqual(response.structuredContent,catalog);
+    assert.deepEqual(calls.at(-1),{dag:'fyso-bot-architect',params:{OP:'connections'}});
   } finally {c.close();srv.close();}
 });
 

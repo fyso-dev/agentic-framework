@@ -15,12 +15,14 @@ class ExtensionsE2E(unittest.TestCase):
             self.skipTest('Copier runner (uvx) or mise unavailable')
         with tempfile.TemporaryDirectory(prefix='extensions-') as tmp:
             base = Path(tmp)
+            age_file = base / 'age.txt'
             password_file = base / 'web-password'
             password_file.write_text('fixture-extension-password-43\n')
             password_file.chmod(0o600)
+            fixture_env={**os.environ, 'MISE_YES':'1', 'FYSO_INITIAL_PASSWORD_FILE':str(password_file), 'MISE_SOPS_AGE_KEY_FILE':str(age_file), 'SOPS_AGE_KEY_FILE':str(age_file)}
             def run(*args, cwd=base):
                 result = subprocess.run(args, cwd=cwd, text=True, capture_output=True,
-                                        env={**os.environ, 'MISE_YES': '1', 'FYSO_INITIAL_PASSWORD_FILE': str(password_file)}, timeout=300)
+                                        env=fixture_env, timeout=300)
                 if result.returncode and any(marker in result.stderr.lower() for marker in
                     ['could not resolve host', 'network is unreachable', 'failed to download', 'connection refused']):
                     self.skipTest('Network unavailable while obtaining pinned test tools')
@@ -79,7 +81,7 @@ class ExtensionsE2E(unittest.TestCase):
             # Real node first, as under `mise run`; a mise shim would load the env by itself.
             node_dir = Path(run('mise', 'which', 'node', cwd=project).strip()).parent
             cleared = subprocess.run(['env', '-i', f"HOME={os.environ['HOME']}", f"PATH={node_dir}:{os.environ['PATH']}",
-                                      f'FYSO_ROOT={project}', 'framework/scripts/run-ext.sh', 'sample', '--',
+                                      f'FYSO_ROOT={project}', f'MISE_SOPS_AGE_KEY_FILE={age_file}', f'SOPS_AGE_KEY_FILE={age_file}', 'framework/scripts/run-ext.sh', 'sample', '--',
                                       'printenv', 'FYSO_EXT_SAMPLE_PORT'],
                                      cwd=project, text=True, capture_output=True, timeout=120)
             self.assertEqual(cleared.stdout.strip(), '8410', cleared.stderr)
@@ -110,7 +112,7 @@ class ExtensionsE2E(unittest.TestCase):
             commit(ext, 'v4')
             run('git', 'tag', 'v4', cwd=ext)
             (project / 'extensions/sample/public/index.html').write_text('local edit\n')
-            blocked = subprocess.run(apply, cwd=project, text=True, capture_output=True, timeout=300)
+            blocked = subprocess.run(apply, cwd=project, env=fixture_env, text=True, capture_output=True, timeout=300)
             self.assertNotEqual(blocked.returncode, 0)
             self.assertIn("uncommitted changes in sample's files", blocked.stderr)
             self.assertEqual((project / 'extensions/sample/public/index.html').read_text(), 'local edit\n')
@@ -122,7 +124,7 @@ class ExtensionsE2E(unittest.TestCase):
             # The panel refuses a source outside the project: Copier would save that machine
             # path in the answers file and every later snapshot would fail check-paths.
             outside = subprocess.run(['mise', 'exec', '--', 'framework/scripts/ext.sh', 'apply', 'add', 'sample'],
-                                     cwd=project, text=True, capture_output=True, timeout=300)
+                                     cwd=project, env=fixture_env, text=True, capture_output=True, timeout=300)
             self.assertNotEqual(outside.returncode, 0)
             self.assertIn('is a path of this machine', outside.stderr)
             self.assertFalse((project / '.copier-answers.ext-sample.yml').exists())

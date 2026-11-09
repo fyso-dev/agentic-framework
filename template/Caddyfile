@@ -100,6 +100,50 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	handle /config/* {
 		respond 404
 	}
+	# Only connector-management APIs are exposed. The OMB bearer stays in Caddy.
+	@panelForeignOrigin {
+		path /api/omb/*
+		header Origin *
+		not header Origin http://panel.{$FYSO_WEB_DOMAIN:localhost}:{$FYSO_HTTP_PORT}
+	}
+	@panelCrossSite {
+		path /api/omb/*
+		header Sec-Fetch-Site cross-site
+	}
+	@nativeConnectors path_regexp nativeConnectors ^/api/omb/(connectors(/(catalog|connected|tools|[a-z][a-z0-9_-]{0,63}(/authorize|/accounts/[A-Za-z0-9][A-Za-z0-9_-]{0,127})?))?|mcp/servers(/[a-z][a-z0-9_-]{0,31}(/test|/sign-in(/[0-9a-f-]{36})?|/sign-out)?)?)$
+	handle @nativeConnectors {
+		route {
+			respond @panelForeignOrigin 403
+			respond @panelCrossSite 403
+			@badConnectorMethod not method GET POST PATCH DELETE
+			respond @badConnectorMethod 405
+			@managedDefinitionWrite {
+				path_regexp managedDefinitionWrite ^/api/omb/mcp/servers(/[a-z][a-z0-9_-]{0,31})?$
+				not method GET
+			}
+			respond @managedDefinitionWrite 405
+			uri replace /api/omb/ /api/ 1
+			header Cache-Control no-store
+			reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
+				header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
+			}
+		}
+	}
+	@managedMcp path_regexp managedMcp ^/api/connectors/mcp(/[a-z][a-z0-9_-]{0,31})?$
+	handle @managedMcp {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	# Dedicated SOPS/native-activation glue; never send project keys through Dagu.
+	handle /api/composio/setup {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	handle /api/composio/* {
+		respond 404
+	}
 	# Exact read-only native roster, without conversation history. No generic OMB proxy.
 	handle /api/omb/bots {
 		@rosterRead method GET

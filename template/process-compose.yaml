@@ -44,10 +44,24 @@ processes:
       restart: on_failure
       backoff_seconds: 5
 
+  connector-setup:
+    command: framework/scripts/run-composio-setup.sh
+    log_location: .data/logs/connector-setup.log
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh connector-setup
+      initial_delay_seconds: 1
+      period_seconds: 2
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+
   caddy:
     command: framework/scripts/run-caddy.sh
     log_location: .data/logs/caddy.log
     depends_on:
+      connector-setup:
+        condition: process_healthy
       web-auth:
         condition: process_healthy
       dagu:

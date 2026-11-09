@@ -6,6 +6,7 @@ import { useRoute } from "./lib/router";
 import { useTheme } from "./lib/theme";
 import { BotForm } from "./screens/BotForm";
 import { Bots } from "./screens/Bots";
+import { Connectors } from "./screens/Connectors";
 import { Apps } from "./screens/Apps";
 import { Observability } from "./screens/Observability";
 import { ExtensionPage } from "./screens/ExtensionPage";
@@ -28,10 +29,13 @@ export function App() {
       screen = <Bots review={!!route.review} />;
       break;
     case "bot":
-      screen = <BotForm index={route.index} />;
+      screen = <BotForm index={route.index} focusConnectors={route.connectors} />;
       break;
     case "observability":
       screen = <Observability />;
+      break;
+    case "connectors":
+      screen = <Connectors initialBotId={route.botId} />;
       break;
     case "extension":
       screen = <ExtensionPage extensionId={route.extensionId} pageId={route.pageId} theme={theme} />;

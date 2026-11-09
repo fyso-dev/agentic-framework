@@ -56,6 +56,12 @@ const TOOLS = {
       catch (e) { return {ok: false, output: `${e.stdout || ''}${e.stderr || ''}`}; }
     },
   },
+  fyso_connections: {
+    description: 'List this project native OpenMausBot and declared MCP connections, without credentials or endpoints. Shows enabled state and whether definitions are in project files; does not test tools. Connect/authenticate services in this project OpenMausBot Apps UI, then assign tools through fyso_bot_plan.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => architect({OP: 'connections'}),
+  },
   fyso_bots_list: {
     description: 'List the native OpenMausBot bots of this project (id, name, title, model, busy).',
     inputSchema: obj(),
@@ -69,7 +75,7 @@ const TOOLS = {
     run: ({bot_id}) => architect({OP: 'read', BOT_ID: bot_id}),
   },
   fyso_bot_plan: {
-    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"). Delete needs the exact bot_id.',
+    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"), tools (native allow/deny selectors; discover servers with fyso_connections). Delete needs the exact bot_id.',
     inputSchema: obj({
       action: str('What to do', {enum: ['create', 'update', 'delete']}),
       bot_id: str('Exact native bot id; required for update and delete'),

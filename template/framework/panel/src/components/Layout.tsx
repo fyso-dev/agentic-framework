@@ -142,6 +142,7 @@ const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconWorkflow },
+  { id: "connectors", href: href.connectors, icon: IconApps },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
@@ -160,6 +161,7 @@ export function SideNav({ route }: { route: Route }) {
   const down = downApps(s);
   const counts: Record<NavItem["id"], ReactNode> = {
 
+    connectors: null,
     observability: null,
     setup: loadingSteps(s) ? null : (
       <span className="nav-count" style={{ color: open === 0 ? "var(--ok)" : s.anyFailed ? "var(--down)" : "var(--warn)", fontWeight: 600 }}>
@@ -178,7 +180,7 @@ export function SideNav({ route }: { route: Route }) {
       {items.map(({ id, href: h, icon: Icon, label }) => (
         <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
           <Icon />
-          <span className="grow">{label ?? t(`nav.${id}`)}</span>
+          <span className="grow"><span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span></span>
           {counts[id]}
         </a>
       ))}
@@ -192,6 +194,7 @@ export function BottomNav({ route }: { route: Route }) {
   const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const badges: Record<NavItem["id"], [number, string]> = {
+    connectors: [0, "badge"],
     observability: [0, "badge"],
     setup: [open, s.anyFailed ? "badge" : "badge badge-warn"],
     bots: [unappliedCount(s), "badge badge-warn"],
@@ -207,7 +210,7 @@ export function BottomNav({ route }: { route: Route }) {
               <Icon size={22} />
               {n > 0 && <span className={cls} aria-hidden="true">{n}</span>}
             </span>
-            {label ?? t(`nav.${id}`)}
+            <span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span>
             {n > 0 && <span className="sr-only"> ({n})</span>}
           </a>
         );
