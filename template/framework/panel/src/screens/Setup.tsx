@@ -5,11 +5,11 @@ import { useTranslation } from "react-i18next";
 import type { Engine, Extension } from "../api/types";
 import { ActionButton, ActionError, ActionStatus, useLogsUrl } from "../components/Action";
 import { ExtensionSetup } from "../components/ExtensionSetup";
-import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { Spinner } from "../components/Icons";
 import { GlobalState } from "../components/Layout";
 import { CopyLine, External, RelTime } from "../components/ui";
 import { localized } from "../lib/i18n";
+import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { href } from "../lib/router";
 import { useStore, type StepState } from "../store";
 
@@ -215,27 +215,38 @@ function GitStep() {
   );
 }
 
+// Once done, the step only runs the extension's workflow (e.g. the trace sync), like the git step;
+// its configuration lives in Apps. Until then it shows the guided key form.
+function ExtensionRun({ dag }: { dag: string }) {
+  const { t } = useTranslation();
+  const { backend } = useStore();
+  const run = useDaguAction<unknown>(backend, dag, "result", { loadLast: true }) as Action<unknown>;
+  const logs = useLogsUrl(dag);
+  return (
+    <>
+      <span className="step-meta"><ActionStatus action={run} /></span>
+      <External href={logs} className="step-link">{t("common.viewInDagu")} </External>
+      <ActionButton action={run} label={t("ext.run")} busyLabel={t("ext.running")} onRun={() => void run.start()} />
+    </>
+  );
+}
+
 function ExtensionStep({ ext, state }: { ext: Extension; state: StepState }) {
   const { t, i18n } = useTranslation();
   const { check, reload } = useStore();
   const setup = ext.setup!;
   const title = localized(i18n.language, setup.title, setup.title_i18n);
   const description = setup.description ? localized(i18n.language, setup.description, setup.description_i18n) : undefined;
+  const dag = state === "done" ? ext.workflows[0] : undefined;
   return (
     <Step
       state={state}
       title={title}
-      side={<span className="step-meta"><ActionStatus action={check} /></span>}
+      side={dag ? <ExtensionRun dag={dag} /> : <span className="step-meta"><ActionStatus action={check} /></span>}
     >
       {description && <p className="step-detail">{description}</p>}
       {state === "failed" && <p role="alert" className="step-error">{t("setup.extension.failed")}</p>}
-      {/* Its workflows (e.g. the trace sync) run from here once the keys work. */}
-      {state === "done" && ext.workflows.length > 0 && (
-        <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: "0 0 8px", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-          {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
-        </ul>
-      )}
-      <ExtensionSetup ext={ext} onSaved={() => { reload(); void check.start(); }} />
+      {state !== "done" && <ExtensionSetup ext={ext} onSaved={() => { reload(); void check.start(); }} />}
     </Step>
   );
 }
