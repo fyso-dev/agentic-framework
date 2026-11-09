@@ -19,9 +19,10 @@ class ExtensionsE2E(unittest.TestCase):
             password_file = base / 'web-password'
             password_file.write_text('fixture-extension-password-43\n')
             password_file.chmod(0o600)
+            fixture_env={**os.environ, 'MISE_YES':'1', 'FYSO_INITIAL_PASSWORD_FILE':str(password_file), 'MISE_SOPS_AGE_KEY_FILE':str(age_file), 'SOPS_AGE_KEY_FILE':str(age_file)}
             def run(*args, cwd=base):
                 result = subprocess.run(args, cwd=cwd, text=True, capture_output=True,
-                                        env={**os.environ, 'MISE_YES': '1', 'FYSO_INITIAL_PASSWORD_FILE': str(password_file), 'MISE_SOPS_AGE_KEY_FILE':str(age_file), 'SOPS_AGE_KEY_FILE':str(age_file)}, timeout=300)
+                                        env=fixture_env, timeout=300)
                 if result.returncode and any(marker in result.stderr.lower() for marker in
                     ['could not resolve host', 'network is unreachable', 'failed to download', 'connection refused']):
                     self.skipTest('Network unavailable while obtaining pinned test tools')
@@ -111,7 +112,7 @@ class ExtensionsE2E(unittest.TestCase):
             commit(ext, 'v4')
             run('git', 'tag', 'v4', cwd=ext)
             (project / 'extensions/sample/public/index.html').write_text('local edit\n')
-            blocked = subprocess.run(apply, cwd=project, text=True, capture_output=True, timeout=300)
+            blocked = subprocess.run(apply, cwd=project, env=fixture_env, text=True, capture_output=True, timeout=300)
             self.assertNotEqual(blocked.returncode, 0)
             self.assertIn("uncommitted changes in sample's files", blocked.stderr)
             self.assertEqual((project / 'extensions/sample/public/index.html').read_text(), 'local edit\n')
@@ -123,7 +124,7 @@ class ExtensionsE2E(unittest.TestCase):
             # The panel refuses a source outside the project: Copier would save that machine
             # path in the answers file and every later snapshot would fail check-paths.
             outside = subprocess.run(['mise', 'exec', '--', 'framework/scripts/ext.sh', 'apply', 'add', 'sample'],
-                                     cwd=project, text=True, capture_output=True, timeout=300)
+                                     cwd=project, env=fixture_env, text=True, capture_output=True, timeout=300)
             self.assertNotEqual(outside.returncode, 0)
             self.assertIn('is a path of this machine', outside.stderr)
             self.assertFalse((project / '.copier-answers.ext-sample.yml').exists())
