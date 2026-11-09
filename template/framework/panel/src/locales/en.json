@@ -774,18 +774,23 @@
   "mcp": {
     "title": "Connect your assistant",
     "intro": "Use this project’s MCP from Claude or Codex to create bots, install extensions and check its state, just like at the end of the installer.",
-    "prepare": "1. Open a terminal in the project folder",
-    "prepareBody": "Run these commands on the computer where you installed the project. The panel provides instructions; the connection is made from your terminal.",
+    "prepare": "1. Check the execution host",
+    "prepareBody": "The project must be running and the assistant installed on the computer running Dagu.",
     "connect": "2. Connect your assistant",
-    "connectBody": "Copy and run the command for your assistant. You can connect more than one. Codex shares configuration between the app and CLI. Claude Desktop uses the installer’s macOS integration.",
+    "connectBody": "Choose your assistant and press Connect. The panel runs the fyso-agent-connect workflow and shows its result.",
     "restart": "3. Open a new conversation",
     "restartBody": "Restart Claude Desktop to load the server. In Codex and Claude Code, start a new session. If you already connected through the installer, start here.",
     "verify": "4. Check the connection",
     "verifyBody": "Look for the fyso-{{slug}} server in your assistant’s tools and send this message:",
     "prompt": "Read fyso_context and run fyso_status to inspect my project. Tell me what I have and what to configure first.",
     "trouble": "If it does not appear",
-    "troubleBody": "Check that you ran the command from the correct folder and that mise and your assistant are installed. Connect again and start a new session. The project must be running to inspect its services.",
+    "troubleBody": "Check that mise and the assistant are installed for the user running Dagu. Review the workflow error and logs, connect again and open a new session.",
     "disconnect": "Disconnect",
-    "disconnectBody": "Run the matching command to remove this connection. Your project and bots are preserved."
+    "disconnectBody": "Run the matching command to remove this connection. Your project and bots are preserved.",
+    "hostNote": "The connection changes configuration for the user running Dagu on that computer. It does not configure another computer used to open the browser.",
+    "demo": "Demo mode: actions are simulated and do not change assistant configuration.",
+    "connectButton": "Connect",
+    "disconnectButton": "Disconnect",
+    "busy": "Running…"
   }
 }

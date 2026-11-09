@@ -317,6 +317,11 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const createdAt = Date.now();
       const proposed = params?.TEAM_B64 ? fromBase64Utf8(params.TEAM_B64) : team;
       switch (dag) {
+        case DAGS.agentConnect:
+          add({ dag, id, createdAt, duration: 1800, outcome: scenario === "failed" ? "failed" : "succeeded",
+            error: scenario === "failed" ? "Assistant CLI not found on the Dagu host" : undefined,
+            outputs: () => ({ result: JSON.stringify({ target: params?.TARGET, mode: params?.MODE, message: "Mock: no assistant configuration was changed" }) }) });
+          break;
         case DAGS.setupCheck:
           add({ dag, id, createdAt, duration: 3500, outcome: "succeeded", outputs: () => ({ check: JSON.stringify(check()) }) });
           break;

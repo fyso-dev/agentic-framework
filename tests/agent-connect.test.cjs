@@ -14,7 +14,7 @@ function sandbox(fn) {
   const run=(...args)=>spawnSync(process.execPath,[script,...args],{encoding:'utf8',env:{HOME:home,PATH:`${bin}:/usr/bin:/bin`,FYSO_PROJECT:'demo',FYSO_PROJECT_NAME:'Mi Demo',MISE_EXE:'/opt/mise',FYSO_OPEN:path.join(bin,'open')}});
   const calls=()=>fs.existsSync(log)?fs.readFileSync(log,'utf8').trim().split('\n'):[];
   const desktop=path.join(home,'Library/Application Support/Claude/claude_desktop_config.json');
-  try {fn({home,run,calls,desktop});} finally {fs.rmSync(home,{recursive:true,force:true});}
+  try {fn({home,run,calls,desktop,bin});} finally {fs.rmSync(home,{recursive:true,force:true});}
 }
 
 test('Claude Desktop: merges fyso-<slug> keeping other settings, backs up, and removes it again',()=>sandbox(({run,desktop})=>{
@@ -52,4 +52,20 @@ test('open: Codex gets a new thread in the project folder, with the first prompt
   assert.equal(url.searchParams.get('path'),root);
   assert.match(url.searchParams.get('prompt'),/fyso-demo.*"Mi Demo".*fyso_status/);
   assert.equal(run('open','cursor').status,1);
+}));
+
+
+test('Dagu adapter validates parameters and uses native connector in an isolated home',()=>sandbox(({home,bin,calls})=>{
+  const adapter=path.resolve(__dirname,'../template/framework/scripts/agent-connect-action.cjs');
+  const run=(target,mode='connect')=>spawnSync(process.execPath,[adapter],{encoding:'utf8',env:{HOME:home,PATH:`${bin}:/usr/bin:/bin`,FYSO_PROJECT:'demo',MISE_EXE:'/opt/mise',TARGET:target,MODE:mode}});
+  assert.equal(run('codex; touch injected').status,1);
+  assert.equal(run('codex','open').status,1);
+  assert.deepEqual(calls(),[]);
+  const connected=run('codex');assert.equal(connected.status,0,connected.stderr);
+  assert.equal(JSON.parse(connected.stdout).target,'codex');
+  assert.match(calls().at(-1),/^codex mcp add fyso-demo/);
+  const disconnected=run('codex','disconnect');assert.equal(disconnected.status,0,disconnected.stderr);
+  assert.equal(JSON.parse(disconnected.stdout).mode,'disconnect');
+  fs.writeFileSync(path.join(bin,'codex'),'#!/bin/sh\nexit 9\n',{mode:0o755});
+  assert.equal(run('codex').status,1);
 }));

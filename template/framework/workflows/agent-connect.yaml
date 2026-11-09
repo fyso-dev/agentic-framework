@@ -1,0 +1,11 @@
+description: Connect or disconnect the project MCP in an assistant on the Dagu host
+type: graph
+max_active_runs: 1
+params:
+  - TARGET: ""
+  - MODE: connect
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: connect
+    command: mise exec -- node framework/scripts/agent-connect-action.cjs
+    output: RESULT

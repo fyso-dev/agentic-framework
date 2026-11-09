@@ -774,18 +774,23 @@
   "mcp": {
     "title": "Conectá tu asistente",
     "intro": "Usá el MCP de este proyecto desde Claude o Codex para crear bots, instalar extensiones y revisar su estado, igual que al finalizar el instalador.",
-    "prepare": "1. Abrí una terminal en la carpeta del proyecto",
-    "prepareBody": "Ejecutá estos comandos en el equipo donde instalaste el proyecto. El panel muestra las instrucciones; la conexión se realiza desde tu terminal.",
+    "prepare": "1. Revisá dónde se ejecuta",
+    "prepareBody": "El proyecto debe estar iniciado y el asistente instalado en el equipo donde corre Dagu.",
     "connect": "2. Conectá el asistente que usás",
-    "connectBody": "Copiá y ejecutá el comando de tu asistente. Podés conectar más de uno. Codex comparte la configuración entre la app y la CLI. Claude Desktop usa la integración del instalador para macOS.",
+    "connectBody": "Elegí tu asistente y pulsá Conectar. El panel ejecuta el workflow fyso-agent-connect y muestra el resultado.",
     "restart": "3. Abrí una conversación nueva",
     "restartBody": "Reiniciá Claude Desktop para cargar el servidor. En Codex y Claude Code, iniciá una sesión nueva. Si ya lo conectaste con el instalador, empezá por este paso.",
     "verify": "4. Comprobá la conexión",
     "verifyBody": "Buscá el servidor fyso-{{slug}} en las herramientas de tu asistente y enviá este mensaje:",
     "prompt": "Leé fyso_context y ejecutá fyso_status para revisar mi proyecto. Contame qué tengo y qué conviene configurar primero.",
     "trouble": "Si no aparece",
-    "troubleBody": "Confirmá que ejecutaste el comando desde la carpeta correcta y que mise y el asistente están instalados. Volvé a conectar y abrí una sesión nueva. El proyecto debe estar iniciado para consultar el estado de sus servicios.",
+    "troubleBody": "Confirmá que mise y el asistente estén instalados para el usuario que ejecuta Dagu. Revisá el error y los logs del workflow, volvé a conectar y abrí una sesión nueva.",
     "disconnect": "Desconectar",
-    "disconnectBody": "Para quitar esta conexión, ejecutá el comando correspondiente. Esto conserva el proyecto y sus bots."
+    "disconnectBody": "Para quitar esta conexión, ejecutá el comando correspondiente. Esto conserva el proyecto y sus bots.",
+    "hostNote": "La conexión modifica la configuración del usuario que ejecuta Dagu, en ese equipo. No configura otro equipo desde el que abras el navegador.",
+    "demo": "Modo demo: las acciones son simuladas y no modifican asistentes.",
+    "connectButton": "Conectar",
+    "disconnectButton": "Desconectar",
+    "busy": "Ejecutando…"
   }
 }
