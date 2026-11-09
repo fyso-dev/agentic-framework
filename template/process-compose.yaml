@@ -31,10 +31,26 @@ processes:
       restart: on_failure
       backoff_seconds: 5
 
+  connector-setup:
+    command: framework/scripts/run-composio-setup.sh
+    log_location: .data/logs/connector-setup.log
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: ${FYSO_CONNECTOR_SETUP_PORT}
+        path: /health
+      initial_delay_seconds: 1
+      period_seconds: 2
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+
   caddy:
     command: framework/scripts/run-caddy.sh
     log_location: .data/logs/caddy.log
     depends_on:
+      connector-setup:
+        condition: process_healthy
       dagu:
         condition: process_healthy
       omb:

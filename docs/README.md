@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D38; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D38, D41–D45; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -47,6 +47,9 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
 | Conversational Bot Architect: native CRUD, snapshots and target protection | [bot-architect.md](bot-architect.md) |
+| Panel connectors and per-bot selection | [connectors.md](connectors.md) |
+| Historical Composio CLI trial (withdrawn; automatic setup failed) | [CLI spike](adr/spikes/composio-cli.md) |
+| Connector source recovery and validation limits | [connectors-recovery.md](connectors-recovery.md) |
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
@@ -124,3 +127,29 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-06 | **Menu bar app (D34).** A SwiftBar plugin instead of a native app: `framework/tray/fyso.10s.py` finds running stacks by their process-compose sockets, reads states over the socket and the project from the socket owner's cwd; `mise run tray:install` links it into SwiftBar. Tests use a fake process-compose on a Unix socket (healthy, degraded, stale, none). Finding: SwiftBar runs plugins with a minimal PATH, so the plugin takes `mise` from the PATH of the running process-compose (started by `mise run up`) instead of hard-coding install locations. Start/restart from the menu (stopped projects come from a cache of projects seen running) run mise with that same PATH, so bots started from the menu still find `claude`/`codex` |
 | 2026-11-07 | PR #11 corrections: installer ES/EN resources include workflow titles; repeated names get distinct project/MCP identifiers. Startup model repair sends only live model changes and preserves native/snapshot fields and deleted bots. Regression checks use isolated fixtures; live installer acceptance remains separate. |
 | 2026-11-07 | **Installer direction (D38).** Selected Qt Installer Framework for the Linux graphical wizard, retaining the shared Dagu/mise/Copier flow. Documented the proposed native Windows Qt installer over WSL2, prerequisite/restart handling, ownership and acceptance gates. Qt Linux delivery and Windows runtime support remain unverified; the macOS prototype retains its existing status. [Contract and sources](installer.md#cross-platform-installer-direction--d38). |
+
+| 2026-11-07 | Connector status correction: an unconfigured native app backend is labeled Setup required, while unavailable/incomplete account inventory remains unverified. Only a configured, readable inventory can report an app as not connected. |
+
+| 2026-11-07 | Bot connector visibility: the Bots list now shows MCP selections and links directly to a per-bot editor. The form edits native tools in the existing draft/review/apply flow, labels unconnected hosted services as pending and distinguishes Claude source switches from Codex. A real disposable-bot browser test verified draft isolation and preservation of unrelated profiles. [Evidence](../artifacts/delivery-evidence/bot-connectors/README.md). |
+
+| 2026-11-07 | **Native connector sources (D42).** Added OMB’s own Whop/Agentcard hosted MCP entries and separate Claude Code MCP/skills switches. The native feature patch is versioned and restored; default settings remain unchanged without an opted-in project patch. Native read/save/restore was checked with both switches off; UI true-state writes use fixtures. [Contract](connectors.md#native-sources-without-composio-d42). |
+
+| 2026-11-08 | Reconstructed connector sources from local edit records after loss of the temporary worktree. Source, build and 56 Node tests recovered; historical PNG captures and the generated live fixture were not recovered. See [recovery report](connectors-recovery.md). |
+
+| 2026-11-08 | Guided Composio setup (D43): a panel password form verifies and encrypts a project key, then activates native OMB without restart. Local SOPS/Git and restart-source proof, browser UX fixtures, 63 Node tests and generated-project doctor passed. Real account OAuth remains pending a supplied project key. [Contract](connectors.md#guided-composio-setup-d43) · [Evidence](../artifacts/delivery-evidence/composio-setup/README.md). |
+
+| 2026-11-08 | Guided account authorization: Connect now prepares a named in-panel dialog, opens the provider only on explicit action, explains return to Fyso and checks status automatically. Local provider consent, cancellation, temporary read failure recovery, native OMB OAuth/PKCE and mobile layout passed; external accounts remain unverified. Setup now links directly to project API Keys and focuses the app catalog. [Evidence](../artifacts/delivery-evidence/composio-setup/README.md). |
+
+| 2026-11-08 | Composio CLI 0.6.0 feasibility: official binary/checksum and live browser-login initiation passed. Real CLI against local fixtures obtained existing project keys, created a missing key when permitted and exposed a misleading exit-0 case when creation is denied. Human login, project selection and native OMB acceptance remain pending. [Spike](adr/spikes/composio-cli.md). |
+
+| 2026-11-08 | Real Composio CLI trial (D44): user login and project listing passed; automatic setup failed because CLI 0.6.0 exported a masked key and its creation route returned HTML. Manual setup stays first, encrypted configuration remained byte-identical, and the second route is explicitly experimental. [Actual findings](adr/spikes/composio-cli.md). |
+
+| 2026-11-09 | Removed the experimental Composio CLI option at the user's request: panel UI/locales, runtime routes/glue, dependency and CLI tests removed. Manual encrypted-key setup is the only supported method; native application OAuth remains available. [Contract](connectors.md#withdrawn-cli-experiment). |
+
+| 2026-11-09 | Bot editors now include native Composio application inventory separately from MCP selections. Saved failed/expired connections show lifecycle status; account naming is scoped to the app. Application grants remain native OMB Access settings. [Contract](connectors.md#account-lifecycle-presentation) · [Local UX evidence](../artifacts/delivery-evidence/connector-account-visibility/README.md). |
+
+| 2026-11-09 | Native application access in the panel (D45): off/read/write controls, explicit preview/apply, exact-ID native verification and project-owned native patches for restoration. This replaces the OMB Access link-out for bot permissions. [Contract](connectors.md#application-permissions-in-the-panel-d45) · [Real local proof](../artifacts/delivery-evidence/app-permissions/README.md). |
+
+| 2026-11-09 | Native catalog artwork: Composio already supplies logo URLs through OMB; the panel now displays them on app cards and in bot permissions, with initials for missing/failed images. [Contract](connectors.md#connector-artwork). |
+
+| 2026-11-09 | Simplified bot connectors and catalog: compact logo cards, ten common recommended apps, search/all-catalog escape hatch and preserved existing connections. Whop/Agentcard and source switches moved to advanced options; no access settings were changed by filtering. [Contract](connectors.md#recommended-discovery-and-compact-cards) · [UI evidence](../artifacts/delivery-evidence/recommended-connectors/README.md). |

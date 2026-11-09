@@ -11,6 +11,8 @@ node framework/scripts/panel-data.cjs config
 if stack_running; then
   # After `copier update` with the stack up: still repair models the engines retired (D37).
   framework/scripts/bots.sh repair || true
+  node framework/scripts/connector-preferences.cjs restore
+  node framework/scripts/app-access.cjs restore
   echo "Already running. 'mise run status' to inspect, 'mise run down' to stop."
   exit 0
 fi
@@ -34,6 +36,8 @@ for _ in $(seq 1 120); do
     fi
     # Models an engine no longer offers would make OMB reject every bot (D37).
     framework/scripts/bots.sh repair || true
+    node framework/scripts/connector-preferences.cjs restore
+    node framework/scripts/app-access.cjs restore
     # Fill the panel's checklist right away (runs in Dagu, in the background).
     curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-setup-check/enqueue" || true

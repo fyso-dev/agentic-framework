@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Engine } from "../api/types";
+import { BotConnectors } from "../components/BotConnectors";
+import type { ToolScope } from "../lib/connector-access";
 import { Avatar, Modal, Switch } from "../components/ui";
 import { go, href } from "../lib/router";
 import {
@@ -28,13 +30,13 @@ function useEngines(bots: Bot[]): { list: Engine[]; checked: boolean } {
   }, [checkData, bots]);
 }
 
-export function BotForm({ index }: { index: number | null }) {
+export function BotForm({ index,focusConnectors }: { index: number | null;focusConnectors?:boolean }) {
   const s = useStore();
   const { t } = useTranslation();
   if (s.team.status !== "ok") return <main className="page page-narrow"><p className="mute">{t("common.loading")}</p></main>;
   const bot = index === null ? null : s.workingBots.find((b) => b.index === index) ?? null;
   if (index !== null && !bot) return <NotFound />;
-  return <Form key={index ?? "new"} bot={bot} />;
+  return <Form key={index ?? "new"} bot={bot} focusConnectors={focusConnectors} />;
 }
 
 function NotFound() {
@@ -47,7 +49,7 @@ function NotFound() {
   );
 }
 
-function Form({ bot }: { bot: Bot | null }) {
+function Form({ bot,focusConnectors }: { bot: Bot | null;focusConnectors?:boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const id = useId();
@@ -63,6 +65,11 @@ function Form({ bot }: { bot: Bot | null }) {
   const initialSoul = bot?.soul.kind === "inline" ? bot.soul.text : "";
   const [soul, setSoul] = useState(initialSoul);
   const [uses, setUses] = useState(bot ? bot.usesWorkflows : true);
+  const [connectorScope,setConnectorScope]=useState<ToolScope|undefined>(bot?.tools);
+  const [connectorsChanged,setConnectorsChanged]=useState(false);
+  const matches=bot?(s.runtimeBots.data||[]).filter(native=>native.name===bot.name):[];
+  const runtime=matches.length===1?matches[0]:undefined;
+  useEffect(()=>{if(!connectorsChanged && !s.draft)setConnectorScope(runtime?runtime.toolScope:bot?.tools);},[runtime,connectorsChanged,s.draft,bot?.tools]);
   const [errors, setErrors] = useState<Errors>({});
   const [showSummary, setShowSummary] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -74,6 +81,7 @@ function Form({ bot }: { bot: Bot | null }) {
     return () => document.body.classList.remove("with-form-foot");
   }, []);
 
+  useEffect(()=>{if(focusConnectors){const section=document.getElementById('bot-connectors');section?.focus({preventScroll:true});section?.scrollIntoView({block:'start'});}},[focusConnectors]);
   const current = engines.list.find((e) => e.id === engine);
   const models = useMemo(() => {
     const list = current?.models ?? [];
@@ -114,6 +122,7 @@ function Form({ bot }: { bot: Bot | null }) {
       model: engine ? `${engine}/${model}` : model,
       soulText: soulChanged ? soul : null,
       usesWorkflows: uses,
+      ...(connectorsChanged?{tools:connectorScope||{}}:{}),
     });
     s.setDraft(serializeTeam(doc));
     go(href.bots);
@@ -267,6 +276,8 @@ function Form({ bot }: { bot: Bot | null }) {
             </>
           )}
         </div>
+
+        <BotConnectors scope={connectorScope} runtime={runtime} engine={engine} projectTools={uses} onChange={scope=>{setConnectorScope(scope);setConnectorsChanged(true);}} />
 
         <div className="toggle-box">
           <div className="grow">

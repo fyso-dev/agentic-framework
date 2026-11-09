@@ -17,3 +17,33 @@ After each successful mutation, independently read/list the target before report
 ## Import an existing native bot
 
 Use `mise run bots:architect` with `{"OP":"import","BOT_ID":"<exact native ID>"}` when the user asks to bring an existing OpenMausBot bot into project configuration. This operation exports the native profile and imported skill files, appends only that bot to the project team, and commits them. It never creates or updates a runtime bot. Inspect a fresh list first; ambiguous names and uncommitted project team edits are rejected. A bot can already exist in a committed native snapshot while still being absent from the project team. Do not call that bot unversioned.
+
+## Connections and tool access
+
+Before creating or changing a bot that needs external services, run
+`mise run bots:architect '{"OP":"connections"}'`. This discovers only this project's
+OMB catalog and versioned MCP sources; it never exposes endpoints or credentials.
+To connect a service, direct the person to this project's OpenMausBot Apps / MCP
+servers UI. OAuth authorization is performed by the person there. Do not ask for
+keys, reuse a desktop connection, install Activepieces by default, or invent a
+server name. A listed server is configured, not proof that a tool call succeeds.
+Native-only definitions need reconnection after a restore; prefer project MCP
+sources for reproducible custom definitions.
+
+The native bot entry also accepts `tools: {allow: [...], deny: [...]}`. Select
+only the role's required tools, for example `mcp:dagu:dagu_read`, using exact
+tool names discovered in OMB. `mcp:dagu:*` permits all tools of that server and
+`native:*` retains engine-native tools: neither means read-only. An explicit
+`allow: []` denies all tools. Omitting `allow` inherits the catalog; omitting the
+whole `tools` field on update preserves the current selection. A supplied tools
+object replaces that selection, so read the existing profile and preserve its
+entries unless the person requested their removal. Do not infer full approval
+from access to a connector. Discover actual tool names in OMB before claiming
+read-only access. Connected-app account and toolkit permissions are managed in
+native OMB Access settings, not this team-file surface.
+
+After apply, read the bot to verify its tools selection, then perform a harmless,
+read-only operation when authorized. Report configuration and execution evidence
+separately. If a connection is disabled, unavailable, or excluded by native bot
+Access settings, fix that in OMB before planning; do not broaden permissions to
+work around it.

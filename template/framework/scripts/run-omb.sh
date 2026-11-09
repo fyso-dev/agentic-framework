@@ -11,6 +11,17 @@ bot_env=()
 while IFS='=' read -r name _; do
   [[ $name == BOT_* || $name == FYSO_EXT_*_PORT ]] && bot_env+=("$name=${!name}")
 done < <(env)
+# Self-hosted connected apps use OMB's native Composio support. The encrypted
+# project secret is mapped only into this server, never inherited from the host.
+# Process-compose can retain an old environment after a panel key update.
+# Prefer the current encrypted project value on every native server start.
+if [ -f secrets.enc.yaml ] && grep -q '^FYSO_COMPOSIO_API_KEY:' secrets.enc.yaml; then
+  composio_key=$(SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}" \
+    sops decrypt --extract '["FYSO_COMPOSIO_API_KEY"]' secrets.enc.yaml)
+  bot_env+=("COMPOSIO_API_KEY=$composio_key")
+elif [ -n "${FYSO_COMPOSIO_API_KEY:-}" ]; then
+  bot_env+=("COMPOSIO_API_KEY=$FYSO_COMPOSIO_API_KEY")
+fi
 clean_exec \
   ${bot_env[@]+"${bot_env[@]}"} \
   OMB_PORT="$FYSO_OMB_PORT" \

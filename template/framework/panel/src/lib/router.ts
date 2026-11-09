@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 export type Route =
   | { name: "setup" }
   | { name: "bots"; review?: boolean }
-  | { name: "bot"; index: number | null }
+  | { name: "bot"; index: number | null; connectors?:boolean }
+  | { name: "connectors"; botId?:string }
   | { name: "apps" }
   | { name: "observability" };
 
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  const [pathname,query]=hash.replace(/^#\/?/, "").split("?");
+  const parts = pathname.split("/").filter(Boolean);
   if (parts[0] === "observability") return { name: "observability" };
+  if (parts[0] === "connectors") {const botId=new URLSearchParams(query||" ").get("bot");return { name: "connectors",...(botId?{botId}:{}) };}
   if (parts[0] === "apps") return { name: "apps" };
   if (parts[0] === "bots") {
     if (parts[1] === "review") return { name: "bots", review: true };
     if (parts[1] === "new") return { name: "bot", index: null };
-    if (parts[1] && /^\d+$/.test(parts[1])) return { name: "bot", index: Number(parts[1]) };
+    if (parts[1] && /^\d+$/.test(parts[1])) return { name: "bot", index: Number(parts[1]),...(new URLSearchParams(query||"").get("section")==="connectors"?{connectors:true}:{}) };
     return { name: "bots" };
   }
   return { name: "setup" };
@@ -27,6 +30,9 @@ export const href = {
   review: "#/bots/review",
   newBot: "#/bots/new",
   bot: (index: number) => `#/bots/${index}`,
+  botConnectors: (index:number) => `#/bots/${index}?section=connectors`,
+  connectors: "#/connectors",
+  connectorsForBot: (id:string) => `#/connectors?bot=${encodeURIComponent(id)}`,
   apps: "#/apps",
   observability: "#/observability",
 };

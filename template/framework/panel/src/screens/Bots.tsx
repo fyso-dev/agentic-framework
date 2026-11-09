@@ -1,11 +1,12 @@
 // Bots: the list over team.yaml (draft vs file on disk) and the review/apply dialog.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS, type Engine } from "../api/types";
 import { IconBot, IconPlus } from "../components/Icons";
 import { unappliedCount } from "../components/Layout";
 import { Avatar, External, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
+import { accessFor } from "../lib/connector-access";
 import { splitModel, type BotState } from "../lib/team";
 import { botRoster, versionStatus } from "../lib/botRoster";
 import { useDaguAction } from "../lib/useDaguAction";
@@ -50,6 +51,8 @@ export function Bots({ review }: { review: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const eng = useEngineLabel();
+  const connections=useDaguAction<{servers:{name:string}[]}>(s.backend,DAGS.botArchitect,'RESULT');
+  useEffect(()=>{if(!s.mock)void connections.start({OP:'connections'});},[]);
   const importing = useDaguAction<{botId:string; commit:string}>(s.backend,DAGS.botArchitect,"result");
   const importBot = async (id:string) => {
     if (s.draft || importing.phase === "running") return;
@@ -145,12 +148,18 @@ export function Bots({ review }: { review: boolean }) {
             const version = versionStatus(row,s.botVersioning.status === "ok" ? s.botVersioning.data : undefined);
             const canImport = row.nativeId && !row.ambiguous && !configuration && version !== "project";
             const { engine, modelId } = splitModel(model);
+            const live=runtime?.find(bot=>bot.id===row.nativeId);
+            const scope=configuration && state!=='applied'?configuration.bot.tools:live?live.toolScope:configuration?.bot.tools;
+            const known=[...new Set([...(connections.phase==='ok'?(connections.output?.servers||[]).map(server=>server.name):[]),...[...scope?.allow||[],...scope?.deny||[]].flatMap(selector=>{const match=/^mcp:([^:]+):/.exec(selector);return match?[match[1]]:[];})])];
+            const selected=known.filter(server=>accessFor(scope,server)!=='none');
+            const connectorSummary=connections.phase==='ok'?(selected.length?selected.join(' · '):t('botConnectors.none')):t('botConnectors.summaryUnknown');
             const inner = (
               <>
                 <Avatar name={name} />
                 <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                   <p style={{ fontWeight: 700 }} className="ellipsis">{name}</p>
                   <p className="mute ellipsis" style={{ fontSize: 13 }}>{title || "—"}</p>
+                  <p className="hint ellipsis" title={connectorSummary}>{t("botConnectors.summary",{names:connectorSummary})}</p>
                 </div>
                 <span className="bot-engine"><span className="pill pill-outline">{eng.kind(engine)}</span></span>
                 <span className="bot-model ellipsis" title={model}>{modelId}</span>
@@ -163,6 +172,7 @@ export function Bots({ review }: { review: boolean }) {
                   {inner}
                   <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",flexBasis:"100%",justifyContent:"flex-end"}}>
                     {state !== "deleted" && configuration && <a className="btn btn-ghost" href={href.bot(configuration.bot.index)} aria-label={t("bots.edit",{name})}>{t("bots.editAction")}</a>}
+                    {state !== "deleted" && !row.ambiguous && (configuration || row.nativeId) && <a className="btn btn-ghost" href={configuration?href.botConnectors(configuration.bot.index):href.connectorsForBot(row.nativeId!)} aria-label={t('botConnectors.openNamed',{name})}>{t('botConnectors.title')}</a>}
                     {state !== "deleted" && canImport && <button type="button" className="btn btn-pri" disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={() => void importBot(row.nativeId!)} aria-label={t("bots.importNamed",{name})}>{t("bots.import")}</button>}
                     {s.project.data && <External href={s.project.data.urls.omb} className="btn btn-ghost">{t("bots.runtimeOpen")}</External>}
                   </div>

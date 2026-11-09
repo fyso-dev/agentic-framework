@@ -29,22 +29,26 @@ bots:
     title: Designs and fixes Dagu workflows
     model: {{ strong }}
     approval: full             # writes workflows through the Dagu MCP without asking
+    tools: { allow: ["native:*", "mcp:dagu:*"] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }
 
   - name: Run Operator
     title: Watches runs, explains failures, retries
     model: {{ fast }}
     approval: ask
+    tools: { allow: ["native:*", "mcp:dagu:dagu_read", "mcp:dagu:dagu_execute"] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/run-operator.md }
 
   - name: Builder
     title: Turns requests into branches and PRs (fyso-dev-task)
     model: {{ strong }}
     approval: full             # starts fyso-dev-task through the Dagu MCP without asking
+    tools: { allow: ["native:*", "mcp:dagu:*"] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/builder.md }
 
   - name: Bot Architect
     title: Creates and maintains project bots through versioned native plans
     model: {{ strong }}
     approval: full
+    tools: { allow: ["native:*", "mcp:fyso:*"] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/bot-architect.md }

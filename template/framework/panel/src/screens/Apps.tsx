@@ -2,6 +2,7 @@
 // apps added by extensions, with health. Installed extensions are listed read-only
 // (docs/extensions-contract.md §5); the marketplace (§8) installs and upgrades them
 // through the fyso-ext-catalog and fyso-ext-install workflows. Removing stays a terminal task.
+import { Connections } from "../components/Connections";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
@@ -335,6 +336,7 @@ export function Apps() {
           ) : null}
         </section>
       )).filter((_, i) => i < 2 || groups[i].apps.length > 0)}
+      <Connections />
       <Extensions />
       <Market />
     </main>

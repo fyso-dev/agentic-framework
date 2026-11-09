@@ -134,11 +134,12 @@ export function TopBar(props: ThemeProps) {
   );
 }
 
-type NavItem = { id: "setup" | "bots" | "apps" | "observability"; href: string; icon: typeof IconBot };
+type NavItem = { id: "setup" | "bots" | "apps" | "observability" | "connectors"; href: string; icon: typeof IconBot };
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconWorkflow },
+  { id: "connectors", href: href.connectors, icon: IconApps },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
@@ -152,6 +153,7 @@ export function SideNav({ route }: { route: Route }) {
   const down = downApps(s);
   const counts: Record<NavItem["id"], ReactNode> = {
 
+    connectors: null,
     observability: null,
     setup: loadingSteps(s) ? null : (
       <span className="nav-count" style={{ color: open === 0 ? "var(--ok)" : s.anyFailed ? "var(--down)" : "var(--warn)", fontWeight: 600 }}>
@@ -183,13 +185,14 @@ export function BottomNav({ route }: { route: Route }) {
   const s = useStore();
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const badges: Record<NavItem["id"], [number, string]> = {
+    connectors: [0, "badge"],
     observability: [0, "badge"],
     setup: [open, s.anyFailed ? "badge" : "badge badge-warn"],
     bots: [unappliedCount(s), "badge badge-warn"],
     apps: [downApps(s), "badge"],
   };
   return (
-    <nav aria-label={t("nav.label")} className="bottomnav">
+    <nav aria-label={t("nav.label")} className="bottomnav" style={{gridTemplateColumns:`repeat(${ITEMS.length}, minmax(0, 1fr))`}}>
       {ITEMS.map(({ id, href: h, icon: Icon }) => {
         const [n, cls] = badges[id];
         return (
@@ -198,7 +201,7 @@ export function BottomNav({ route }: { route: Route }) {
               <Icon size={22} />
               {n > 0 && <span className={cls} aria-hidden="true">{n}</span>}
             </span>
-            {t(`nav.${id}`)}
+            <span className="bottomnav-label">{t(`nav.${id}`)}</span>
             {n > 0 && <span className="sr-only"> ({n})</span>}
           </a>
         );

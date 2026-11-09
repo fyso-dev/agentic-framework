@@ -29,6 +29,10 @@ for t in dagu openmausbot caddy process-compose sops; do
   command -v "$t" >/dev/null && ok "$t" || bad "$t missing: run 'mise install'"
 done
 
+echo "Connector setup"
+curl -fsS -o /dev/null "http://127.0.0.1:${FYSO_CONNECTOR_SETUP_PORT:-$((FYSO_HTTP_PORT + 9))}/health" \
+  && ok "Composio setup service" || bad "Composio setup service unavailable"
+
 echo "Logins"
 # Only engines a bot uses are required; at least one must be signed in (PLAN D32).
 used=" $(node framework/scripts/panel-data.cjs engines 2>/dev/null | tr '\n' ' ')"
