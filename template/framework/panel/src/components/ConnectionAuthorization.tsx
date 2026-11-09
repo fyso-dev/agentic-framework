@@ -25,8 +25,8 @@ export function ConnectionAuthorization({phase,label,url,opened,checkFailed,past
     </div>
     <div className="modal-foot">
       {phase==='complete'?<button type="button" className="btn btn-pri" disabled={busy} onClick={()=>{dialog.current?.close();onDone();}}>{t('connectionFlow.done')}</button>:<>
-        {phase==='waiting'&&<button className="btn btn-ghost" type="button" disabled={busy} onClick={onCheck}>{t('connectionFlow.check')}</button>}
-        <button className="btn btn-ghost" type="button" disabled={busy} onClick={onCancel}>{t(phase==='failed'?'connectionFlow.back':'common.cancel')}</button>
+        {phase==='waiting'&&<button className="btn btn-soft" type="button" disabled={busy} onClick={onCheck}>{t('connectionFlow.check')}</button>}
+        <button className="btn btn-soft" type="button" disabled={busy} onClick={onCancel}>{t(phase==='failed'?'connectionFlow.back':'common.cancel')}</button>
       </>}
     </div>
   </dialog>;

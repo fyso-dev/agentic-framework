@@ -70,28 +70,21 @@ A vertical list of steps. Each step shows:
 
 ### 3. Bots
 
-**List:** one row or card per bot with:
-- avatar,
-- name and role,
-- engine badge: "Suscripción" or "API",
-- model,
-- state: "aplicado", "cambios sin aplicar" or "nuevo".
+Layout (D49, Claude Design B1.3): **list on the left, detail on the right**. On phones the list and the detail are separate screens with a back arrow.
 
-Plus an **"Agregar bot"** button.
+**List:** avatar, name, a stack of connector logos and a dot for unapplied state (amber pending, accent new, red deleted; hollow = only in OpenMausBot). A **"+"** creates a bot. When there are unapplied changes, a compact strip offers **"Revisar y aplicar"** and discard.
 
-**Bot form** (drawer or page) with these fields:
+**Detail:** header with avatar, name, role, state pill and a toolbar (chat in OpenMausBot, delete). Three tabs, one question each:
 
-| Field | Type | Notes |
-|---|---|---|
-| Nombre | text | Unique, at most 100 characters |
-| Rol | text | One line, e.g. "Diseña workflows de Dagu" |
-| Motor | select | Only the engines configured in the project: "Claude · suscripción", "Claude · API", "Codex · suscripción"… |
-| Modelo | select | Depends on the engine |
-| Instrucciones base | long text (Markdown) | At most 24,000 bytes. Hint: "El ajuste fino se hace después en OpenMausBot" |
-| Skills | list of toggles | Name + one line each |
-| Usa workflows (Dagu) | toggle | On by default |
+| Tab | Content |
+|---|---|
+| Perfil | Nombre, Rol; activity tiles (conversations, tools used, conversations with errors, estimated usage) from the observability snapshot; *Piensa con* (engine + model); *Autonomía* (Pregunta / Solo = `approval: ask/full`); chips for instructions file, skills and last commit |
+| Instrucciones | Markdown editor with "+ Rol / Reglas / Tono / Ejemplos" section inserts, a tip, "Probar en OpenMausBot" and the 24,000-byte counter |
+| Conectores · N | One card per active access: *Proyecto* (Dagu workflows), MCP servers (*Completo* or *Parcial*), apps (*Leer* / *Escribir*). Hover shows ✕ to remove. A dashed "+" card opens a logo picker of what can still be granted, plus "Conectar una aplicación nueva" |
 
-Buttons: **"Guardar"** and **"Eliminar bot"**. Delete asks for confirmation.
+Icons carry the meaning; secondary text goes in tooltips (`data-tip`), with an accessible name on every icon-only control. One vocabulary for access: *Leer*, *Escribir*, *Completo*.
+
+**Save:** a floating bar ("Sin guardar" · undo · **Guardar**) appears only with changes. Guardar writes the team.yaml draft and applies app grants in the same click. Delete asks for confirmation.
 
 **Apply flow** (key moment, design it carefully):
 1. After saving, a **"Vista previa de cambios"** shows the plan before anything is applied, e.g.:
@@ -100,7 +93,7 @@ Buttons: **"Guardar"** and **"Eliminar bot"**. Delete asks for confirmation.
    - "Plan: 1 a crear, 1 a cambiar, 0 a eliminar"
 2. The note: "Antes de aplicar se guardan en git los ajustes hechos en OpenMausBot".
 3. **"Aplicar"** runs it with the standard action pattern, or **"Cancelar"**.
-4. On success: "Aplicado. Ya podés usarlos en OpenMausBot" + "Abrir OpenMausBot ↗".
+4. On success: "Aplicado. Ya puedes usarlos en OpenMausBot" + "Abrir OpenMausBot ↗".
 
 **States to design:**
 - list with mixed states,
