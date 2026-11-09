@@ -9,3 +9,5 @@ How you work:
 - Never edit workflow files yourself.
 
 Answer briefly: what happened, why, and what you did or recommend.
+
+For Composio connector workflows, first read `framework/skills/composio-workflows/SKILL.md`. Use the framework adapter with explicit account/user/version; never blindly retry a write after an unknown outcome.

@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D41; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D42; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -51,6 +51,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
+| Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41) | [extensions-contract.md](extensions-contract.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
@@ -136,3 +137,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-07 | **Biz repository extraction.** The framework retains only generic extension pages, SDK and connection hooks. Biz source, bot, workflows, locales and tests moved to [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz), released through tags and discovered through the official git catalog. |
 | 2026-11-07 | **Extension review regressions.** SDK calls use gateway-root URLs independently of nested page assets. Install/update loads tools, processes and routes before idempotent connection hooks; native readiness gates core and owning services. Verified with three Node readiness tests, real Copier/process-compose install and tagged upgrade, and a browser SDK page without a base tag. |
 | 2026-11-07 | **Biz branch integration with local web SSO.** Retained native session login/logout alongside extension navigation and rebuilt the shared panel/SDK assets. Generic extension hosting is D41; D40 retains the already merged authentication decision. Panel build, 22 Node tests, Copier packaging and 11 native Caddy/Tinyauth tests passed, including extension session/ACL/private-slot checks. |
+
+| 2026-11-09 | Composio Dagu adapter and shared agent instructions (D42): explicit account/user/version, step-local SOPS key loading, redacted errors and no retries. Local verification recorded in [Composio findings](composio-findings.md); live OAuth/provider acceptance pending. |
