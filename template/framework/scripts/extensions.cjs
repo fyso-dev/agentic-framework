@@ -18,13 +18,29 @@ function secrets(id) {
 function missing(id, env = process.env) {
   return secrets(id).filter(s => s.required === true && !env[s.name]).map(s => s.name);
 }
+const installed = () => glob('.copier-answers.ext-*.yml').map(f => f.slice('.copier-answers.ext-'.length, -4));
+// `ext-<id>-*.yaml`, minus files of installed extensions whose id extends <id> (`sample` vs `sample-other`).
+function workflows(id) {
+  const longer = installed().filter(o => o !== id && o.startsWith(`${id}-`));
+  return glob(`project/workflows/ext-${id}-*.yaml`).filter(f => !longer.some(o => f.startsWith(`project/workflows/ext-${o}-`)));
+}
+function pages(id) {
+  return glob(`extensions/${id}/pages/*.yaml`).map(file=>{
+    const pageId=file.split('/').pop().slice(0,-5),data=read(file);
+    if(!validId(pageId) || !data?.name || typeof data.url!=='string' || !data.url.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.html$/.test(data.url))throw new Error(`${file}: invalid extension page`);
+    if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
+    if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
+    const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
+    return {id:pageId,...name,url:data.url,icon:data.icon||'apps'};
+  });
+}
 function inventory(apps, env = process.env) {
   return glob('.copier-answers.ext-*.yml').map(file => {
     const id = file.slice('.copier-answers.ext-'.length, -4);
     if (!validId(id)) throw Error(`Invalid extension id in ${file}`);
     const answers = read(file);
     const base = `extensions/${id}`;
-    return {id, src:answers._src_path, version:answers._commit || null,
+    return {id, pages:pages(id), src:answers._src_path, version:answers._commit || null,
       apps:apps.filter(a => a.file === `${base}/app.yaml`).map(a => a.id),
       secrets:secrets(id).map(s => {
         const description = typeof s.description === 'string' ? {description:s.description} :
@@ -32,7 +48,7 @@ function inventory(apps, env = process.env) {
         return {name:s.name, ...description, required:s.required === true, set:!!env[s.name]};
       }),
       mcpServers:fs.existsSync(`${base}/mcp.json`) ? Object.keys(JSON.parse(fs.readFileSync(`${base}/mcp.json`)).mcpServers || {}) : [],
-      workflows:glob(`project/workflows/ext-${id}-*.yaml`).map(f => f.split('/').pop().slice(0,-5)),
+      workflows:workflows(id).map(f => f.split('/').pop().slice(0,-5)),
       skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2))};
   });
 }
@@ -48,6 +64,7 @@ function check(env = process.env) {
     const id = file.split('/')[1];
     for (const name of missing(id,env)) errors.push(`${id}: required secret ${name} is empty`);
   }
+  for (const id of installed()) {try {pages(id);} catch(error) {errors.push(error.message);}}
   return errors;
 }
 function run(id, command) {
@@ -55,12 +72,12 @@ function run(id, command) {
   const absent = missing(id);
   if (absent.length) throw Error(`${id}: required secret(s) empty: ${absent.join(', ')}`);
   const names = new Set(['PATH','HOME',...secrets(id).map(s => s.name)]);
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => names.has(k) || k.startsWith('FYSO_')));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('FYSO_AUTH_') && (names.has(k) || k.startsWith('FYSO_'))));
   const child = spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, glob, validId, secrets, missing, inventory, check};
+module.exports = {read, glob, validId, secrets, missing, workflows, inventory, check};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));

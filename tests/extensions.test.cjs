@@ -21,7 +21,7 @@ test('MCP merges framework, project and sorted extensions, preserving placeholde
   put('extensions/sample/mcp.json',JSON.stringify({mcpServers:{sample:{url:'${FYSO_EXT_SAMPLE_PORT}'}}}));
   const result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
   const config=JSON.parse(fs.readFileSync(path.join(root,'.mcp.json')));
-  assert.deepEqual(Object.keys(config.mcpServers),['dagu','project','sample']);
+  assert.deepEqual(Object.keys(config.mcpServers),['dagu','fyso','project','sample']);
   assert.equal(config.mcpServers.project.url,'${TOKEN}');
 }));
 test('MCP duplicate reports both owners and leaves previous output intact',()=>fixture(({root,put,run})=>{
@@ -32,9 +32,9 @@ test('MCP duplicate reports both owners and leaves previous output intact',()=>f
 }));
 test('run-ext filters ambient variables and preserves declared multiline secrets and argv',()=>fixture(({put,run})=>{
   put('extensions/sample/secrets.yaml','- name: SAMPLE_TOKEN\n  required: true\n');
-  const result=run(['bash','framework/scripts/run-ext.sh','sample','--',process.execPath,'-e','console.log(JSON.stringify({env:process.env,args:process.argv.slice(1)}))','a b'],{SAMPLE_TOKEN:'private\nvalue',AMBIENT_SECRET:'hidden',FYSO_EXT_SAMPLE_PORT:'19410'});
+  const result=run(['bash','framework/scripts/run-ext.sh','sample','--',process.execPath,'-e','console.log(JSON.stringify({env:process.env,args:process.argv.slice(1)}))','a b'],{SAMPLE_TOKEN:'private\nvalue',AMBIENT_SECRET:'hidden',FYSO_AUTH_USERS:'private-auth-canary',FYSO_AUTH_FUTURE_SECRET:'private-provider-canary',FYSO_EXT_SAMPLE_PORT:'19410'});
   assert.equal(result.status,0,result.stderr);const data=JSON.parse(result.stdout);
-  assert.equal(data.env.SAMPLE_TOKEN,'private\nvalue');assert.equal(data.env.AMBIENT_SECRET,undefined);
+  assert.equal(data.env.SAMPLE_TOKEN,'private\nvalue');assert.equal(data.env.AMBIENT_SECRET,undefined);assert.equal(data.env.FYSO_AUTH_USERS,undefined);assert.equal(data.env.FYSO_AUTH_FUTURE_SECRET,undefined);
   assert.equal(data.env.USER,undefined);assert.equal(data.env.FYSO_EXT_SAMPLE_PORT,'19410');assert.deepEqual(data.args,['a b']);
 }));
 test('run-ext refuses missing required secrets before executing a command',()=>fixture(({root,put,run})=>{
@@ -66,6 +66,12 @@ test('remove deletes only named slots, retaining runtime data, secrets and other
   for(const file of ['.data/ext/sample/data','secrets.enc.yaml','extensions/other/app.yaml'])assert.ok(fs.existsSync(path.join(root,file)));
   assert.equal(run(['node','framework/scripts/ext-lifecycle.cjs','remove','../other']).status,1);
 }));
+test('remove keeps workflows of an installed extension whose id extends the removed one',()=>fixture(({root,put,run})=>{
+  for(const file of ['.copier-answers.ext-sample.yml','.copier-answers.ext-sample-other.yml','project/workflows/ext-sample-check.yaml','project/workflows/ext-sample-other-check.yaml'])put(file,'_src_path: x');
+  const result=run(['node','framework/scripts/ext-lifecycle.cjs','remove','sample']);assert.equal(result.status,0,result.stderr);
+  assert.ok(!fs.existsSync(path.join(root,'project/workflows/ext-sample-check.yaml')));
+  assert.ok(fs.existsSync(path.join(root,'project/workflows/ext-sample-other-check.yaml')));
+}));
 test('process-compose startup merges all fragments and clients address the same socket',()=>fixture(({root,put,run})=>{
   put('project/apps/test/process.yaml','');put('extensions/sample/process.yaml','');
   put('bin/process-compose','#!/usr/bin/env bash\nprintf "%s\\n" "$@"\n');fs.chmodSync(path.join(root,'bin/process-compose'),0o755);
@@ -76,4 +82,24 @@ test('process-compose startup merges all fragments and clients address the same 
     else assert.ok(!actual.includes('-f'));
     assert.deepEqual(actual.slice(-2),['--unix-socket','/tmp/fyso-unknown-19400.sock']);
   }
+}));
+
+test('installed extensions register multiple localized static pages without core routes',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-reports.yml','_src_path: fixture\n');
+  put('extensions/reports/pages/overview.yaml','name: {es: Informes, en: Reports}\nurl: /extensions/reports/panel/overview.html\n');
+  put('extensions/reports/pages/history.yaml','name: History\nurl: /extensions/reports/panel/history.html\n');
+  put('extensions/reports/panel/overview.html','<!doctype html><h1>Fixture overview</h1>');
+  put('extensions/reports/panel/history.html','<!doctype html><h1>Fixture history</h1>');
+  const result=run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  assert.equal(result.status,0,result.stderr);const [extension]=JSON.parse(result.stdout);
+  assert.equal(extension.pages.length,2);assert.equal(extension.pages[1].name_i18n.en,'Reports');
+  assert.deepEqual(extension.pages.map(p=>p.id),['history','overview']);
+}));
+test('page registrations cannot expose secret slots or missing public files',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-reports.yml','_src_path: fixture\n');
+  put('extensions/reports/pages/overview.yaml','name: Reports\nurl: /extensions/reports/secrets.yaml\n');
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  let result=invoke();assert.equal(result.status,1);assert.match(result.stderr,/invalid extension page/);
+  put('extensions/reports/pages/overview.yaml','name: Reports\nurl: /extensions/reports/panel/missing.html\n');
+  result=invoke();assert.equal(result.status,1);assert.match(result.stderr,/missing page entry/);
 }));

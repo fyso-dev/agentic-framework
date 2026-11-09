@@ -1,6 +1,6 @@
 # Composio workflow findings — 2026-11-09
 
-Implemented under D31 as an optional framework adapter and native DAG example. No connector execution, OAuth configuration, external write, service restart or project bot modification was performed.
+Implemented under D42 as an optional framework adapter and native DAG example. No connector execution, OAuth configuration, external write, service restart or project bot modification was performed.
 
 ## Local evidence
 

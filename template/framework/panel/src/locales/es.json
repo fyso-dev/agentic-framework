@@ -1,4 +1,5 @@
 {
+  "session": {"logout": "Cerrar sesión", "unavailable": "No se pudo verificar la sesión"},
   "common": {
     "newTab": "(se abre en una pestaña nueva)",
     "copy": "Copiar",
@@ -101,7 +102,8 @@
       "never_other": "{{count}} bots definidos, todavía sin verificar",
       "review": "Revisar y aplicar",
       "reviewPlain": "Revisar y aplicar",
-      "view": "Ver bots"
+      "view": "Ver bots",
+      "invalid": "OpenMausBot rechaza el equipo: {{error}}"
     },
     "dagu": {
       "title": "Bots conectados a Dagu",
@@ -364,9 +366,33 @@
     "workflows_other": "{{count}} workflows",
     "skills_one": "{{count}} skill (activala en un bot)",
     "skills_other": "{{count}} skills (activalas en un bot)",
-    "manage": "Instalar, actualizar o quitar extensiones se hace desde la terminal. Para actualizar todas:",
+    "manage": "Quitar una extensión se hace desde la terminal. Para actualizar todas:",
     "emptyTitle": "No hay extensiones instaladas.",
-    "emptyHint": "Instalá una desde su repo:",
+    "emptyHint": "Instalá una desde el marketplace o desde su repo:",
     "emptyCommand": "mise run ext:add gh:org/fyso-ext-nombre"
+  },
+  "market": {
+    "title": "Marketplace",
+    "catalogs": "Catálogos: {{names}}",
+    "refresh": "Actualizar catálogo",
+    "refreshing": "Leyendo catálogos…",
+    "never": "Leé los catálogos de project/marketplaces.yaml para ver las extensiones disponibles.",
+    "empty": "Los catálogos no listan extensiones.",
+    "catalogError": "No se pudo leer el catálogo {{name}}: {{error}}",
+    "from": "de {{catalog}}",
+    "install": "Instalar {{version}}",
+    "update": "Actualizar a {{version}}",
+    "installing": "Instalando…",
+    "updating": "Actualizando…",
+    "installed": "Instalada {{version}}",
+    "noTags": "Sin versiones publicadas",
+    "done": "{{id}} {{version}} quedó instalada y commiteada ({{commit}}). Si declara secretos, cargalos con:",
+    "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commitear, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
+    "hintCommand": "mise run ext:add <id>",
+    "tags": "Etiquetas"
+  },
+  "extensionPage": {
+    "missing": "La página de la extensión no está instalada.",
+    "loading": "Cargando la página…"
   }
 }

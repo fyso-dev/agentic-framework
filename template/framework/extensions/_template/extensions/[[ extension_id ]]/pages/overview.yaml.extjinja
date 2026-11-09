@@ -1,0 +1,2 @@
+name: {es: Mi extensión, en: My extension}
+url: /extensions/[[ extension_id ]]/panel/index.html

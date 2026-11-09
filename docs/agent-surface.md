@@ -1,0 +1,75 @@
+# Agent surface: the platform MCP and Dagu for coding agents (D33)
+
+Two separate things, both available to any MCP client opened in a project (Claude Code, Codex, OpenMausBot bots):
+
+1. **`fyso` — the platform's own MCP server.** Typed tools for what the panel does: inspect the project, build bots, install extensions, run checks and snapshots.
+2. **Dagu for agents — Dagu's own MCP and authoring skill**, so an agent can design, run and debug workflows.
+
+Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json`, contract in [extensions-contract.md §4](extensions-contract.md#4-mcpjson-is-generated)).
+
+## 1. `fyso` MCP server
+
+`framework/scripts/fyso-mcp.cjs`, MCP over **stdio**, no dependencies, started as `mise exec -- node framework/scripts/fyso-mcp.cjs` from the project root (mise loads the ports and the decrypted login). No port, no process in the stack.
+
+**Rule:** every change goes through the **same Dagu workflows as the panel** (contract in [panel-contract.md §3](panel-contract.md#3-action-workflows)); the server never edits project files itself. A tool waits for its run and returns the workflow output; a failed run comes back as a tool error with Dagu's step error and run id.
+
+| Tool | Does | Through |
+|---|---|---|
+| `fyso_status` | project, health of Dagu/OMB/gateway, apps, installed extensions (secret **presence** only), bot versioning | `panel-data.cjs config` + `health.sh` (read-only) |
+| `fyso_check` | setup checklist | `fyso-setup-check` |
+| `fyso_doctor` | `mise run doctor` output and result | `doctor.sh` (read-only) |
+| `fyso_bots_list`, `fyso_bot_read` | native bots, one profile + revision | `fyso-bot-architect` `OP=list\|read` |
+| `fyso_bot_plan` | preview create/update/delete of one bot → `planId` | `fyso-bot-architect` `OP=plan` |
+| `fyso_bot_apply` | apply a plan by `planId` (snapshot, apply, commit) | `fyso-bot-architect` `OP=apply` |
+| `fyso_bot_import` | version a native-only bot | `fyso-bot-architect` `OP=import` |
+| `fyso_ext_search` | catalog entries, latest version, install state | `fyso-ext-catalog` |
+| `fyso_ext_install` | install (`add`) or upgrade (`update`) one extension | `fyso-ext-install` |
+| `fyso_snapshot` | save bots and memory to git | `fyso-snapshot` |
+| `fyso_observability` | conversations, execution, AI consumption | `fyso-observability` |
+
+**Not exposed, on purpose** (terminal tasks for a person): secret values (`mise run secrets`), removing extensions (`mise run ext:remove`), starting/stopping the stack (`mise run up/down`). The server's `instructions` tell agents to plan before applying bots and never to ask for secret values.
+
+## 2. Dagu for coding agents
+
+- **MCP:** the `dagu` entry of `.mcp.json` (`http://127.0.0.1:${FYSO_DAGU_PORT}/mcp`, header `Authorization: ${DAGU_MCP_AUTH}`). `DAGU_MCP_AUTH` is derived by mise from the project login (`mise.toml`, never stored), so an agent started inside the project's mise environment (`mise activate`, or `mise exec -- claude`) authenticates. OpenMausBot sets the same value for bots. Tools: `dagu_read`, `dagu_execute`, `dagu_change`.
+- **Skill:** `mise run agent:setup` installs Dagu's own `dagu` authoring skill, **pinned to this project's Dagu version**, with the [`skills`](https://github.com/vercel-labs/skills) CLI 1.7.6 (`dagucloud/dagu@v<version> --skill dagu -a claude-code codex --copy`, telemetry off) into `.claude/skills/dagu` and `.agents/skills/dagu`. Those folders are rebuildable and git-ignored. Bots keep reading the same reference over MCP (Phase 2).
+
+## Shared operating context
+
+`template/framework/agent-context.md` is the local, template-owned operating guide: architecture, ownership, isolation, task routing, procedures, verification and desktop tool limitations. The platform MCP includes the guide in `initialize.instructions` and exposes read-only `fyso_context` without Dagu or a running stack. CLI `AGENTS.md`, every default bot soul (including Chief), and desktop opening prompts point to the same guide. Role instructions keep their narrower permissions. No generated configuration or user-home instructions are overwritten.
+
+Copier updates refresh the framework guide. Existing project-owned team declarations and runtime souls are preserved: adopting new role instructions requires an explicit bot update; this change does not silently reapply existing bots. New generated projects include the Chief soul by default.
+
+## Verification (2026-11-06, Test 1 project)
+
+- `fyso` over stdio, started exactly as `.mcp.json` does: `initialize`; `fyso_status` (services ok, apps, extensions); `fyso_bots_list` (4 native bots); `fyso_ext_search` (official catalog, install state); `fyso_bot_plan` (a "Soporte" bot, preview only, not applied); `fyso_doctor` (all checks passed).
+- `DAGU_MCP_AUTH` from the sops-encrypted login matches the gateway header; Dagu MCP `initialize` → 200. `claude mcp list` in the project shows `dagu` and `fyso`.
+- Tests: `tests/fyso-mcp.test.cjs` (stdio handshake, tool list, workflow params and parsed outputs, failures and bad arguments as tool errors).
+- Not run here: `mise run agent:setup` (downloads the `skills` CLI from npm; run it once per project).
+
+## 3. Connect desktop and CLI agents (D36)
+
+`.mcp.json` only reaches agents opened inside the project folder. To manage a project from **Claude Desktop** or **Codex** anywhere:
+
+```sh
+mise run agent:connect                   # desktop apps found on this Mac (Claude Desktop, Codex)
+mise run agent:connect claude-code       # Claude Code CLI as well (opt-in)
+mise run agent:disconnect                # remove this project's entry
+mise run agent:open [codex|claude-desktop]   # new conversation about this project
+```
+
+`agent:open` uses the apps' own deep links (read from their bundles): **`codex://threads/new?path=<project>&prompt=…`** opens a Codex thread in the project folder; **`claude://claude.ai/new?q=…`** opens a Claude Desktop chat, restarting Claude first when it runs, because it loads MCP servers only at start. The first message is typed in, not sent: it asks to use `fyso-<slug>` starting with `fyso_status`.
+
+| Target | How | Notes |
+|---|---|---|
+| `claude-desktop` | merges `~/Library/Application Support/Claude/claude_desktop_config.json` (keeps other keys, writes `*.fyso-backup`) | no CLI exists for it; restart Claude Desktop |
+| `codex` | `codex mcp add` (the ChatGPT app bundles the Codex CLI) | app and CLI share `~/.codex/config.toml` |
+| `claude-code` | `claude mcp add --scope user` | opt-in |
+
+The entry is named **`fyso-<slug>`**, one per project: a plain `fyso` may already exist (e.g. the Fyso cloud server). It runs `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`, an absolute launcher, because desktop apps start servers with a minimal `PATH` and no project folder. Verified: started that way from `/` with only the system `PATH`, the server answers and `fyso_status` reports the project. Tests: `tests/agent-connect.test.cjs` (fake HOME and CLIs).
+
+The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment.
+
+### Shared context verification (2026-11-06)
+
+Nine targeted MCP/agent-connect tests passed, including real stdio initialization and an offline context call with no Dagu fixture, plus fake-home desktop/CLI registration checks. `git diff --check` and the repository path check passed. No desktop app or live bot conversation was exercised. `mise run doctor` is unavailable in the template checkout (no root runtime task); generated-stack doctor acceptance remains unverified.

@@ -1,0 +1,3 @@
+# Extension catalogs: git repos with a marketplace.yaml at the root (D31).
+# The first catalog that lists an id wins. Add private catalogs below.
+- gh:fyso-dev/fyso-extensions

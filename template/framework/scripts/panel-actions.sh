@@ -34,7 +34,9 @@ case "${1:-}" in
     if command -v codex >/dev/null && codex login status >/dev/null 2>&1; then FYSO_CODEX_OK=true; fi
     if framework/scripts/health.sh dagu >/dev/null 2>&1; then FYSO_DAGU_OK=true; fi
     omb models --json > "$tmp/models.json"
-    omb team apply "$tmp/rendered.yaml" --dry-run --json > "$tmp/plan.json"
+    # A team OMB rejects (e.g. a model the engine no longer offers) is a check result,
+    # not a crash: keep its JSON error so the panel can say which bot and why.
+    omb team apply "$tmp/rendered.yaml" --dry-run --json > "$tmp/plan.json" || true
     node framework/scripts/panel-data.cjs check "$tmp/models.json" "$tmp/plan.json"
     ;;
   *) fail 'usage: panel-actions.sh <check|plan|apply>' ;;

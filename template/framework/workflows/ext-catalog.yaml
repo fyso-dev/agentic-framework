@@ -1,0 +1,10 @@
+description: Panel ext-catalog (extension marketplace, D31)
+type: graph
+max_active_runs: 1
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: catalog
+    command: mise exec -- node framework/scripts/marketplace.cjs json
+    output: CATALOG

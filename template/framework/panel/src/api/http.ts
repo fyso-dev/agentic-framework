@@ -14,12 +14,13 @@ export class HttpError extends Error {
 
 async function request(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, { credentials: "same-origin", cache: "no-store", ...init });
+  if (res.status === 401) window.dispatchEvent(new Event("fyso-session-expired"));
   if (!res.ok) throw new HttpError(res.status, url, await res.text().catch(() => ""));
   return res;
 }
 
 const json = async <T>(url: string, init?: RequestInit) => (await request(url, init)).json() as Promise<T>;
-const dagu = (path: string) => `api/dagu/${path}`;
+const dagu = (path: string) => `/api/dagu/${path}`;
 const enc = encodeURIComponent;
 
 type DaguNode = { error?: string; status?: number; statusLabel?: string; step?: { name?: string } };
@@ -48,13 +49,13 @@ export function toRun(d: DaguRunDetails, fallbackId = ""): Run {
 }
 
 export const httpBackend: Backend = {
-  getBotVersioning: () => json("config/bot-versioning.json"),
-  getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("api/omb/bots")).bots,
-  getObservability: () => json("config/observability.json"),
-  getProject: () => json<Project>("config/project.json"),
-  getTeam: async () => (await request("config/team.yaml")).text(),
-  getApps: () => json<App[]>("config/apps.json"),
-  getExtensions: () => json<Extension[]>("config/extensions.json"),
+  getBotVersioning: () => json("/config/bot-versioning.json"),
+  getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("/api/omb/bots")).bots,
+  getObservability: () => json("/config/observability.json"),
+  getProject: () => json<Project>("/config/project.json"),
+  getTeam: async () => (await request("/config/team.yaml")).text(),
+  getApps: () => json<App[]>("/config/apps.json"),
+  getExtensions: () => json<Extension[]>("/config/extensions.json"),
 
   async enqueue(dag, params) {
     const body = params ? { params: JSON.stringify(params) } : {};
