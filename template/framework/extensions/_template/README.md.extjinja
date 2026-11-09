@@ -47,6 +47,10 @@ Write **only** these paths. Never edit files another template owns (`mise.toml`,
 - **Ports:** use one port in the project's extension block (`port_base+10` … `+19`),
   asked in `copier.yml` as the question `extension_port` (the installer fills it with a free port) and exposed as `FYSO_EXT_<EXT>_PORT` (id in upper case,
   `-` → `_`). Listen on `127.0.0.1`; Caddy is the only entry point.
+- **Web login:** keep `import fyso_login` and use `[[ extension_id ]].${FYSO_WEB_DOMAIN}`.
+  Add the app's explicit user allowlist to `project/auth/tinyauth.yaml`; unknown apps
+  are denied. Native application roles remain separate. The framework strips its
+  shared login cookie after authentication, before proxying to application servers.
 - **Secrets:** users set values with `mise run secrets` in the project (sops + age).
 - **Pin versions** of every tool in the conf.d file; never `latest`.
 - **No machine-specific paths;** use `FYSO_ROOT`, `FYSO_DATA` or relative paths.
@@ -73,3 +77,13 @@ catalog's `marketplace.yaml` (official: `fyso-dev/fyso-extensions`; see the cont
  Projects upgrade with `mise run ext:update [[ extension_id ]]`,
 list with `mise run ext:list` and uninstall with `mise run ext:remove [[ extension_id ]]`
 (runtime data and secret values are kept).
+
+## Own tabs and pages
+
+`extensions/<id>/pages/<page>.yaml` registers a localized navigation entry. Its
+`url` names a static HTML file under `extensions/<id>/panel/`. The framework reads
+installed registrations; it never imports extension-specific screens. Multiple
+pages and extensions work without changing the core router. The included native
+HTML example uses the project's theme/language query parameters and its own
+locale files. A React page may optionally import the v1 SDK from
+`/assets/extension-sdk.js`; plain static pages need no JavaScript framework.

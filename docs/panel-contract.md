@@ -2,7 +2,9 @@
 
 The panel is a static SPA. It has **no backend of its own** (PLAN §9, D13). It reads files that Caddy serves read-only, and it acts by starting Dagu workflows and reading their outputs. This file is the contract between the SPA (`framework/panel/`) and the plumbing (`framework/workflows/`, `framework/scripts/`, `Caddyfile`).
 
-All URLs are relative to the panel origin `http://panel.localhost:<port>`. The browser is already authenticated with basic auth (D11), and Caddy forwards the same `Authorization` header to Dagu (D19).
+All URLs are relative to `http://panel.<slug>-<port>.localhost:<port>`. Caddy authorizes the native shared web session (D40) and injects Dagu’s separate technical credential server-side. Browsers never send that credential. See [web authentication](web-auth.md) for access permissions and native identity limits.
+
+`GET /api/session` exposes the native authority’s current public identity (`auth.authenticated`, `username`, `name`, `providerId`). `POST /api/session/logout` revokes the native session. Other logout methods return 405. API authentication failures return 401/403; a panel 401 reloads the page through the gateway login flow. Identity checks run on focus and every 30 seconds; a changed provider/user reloads all panel state. No credential, cookie value or upstream token is returned in project configuration.
 
 ## 1. Read-only files
 

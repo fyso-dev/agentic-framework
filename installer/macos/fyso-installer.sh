@@ -92,7 +92,7 @@ block_free() {   # $1: port base. Free = valid range, not taken by another proje
 }
 first_free_block() { b=8400; while [ $b -lt 9900 ] && ! block_free $b; do b=$((b+10)); done; echo $b; }
 short() { case $1 in "$HOME"/*) printf '~/%s' "${1#$HOME/}" ;; *) printf '%s' "$1" ;; esac; }
-NAME=$default_name; FOLDER="$HOME/Fyso"; CHOICE="Claude Code"; ADMIN=admin; PASSWORD=admin; PORT=""
+NAME=$default_name; FOLDER="$HOME/Fyso"; CHOICE="Claude Code"; ADMIN=admin; PASSWORD=""; PORT=""
 if [ "${FYSO_AUTO:-}" = 1 ]; then
   NAME=${FYSO_NAME:-$NAME}; FOLDER=${FYSO_FOLDER:-$FOLDER}; CHOICE=${FYSO_ENGINE:-$CHOICE}
   ADMIN=${FYSO_ADMIN:-$ADMIN}; PASSWORD=${FYSO_PASSWORD:-$PASSWORD}; PORT=${FYSO_PORT:-$(first_free_block)}
@@ -105,7 +105,7 @@ else
       --message "$(t "$L_FORM" "$(short "$FOLDER")")" \
       --textfield "$F_NAME,name=name,value=$NAME,required" \
       --textfield "$F_ADMIN,name=admin,value=$ADMIN,required" \
-      --textfield "$F_PASSWORD,name=password,secure,value=$PASSWORD,required" \
+      --textfield "$F_PASSWORD,name=password,secure,value=$PASSWORD,required,regex=^.{12}.*$,regexerror=$F_PASSWORD_ERR" \
       --textfield "$F_PORT,name=port,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=$F_PORT_ERR" \
       --selecttitle "$F_ENGINE" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
       --infobuttontext "$B_CHANGE_FOLDER" --button1text "$B_INSTALL" --button2text "$B_CANCEL" \
@@ -259,12 +259,9 @@ else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
 
 mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"
-# Report the login that really works (a template without the password handoff keeps admin).
-login_ok() { curl -s -o /dev/null -w '%{http_code}' -u "$1:$2" "http://panel.localhost:$PORT/" | grep -q 200; }
-if [ "$PASSWORD" != admin ] && login_ok "$ADMIN" "$PASSWORD"; then pwtext=$PW_CHOSEN
-elif login_ok "$ADMIN" admin; then pwtext=$PW_ADMIN
-else pwtext=$PW_UNVERIFIED; fi
-ui "message: $(t "$L_DONE" "$NAME" "http://panel.localhost:$PORT" "$ADMIN" "$pwtext")"
+# The setup step validates and encrypts the chosen local-user password.
+pwtext=$PW_CHOSEN
+ui "message: $(t "$L_DONE" "$NAME" "http://panel.$SLUG-$PORT.localhost:$PORT" "$ADMIN" "$pwtext")"
 # ---------------------------------------------------------------- 5. Connect agents (D36)
 # Offer the agents found on this Mac: desktop apps checked, Claude Code CLI as an option.
 # The connect screen opens underneath (same size and place) before "Continuar" is enabled,
@@ -298,16 +295,16 @@ fi
 if [ -n "${picks// /}" ]; then
   connect_out=$("$MISE" -C "$DIR" run agent:connect $picks 2>&1); echo "$connect_out"
 fi
-[ "${FYSO_AUTO:-}" = 1 ] && { echo "done: http://panel.localhost:$PORT"; echo "connect: ${picks:-none}"; exit 0; }
+[ "${FYSO_AUTO:-}" = 1 ] && { echo "done: http://panel.$SLUG-$PORT.localhost:$PORT"; echo "connect: ${picks:-none}"; exit 0; }
 # ---------------------------------------------------------------- 6. Open the assistant
 # Next step after connecting: open the desktop assistant with a new conversation about the
 # project (agent:open: Codex in the project folder; Claude Desktop restarted to load the server).
-open_panel() { open "http://panel.localhost:$PORT"; }
+open_panel() { open "http://panel.$SLUG-$PORT.localhost:$PORT"; }
 case " $picks " in *" codex "*) primary=codex; plabel=Codex ;; *" claude-desktop "*) primary=claude-desktop; plabel=Claude ;; *) primary="" ;; esac
 if [ -n "$primary" ]; then
   extra=(); case " $picks " in *" codex "*" claude-desktop "*|*" claude-desktop "*" codex "*) extra=(--infobuttontext "$(t "$B_OPEN" Claude)") ;; esac
   "$DIALOG" "${STYLE[@]}" --title none \
-    --message "$(t "$L_READY" "$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" "$plabel" "$NAME" "http://panel.localhost:$PORT")" \
+    --message "$(t "$L_READY" "$(printf '%s\n' "$connect_out" | grep -E '^[✓✗]' | sed 's/$/\\n/' | tr -d '\n')" "$plabel" "$NAME" "http://panel.$SLUG-$PORT.localhost:$PORT")" \
     --button1text "$(t "$B_OPEN" "$plabel")" --button2text "$B_OPEN_PANEL" ${extra[@]+"${extra[@]}"} "${SIZE[@]}" --moveable
   case $? in
     0) "$MISE" -C "$DIR" run agent:open "$primary" ;;

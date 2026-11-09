@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+  <Name>Fyso</Name><Version>0.1.0</Version><Title>Fyso</Title>
+  <Publisher>Fyso</Publisher>
+  <WizardDefaultWidth>900</WizardDefaultWidth><WizardDefaultHeight>650</WizardDefaultHeight>
+  <TargetDir>@HomeDir@/.cache/fyso-installer</TargetDir>
+  <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
+  <AllowSpaceInPath>true</AllowSpaceInPath>
+</Installer>

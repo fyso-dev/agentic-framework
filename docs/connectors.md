@@ -1,4 +1,4 @@
-# Connector management in the panel (D41)
+# Connector management in the panel (D42)
 
 The panel has a dedicated **Connectors** tab at `#/connectors`. It reuses native
 OpenMausBot APIs for app discovery, accounts, MCP management, connection probes and
@@ -103,17 +103,17 @@ identities. It never probes external services. Tools plans reject missing server
 disabled native-only servers and native per-bot exclusions before mutation. A
 connection revision invalidates a plan if its catalog/source changes before apply.
 
-## Guided Composio setup (D43)
+## Guided Composio setup (D44)
 
 Open Connectors and choose **Set up Composio**. The form links directly to Composio project API Keys, explains project selection and returning to Fyso, and accepts the key in a password field. **Save and verify** checks project Auth Configs access, stores the key encrypted and activates OMB immediately. The person can then choose an app and complete native OAuth. No terminal or secret editor is part of the panel flow.
 
-`POST /api/composio/setup` is the only setup route. The gateway authenticates it; the loopback adapter also requires the project Basic identity, exact panel origin, JSON content type and a bounded body containing only `apiKey`. Arbitrary native config patches and caller-selected upstream URLs are rejected. The key is never returned, logged, passed in command arguments, sent to Dagu or stored in browser persistence. The browser clears the field on submission and on cancel.
+`POST /api/composio/setup` is the only setup route. The gateway requires the native web session and panel ACL; it injects the project technical Basic identity into the private Unix-socket adapter. The adapter requires that identity, exact panel origin, JSON content type and a bounded body containing only `apiKey`. Arbitrary native config patches and caller-selected upstream URLs are rejected. The key is never returned, logged, passed in command arguments, sent to Dagu or stored in browser persistence. The browser clears the field on submission and on cancel.
 
 The adapter reads `GET https://backend.composio.dev/api/v3.1/auth_configs?limit=1` to verify access without creating a session or account. It uses `sops set --value-stdin` to update only `FYSO_COMPOSIO_API_KEY` in `secrets.enc.yaml`, preserves existing entries and commits only that encrypted file. Pending manual edits are rejected. A save failure leaves native OMB unchanged and restores the prior encrypted file. Native activation failure is reported separately from a successful encrypted save; retrying the form retries activation.
 
 OMB's native `PATCH /api/config` activates the project key; its private runtime credential representation remains native OMB behavior. The project source of truth is the encrypted file. `run-omb.sh` reads that current key at startup so stale supervisor environment values cannot replace a later panel update. No personal OMB instance or host Composio key is imported.
 
-`connector-setup` runs under native process-compose on project port `base + 9`, with only project credentials, native ports and the SOPS age context. Its health is checked by process-compose and doctor. Core tool pins remain unchanged.
+`connector-setup` runs under native process-compose on a private Unix socket keyed by the project HTTP port, with only project credentials, native ports and the SOPS age context. Its health is checked by process-compose and doctor. Core tool pins remain unchanged.
 
 A key verifies configuration, not external account authorization or a successful bot tool call. Native toolkit/auth-config requirements and account grants remain OMB/Composio responsibilities. The manual encrypted-secret mapping remains supported for headless projects; custom MCP servers do not require Composio.
 
@@ -169,7 +169,7 @@ are not enumerated or copied by this project inventory. Claude's global source
 switches do not apply to a bot running Codex.
 
 
-## Native sources without Composio (D42)
+## Native sources without Composio (D43)
 
 The initial panel exposed only the Composio catalog and manual MCP creation. OMB
 0.1.141 also ships direct hosted MCP cards for **Whop** and **Agentcard**, and two
@@ -222,7 +222,7 @@ inactive or unverified. Only active accounts offer Disconnect; other saved recor
 offer Remove saved connection. Removal still targets one exact native account ID
 and requires confirmation. No stored account is removed merely because it is inactive.
 
-## Application permissions in the panel (D45)
+## Application permissions in the panel (D46)
 
 In a bot editor, choose **No access**, **Read only** or **Read and write** for an
 application. Choose **Review app permissions**, inspect the application/level list
@@ -286,3 +286,12 @@ Native direct presets and Claude source switches remain available under Advanced
 options. Bot permissions use compact icon cards; explanatory text and optional
 Whop/Agentcard MCP controls are also disclosed under advanced options. No account,
 permission or server is removed merely because its UI is collapsed or filtered.
+
+## Current-main web session integration
+
+Human access uses the existing Tinyauth session and panel ACL. Caddy strips incoming
+identity/Authorization headers, validates the session, removes its cookie before
+forwarding and injects the technical credential for the private setup adapter.
+The adapter uses a Unix socket with mode 0600, so native web auth retains base+9
+and the ten-port block does not grow. Existing Basic-login preview captures are
+historical UX evidence; native gateway session tests cover the integrated boundary.

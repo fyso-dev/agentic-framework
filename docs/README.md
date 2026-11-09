@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D38, D41–D45; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D46; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -43,6 +43,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
+| Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
@@ -53,7 +54,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
-| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace (D30, D31) | [extensions-contract.md](extensions-contract.md) |
+| Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41) | [extensions-contract.md](extensions-contract.md) |
+| Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
@@ -70,11 +72,13 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote Builder acceptance pending |
 | 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
+| 5.7 | Local users and shared web sessions (D40) | ✅ verified locally: native security matrix, generated-stack doctor and real browser SSO · [evidence](../artifacts/delivery-evidence/web-auth/README.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
-| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
+| 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz and generic extension pages verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
+| 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
@@ -83,6 +87,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-06 | Shared agent operating context: local guide, MCP initialization and offline `fyso_context`, CLI entry point, desktop prompt and all default bot roles including Chief. Existing project-owned profiles require explicit adoption. See [agent surface](agent-surface.md#shared-operating-context). |
 |---|---|
 | 2026-11-05 | [Phase 0 harness spike](adr/spikes/harness.md): **yes** — Dagu v2.22.4 `harness.run` ran Claude Code and Codex on the subscription logins (no API key) inside throwaway worktrees and returned the result as outputs and artifacts. Caveats for `dev-task`: a denied permission still exits 0 (add a diff gate); the user's CLI config applies (pin the Codex approval policy); stdout is not live; step `working_dir` does not resolve `${steps.*}`. Phase 0 remains open |
 | 2026-11-05 | [Phase 0 tooling spike](adr/spikes/tooling.md): exact mise pins with explicit sandbox verification failures/fallbacks; SOPS and fnox age round trips; Dagu Git Sync API edit → commit/push verified against a local bare repo (local-URL clone limitation). Phase 0 remains open |
@@ -132,24 +137,31 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 | 2026-11-07 | Bot connector visibility: the Bots list now shows MCP selections and links directly to a per-bot editor. The form edits native tools in the existing draft/review/apply flow, labels unconnected hosted services as pending and distinguishes Claude source switches from Codex. A real disposable-bot browser test verified draft isolation and preservation of unrelated profiles. [Evidence](../artifacts/delivery-evidence/bot-connectors/README.md). |
 
-| 2026-11-07 | **Native connector sources (D42).** Added OMB’s own Whop/Agentcard hosted MCP entries and separate Claude Code MCP/skills switches. The native feature patch is versioned and restored; default settings remain unchanged without an opted-in project patch. Native read/save/restore was checked with both switches off; UI true-state writes use fixtures. [Contract](connectors.md#native-sources-without-composio-d42). |
+| 2026-11-07 | **Native connector sources (D43).** Added OMB’s own Whop/Agentcard hosted MCP entries and separate Claude Code MCP/skills switches. The native feature patch is versioned and restored; default settings remain unchanged without an opted-in project patch. Native read/save/restore was checked with both switches off; UI true-state writes use fixtures. [Contract](connectors.md#native-sources-without-composio-d43). |
 
 | 2026-11-08 | Reconstructed connector sources from local edit records after loss of the temporary worktree. Source, build and 56 Node tests recovered; historical PNG captures and the generated live fixture were not recovered. See [recovery report](connectors-recovery.md). |
 
-| 2026-11-08 | Guided Composio setup (D43): a panel password form verifies and encrypts a project key, then activates native OMB without restart. Local SOPS/Git and restart-source proof, browser UX fixtures, 63 Node tests and generated-project doctor passed. Real account OAuth remains pending a supplied project key. [Contract](connectors.md#guided-composio-setup-d43) · [Evidence](../artifacts/delivery-evidence/composio-setup/README.md). |
+| 2026-11-08 | Guided Composio setup (D44): a panel password form verifies and encrypts a project key, then activates native OMB without restart. Local SOPS/Git and restart-source proof, browser UX fixtures, 63 Node tests and generated-project doctor passed. Real account OAuth remains pending a supplied project key. [Contract](connectors.md#guided-composio-setup-d44) · [Evidence](../artifacts/delivery-evidence/composio-setup/README.md). |
 
 | 2026-11-08 | Guided account authorization: Connect now prepares a named in-panel dialog, opens the provider only on explicit action, explains return to Fyso and checks status automatically. Local provider consent, cancellation, temporary read failure recovery, native OMB OAuth/PKCE and mobile layout passed; external accounts remain unverified. Setup now links directly to project API Keys and focuses the app catalog. [Evidence](../artifacts/delivery-evidence/composio-setup/README.md). |
 
 | 2026-11-08 | Composio CLI 0.6.0 feasibility: official binary/checksum and live browser-login initiation passed. Real CLI against local fixtures obtained existing project keys, created a missing key when permitted and exposed a misleading exit-0 case when creation is denied. Human login, project selection and native OMB acceptance remain pending. [Spike](adr/spikes/composio-cli.md). |
 
-| 2026-11-08 | Real Composio CLI trial (D44): user login and project listing passed; automatic setup failed because CLI 0.6.0 exported a masked key and its creation route returned HTML. Manual setup stays first, encrypted configuration remained byte-identical, and the second route is explicitly experimental. [Actual findings](adr/spikes/composio-cli.md). |
+| 2026-11-08 | Real Composio CLI trial (D45): user login and project listing passed; automatic setup failed because CLI 0.6.0 exported a masked key and its creation route returned HTML. Manual setup stays first, encrypted configuration remained byte-identical, and the second route is explicitly experimental. [Actual findings](adr/spikes/composio-cli.md). |
 
 | 2026-11-09 | Removed the experimental Composio CLI option at the user's request: panel UI/locales, runtime routes/glue, dependency and CLI tests removed. Manual encrypted-key setup is the only supported method; native application OAuth remains available. [Contract](connectors.md#withdrawn-cli-experiment). |
 
 | 2026-11-09 | Bot editors now include native Composio application inventory separately from MCP selections. Saved failed/expired connections show lifecycle status; account naming is scoped to the app. Application grants remain native OMB Access settings. [Contract](connectors.md#account-lifecycle-presentation) · [Local UX evidence](../artifacts/delivery-evidence/connector-account-visibility/README.md). |
 
-| 2026-11-09 | Native application access in the panel (D45): off/read/write controls, explicit preview/apply, exact-ID native verification and project-owned native patches for restoration. This replaces the OMB Access link-out for bot permissions. [Contract](connectors.md#application-permissions-in-the-panel-d45) · [Real local proof](../artifacts/delivery-evidence/app-permissions/README.md). |
+| 2026-11-09 | Native application access in the panel (D46): off/read/write controls, explicit preview/apply, exact-ID native verification and project-owned native patches for restoration. This replaces the OMB Access link-out for bot permissions. [Contract](connectors.md#application-permissions-in-the-panel-d46) · [Real local proof](../artifacts/delivery-evidence/app-permissions/README.md). |
 
 | 2026-11-09 | Native catalog artwork: Composio already supplies logo URLs through OMB; the panel now displays them on app cards and in bot permissions, with initials for missing/failed images. [Contract](connectors.md#connector-artwork). |
 
 | 2026-11-09 | Simplified bot connectors and catalog: compact logo cards, ten common recommended apps, search/all-catalog escape hatch and preserved existing connections. Whop/Agentcard and source switches moved to advanced options; no access settings were changed by filtering. [Contract](connectors.md#recommended-discovery-and-compact-cards) · [UI evidence](../artifacts/delivery-evidence/recommended-connectors/README.md). |
+| 2026-11-07 | **Local web security (D40).** Replaced browser Basic challenges with native Tinyauth sessions, encrypted local users and explicit app ACLs. Pinned native macOS build and real Caddy/Tinyauth security matrix verified; generated-stack doctor and real Chromium login/navigation/logout passed. Existing Dagu/OMB technical identity limits and remote HTTPS gates are explicit. PR review regression: the session-cookie exception now requires the panel host, with 12 upstream path/method cases reproduced red then verified green. [Contract](web-auth.md) · [Evidence](../artifacts/delivery-evidence/web-auth/README.md). |
+| 2026-11-07 | **D38 implementation in an isolated worktree.** Qt IFW wizard, shared Dagu generator, Linux adapter and Windows/WSL2 adapter with private stdin handoff and host-port inventory. Linux ARM64 native build and authenticated routes passed; doctor reports the fixture's missing Codex login. Windows protocol tests run real PowerShell against a shim; native Windows acceptance is pending. [Build contract](../installer/qt/README.md) · [Evidence](../artifacts/delivery-evidence/installer-cross-platform/README.md). |
+| 2026-11-07 | **Fyso Biz integration (D39), verified locally.** Bundled Copier source and panel tab; live MCP discovery found 70 tools including native objective vision and palancas. Real tab install/reinstall, authenticated doctor and browser smoke verified departments, KPIs, objectives and palancas with the supplied test token; Biz Partner is provisioned idempotently through native Bot Architect; multi-user isolation requires the optional second token. [Contract](fyso-biz.md) · [evidence](../artifacts/delivery-evidence/fyso-biz/README.md). |
+| 2026-11-07 | **Generic extension pages (D41).** Native page registrations and static assets add tabs/pages without core-specific screens. Biz source/locales moved into its own compiled page; an independent plain HTML extension exercises two additional pages. [Contract](extensions-contract.md#9-extension-owned-tabs-and-pages). |
+| 2026-11-07 | **Biz repository extraction.** The framework retains only generic extension pages, SDK and connection hooks. Biz source, bot, workflows, locales and tests moved to [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz), released through tags and discovered through the official git catalog. |
+| 2026-11-07 | **Extension review regressions.** SDK calls use gateway-root URLs independently of nested page assets. Install/update loads tools, processes and routes before idempotent connection hooks; native readiness gates core and owning services. Verified with three Node readiness tests, real Copier/process-compose install and tagged upgrade, and a browser SDK page without a base tag. |
+| 2026-11-07 | **Biz branch integration with local web SSO.** Retained native session login/logout alongside extension navigation and rebuilt the shared panel/SDK assets. Generic extension hosting is D41; D40 retains the already merged authentication decision. Panel build, 22 Node tests, Copier packaging and 11 native Caddy/Tinyauth tests passed, including extension session/ACL/private-slot checks. |

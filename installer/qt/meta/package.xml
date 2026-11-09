@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <DisplayName>Fyso</DisplayName>
+  <Description>Fyso project setup</Description>
+  <Version>0.1.0</Version>
+  <ReleaseDate>2026-11-07</ReleaseDate>
+  <Default>true</Default>
+  <Script>installscript.qs</Script>
+  <UserInterfaces><UserInterface>project.ui</UserInterface></UserInterfaces>
+</Package>

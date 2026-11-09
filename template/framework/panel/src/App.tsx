@@ -9,6 +9,7 @@ import { Bots } from "./screens/Bots";
 import { Connectors } from "./screens/Connectors";
 import { Apps } from "./screens/Apps";
 import { Observability } from "./screens/Observability";
+import { ExtensionPage } from "./screens/ExtensionPage";
 import { Setup } from "./screens/Setup";
 import { useStore } from "./store";
 
@@ -35,6 +36,9 @@ export function App() {
       break;
     case "connectors":
       screen = <Connectors initialBotId={route.botId} />;
+      break;
+    case "extension":
+      screen = <ExtensionPage extensionId={route.extensionId} pageId={route.pageId} theme={theme} />;
       break;
     case "apps":
       screen = <Apps />;

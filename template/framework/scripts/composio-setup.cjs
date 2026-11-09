@@ -67,8 +67,26 @@ function createServer(env=process.env,save=configure) {
     }catch(error){reply(error instanceof SetupError?error.status:500,{error:error instanceof SetupError?error.code:'saveFailed'});}
   });
 }
-module.exports={validate,configure,createServer,SetupError};
+async function listenSocket(server,socket) {
+  if(fs.existsSync(socket)) {
+    const stat=fs.lstatSync(socket);
+    if(!stat.isSocket()||stat.uid!==process.getuid())throw Error('unsafe connector setup socket');
+    await new Promise((resolve,reject)=>{
+      const probe=require('node:net').connect(socket);
+      probe.once('connect',()=>{probe.destroy();reject(Error('connector setup already running'));});
+      probe.once('error',error=>{if(error.code==='ECONNREFUSED'||error.code==='ENOENT')resolve();else reject(error);});
+      probe.setTimeout(1000,()=>{probe.destroy();reject(Error('connector setup socket busy'));});
+    });
+    fs.unlinkSync(socket);
+  }
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(socket,resolve);});
+  fs.chmodSync(socket,0o600);
+}
+module.exports={validate,configure,createServer,listenSocket,SetupError};
 if(require.main===module){
-  for(const name of ['FYSO_ROOT','FYSO_DATA','FYSO_OMB_PORT','FYSO_HTTP_PORT','FYSO_CONNECTOR_SETUP_PORT','FYSO_ADMIN_USER','FYSO_ADMIN_PASSWORD'])if(!process.env[name])throw new Error(`Missing ${name}`);
-  createServer().listen(Number(process.env.FYSO_CONNECTOR_SETUP_PORT),'127.0.0.1');
+  for(const name of ['FYSO_ROOT','FYSO_DATA','FYSO_OMB_PORT','FYSO_HTTP_PORT','FYSO_CONNECTOR_SETUP_SOCKET','FYSO_ADMIN_USER','FYSO_ADMIN_PASSWORD'])if(!process.env[name])throw new Error(`Missing ${name}`);
+  process.umask(0o077);
+  const server=createServer();
+  listenSocket(server,process.env.FYSO_CONNECTOR_SETUP_SOCKET).catch(()=>{console.error('Connector setup socket unavailable');process.exitCode=1;});
+  process.once('SIGTERM',()=>server.close(()=>process.exit(0)));
 }

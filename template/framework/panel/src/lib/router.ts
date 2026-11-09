@@ -6,6 +6,7 @@ export type Route =
   | { name: "bots"; review?: boolean }
   | { name: "bot"; index: number | null; connectors?:boolean }
   | { name: "connectors"; botId?:string }
+  | { name: "extension"; extensionId:string; pageId:string }
   | { name: "apps" }
   | { name: "observability" };
 
@@ -14,6 +15,7 @@ export function parseHash(hash: string): Route {
   const parts = pathname.split("/").filter(Boolean);
   if (parts[0] === "observability") return { name: "observability" };
   if (parts[0] === "connectors") {const botId=new URLSearchParams(query||" ").get("bot");return { name: "connectors",...(botId?{botId}:{}) };}
+  if (parts[0] === "extensions" && parts[1] && parts[2]) return {name:"extension",extensionId:parts[1],pageId:parts[2]};
   if (parts[0] === "apps") return { name: "apps" };
   if (parts[0] === "bots") {
     if (parts[1] === "review") return { name: "bots", review: true };
@@ -33,6 +35,7 @@ export const href = {
   botConnectors: (index:number) => `#/bots/${index}?section=connectors`,
   connectors: "#/connectors",
   connectorsForBot: (id:string) => `#/connectors?bot=${encodeURIComponent(id)}`,
+  extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,
   apps: "#/apps",
   observability: "#/observability",
 };

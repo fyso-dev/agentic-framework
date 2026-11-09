@@ -32,6 +32,8 @@ export type ExtensionSecret = {
   set: boolean;
 };
 
+export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string};
+
 export type Extension = {
   id: string;
   src: string;
@@ -41,6 +43,7 @@ export type Extension = {
   mcpServers: string[];
   workflows: string[];
   skills: string[];
+  pages?: ExtensionPageRegistration[];
 };
 
 /** Output `catalog` of `fyso-ext-catalog` (docs/extensions-contract.md §8). */

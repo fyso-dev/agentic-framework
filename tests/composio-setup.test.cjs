@@ -62,3 +62,16 @@ test('HTTP setup requires project login, exact origin, JSON and an exact route',
   const response=await fetch(url+'/api/composio/setup',{method:'POST',headers,body:JSON.stringify({apiKey:key})});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.deepEqual(await response.json(),{saved:true,active:true});assert.equal(calls,1);
  }finally{await new Promise(resolve=>server.close(resolve));}
 }));
+test('private socket keeps active listeners and non-socket files intact',()=>fixture(async f=>{
+ const {listenSocket}=require('../template/framework/scripts/composio-setup.cjs');
+ const socket=path.join(f.root,'s'),server=createServer(f.env,async()=>({saved:true,active:true}));
+ await listenSocket(server,socket);
+ try{
+  assert.equal(fs.statSync(socket).mode&0o777,0o600);
+  await assert.rejects(listenSocket(createServer(f.env),socket),/already running/);
+  const response=await new Promise((resolve,reject)=>{require('node:http').get({socketPath:socket,path:'/health'},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));}).on('error',reject);});
+  assert.equal(response,200);
+  const regular=path.join(f.root,'keep');fs.writeFileSync(regular,'keep');
+  await assert.rejects(listenSocket(createServer(f.env),regular),/unsafe/);assert.equal(fs.readFileSync(regular,'utf8'),'keep');
+ }finally{await new Promise(resolve=>server.close(resolve));}
+}));

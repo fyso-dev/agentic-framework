@@ -13,6 +13,8 @@ min_version = "2026.10.6"
 "core:node" = "24.15.0"
 "npm:yaml" = "2.8.1"
 "aqua:cli/cli" = "2.95.0"
+"core:go" = "1.26.8"
+"core:pnpm" = "11.1.2"
 
 [settings.npm]
 package_manager = "npm"
@@ -26,6 +28,9 @@ FYSO_PROJECT_NAME = "{{ project_name }}"
 FYSO_ROOT = "{% raw %}{{ config_root }}{% endraw %}"
 FYSO_DATA = "{% raw %}{{ config_root }}{% endraw %}/.data"
 FYSO_ADMIN_USER = "{{ admin_user }}"
+FYSO_WEB_DOMAIN = "{{ project_slug }}-{{ port_base }}.localhost"
+FYSO_TINYAUTH_VERSION = "5.2.0"
+FYSO_TINYAUTH_SHA256 = "5fec14cb1a7cf43ef5c9dafc9fa9fba6fcbc2d8fd328cd5a78dd42aae4c0efde" # gitleaks:allow public source checksum
 
 # Port block (PLAN §3.1): base {{ port_base }}.
 FYSO_HTTP_PORT = "{{ port_base }}"
@@ -37,7 +42,7 @@ FYSO_OMB_WEBHOOK_PORT = "{{ port_base + 5 }}"
 FYSO_DAGU_COORDINATOR_PORT = "{{ port_base + 6 }}"
 FYSO_DAGU_COORDINATOR_HEALTH_PORT = "{{ port_base + 7 }}"
 FYSO_CADDY_ADMIN_PORT = "{{ port_base + 8 }}"
-FYSO_CONNECTOR_SETUP_PORT = "{{ port_base + 9 }}"
+FYSO_AUTH_PORT = "{{ port_base + 9 }}"
 
 # Every `openmausbot` CLI call targets THIS project's server, never the
 # desktop app it would otherwise auto-discover on 8799.
@@ -53,7 +58,7 @@ description = "Create the age key (if missing), .sops.yaml and secrets.enc.yaml"
 run = "framework/scripts/setup.sh"
 
 [tasks.up]
-description = "Start Dagu, OpenMausBot and Caddy in the background"
+description = "Start web login, Dagu, OpenMausBot and Caddy in the background"
 run = "framework/scripts/up.sh"
 
 [tasks.down]
@@ -83,6 +88,14 @@ run = "framework/scripts/bots.sh check"
 [tasks.auth]
 description = "Check and set up the engine logins (Claude, Codex, API keys)"
 run = "framework/scripts/auth.sh"
+
+[tasks."web-auth:install"]
+description = "Build the pinned, unmodified native login service"
+run = "framework/scripts/install-web-auth.sh"
+
+[tasks."web-auth:users"]
+description = "Manage local web users while the stack is stopped: init, add <username>, remove <username>"
+run = "framework/scripts/web-auth-users.sh"
 
 [tasks.snapshot]
 description = "Save bots, memory and workflows to git now (also runs hourly in Dagu)"

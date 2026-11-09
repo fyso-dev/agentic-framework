@@ -2,7 +2,8 @@
 # Start the project in the background and wait until the gateway answers.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-require_env FYSO_ADMIN_PASSWORD FYSO_DATA
+require_env FYSO_ADMIN_PASSWORD FYSO_DATA FYSO_AUTH_USERS FYSO_WEB_DOMAIN
+[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "HTTP web login is local-only. Remote HTTPS deployment is not configured."
 
 node framework/scripts/mcp-config.cjs
 node framework/scripts/extensions.cjs check
@@ -13,6 +14,7 @@ if stack_running; then
   framework/scripts/bots.sh repair || true
   node framework/scripts/connector-preferences.cjs restore
   node framework/scripts/app-access.cjs restore
+  framework/scripts/connect-extensions.sh
   echo "Already running. 'mise run status' to inspect, 'mise run down' to stop."
   exit 0
 fi
@@ -21,6 +23,7 @@ busy=()
 for p in $(block_ports); do port_in_use "$p" && busy+=("$p"); done
 [ ${#busy[@]} -eq 0 ] || fail "ports in use: ${busy[*]}. Another program (or project) uses this block; change port_base."
 
+framework/scripts/install-web-auth.sh
 mkdir -p "$FYSO_DATA/logs"
 pc up --detached >>"$FYSO_DATA/logs/up.log" 2>&1
 
@@ -38,15 +41,16 @@ for _ in $(seq 1 120); do
     framework/scripts/bots.sh repair || true
     node framework/scripts/connector-preferences.cjs restore
     node framework/scripts/app-access.cjs restore
+    framework/scripts/connect-extensions.sh
     # Fill the panel's checklist right away (runs in Dagu, in the background).
     curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-setup-check/enqueue" || true
     curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-observability/enqueue" || true
     cat <<MSG
-  Panel        http://panel.localhost:$FYSO_HTTP_PORT     (user: $FYSO_ADMIN_USER)
-  Dagu         http://dagu.localhost:$FYSO_HTTP_PORT
-  OpenMausBot  http://omb.localhost:$FYSO_HTTP_PORT         (same project login)
+  Panel        http://panel.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT     (local web login)
+  Dagu         http://dagu.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT
+  OpenMausBot  http://omb.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT         (same web session)
 
   mise run status · mise run logs <dagu|omb|caddy> · mise run doctor · mise run down
 MSG
