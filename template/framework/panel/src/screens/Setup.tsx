@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { Engine, Extension } from "../api/types";
 import { ActionButton, ActionError, ActionStatus, useLogsUrl } from "../components/Action";
 import { ExtensionSetup } from "../components/ExtensionSetup";
+import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { Spinner } from "../components/Icons";
 import { GlobalState } from "../components/Layout";
 import { CopyLine, External, RelTime } from "../components/ui";
@@ -228,6 +229,12 @@ function ExtensionStep({ ext, state }: { ext: Extension; state: StepState }) {
     >
       {description && <p className="step-detail">{description}</p>}
       {state === "failed" && <p role="alert" className="step-error">{t("setup.extension.failed")}</p>}
+      {/* Its workflows (e.g. the trace sync) run from here once the keys work. */}
+      {state === "done" && ext.workflows.length > 0 && (
+        <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: "0 0 8px", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+          {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
+        </ul>
+      )}
       <ExtensionSetup ext={ext} onSaved={() => { reload(); void check.start(); }} />
     </Step>
   );
