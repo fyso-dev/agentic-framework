@@ -266,7 +266,24 @@
     "emptyTitle": "This project has no apps of its own yet.",
     "emptyHint": "Copy the template to create the first one:",
     "emptyCommand": "cp -r framework/apps/_template project/apps/my-app",
-    "extension": "Extension apps"
+    "extension": "Extension apps",
+    "tabOpen": "Open",
+    "tabExt": "Extensions",
+    "updates_one": "{{count}} update available",
+    "updates_other": "{{count}} updates available",
+    "openAria": "{{name}}, open in a new tab",
+    "offAria": "{{name}} (off)",
+    "healthTip": {
+      "ok": "Working · {{host}}",
+      "down": "Not responding at the last check · {{host}}",
+      "unknown": "Not checked yet · {{host}}"
+    },
+    "downFlag": "Not responding",
+    "downTip": "Check its logs in Dagu",
+    "offTip": "Turn it on in project/apps",
+    "add": "Create a project app",
+    "addTip": "Copy the template: {{command}}",
+    "addCopied": "Command copied"
   },
   "observ": {
     "title": "Observability",
@@ -373,7 +390,15 @@
     "manage": "Removing an extension is a terminal task. To upgrade all of them:",
     "emptyTitle": "No extensions installed.",
     "emptyHint": "Install one from the marketplace or from its repo:",
-    "emptyCommand": "mise run ext:add gh:org/fyso-ext-name"
+    "emptyCommand": "mise run ext:add gh:org/fyso-ext-name",
+    "installedTitle": "Installed",
+    "source": "Source",
+    "readyTip": "Every required secret is set",
+    "mcpTip": "MCP servers",
+    "workflowsTip": "Workflows",
+    "skillsTip": "Skills: enable them on a bot",
+    "appsTip": "Apps",
+    "versionTip": "Installed version"
   },
   "market": {
     "title": "Marketplace",
@@ -393,7 +418,20 @@
     "done": "{{id}} {{version}} is installed and committed ({{commit}}). If it declares secrets, set them with:",
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
-    "tags": "Tags"
+    "tags": "Tags",
+    "catalogTitle": "Catalog",
+    "search": "Search",
+    "searchLabel": "Search extensions",
+    "refreshTip": "Refresh catalog · {{names}}",
+    "commitTip": "Commits only the extension's files",
+    "site": "Extension site",
+    "latestTip": "Latest published version",
+    "installedTip": "Installed {{version}}",
+    "installShort": "Install",
+    "installedShort": "Installed",
+    "noMatch": "No extension matches the search.",
+    "terminal": "From the terminal",
+    "removeNote": "Removing an extension is a terminal-only task."
   },
   "extensionPage": {
     "missing": "This extension page is not installed.",
@@ -417,7 +455,6 @@
   "connectors": {
     "title": "Connectors",
     "subtitle": "Connect your apps and choose which bots can use them.",
-    "manage": "Manage connectors",
     "refresh": "Refresh",
     "loading": "Loading…",
     "apps": "Applications",

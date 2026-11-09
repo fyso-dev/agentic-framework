@@ -120,17 +120,21 @@ Icons carry the meaning; secondary text goes in tooltips (`data-tip`), with an a
 
 ### 4. Apps
 
-A launcher grid with two groups:
-- **Framework:** always present. Dagu ("Workflows") and OpenMausBot ("Bots").
-- **Proyecto:** the apps the project adds.
+Two tabs, kept in the address (`#/apps`, `#/apps?tab=ext`). Details live in tooltips; the page keeps text short.
 
-**App card:**
+**Abrir:** a tile launcher in up to three groups:
+- **Framework:** always present. Dagu ("Workflows") and OpenMausBot ("Bots").
+- **Proyecto:** the apps the project adds, plus a dashed "+" tile that copies `cp -r framework/apps/_template project/apps/mi-app`.
+- **Apps de extensiones:** only when an extension adds apps.
+
+**Extensiones:** installed extensions as cards (source, ready or missing secrets, capability counts for MCP, workflows, skills and apps, secret chips, version, and "Actualizar a vX" when the catalog has a newer tag), then the catalog with search, refresh, install and update. Terminal commands sit in a collapsed "Desde la terminal" block. The tab shows a badge with the number of available updates. Connectors live in their own section, not here.
+
+**App tile:**
 - **Icon**, from a generic name such as `workflow`, `bot` or `users`.
 - **Name and a one-line description**, e.g. "Dagu · Workflows y ejecuciones".
-- **Address** in small text, e.g. `dagu.localhost`.
-- **Health dot** with 4 states: healthy, degraded (slow or erroring), down, and unknown (not checked yet).
-- **"Abrir"** button that opens a new tab. The whole card is clickable.
-- **Optional access note**, e.g. for OpenMausBot: "Usa su propio acceso: la primera vez pide emparejar el dispositivo".
+- **Health dot**; its tooltip carries the state and the address, e.g. `dagu.localhost`.
+- The whole tile opens a new tab; an arrow appears on hover.
+- **Optional flag:** "Apagada", "No responde", or the access note, e.g. for OpenMausBot: "Login del proyecto".
 
 **States to design:**
 - the 4 health states,
