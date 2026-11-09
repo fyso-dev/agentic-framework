@@ -61,7 +61,8 @@
     "appsDown_one": "{{count}} app no responde",
     "appsDown_other": "{{count}} apps no responden",
     "observability": "Observabilidad",
-    "connectors": "Conectores"
+    "connectors": "Conectores",
+    "mcp": "Conectar MCP"
   },
   "setup": {
     "title": "Puesta a punto",
@@ -736,5 +737,22 @@
     "discard": "Descartar",
     "saveFailed": "No se pudieron guardar los accesos",
     "saveTipApps": "Los accesos a aplicaciones se aplican al guardar; el resto queda pendiente hasta «Revisar y aplicar»."
+  },
+  "mcp": {
+    "title": "Conectá tu asistente",
+    "intro": "Usá el MCP de este proyecto desde Claude o Codex para crear bots, instalar extensiones y revisar su estado, igual que al finalizar el instalador.",
+    "prepare": "1. Abrí una terminal en la carpeta del proyecto",
+    "prepareBody": "Ejecutá estos comandos en el equipo donde instalaste el proyecto. El panel muestra las instrucciones; la conexión se realiza desde tu terminal.",
+    "connect": "2. Conectá el asistente que usás",
+    "connectBody": "Copiá y ejecutá el comando de tu asistente. Podés conectar más de uno. Codex comparte la configuración entre la app y la CLI. Claude Desktop usa la integración del instalador para macOS.",
+    "restart": "3. Abrí una conversación nueva",
+    "restartBody": "Reiniciá Claude Desktop para cargar el servidor. En Codex y Claude Code, iniciá una sesión nueva. Si ya lo conectaste con el instalador, empezá por este paso.",
+    "verify": "4. Comprobá la conexión",
+    "verifyBody": "Buscá el servidor fyso-{{slug}} en las herramientas de tu asistente y enviá este mensaje:",
+    "prompt": "Leé fyso_context y ejecutá fyso_status para revisar mi proyecto. Contame qué tengo y qué conviene configurar primero.",
+    "trouble": "Si no aparece",
+    "troubleBody": "Confirmá que ejecutaste el comando desde la carpeta correcta y que mise y el asistente están instalados. Volvé a conectar y abrí una sesión nueva. El proyecto debe estar iniciado para consultar el estado de sus servicios.",
+    "disconnect": "Desconectar",
+    "disconnectBody": "Para quitar esta conexión, ejecutá el comando correspondiente. Esto conserva el proyecto y sus bots."
   }
 }
