@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS } from "../api/types";
-import { ActionButton, ActionError, ActionStatus } from "../components/Action";
+import { ActionError, ActionStatus } from "../components/Action";
 import { useDaguAction } from "../lib/useDaguAction";
 import { CopyLine } from "../components/ui";
 import { useStore } from "../store";
@@ -15,14 +16,27 @@ function ConnectionActions() {
   const { t } = useTranslation();
   const { backend, mock } = useStore();
   const action = useDaguAction<{ target: string; mode: string; message: string }>(backend, DAGS.agentConnect, "result");
+  const [active, setActive] = useState<string | null>(null);
+  const running = action.phase === "running";
+  const run = (target: string, mode: string) => {
+    if (active) return;
+    setActive(`${target}:${mode}`);
+    void action.start({ TARGET: target, MODE: mode }).finally(() => setActive(null));
+  };
   return <>
     <p>{t("mcp.hostNote")}</p>
     {mock && <p role="note">{t("mcp.demo")}</p>}
     {assistants.map(({ id, label }) => <div key={id} style={{ marginTop: 16 }}>
       <h3>{label}</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <ActionButton action={action} label={t("mcp.connectButton")} busyLabel={t("mcp.busy")} onRun={() => void action.start({ TARGET: id, MODE: "connect" })} />
-        <ActionButton action={action} label={t("mcp.disconnectButton")} busyLabel={t("mcp.busy")} primary={false} onRun={() => void action.start({ TARGET: id, MODE: "disconnect" })} />
+        {(["connect", "disconnect"] as const).map(mode => {
+          const selected = active === `${id}:${mode}`;
+          return <button key={mode} type="button" className={`btn btn-sm ${mode === "connect" ? "btn-pri" : "btn-soft"}`}
+            disabled={active !== null || running} aria-busy={selected}
+            onClick={() => run(id, mode)}>
+            {selected ? t("mcp.busy") : t(`mcp.${mode}Button`)}
+          </button>;
+        })}
       </div>
     </div>)}
     <ActionStatus action={action} />
