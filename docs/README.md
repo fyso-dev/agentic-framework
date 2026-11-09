@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D47; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D48; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -57,6 +57,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41) | [extensions-contract.md](extensions-contract.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
+| Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
@@ -172,3 +173,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-09 | PR #19 integration with current main: connector setup shares encrypted `COMPOSIO_API_KEY` with Dagu, retains the legacy OMB key fallback and uses a private Unix socket behind the native Tinyauth session. Real Caddy/Tinyauth security matrix: 12 passed. |
 
 | 2026-11-09 | PR #19 P1 correction: panel-created MCP definitions now live in project-owned native `project/omb-mcp.json`, with SOPS-only header values and restore before bot selectors. Raw gateway definition writes are blocked; native probes/OAuth remain. [Contract](connectors.md#managed-native-mcp-persistence) · [Real restore proof](../artifacts/delivery-evidence/managed-mcp/README.md). |
+
+| 2026-11-09 | **Langfuse extension (D48), verified locally against a recording server; published as `v0.1.0`.** Generated project (port block 19400), `ext:add` from a local tag, keys through sops, doctor green, scheduled Dagu workflow exported real OMB 0.1.141 traces (9 spans, OTLP v4 header); second run sent nothing. Real data showed Codex shell calls are named by their raw command line: exported as `shell`. Configuration reduced to the Langfuse keys (optional `LANGFUSE_BASE_URL`, default Cloud EU) in secrets; no install questions. Acceptance by a real Langfuse instance pending. [Evidence](../artifacts/delivery-evidence/langfuse/README.md) |
