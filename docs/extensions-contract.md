@@ -36,6 +36,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Connection hook (optional) | `extensions/<ext>/connect.sh` | Runs through `run-ext.sh` after tools, processes and routes are loaded on install/update when running, and on `up`; native process-compose readiness probes gate the hook; missing secrets defer it. Must be idempotent and preserve unrelated project state |
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
+| Setup step (optional) | `extensions/<ext>/setup.yaml` | Panel Setup checklist, `fyso-setup-check` (D51) |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
 | Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person lists them in `team.yaml` (not automatic, see §6) |
 | Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu (flat file; see §6 for subdirectories). Files matching a longer installed id (`ext-<ext>-other-*` when `<ext>-other` is installed) belong to that extension |
@@ -45,9 +46,10 @@ An extension writes **only** these paths. It never edits a file that another tem
 ### `secrets.yaml`
 
 ```yaml
-# Names only. Values live in secrets.enc.yaml (`mise run secrets`).
+# Names only. Values live in secrets.enc.yaml: set them in the panel (§5) or with `mise run secrets`.
 - name: SAMPLE_TOKEN
   description: {es: Token de ejemplo, en: Sample token}
+  url: https://example.com/settings/tokens   # optional, HTTPS: where the value is obtained (D50)
   required: true
 ```
 
@@ -105,7 +107,24 @@ type Extension = {
 }
 ```
 
-`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). The panel shows installed extensions read-only; installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+
+### Guided setup (D50)
+
+Each installed extension with a `secrets.yaml` shows a form in the panel, open by itself while a required value is missing. Secrets with a `url` get a button that opens that page (deep-link the provider's key page). With several secrets, one field takes the block the provider shows (`NAME="value"` lines, optional `export`, quotes and comments; undeclared names are ignored) and the individual fields stay as a fallback. A blank field keeps the current value. `POST /api/extensions/<ext>/secrets` with `{"values": {"NAME": "value"}}` goes through the web-session gateway to the private connector-setup socket (D45), never through Dagu. The adapter accepts only names declared by that installed extension, writes each value with `sops set --value-stdin`, commits only `secrets.enc.yaml` (`extensions: configure <ext>`), and restores the file on any failure. It shares the connector-settings lock and refuses to write while `secrets.enc.yaml` has uncommitted changes.
+
+Then `ext.sh configured <ext>` reloads the extension: when the stack runs, it restarts the processes in its `process.yaml` and runs connection hooks; it regenerates panel data and runs `doctor.sh` through `run-ext.sh`. The reply is `{saved, missing, check: ok|failed|none|unknown}`; doctor output is never returned. Make `doctor.sh` verify the credentials when it can, so the panel can say "saved and verified". Clearing a value stays a terminal task (`mise run secrets`).
+
+### Setup step (D51)
+
+An extension that must be configured before it works adds a step to the panel's **Setup** checklist with `extensions/<ext>/setup.yaml`:
+
+```yaml
+title: {es: Conectar Langfuse, en: Connect Langfuse}   # required
+description: {es: …, en: …}                           # optional
+```
+
+The step shows the description and the guided form above, and counts toward the checklist. Its state comes from `fyso-setup-check` (the panel's "verify" action), not from the panel: **pending** while a required secret is empty, then **failed** or **done** by the extension's `doctor.sh` run through `run-ext.sh` (no doctor: done). Saving the form runs the check again. So a key that does not authenticate never shows as done.
 
 ## 6. Known limits (v1)
 

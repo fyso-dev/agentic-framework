@@ -135,6 +135,13 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 			header_up Authorization "{$FYSO_DAGU_AUTH}"
 		}
 	}
+	# Extension secrets (D50): same private glue; values never pass through Dagu.
+	@extensionSecrets path_regexp extensionSecrets ^/api/extensions/[a-z][a-z0-9-]{1,30}/secrets$
+	handle @extensionSecrets {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
 	# Dedicated SOPS/native-activation glue; never send project keys through Dagu.
 	handle /api/composio/setup {
 		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {

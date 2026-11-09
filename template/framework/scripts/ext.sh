@@ -116,9 +116,31 @@ case "$action" in
     node -e 'console.log(JSON.stringify({id:process.argv[1],mode:process.argv[2],version:process.argv[3]||null,commit:process.argv[4]}))' \
       "$id" "$mode" "$version" "$(git rev-parse --short HEAD)"
     ;;
+  configured)
+    # After the panel saved this extension's secrets (D50): restart its processes and run
+    # its connect hook with the new values, refresh panel data, run its doctor. Prints JSON.
+    id=${1:-}
+    [[ $id =~ ^[a-z][a-z0-9-]{1,30}$ && -d extensions/$id ]] || fail 'Usage: ext.sh configured <id>'
+    if stack_running; then
+      if [ -f "extensions/$id/process.yaml" ]; then
+        while IFS= read -r name; do
+          [ -z "$name" ] || pc process restart "$name" >&2 || true
+        done < <(node -e 'const p=require("./framework/scripts/extensions.cjs").read(process.argv[1]);console.log(Object.keys((p&&p.processes)||{}).join("\n"))' "extensions/$id/process.yaml")
+      fi
+      [ ! -f "extensions/$id/connect.sh" ] || framework/scripts/connect-extensions.sh >&2 || true
+    fi
+    node framework/scripts/panel-data.cjs config >&2
+    missing=$(node -e 'console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").missing(process.argv[1])))' "$id")
+    check=none
+    if [ -f "extensions/$id/doctor.sh" ]; then
+      # Output stays out of the reply: a doctor may print account names or URLs.
+      if framework/scripts/run-ext.sh "$id" -- bash "extensions/$id/doctor.sh" >/dev/null 2>&1; then check=ok; else check=failed; fi
+    fi
+    printf '{"missing":%s,"check":"%s"}\n' "$missing" "$check"
+    ;;
   remove)
     node framework/scripts/ext-lifecycle.cjs remove "$@"
     refresh
     ;;
-  *) fail 'Usage: ext.sh <add|update|list|search|remove|apply>' ;;
+  *) fail 'Usage: ext.sh <add|update|list|search|remove|apply|configured>' ;;
 esac

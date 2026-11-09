@@ -166,7 +166,7 @@ export function SideNav({ route }: { route: Route }) {
     observability: null,
     setup: loadingSteps(s) ? null : (
       <span className="nav-count" style={{ color: open === 0 ? "var(--fy-ok)" : s.anyFailed ? "var(--fy-down)" : "var(--fy-warn)", fontWeight: 700 }}>
-        {s.stepsDone}/4
+        {s.stepsDone}/{s.stepsTotal}
       </span>
     ),
     bots: unapplied > 0

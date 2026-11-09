@@ -37,7 +37,19 @@ case "${1:-}" in
     # A team OMB rejects (e.g. a model the engine no longer offers) is a check result,
     # not a crash: keep its JSON error so the panel can say which bot and why.
     omb team apply "$tmp/rendered.yaml" --dry-run --json > "$tmp/plan.json" || true
-    node framework/scripts/panel-data.cjs check "$tmp/models.json" "$tmp/plan.json"
+    # Extension Setup steps (D51): pending while a required secret is empty, then the
+    # extension's own doctor decides. Dagu's cleared environment lacks the decrypted
+    # secrets, so both read the project's mise environment.
+    : > "$tmp/ext-setup.tsv"
+    for file in extensions/*/setup.yaml; do
+      [ -f "$file" ] || continue
+      id=$(basename "$(dirname "$file")")
+      if [ -n "$(mise exec -- node -e 'console.log(require("./framework/scripts/extensions.cjs").missing(process.argv[1]).join(","))' "$id")" ]; then state=pending
+      elif [ -f "extensions/$id/doctor.sh" ] && ! framework/scripts/run-ext.sh "$id" -- bash "extensions/$id/doctor.sh" >/dev/null 2>&1; then state=failed
+      else state=done; fi
+      printf '%s\t%s\n' "$id" "$state" >> "$tmp/ext-setup.tsv"
+    done
+    node framework/scripts/panel-data.cjs check "$tmp/models.json" "$tmp/plan.json" "$tmp/ext-setup.tsv"
     ;;
   *) fail 'usage: panel-actions.sh <check|plan|apply>' ;;
 esac
