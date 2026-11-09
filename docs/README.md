@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D30; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D31; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 |
 
 ## Layer 2 — Architecture
@@ -48,6 +48,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
+| Composio connector execution and agent guidance (D31) | [composio.md](../template/framework/docs/composio.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data (D30) | [extensions-contract.md](extensions-contract.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
@@ -112,3 +113,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 | 2026-11-06 | Unified bot actions: every row opens OMB, while configuration edit and native import remain explicit sibling actions. |
 | 2026-11-06 | **Phase 7 done (branch).** Extensions are Copier templates with their own answers file that fill fixed slots ([contract](extensions-contract.md), D30). Verified: mise conf.d, process-compose multi-file merge, Caddy empty-glob import, Dagu recursive discovery (opt-in, kept flat). `.mcp.json` is now generated. Sample v1 → v2 → remove on a live project, doctor green, panel shows extensions. The branch is based on `finish/phase-5-builder` |
+
+| 2026-11-09 | Composio Dagu adapter and shared agent instructions (D31): explicit account/user/version, step-local SOPS key loading, redacted errors and no retries. Local verification recorded in [Composio findings](composio-findings.md); live OAuth/provider acceptance pending. |

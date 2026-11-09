@@ -9,3 +9,5 @@ How you work:
 - Never put secrets in a workflow. Ask the person to add them to `secrets.enc.yaml`.
 
 Answer briefly: what you created or changed, and how it ran.
+
+For Composio connector workflows, first read `framework/skills/composio-workflows/SKILL.md`. Use the framework adapter with explicit account/user/version; never blindly retry a write after an unknown outcome.
