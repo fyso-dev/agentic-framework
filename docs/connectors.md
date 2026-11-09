@@ -21,7 +21,8 @@ The framework does not implement another OAuth client or tool executor.
    Additional accounts require distinct names; disconnect targets one exact account.
 3. For an MCP server, choose **Add MCP**, then enter its URL or executable and
    arguments (one argument per line). Optional credentials use a write-only header
-   field. Save and test discovers actual tools; failed or unauthorized servers stay
+   field. Definitions are versioned in project-owned `project/omb-mcp.json`;
+   header values are stored only in SOPS and referenced by name. Save and test discovers actual tools; failed or unauthorized servers stay
    disabled. Remote servers can start native OAuth from the same card.
 4. Use Test, Enable/Disable or Remove on the server's card. Remove uses a focused
    confirmation dialog. Existing project-declared connectors are listed separately
@@ -87,13 +88,15 @@ only `native:*` and `mcp:fyso-biz:*`. Existing Biz Partner profiles remain intac
 |---|---|---|
 | `framework/mcp.json`, `project/mcp.json`, `extensions/*/mcp.json` | Native server definitions merged into `.mcp.json` | Secret provisioning and any required sign-in |
 | `project/bots/team.yaml`, `state/bots/team.yaml` | Native `tools` selection | Availability and authorization of its referenced connections |
-| Native-only OMB MCP settings | Not included in the existing team snapshot | Recreate the server and sign in after a clean restore |
+| Panel-created OMB MCP settings (`project/omb-mcp.json`) | Native MCP definition and intended enabled state, secret references only | Native restore recreates the server; OAuth sign-in must be renewed |
+| Unmanaged OMB MCP settings created outside the panel | Not included in the team snapshot | Import into a project-owned source and sign in after a clean restore |
 | OMB connected apps | Account grants remain native OMB state | Reconnect accounts and verify native Access settings |
 
 Keep reproducible custom definitions in existing project/extension MCP slots and
 secret references in the encrypted project secret file. Do not save secret values
-in JSON, instructions or the panel. This change does not export native OMB keys or
-OAuth sessions into Git, nor does it claim native-only connections are portable.
+in JSON, instructions or the panel. The panel versions its custom native MCP definitions and encrypted header values.
+It does not export native OAuth sessions into Git or claim unmanaged native-only
+connections are portable.
 The inventory labels them explicitly. Duplicate native/project names indicate two
 sources, not proof that their definitions match; use one source deliberately.
 
@@ -300,3 +303,28 @@ The canonical encrypted key is `COMPOSIO_API_KEY`, shared with native Dagu conne
 steps from D42. OMB startup prefers this encrypted entry, then accepts the legacy
 `FYSO_COMPOSIO_API_KEY` entry for existing projects. Ambient host `COMPOSIO_API_KEY`
 is never inherited by OMB. Updating through the panel writes only the canonical key.
+
+## Managed native MCP persistence
+
+Panel creation, enable/disable and removal use `/api/connectors/mcp` and its exact
+server-name child routes through the same private socket, session/ACL, technical
+credential and exact-origin checks as Composio setup. Raw native definition writes
+through `/api/omb/mcp/servers` are denied; native probes and OAuth stay available.
+Credential-bearing input never goes through Dagu.
+
+`project/omb-mcp.json` uses the native `{mcpServers: {...}}` format. It is a native
+OMB source, separate from cwd `.mcp.json` declarations. Root-relative command/file
+arguments use `${FYSO_ROOT}`. Headers contain only `${FYSO_MCP_...}` secret references;
+values are encrypted in `secrets.enc.yaml` through SOPS stdin. The adapter versions
+only those exact files, refuses pending edits and native name collisions, scans
+secrets/paths before saving and rolls back a newly created native server if commit
+fails. Composio and MCP secret updates share a lock to avoid lost encrypted edits.
+
+Restore and up recreate managed servers before restoring bot selectors. Desired
+enabled servers are probed before enabling; an unavailable server or one needing
+OAuth remains disabled. Definitions, credentials and enabled intent survive loss
+of native OMB state, while native OAuth sessions remain runtime-only. Removal
+versions the definition deletion; encrypted unused header entries are retained,
+rather than deleting a potentially shared secret. If a native update fails after
+a versioned state change, the panel reports failure and the source can be retried
+or restored; it does not report a successful runtime mutation.

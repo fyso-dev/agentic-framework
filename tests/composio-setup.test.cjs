@@ -28,14 +28,14 @@ test('encrypted project save is scoped and native activation does not require a 
  assert.ok(f.commands.every(c=>!JSON.stringify(c.args).includes(key)));
  assert.ok(f.commands.find(c=>c.args[0]==='commit').args.includes('secrets.enc.yaml'));
  assert.deepEqual(JSON.parse(f.requests[1].options.body),{composio:{apiKey:key}});
- assert.equal(fs.existsSync(path.join(f.env.FYSO_DATA,'composio-setup.lock')),false);
+ assert.equal(fs.existsSync(path.join(f.env.FYSO_DATA,'connector-settings.lock')),false);
 }));
 test('dirty secrets and concurrent setup are preserved rather than overwritten',()=>fixture(async f=>{
  await assert.rejects(configure({apiKey:key},f.env,f.request,(bin,args,options)=>args[0]==='status'?' M secrets.enc.yaml':f.command(bin,args,options)),{code:'pendingSecrets'});
  assert.equal(fs.readFileSync(path.join(f.root,'secrets.enc.yaml'),'utf8'),'original encrypted data');
- fs.mkdirSync(path.join(f.env.FYSO_DATA,'composio-setup.lock'));
+ fs.mkdirSync(path.join(f.env.FYSO_DATA,'connector-settings.lock'));
  await assert.rejects(configure({apiKey:key},f.env,f.request,f.command),{code:'busy'});
- assert.equal(fs.existsSync(path.join(f.env.FYSO_DATA,'composio-setup.lock')),true);
+ assert.equal(fs.existsSync(path.join(f.env.FYSO_DATA,'connector-settings.lock')),true);
 }));
 test('failed SOPS or commit cannot activate a key or leak stderr',()=>fixture(async f=>{
  for(const failing of ['sops','commit']){
@@ -73,5 +73,19 @@ test('private socket keeps active listeners and non-socket files intact',()=>fix
   assert.equal(response,200);
   const regular=path.join(f.root,'keep');fs.writeFileSync(regular,'keep');
   await assert.rejects(listenSocket(createServer(f.env),regular),/unsafe/);assert.equal(fs.readFileSync(regular,'utf8'),'keep');
+ }finally{await new Promise(resolve=>server.close(resolve));}
+}));
+
+test('managed MCP requests use the same private authentication and origin boundary',()=>fixture(async f=>{
+ const calls=[],server=createServer(f.env,async()=>({saved:true,active:true}),async(...args)=>{calls.push(args.slice(0,3));return {saved:true,active:true};});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const url=`http://127.0.0.1:${server.address().port}/api/connectors/mcp`,headers={Authorization:'Basic '+Buffer.from('fixture:fixture').toString('base64'),Origin:'http://panel.localhost:19540','Content-Type':'application/json'};
+ try{
+  assert.equal((await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
+  assert.equal((await fetch(url,{method:'POST',headers:{...headers,Origin:'https://foreign.invalid'},body:'{}'})).status,403);
+  assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({name:'demo',url:'https://example.invalid/mcp'})})).status,200);
+  assert.equal((await fetch(url+'/demo',{method:'PATCH',headers,body:JSON.stringify({enabled:false})})).status,200);
+  assert.equal((await fetch(url+'/demo',{method:'DELETE',headers})).status,200);
+  assert.deepEqual(calls.map(call=>call.slice(0,2)),[['create','demo'],['enable','demo'],['remove','demo']]);
  }finally{await new Promise(resolve=>server.close(resolve));}
 }));

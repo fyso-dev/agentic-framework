@@ -169,6 +169,11 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertFalse(echo['webCookieLeaked'])
         self.assertEqual(self.request('panel', route, 'POST', {}, Cookie=cookie, Origin='https://foreign.invalid')[0], 403)
         self.assertEqual(self.request('panel', '/api/composio/private', Cookie=cookie)[0], 404)
+        status, _, body = self.request('panel', '/api/connectors/mcp', 'POST', {'name':'fixture'}, Cookie=cookie, Origin=origin)
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)['daguCredential'])
+        self.assertFalse(json.loads(body)['webCookieLeaked'])
+        self.assertEqual(self.request('panel', '/api/connectors/mcp', 'POST', {})[0], 401)
 
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:

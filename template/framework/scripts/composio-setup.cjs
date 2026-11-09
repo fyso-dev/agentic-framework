@@ -12,7 +12,7 @@ function validate(input) {
 async function configure(input,env=process.env,request=fetch,command=execFileSync) {
   const apiKey=validate(input),root=env.FYSO_ROOT,data=env.FYSO_DATA;
   if(!root||!data||!/^\d+$/.test(env.FYSO_OMB_PORT||''))throw new SetupError('unavailable',503);
-  fs.mkdirSync(data,{recursive:true});const lock=path.join(data,'composio-setup.lock');
+  fs.mkdirSync(data,{recursive:true});const lock=path.join(data,'connector-settings.lock');
   try{fs.mkdirSync(lock);}catch{throw new SetupError('busy',409);}
   const file=path.join(root,'secrets.enc.yaml'),temporary=path.join(lock,'secrets.enc.yaml');
   let original,persisted=false;
@@ -48,7 +48,7 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
     throw new SetupError('saveFailed',500);
   }finally{fs.rmSync(lock,{recursive:true,force:true});}
 }
-function createServer(env=process.env,save=configure) {
+function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate) {
   const expected=Buffer.from('Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
   const origin=`http://panel.${env.FYSO_WEB_DOMAIN||'localhost'}:${env.FYSO_HTTP_PORT}`;
   return http.createServer(async(req,res)=>{
@@ -56,15 +56,18 @@ function createServer(env=process.env,save=configure) {
     if(req.url==='/health'&&req.method==='GET')return reply(200,{ok:true});
     const supplied=Buffer.from(req.headers.authorization||'');
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return reply(401,{error:'unauthorized'});
-    if(req.url!=='/api/composio/setup')return reply(404,{error:'notFound'});
-    if(req.method!=='POST')return reply(405,{error:'methodNotAllowed'});
+    const mcp=/^\/api\/connectors\/mcp(?:\/([a-z][a-z0-9_-]{0,31}))?$/.exec(req.url||'');
+    if(req.url!=='/api/composio/setup'&&!mcp)return reply(404,{error:'notFound'});
+    const allowed=mcp?(mcp[1]?['PATCH','DELETE']:['POST']):['POST'];
+    if(!allowed.includes(req.method))return reply(405,{error:'methodNotAllowed'});
     if(req.headers.origin!==origin||req.headers['sec-fetch-site']==='cross-site')return reply(403,{error:'origin'});
-    if(req.headers['content-type']?.split(';')[0]!=='application/json')return reply(415,{error:'invalidInput'});
+    if(req.method!=='DELETE'&&req.headers['content-type']?.split(';')[0]!=='application/json')return reply(415,{error:'invalidInput'});
     try {
       let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>8192)throw new SetupError('invalidInput',413);}
-      let input;try{input=JSON.parse(body);}catch{throw new SetupError('invalidInput');}
+      let input;try{input=body?JSON.parse(body):{};}catch{throw new SetupError('invalidInput');}
+      if(mcp){const op=req.method==='POST'?'create':req.method==='PATCH'?'enable':'remove';const result=await manage(op,mcp[1]||input.name,input,env);return reply(200,result);}
       const result=await save(input,env);reply(result.active?200:202,result);
-    }catch(error){reply(error instanceof SetupError?error.status:500,{error:error instanceof SetupError?error.code:'saveFailed'});}
+    }catch(error){reply(error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError?error.status:500,{error:error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError?error.code:'saveFailed'});}
   });
 }
 async function listenSocket(server,socket) {

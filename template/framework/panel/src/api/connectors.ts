@@ -23,6 +23,12 @@ async function request<T>(route:string,method='GET',body?:unknown):Promise<T> {
   if(!response.ok)throw new ConnectorError(response.status);
   return response.json() as Promise<T>;
 }
+async function manage<T>(name:string,method:string,body?:unknown):Promise<T> {
+  const response=await fetch(`/api/connectors/mcp${name?'/'+encodeURIComponent(name):''}`,{method,credentials:'same-origin',cache:'no-store',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  if(response.status===401)window.dispatchEvent(new Event('fyso-session-expired'));
+  if(!response.ok)throw new ConnectorError(response.status);
+  return response.json() as Promise<T>;
+}
 const server=(name:string)=>`mcp/servers/${encodeURIComponent(name)}`;
 export const connectors={
   catalog:()=>request<AppCatalog>('connectors/catalog'),
@@ -30,10 +36,10 @@ export const connectors={
   authorizeApp:(slug:string,alias:string)=>request<{url:string}>(`connectors/${encodeURIComponent(slug)}/authorize`,'POST',{alias}),
   removeAccount:(slug:string,id:string)=>request(`connectors/${encodeURIComponent(slug)}/accounts/${encodeURIComponent(id)}`,'DELETE'),
   servers:()=>request<{servers:NativeServer[]}>('mcp/servers'),
-  create:(input:ServerInput)=>request('mcp/servers','POST',input),
+  create:(input:ServerInput)=>manage('', 'POST',input),
   test:(name:string)=>request<Probe>(`${server(name)}/test`,'POST',{}),
-  enable:(name:string,enabled:boolean)=>request(server(name),'PATCH',{enabled}),
-  remove:(name:string)=>request(server(name),'DELETE'),
+  enable:(name:string,enabled:boolean)=>manage(name,'PATCH',{enabled}),
+  remove:(name:string)=>manage(name,'DELETE'),
   signIn:(name:string)=>request<{auth:SignIn}>(`${server(name)}/sign-in`,'POST',{}),
   signInStatus:(name:string,id:string)=>request<{auth:SignIn}>(`${server(name)}/sign-in/${encodeURIComponent(id)}`),
   cancelSignIn:(name:string,id:string)=>request(`${server(name)}/sign-in/${encodeURIComponent(id)}`,'DELETE'),

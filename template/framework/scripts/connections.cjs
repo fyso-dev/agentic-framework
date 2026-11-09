@@ -30,7 +30,7 @@ async function inventory(env=process.env,request=fetch) {
     if(!serverName.test(server.name))throw Error('invalid native MCP server name');
     records.set(server.name,{name:server.name,sources:['omb'],enabled:server.enabled===true,verification:'not-tested',portable:false});
   }
-  const files=['framework/mcp.json','project/mcp.json',...[...fs.globSync('extensions/*/mcp.json',{cwd:root})].sort()];
+  const files=['framework/mcp.json','project/mcp.json','project/omb-mcp.json',...[...fs.globSync('extensions/*/mcp.json',{cwd:root})].sort()];
   for(const file of files) {
     const full=path.join(root,file);if(!fs.existsSync(full))continue;
     const source=fs.readFileSync(full,'utf8');revisions.push(file,source);
@@ -43,7 +43,7 @@ async function inventory(env=process.env,request=fetch) {
       records.set(name,{name,sources:[...(prior?.sources||[]),file],enabled:prior?.enabled??null,verification:'not-tested',portable:true});
     }
   }
-  return {revision:crypto.createHash('sha256').update(JSON.stringify(revisions)).digest('hex'),servers:[...records.values()].sort((a,b)=>a.name.localeCompare(b.name)),authentication:'Use this project OpenMausBot Apps UI. OAuth sign-ins must be renewed after restore; native-only server definitions are not in project snapshots.'};
+  return {revision:crypto.createHash('sha256').update(JSON.stringify(revisions)).digest('hex'),servers:[...records.values()].sort((a,b)=>a.name.localeCompare(b.name)),authentication:'Use this project OpenMausBot Apps UI. OAuth sign-ins must be renewed after restore; Definitions created in the panel are restored from project/omb-mcp.json; unmanaged native-only entries require import.'};
 }
 async function checkSelection(tools,env,bot,request) {
   const catalog=await inventory(env,request),known=new Map(catalog.servers.map(s=>[s.name,s]));
@@ -51,7 +51,7 @@ async function checkSelection(tools,env,bot,request) {
     const match=/^mcp:([^:]+):/.exec(selector);if(!match)continue;
     const server=known.get(match[1]);
     if(!server)throw Error(`unknown MCP server: ${match[1]}; connect it in this project first`);
-    if(server.enabled===false && server.sources.length===1)throw Error(`MCP server is disabled: ${match[1]}`);
+    if(server.enabled===false && server.sources.every(source=>['omb','project/omb-mcp.json'].includes(source)))throw Error(`MCP server is disabled: ${match[1]}`);
     if(bot?.mcpServers && !bot.mcpServers.includes(match[1]) && server.sources.includes('omb'))throw Error(`native bot access excludes ${match[1]}; enable it in OpenMausBot first`);
   }
   return catalog.revision;

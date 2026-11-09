@@ -460,7 +460,7 @@
     "disabled": "Deshabilitado",
     "remove": "Eliminar",
     "noMcp": "Todavía no agregaste servidores MCP.",
-    "nativePersistence": "Guardado en OpenMausBot. Requiere recreación después de una restauración limpia.",
+    "nativePersistence": "Las definiciones creadas acá se versionan. OAuth requiere reconexión tras una restauración limpia.",
     "projectServers": "Conectores declarados en el proyecto",
     "projectServersHint": "Sus definiciones se administran desde los archivos del proyecto o sus extensiones. También podés asignarlos a bots desde aquí.",
     "toolCount": "Conexión verificada · {{count}} herramientas",

@@ -27,6 +27,12 @@ async function main() {
       if(p.endsWith('/fyso-connector-preferences/preference-ui-fixture'))return route.fulfill({json:{dagRunDetails:{dagRunId:'preference-ui-fixture',statusLabel:'succeeded'}}});
       return route.continue();
     });
+    await page.route('**/api/connectors/mcp**',async route=>{
+      const name=new URL(route.request().url()).pathname.split('/').pop();
+      if(route.request().method()==='POST'){const input=route.request().postDataJSON();creates.push(input);servers.push({...input,enabled:false});}
+      if(route.request().method()==='DELETE')servers=servers.filter(server=>server.name!==name);
+      return route.fulfill({json:{saved:true,active:true}});
+    });
     await page.route('**/api/omb/mcp/servers**',async route=>{
       const p=new URL(route.request().url()).pathname,method=route.request().method();
       if(p.endsWith('/mcp/servers')){

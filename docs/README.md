@@ -170,3 +170,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-09 | Composio Dagu adapter and shared agent instructions (D42): explicit account/user/version, step-local SOPS key loading, redacted errors and no retries. Local verification recorded in [Composio findings](composio-findings.md); live OAuth/provider acceptance pending. |
 
 | 2026-11-09 | PR #19 integration with current main: connector setup shares encrypted `COMPOSIO_API_KEY` with Dagu, retains the legacy OMB key fallback and uses a private Unix socket behind the native Tinyauth session. Real Caddy/Tinyauth security matrix: 12 passed. |
+
+| 2026-11-09 | PR #19 P1 correction: panel-created MCP definitions now live in project-owned native `project/omb-mcp.json`, with SOPS-only header values and restore before bot selectors. Raw gateway definition writes are blocked; native probes/OAuth remain. [Contract](connectors.md#managed-native-mcp-persistence) · [Real restore proof](../artifacts/delivery-evidence/managed-mcp/README.md). |

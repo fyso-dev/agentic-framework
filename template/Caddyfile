@@ -117,11 +117,22 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 			respond @panelCrossSite 403
 			@badConnectorMethod not method GET POST PATCH DELETE
 			respond @badConnectorMethod 405
+			@managedDefinitionWrite {
+				path_regexp managedDefinitionWrite ^/api/omb/mcp/servers(/[a-z][a-z0-9_-]{0,31})?$
+				not method GET
+			}
+			respond @managedDefinitionWrite 405
 			uri replace /api/omb/ /api/ 1
 			header Cache-Control no-store
 			reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
 				header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
 			}
+		}
+	}
+	@managedMcp path_regexp managedMcp ^/api/connectors/mcp(/[a-z][a-z0-9_-]{0,31})?$
+	handle @managedMcp {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
 		}
 	}
 	# Dedicated SOPS/native-activation glue; never send project keys through Dagu.

@@ -28,7 +28,7 @@ export function BotConnectors({scope,onChange,runtime,engine,projectTools}:{scop
   for(const server of native||[])rows.set(server.name,{name:server.name,label:server.name,status:server.enabled?'enabled':'disabled',available:server.enabled,server});
   if(inventory.phase==='ok')for(const server of inventory.output?.servers||[]) {
     const prior=rows.get(server.name);
-    if(server.portable)rows.set(server.name,{...prior,name:server.name,label:server.name,status:projectTools?'project':'needsProject',available:projectTools});
+    if(server.portable&&!server.sources.includes('project/omb-mcp.json'))rows.set(server.name,{...prior,name:server.name,label:server.name,status:projectTools?'project':'needsProject',available:projectTools});
   }
   for(const preset of directMcp) {
     const existing=native?.find(server=>server.url?.replace(/\/$/,'')===preset.url.replace(/\/$/,''));

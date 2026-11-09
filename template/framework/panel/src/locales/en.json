@@ -460,7 +460,7 @@
     "disabled": "Disabled",
     "remove": "Remove",
     "noMcp": "No MCP servers have been added yet.",
-    "nativePersistence": "Saved in OpenMausBot. Recreate after a clean restore.",
+    "nativePersistence": "Definitions created here are versioned. Reauthorize OAuth accounts after a clean restore.",
     "projectServers": "Project-declared connectors",
     "projectServersHint": "Their definitions are managed in project files or extensions. You can also assign them to bots here.",
     "toolCount": "Connection verified · {{count}} tools",
