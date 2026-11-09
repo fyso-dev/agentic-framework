@@ -73,7 +73,7 @@ The operation creates a local configuration commit. Unlike the scheduled snapsho
 
 Import preserves effective native settings when the export omits native defaults. If shared project defaults would be inherited, it materializes those defaults on existing declarations and removes the shared defaults before appending the imported profile. Existing effective bot definitions remain unchanged; only the native YAML representation changes.
 
-## Native connectors (D42)
+## Native connectors (D43)
 
 `OP=connections` returns a credential-free inventory of native OMB MCP server
 names and framework/project/extension MCP source names. It does not probe servers
