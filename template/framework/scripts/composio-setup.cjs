@@ -28,7 +28,7 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
     if(run('git',['status','--porcelain','--','secrets.enc.yaml']).trim())throw new SetupError('pendingSecrets',409);
     original=fs.readFileSync(file);fs.writeFileSync(temporary,original,{mode:0o600});
     // Never put the secret in command arguments, a plaintext file or Dagu data.
-    run('sops',['set','--value-stdin',temporary,'["FYSO_COMPOSIO_API_KEY"]'],{input:JSON.stringify(apiKey)});
+    run('sops',['set','--value-stdin',temporary,'["COMPOSIO_API_KEY"]'],{input:JSON.stringify(apiKey)});
     fs.renameSync(temporary,file);
     run('git',['add','--','secrets.enc.yaml']);
     let changed=false;try{run('git',['diff','--cached','--quiet','--','secrets.enc.yaml']);}catch{changed=true;}

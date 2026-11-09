@@ -109,7 +109,7 @@ Open Connectors and choose **Set up Composio**. The form links directly to Compo
 
 `POST /api/composio/setup` is the only setup route. The gateway requires the native web session and panel ACL; it injects the project technical Basic identity into the private Unix-socket adapter. The adapter requires that identity, exact panel origin, JSON content type and a bounded body containing only `apiKey`. Arbitrary native config patches and caller-selected upstream URLs are rejected. The key is never returned, logged, passed in command arguments, sent to Dagu or stored in browser persistence. The browser clears the field on submission and on cancel.
 
-The adapter reads `GET https://backend.composio.dev/api/v3.1/auth_configs?limit=1` to verify access without creating a session or account. It uses `sops set --value-stdin` to update only `FYSO_COMPOSIO_API_KEY` in `secrets.enc.yaml`, preserves existing entries and commits only that encrypted file. Pending manual edits are rejected. A save failure leaves native OMB unchanged and restores the prior encrypted file. Native activation failure is reported separately from a successful encrypted save; retrying the form retries activation.
+The adapter reads `GET https://backend.composio.dev/api/v3.1/auth_configs?limit=1` to verify access without creating a session or account. It uses `sops set --value-stdin` to update only `COMPOSIO_API_KEY` in `secrets.enc.yaml`, preserves existing entries and commits only that encrypted file. Pending manual edits are rejected. A save failure leaves native OMB unchanged and restores the prior encrypted file. Native activation failure is reported separately from a successful encrypted save; retrying the form retries activation.
 
 OMB's native `PATCH /api/config` activates the project key; its private runtime credential representation remains native OMB behavior. The project source of truth is the encrypted file. `run-omb.sh` reads that current key at startup so stale supervisor environment values cannot replace a later panel update. No personal OMB instance or host Composio key is imported.
 
@@ -295,3 +295,8 @@ forwarding and injects the technical credential for the private setup adapter.
 The adapter uses a Unix socket with mode 0600, so native web auth retains base+9
 and the ten-port block does not grow. Existing Basic-login preview captures are
 historical UX evidence; native gateway session tests cover the integrated boundary.
+
+The canonical encrypted key is `COMPOSIO_API_KEY`, shared with native Dagu connector
+steps from D42. OMB startup prefers this encrypted entry, then accepts the legacy
+`FYSO_COMPOSIO_API_KEY` entry for existing projects. Ambient host `COMPOSIO_API_KEY`
+is never inherited by OMB. Updating through the panel writes only the canonical key.

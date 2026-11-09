@@ -17,7 +17,7 @@ const {configure}=require('../template/framework/scripts/composio-setup.cjs');
    activation=true;assert.equal(JSON.parse(options.body).composio.apiKey,key);return {ok:true,json:async()=>({composio:{configured:true}})};
   });
   assert.deepEqual(result,{saved:true,active:true});assert.equal(activation,true);
-  assert.equal(run('sops',['decrypt','--extract','["FYSO_COMPOSIO_API_KEY"]','secrets.enc.yaml']).trim(),key);
+  assert.equal(run('sops',['decrypt','--extract','["COMPOSIO_API_KEY"]','secrets.enc.yaml']).trim(),key);
   assert.equal(run('sops',['decrypt','--extract','["EXISTING_SECRET"]','secrets.enc.yaml']).trim(),'keep-this-fixture-value');
   assert.ok(!fs.readFileSync(path.join(root,'secrets.enc.yaml'),'utf8').includes(key));
   assert.deepEqual(run('git',['diff-tree','--no-commit-id','--name-only','-r','HEAD']).trim().split('\n'),['secrets.enc.yaml']);
@@ -25,7 +25,7 @@ const {configure}=require('../template/framework/scripts/composio-setup.cjs');
   const scripts=path.join(root,'framework/scripts'),bin=path.join(root,'bin');fs.mkdirSync(scripts,{recursive:true});fs.mkdirSync(bin);
   for(const name of ['run-omb.sh','lib.sh'])fs.copyFileSync(path.join(__dirname,'../template/framework/scripts',name),path.join(scripts,name));
   fs.writeFileSync(path.join(bin,'openmausbot'),'#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({key:process.env.COMPOSIO_API_KEY}));\n',{mode:0o700});
-  const restarted=run('bash',[path.join(scripts,'run-omb.sh')],{env:{...env,PATH:bin+path.delimiter+env.PATH,FYSO_HTTP_PORT:'19540',FYSO_DAGU_PORT:'19541',FYSO_OMB_WEBHOOK_PORT:'19545',FYSO_ADMIN_USER:'fixture',FYSO_ADMIN_PASSWORD:'fixture',FYSO_COMPOSIO_API_KEY:'stale-supervisor-fixture'}});
+  const restarted=run('bash',[path.join(scripts,'run-omb.sh')],{env:{...env,PATH:bin+path.delimiter+env.PATH,FYSO_WEB_DOMAIN:'fixture.localhost',FYSO_HTTP_PORT:'19540',FYSO_DAGU_PORT:'19541',FYSO_OMB_WEBHOOK_PORT:'19545',FYSO_ADMIN_USER:'fixture',FYSO_ADMIN_PASSWORD:'fixture',FYSO_COMPOSIO_API_KEY:'stale-supervisor-fixture'}});
   assert.equal(JSON.parse(restarted).key,key);
   console.log('PASS: real SOPS encryption, existing secret preserved, scoped Git commit, native activation fixture, fresh encrypted key after restart');
  }finally{fs.rmSync(root,{recursive:true,force:true});}

@@ -168,3 +168,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-07 | **Biz branch integration with local web SSO.** Retained native session login/logout alongside extension navigation and rebuilt the shared panel/SDK assets. Generic extension hosting is D41; D40 retains the already merged authentication decision. Panel build, 22 Node tests, Copier packaging and 11 native Caddy/Tinyauth tests passed, including extension session/ACL/private-slot checks. |
 
 | 2026-11-09 | Composio Dagu adapter and shared agent instructions (D42): explicit account/user/version, step-local SOPS key loading, redacted errors and no retries. Local verification recorded in [Composio findings](composio-findings.md); live OAuth/provider acceptance pending. |
+
+| 2026-11-09 | PR #19 integration with current main: connector setup shares encrypted `COMPOSIO_API_KEY` with Dagu, retains the legacy OMB key fallback and uses a private Unix socket behind the native Tinyauth session. Real Caddy/Tinyauth security matrix: 12 passed. |
