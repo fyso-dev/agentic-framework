@@ -28,6 +28,8 @@ export type ExtensionSecret = {
   name: string;
   description?: string;
   description_i18n?: Record<string, string>;
+  /** Page where the value is obtained (HTTPS). */
+  url?: string;
   required: boolean;
   set: boolean;
 };
@@ -44,6 +46,8 @@ export type Extension = {
   workflows: string[];
   skills: string[];
   pages?: ExtensionPageRegistration[];
+  /** Setup step the extension adds (`extensions/<ext>/setup.yaml`, D51). */
+  setup?: { title: string; title_i18n?: Record<string, string>; description?: string; description_i18n?: Record<string, string> };
 };
 
 /** Output `catalog` of `fyso-ext-catalog` (docs/extensions-contract.md §8). */
@@ -87,6 +91,8 @@ export type Engine = {
 /** Output `check` of `fyso-setup-check`. */
 export type SetupCheck = {
   checkedAt: string;
+  /** Extension Setup steps (D51): pending while a required secret is empty, then the extension's doctor. */
+  extensions?: { id: string; state: "done" | "pending" | "failed" }[];
   engines: Engine[];
   /** `error`: OpenMausBot rejected the team file (e.g. a model the engine no longer offers). */
   bots: { count: number; pending: number; ok: boolean; error?: string };

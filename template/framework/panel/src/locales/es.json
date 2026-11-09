@@ -128,6 +128,9 @@
       "saving": "Guardando…",
       "committed": "commit {{sha}}",
       "noChanges": "sin cambios para guardar"
+    },
+    "extension": {
+      "failed": "La comprobación de la extensión falló. Revisa la configuración: si las claves cambiaron o son de ejemplo, carga unas nuevas."
     }
   },
   "bots": {
@@ -399,7 +402,37 @@
     "workflowsTip": "Workflows",
     "skillsTip": "Skills: actívalas en un bot",
     "appsTip": "Apps",
-    "versionTip": "Versión instalada"
+    "versionTip": "Versión instalada",
+    "setup": {
+      "optional": "opcional",
+      "keep": "Cargado. Déjalo vacío para no cambiarlo",
+      "private": "Los valores se guardan cifrados y no se vuelven a mostrar.",
+      "save": "Guardar y comprobar",
+      "saving": "Guardando…",
+      "change": "Cambiar configuración",
+      "ready": "Configuración guardada y comprobada.",
+      "saved": "Configuración guardada.",
+      "checkFailed": "Se guardó, pero la comprobación de la extensión falló. Revisa los valores.",
+      "stillMissing": "Se guardó, pero todavía faltan valores obligatorios.",
+      "invalidInput": "Revisa los valores: no pueden tener saltos de línea ni superar 4096 caracteres.",
+      "pendingSecrets": "Hay cambios sin guardar en los secretos del proyecto. Guarda o descarta esos cambios y prueba de nuevo.",
+      "busy": "Otra configuración se está guardando. Prueba de nuevo en unos segundos.",
+      "saveFailed": "No se pudo guardar. No se cambió nada.",
+      "notFound": "Esta extensión no declara secretos.",
+      "unavailable": "El servicio de configuración no está disponible. Reinicia el proyecto.",
+      "stepOpen": "Abre la página de claves y crea una nueva",
+      "openKeys": "Abrir {{host}}",
+      "stepCopy": "Copia el bloque que te muestra",
+      "stepCopyOne": "Copia el valor que te muestra",
+      "stepPaste": "Pégalo aquí y guarda",
+      "block": "Pega aquí lo que copiaste",
+      "detected": "Listo para guardar: {{names}}",
+      "nothingDetected": "No se reconoció ninguna clave. Pega el bloque completo que muestra la página, o carga los valores uno por uno.",
+      "oneByOne": "Cargar los valores uno por uno",
+      "example": "Eso parece un ejemplo, no tu clave ({{names}}). Crea una clave nueva en la página de Langfuse y copia el bloque que aparece en la ventana de la clave: ahí se ve completa una sola vez."
+    },
+    "run": "Ejecutar",
+    "running": "Ejecutando…"
   },
   "market": {
     "title": "Marketplace",
@@ -416,7 +449,7 @@
     "updating": "Actualizando…",
     "installed": "Instalada {{version}}",
     "noTags": "Sin versiones publicadas",
-    "done": "{{id}} {{version}} quedó instalada en un commit ({{commit}}). Si declara secretos, cárgalos con:",
+    "done": "{{id}} {{version}} quedó instalada y guardada en un commit ({{commit}}). Si necesita claves, cárgalas en su tarjeta, en Instaladas.",
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commit, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Etiquetas",

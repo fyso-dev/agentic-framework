@@ -56,5 +56,7 @@ if (process.argv[2] === 'config') {
     models:(e.models?.options || []).map(m => m.id),
     ...(['claude','codex'].includes(e.instanceId) ? {fixHint:e.instanceId === 'claude' ? 'claude /login':'codex login --device-auth'} : {})
   })).filter(e => used.has(e.id) || (defaults.has(e.id) && e.ok));
-  console.log(JSON.stringify({checkedAt:new Date().toISOString(), engines, bots:{count:bots.length,pending,ok:!invalid && pending===0,...(invalid && {error:invalid})}, dagu:{ok:env.FYSO_DAGU_OK==='true',botsConnected:connected}}));
+  const extensions = (process.argv[5] && fs.existsSync(process.argv[5]) ? fs.readFileSync(process.argv[5], 'utf8') : '')
+    .split('\n').filter(Boolean).map(line => line.split('\t')).filter(([, state]) => ['done','pending','failed'].includes(state)).map(([id, state]) => ({id, state}));
+  console.log(JSON.stringify({checkedAt:new Date().toISOString(), extensions, engines, bots:{count:bots.length,pending,ok:!invalid && pending===0,...(invalid && {error:invalid})}, dagu:{ok:env.FYSO_DAGU_OK==='true',botsConnected:connected}}));
 }

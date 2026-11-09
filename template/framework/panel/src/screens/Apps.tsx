@@ -2,7 +2,8 @@
 // project's own apps and the apps added by extensions, each with its health. "Extensions"
 // lists the installed extensions (docs/extensions-contract.md §5) and the marketplace (§8),
 // which installs and upgrades through the fyso-ext-catalog and fyso-ext-install workflows.
-// Removing an extension stays a terminal task. Details live in tooltips; the page keeps text short.
+// Each installed extension asks for its declared secrets (guided setup, D50) and runs its
+// workflows. Removing an extension stays a terminal task. Details live in tooltips; the page keeps text short.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
@@ -11,6 +12,8 @@ import {
   AppIcon, IconApps, IconArrowUpRight, IconCheck, IconDownload, IconExternal, IconFlow, IconInfo, IconLayers,
   IconLock, IconLockOpen, IconPlug, IconPlus, IconPuzzle, IconRefresh, IconSearch, IconTerminal, Spinner,
 } from "../components/Icons";
+import { ExtensionSetup } from "../components/ExtensionSetup";
+import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { CopyLine } from "../components/ui";
 import { localized } from "../lib/i18n";
 import { go, href, type AppsTab } from "../lib/router";
@@ -224,7 +227,6 @@ function InstallOutcome({ entry, market, where }: { entry: MarketplaceEntry; mar
       {out && (
         <div role="status" className="ap-done">
           <p className="mute">{t("market.done", { id: out.id, version: out.version ?? "", commit: out.commit })}</p>
-          <CopyLine text="mise run secrets" />
         </div>
       )}
     </>
@@ -234,6 +236,7 @@ function InstallOutcome({ entry, market, where }: { entry: MarketplaceEntry; mar
 function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: MarketplaceEntry; market: Market }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  const { reload } = useStore();
   const missing = ext.secrets.filter((x) => x.required && !x.set);
   const caps = [
     { n: ext.mcpServers.length, tip: t("ext.mcpTip"), Icon: IconPlug },
@@ -277,7 +280,12 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
           })}
         </ul>
       )}
-      {missing.length > 0 && <CopyLine text="mise run secrets" />}
+      {ext.workflows.length > 0 && (
+        <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+          {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
+        </ul>
+      )}
+      <ExtensionSetup ext={ext} onSaved={reload} />
       <div className="ap-foot">
         <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>
         <span className="grow" />

@@ -1,4 +1,5 @@
-// Small panel glue: native Composio validation, SOPS persistence and OMB activation.
+// Small panel glue: native Composio validation, SOPS persistence and OMB activation;
+// managed MCP definitions; extension secrets (D50, extension-secrets.cjs).
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const {execFileSync}=require('node:child_process');
 const {timingSafeEqual}=require('node:crypto');
@@ -48,7 +49,7 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
     throw new SetupError('saveFailed',500);
   }finally{fs.rmSync(lock,{recursive:true,force:true});}
 }
-function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate) {
+function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args)) {
   const expected=Buffer.from('Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
   const origin=`http://panel.${env.FYSO_WEB_DOMAIN||'localhost'}:${env.FYSO_HTTP_PORT}`;
   return http.createServer(async(req,res)=>{
@@ -57,7 +58,8 @@ function createServer(env=process.env,save=configure,manage=require('./managed-m
     const supplied=Buffer.from(req.headers.authorization||'');
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return reply(401,{error:'unauthorized'});
     const mcp=/^\/api\/connectors\/mcp(?:\/([a-z][a-z0-9_-]{0,31}))?$/.exec(req.url||'');
-    if(req.url!=='/api/composio/setup'&&!mcp)return reply(404,{error:'notFound'});
+    const extension=/^\/api\/extensions\/([a-z][a-z0-9-]{1,30})\/secrets$/.exec(req.url||'');
+    if(req.url!=='/api/composio/setup'&&!mcp&&!extension)return reply(404,{error:'notFound'});
     const allowed=mcp?(mcp[1]?['PATCH','DELETE']:['POST']):['POST'];
     if(!allowed.includes(req.method))return reply(405,{error:'methodNotAllowed'});
     if(req.headers.origin!==origin||req.headers['sec-fetch-site']==='cross-site')return reply(403,{error:'origin'});
@@ -66,8 +68,9 @@ function createServer(env=process.env,save=configure,manage=require('./managed-m
       let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>8192)throw new SetupError('invalidInput',413);}
       let input;try{input=body?JSON.parse(body):{};}catch{throw new SetupError('invalidInput');}
       if(mcp){const op=req.method==='POST'?'create':req.method==='PATCH'?'enable':'remove';const result=await manage(op,mcp[1]||input.name,input,env);return reply(200,result);}
+      if(extension)return reply(200,await saveExtension(extension[1],input,env));
       const result=await save(input,env);reply(result.active?200:202,result);
-    }catch(error){reply(error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError?error.status:500,{error:error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError?error.code:'saveFailed'});}
+    }catch(error){const known=error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError||error instanceof require('./extension-secrets.cjs').SecretsError;reply(known?error.status:500,{error:known?error.code:'saveFailed'});}
   });
 }
 async function listenSocket(server,socket) {

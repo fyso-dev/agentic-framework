@@ -1,15 +1,17 @@
-// Setup checklist (home): engines, bots applied, bots connected to Dagu, last git save.
+// Setup checklist (home): engines, bots applied, bots connected to Dagu, last git save,
+// plus one step per installed extension that declares setup.yaml (D51).
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine } from "../api/types";
+import type { Engine, Extension } from "../api/types";
 import { ActionButton, ActionError, ActionStatus, useLogsUrl } from "../components/Action";
+import { ExtensionSetup } from "../components/ExtensionSetup";
 import { Spinner } from "../components/Icons";
 import { GlobalState } from "../components/Layout";
 import { CopyLine, External, RelTime } from "../components/ui";
+import { localized } from "../lib/i18n";
+import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { href } from "../lib/router";
 import { useStore, type StepState } from "../store";
-
-const TOTAL = 4;
 
 function StepIcon({ state }: { state: StepState }) {
   const glyph = state === "done" ? "✓" : state === "failed" ? "×" : null;
@@ -213,11 +215,48 @@ function GitStep() {
   );
 }
 
+// Once done, the step only runs the extension's workflow (e.g. the trace sync), like the git step;
+// its configuration lives in Apps. Until then it shows the guided key form.
+function ExtensionRun({ dag }: { dag: string }) {
+  const { t } = useTranslation();
+  const { backend } = useStore();
+  const run = useDaguAction<unknown>(backend, dag, "result", { loadLast: true }) as Action<unknown>;
+  const logs = useLogsUrl(dag);
+  return (
+    <>
+      <span className="step-meta"><ActionStatus action={run} /></span>
+      <External href={logs} className="step-link">{t("common.viewInDagu")} </External>
+      <ActionButton action={run} label={t("ext.run")} busyLabel={t("ext.running")} onRun={() => void run.start()} />
+    </>
+  );
+}
+
+function ExtensionStep({ ext, state }: { ext: Extension; state: StepState }) {
+  const { t, i18n } = useTranslation();
+  const { check, reload } = useStore();
+  const setup = ext.setup!;
+  const title = localized(i18n.language, setup.title, setup.title_i18n);
+  const description = setup.description ? localized(i18n.language, setup.description, setup.description_i18n) : undefined;
+  const dag = state === "done" ? ext.workflows[0] : undefined;
+  return (
+    <Step
+      state={state}
+      title={title}
+      side={dag ? <ExtensionRun dag={dag} /> : <span className="step-meta"><ActionStatus action={check} /></span>}
+    >
+      {description && <p className="step-detail">{description}</p>}
+      {state === "failed" && <p role="alert" className="step-error">{t("setup.extension.failed")}</p>}
+      {state !== "done" && <ExtensionSetup ext={ext} onSaved={() => { reload(); void check.start(); }} />}
+    </Step>
+  );
+}
+
 export function Setup() {
   const { t } = useTranslation();
   const s = useStore();
   const p = s.project.data;
   const done = s.stepsDone;
+  const TOTAL = s.stepsTotal;
   const allDone = done === TOTAL;
   const steps = (
     <ol className="steps card">
@@ -225,6 +264,7 @@ export function Setup() {
       <BotsStep />
       <DaguStep />
       <GitStep />
+      {s.extSteps.map(({ ext, state }) => <ExtensionStep key={ext.id} ext={ext} state={state} />)}
     </ol>
   );
 

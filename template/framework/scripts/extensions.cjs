@@ -34,6 +34,17 @@ function pages(id) {
     return {id:pageId,...name,url:data.url,icon:data.icon||'apps'};
   });
 }
+/** Optional Setup step an extension adds (D51): `extensions/<ext>/setup.yaml` with a title and description. */
+function setup(id) {
+  const file = `extensions/${id}/setup.yaml`;
+  if (!fs.existsSync(file)) return null;
+  const data = read(file) || {};
+  const text = (key, value) => typeof value === 'string' ? {[key]:value} :
+    value && typeof value === 'object' ? {[key]:value.es || value.en || Object.values(value)[0], [`${key}_i18n`]:value} : {};
+  const step = {...text('title', data.title), ...text('description', data.description)};
+  if (!step.title) throw Error(`${file}: a title is required`);
+  return step;
+}
 function inventory(apps, env = process.env) {
   return glob('.copier-answers.ext-*.yml').map(file => {
     const id = file.slice('.copier-answers.ext-'.length, -4);
@@ -45,11 +56,14 @@ function inventory(apps, env = process.env) {
       secrets:secrets(id).map(s => {
         const description = typeof s.description === 'string' ? {description:s.description} :
           s.description ? {description:s.description.es || s.description.en || Object.values(s.description)[0], description_i18n:s.description} : {};
-        return {name:s.name, ...description, required:s.required === true, set:!!env[s.name]};
+        // Optional page where the value is obtained; HTTPS only (D50).
+        const url = typeof s.url === 'string' && /^https:\/\/[^\s]+$/.test(s.url) ? {url:s.url} : {};
+        return {name:s.name, ...description, ...url, required:s.required === true, set:!!env[s.name]};
       }),
       mcpServers:fs.existsSync(`${base}/mcp.json`) ? Object.keys(JSON.parse(fs.readFileSync(`${base}/mcp.json`)).mcpServers || {}) : [],
       workflows:workflows(id).map(f => f.split('/').pop().slice(0,-5)),
-      skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2))};
+      skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2)),
+      ...(setup(id) && {setup:setup(id)})};
   });
 }
 function check(env = process.env) {
@@ -77,7 +91,7 @@ function run(id, command) {
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, glob, validId, secrets, missing, workflows, inventory, check};
+module.exports = {read, glob, validId, secrets, missing, setup, workflows, inventory, check};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));
