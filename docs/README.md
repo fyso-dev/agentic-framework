@@ -178,3 +178,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-09 | Bots redesigned from the Claude Design study "Sensación de simpleza" (B1.3, D49): list + detail in tabs, brand logos, icons with tooltips, one Save. Per-bot activity reuses the observability snapshot; app grants keep the native plan/apply, triggered by Save. |
 
 | 2026-11-09 | [Panel MCP guide](../artifacts/delivery-evidence/panel-mcp-guide/README.md) (`#/mcp`): localized terminal instructions reuse the installer’s native `agent:connect` / `agent:disconnect` tasks, including session restart and `fyso_status` verification. |
+
+| 2026-11-09 | MCP connection actions now enqueue `fyso-agent-connect` from the panel, validate assistant/mode, reuse the installer connector and display run results. The UI identifies the Dagu host/user scope and labels demo actions. |

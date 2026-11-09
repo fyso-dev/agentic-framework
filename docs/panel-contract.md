@@ -175,3 +175,9 @@ file references and unrelated profiles. Native draft preview/apply remains the
 existing `fyso-bots-plan` / `fyso-bots-apply` workflow, not an immediate API patch.
 The live native scope is used for initial form visibility when there is no draft;
 subsequent roster polling never overwrites a connector selection the person edited.
+
+### `fyso-agent-connect` — assistant MCP registration
+
+Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
+
+The MCP page enqueues this DAG and uses the shared action state, errors and Dagu log links. The workflow changes the configuration of the OS user running Dagu on that host, not the browser's machine. It does not launch or restart assistants. Demo mode explicitly labels simulated actions.

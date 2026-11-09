@@ -118,6 +118,7 @@ export type Run = {
 
 /** Action workflows (contract §3). Dagu DAG names. */
 export const DAGS = {
+  agentConnect: "fyso-agent-connect",
   botArchitect: "fyso-bot-architect",
   observability: "fyso-observability",
   setupCheck: "fyso-setup-check",
