@@ -258,6 +258,7 @@ A small Vite + React SPA served by Caddy at `panel.<host>`. It is for **the pers
 **Screens:**
 - **Setup checklist (home):** engines authenticated, bots applied, bots connected to Dagu, last git save. Each item has its state and a fix action.
 - **Bots:** a simple form over `team.yaml` (name, role, engine, model, base instructions, skills). Saving shows the `team apply --dry-run` plan first, then applies.
+- **Connect MCP:** installer-equivalent instructions for connecting Claude Desktop, Codex and Claude Code with native `agent:connect` tasks, restarting sessions, verifying tools and disconnecting.
 - **Apps:** launcher tiles from `project/apps/*/app.yaml` plus the built-ins (Dagu, OMB), with health. They open in a new tab.
 
 **i18n (D12):**
