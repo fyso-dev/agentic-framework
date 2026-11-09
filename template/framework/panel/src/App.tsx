@@ -40,7 +40,7 @@ export function App() {
       screen = <ExtensionPage extensionId={route.extensionId} pageId={route.pageId} theme={theme} />;
       break;
     case "apps":
-      screen = <Apps />;
+      screen = <Apps tab={route.tab ?? "open"} />;
       break;
     default:
       screen = <Setup />;

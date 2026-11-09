@@ -123,6 +123,8 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
       return <IconTruck size={size} />;
     case "chart":
       return <IconChart size={size} />;
+    case "puzzle":
+      return <IconPuzzle size={size} />;
     default:
       return <IconApps size={size} />;
   }
@@ -155,3 +157,14 @@ export const IconCode = icon("M8 8l-4 4 4 4M16 8l4 4-4 4");
 export const IconFlow = (p: P) => <Svg {...p}><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.5 6H15a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h6.5" /></Svg>;
 export const IconBack = icon("M15 5l-7 7 7 7");
 export const IconInfo = icon("M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 7.8v.2");
+
+// Apps (launcher + extensions).
+export const IconPuzzle = icon("M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4v-6h3a2 2 0 1 0 0-4H4V4z");
+export const IconRefresh = icon("M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6");
+export const IconSearch = (p: P) => <Svg {...p}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4-4" /></Svg>;
+export const IconLock = (p: P) => <Svg {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></Svg>;
+export const IconLockOpen = (p: P) => <Svg {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-2" /></Svg>;
+export const IconDownload = icon("M12 4v12M7 11l5 5 5-5M5 20h14");
+export const IconTerminal = icon("M5 7l5 5-5 5M12 17h7");
+export const IconExternal = icon("M10 14L20 4M14 4h6v6M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5");
+export const IconCheck = icon("M5 12l5 5L20 7");

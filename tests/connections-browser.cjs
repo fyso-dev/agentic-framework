@@ -7,7 +7,7 @@ async function main(){
   const context=await browser.newContext({httpCredentials:{username:'admin',password:'admin'},viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.name));
   await page.goto(`${base}/?lang=es#/apps`);
-  await page.getByRole('link',{name:'Administrar conectores',exact:true}).click();
+  await page.locator('nav.sidenav a[href="#/connectors"]').click();
   await page.getByRole('heading',{name:'Conectores',exact:true}).waitFor();
   await page.getByRole('heading',{name:'Gmail',exact:true}).waitFor();
   assert.equal(new URL(page.url()).hash,'#/connectors');
