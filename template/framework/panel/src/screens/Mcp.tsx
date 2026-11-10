@@ -2,7 +2,7 @@
 // to the desktop and CLI agents of the Dagu host through the fyso-agent-connect workflow.
 // MODE=status says which agents are installed and connected; connect, disconnect and open act
 // on one. Those apps live on the Dagu host, so when the panel is opened from another machine the
-// actions are hidden: remote access goes through an HTTP MCP with a token (D50, not built yet).
+// actions are hidden: remote access goes through an HTTP MCP with a token (D52, not built yet).
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS } from "../api/types";
