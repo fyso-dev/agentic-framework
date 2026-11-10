@@ -67,7 +67,8 @@ native OMB entries and the existing flow plans, applies and commits them:
 
 Installation does **not** enable the skill on any bot. The framework's default
 bots have a tool allow-list, so the toggle also selects the `silverbullet`
-server for them; switching the skill off removes that selector. The Connectors
+server for them; switching the skill off removes that selector and marks the
+skill entry `enabled: false` (OMB does not uninstall a skill left out of the file). The Connectors
 tab of the bot shows the server and can narrow it to single tools, for example
 read-only tools for a bot that must not write.
 

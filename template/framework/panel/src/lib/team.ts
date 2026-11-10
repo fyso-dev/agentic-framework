@@ -97,7 +97,7 @@ function readSoul(node: unknown): Soul {
 
 function readSkills(node: unknown): string[] {
   if (!isSeq(node)) return [];
-  return node.items.map((it) => {
+  return node.items.filter(skillEnabled).map((it) => {
     if (isScalar(it)) return decodeEnv(str(it.value));
     if (isMap(it)) return skillLabel(decodeEnv(str(it.get("file") ?? it.get("name") ?? it.get("id") ?? it.get("path"))));
     return "";
@@ -108,22 +108,27 @@ function readSkills(node: unknown): string[] {
 const skillLabel = (v: string) => /([^/]+)\/SKILL\.md$/.exec(v)?.[1] ?? v;
 
 const skillFile = (it: unknown) => (isMap(it) ? decodeEnv(str(it.get("file"))) : "");
+/** OMB's native switch: an entry is on unless it says `enabled: false`. */
+const skillEnabled = (it: unknown) => !(isMap(it) && it.get("enabled") === false);
 
 function readSkillFiles(node: unknown): string[] {
-  return isSeq(node) ? node.items.map(skillFile).filter(Boolean) : [];
+  return isSeq(node) ? node.items.filter(skillEnabled).map(skillFile).filter(Boolean) : [];
 }
 
+// OMB's team apply only adds and updates: a skill left out of the file stays installed
+// and on. So switching off keeps the entry with the native `enabled: false`.
 function setSkill(doc: Document, map: YAMLMap, file: string, on: boolean) {
   const node: unknown = map.get("skills", true);
-  if (!on) {
-    if (!isSeq(node)) return;
-    node.items = node.items.filter((it) => skillFile(it) !== file);
-    if (node.items.length === 0) map.delete("skills");
+  const entry = isSeq(node) ? node.items.find((it) => skillFile(it) === file) : undefined;
+  if (isMap(entry)) {
+    if (on) entry.delete("enabled");
+    else entry.set("enabled", false);
     return;
   }
+  if (!on) return;
   const seq = isSeq(node) ? node : (doc.createNode([]) as YAMLSeq);
   if (seq !== node) map.set("skills", seq);
-  if (!seq.items.some((it) => skillFile(it) === file)) seq.add(doc.createNode({ file: encodeEnv(file) }));
+  seq.add(doc.createNode({ file: encodeEnv(file) }));
 }
 
 export function readBots(doc: Document): Bot[] {

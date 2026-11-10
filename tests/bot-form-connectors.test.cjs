@@ -39,7 +39,13 @@ test('the bot form switches one extension skill as a native file entry and leave
   assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md',file],[file]]);
   assert.deepEqual(readBots(doc)[0].skills,['own','project-knowledge']);
   assert.ok(serializeTeam(doc).includes(`- file: ${file}`));
+  // OMB's team apply never removes an omitted skill: off is the native `enabled: false`.
   for(const index of [0,1])upsertBot(doc,index,{...input,name:index?'Two':'One',skills:[{file,on:false}]});
-  assert.deepEqual(readBots(doc)[0].skillFiles,['skills/one/own/SKILL.md']);
-  assert.equal(doc.getIn(['bots',1,'skills']),undefined,'an emptied list is removed');
+  assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md'],[]]);
+  assert.deepEqual(readBots(doc)[0].skills,['own']);
+  assert.ok(serializeTeam(doc).includes(`- file: ${file}\n        enabled: false`));
+  upsertBot(doc,1,{...input,name:'Two',skills:[{file,on:true}]});
+  assert.equal(doc.getIn(['bots',1,'skills',0,'enabled']),undefined);assert.deepEqual(readBots(doc)[1].skillFiles,[file]);
+  const never=parseTeam(text);upsertBot(never,1,{...input,name:'Two',skills:[{file,on:false}]});
+  assert.equal(never.getIn(['bots',1,'skills']),undefined,'switching off a skill that was never listed writes nothing');
 });
