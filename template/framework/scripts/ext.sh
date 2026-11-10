@@ -18,6 +18,8 @@ activate() {
   MISE_YES=1 mise install >&2
   if stack_running; then
     pc project update >&2
+    # The login authority reads app access at startup (D55); sessions survive the restart.
+    pc process restart web-auth >&2
     pc process restart caddy >&2
     mise exec -- framework/scripts/connect-extensions.sh >&2
   fi

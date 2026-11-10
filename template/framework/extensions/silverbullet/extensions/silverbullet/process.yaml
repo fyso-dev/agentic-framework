@@ -7,3 +7,8 @@ processes:
         command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/doctor.sh
       initial_delay_seconds: 2
       period_seconds: 5
+      failure_threshold: 6
+    # A failed probe stops the process (seen while the extension is reapplied): start it again.
+    availability:
+      restart: on_failure
+      backoff_seconds: 3

@@ -3,7 +3,8 @@
 An opt-in bundled Copier extension, under `template/framework/extensions/silverbullet/`.
 It fills the existing extension slots ([contract](extensions-contract.md)) without
 changing a project's team file or framework configuration. Decisions: **D53**
-(the extension) and **D54** (per-bot skill toggle), [PLAN](PLAN.md).
+(the extension), **D54** (per-bot skill toggle) and **D55** (panel page and
+web access), [PLAN](PLAN.md).
 
 ## Components and source of truth
 
@@ -12,7 +13,8 @@ changing a project's team file or framework configuration. Decisions: **D53**
 | Web wiki | SilverBullet **2.12.1**, native release binary through mise's GitHub backend |
 | Agent tools | Official `@modelcontextprotocol/server-filesystem` **2.2.0**, installed through mise |
 | Documents | **`project/wiki/`**, already used by Dagu and included in the framework snapshot paths |
-| Browser access | `http://docs.<slug>-<port_base>.localhost:<port_base>`, behind the framework's web login (`import fyso_login`) |
+| Panel section | **Conocimiento / Knowledge**, an extension-owned page (`pages/knowledge.yaml`, `panel/`) that embeds the editor and explains how to feed it |
+| Browser access | `http://docs.<slug>-<port_base>.localhost:<port_base>`, behind the framework's web login (`import fyso_login`); panel users may open it (D55) |
 | Process | `ext-silverbullet`, loopback only, on the extension port (first free port of `port_base + 10…19`) |
 | Agent instructions | `project-knowledge` skill, enabled per bot in the panel |
 
@@ -42,6 +44,53 @@ does not list it for install. The framework template preserves the bundled
 `copier.yml` and uses `.slotjinja` internally, so outer Copier rendering does
 not consume its variables.
 
+## In the panel
+
+Installing adds **Conocimiento** (Knowledge) to the panel's navigation. The
+page belongs to the extension and uses the existing page slot and panel SDK
+([contract §9](extensions-contract.md#9-extension-owned-tabs-and-pages)); the
+framework's panel has no SilverBullet code. It shows:
+
+- **The real SilverBullet editor**, embedded. It is the same site as the
+  `docs.` route, loaded with the person's web session, so nothing is copied or
+  re-implemented. "Open in a new tab" keeps the full-window editor one click away.
+- **How to feed it**, as three ways that all write the same files:
+  1. *Write it* in the editor.
+  2. *Ask a bot*: the page lists the project's bots with their state (has
+     access, changed but not applied, or a **Give access** link that opens the
+     bot's profile at the `project-knowledge` switch of D54) and an example
+     request to copy.
+  3. *Bring what you already have*: copy Markdown files into `project/wiki/`.
+- The guide folds away; the choice is remembered in that browser.
+
+The first home page (`index.md`, written only when absent) repeats the three
+ways and proposes three starting pages. It is seeded in Spanish, the panel's
+default language; it is project content and can be rewritten.
+
+The `project-knowledge` skill tells a bot when to write, not only how to read:
+on request (document, note, remember), updating an existing page before
+creating one, linking new pages from the home page and reporting which page
+changed.
+
+### Web access (D55)
+
+Web login denies apps that no rule names. An extension cannot edit the
+project-owned `project/auth/tinyauth.yaml`, so the framework gives each
+extension site the **panel's** access rule when it writes Tinyauth's runtime
+configuration: people who may open the panel may open the knowledge base. To
+restrict it, declare the app yourself; a declared app is never changed:
+
+```yaml
+# project/auth/tinyauth.yaml
+apps:
+  docs:
+    users:
+      allow: "admin"
+```
+
+`ext:add` and `ext:update` restart the login authority so the rule applies at
+once. Existing web sessions survive that restart.
+
 ## Connect agents
 
 Install adds a stdio server named `silverbullet` to the generated `.mcp.json`.
@@ -51,7 +100,8 @@ and the absolute path of `project/wiki/`, derived from the script's own
 location (OMB does not pass `FYSO_ROOT` to bots). A client's Roots cannot
 expand the configured directory.
 
-Enable it per bot in the panel: **Bots → a bot → Profile → Skills**, switch
+Enable it per bot in the panel: from the Knowledge page press **Give access**
+next to the bot, or open **Bots → a bot → Profile → Skills**; switch
 `project-knowledge` on, then **Review and apply** (D54). The panel writes the
 native OMB entries and the existing flow plans, applies and commits them:
 
@@ -96,6 +146,10 @@ sandbox for a compromised process.
   filesystem. macOS verification does not prove case-insensitive path behavior.
 - Markdown is the agent-readable source. Uploading a PDF does not add OCR,
   extraction, embeddings or retrieval automatically.
+- The embedded editor is a frame of the `docs.` site. It keeps SilverBullet's
+  own look and does not follow the panel's dark theme or language.
+- Hot install reaches bots on the next start: a bot gets the `silverbullet`
+  MCP server after `mise run up` restarts OpenMausBot (extensions-contract §6).
 - Concurrent browser and MCP edits can race. Read before editing, coordinate
   writers and review Git changes. No cross-client transactional locking is added.
 
@@ -117,6 +171,21 @@ its own Git repository and add it to a catalog (extensions-contract §8).
 To remove, run `mise run ext:remove silverbullet` and restart the project's
 stack. `project/wiki/` and `.data/ext/silverbullet/` remain. Switch the skill
 off on the bots that used it first.
+
+## Verification of the panel page and web access (2026-11-10, D55)
+
+On a project generated from the branch (slug `sbint`, port block 29600, macOS),
+`tests/silverbullet-panel-browser.cjs` drove a real browser through the login,
+the Knowledge section, the embedded editor, a file dropped into `project/wiki/`,
+the "Give access" link, the folded guide, English, and a restart of the login
+authority. Results, screenshots and what was not verified:
+[evidence](../artifacts/delivery-evidence/silverbullet/README.md).
+
+```sh
+FYSO_TEST_WEB_PANEL=http://panel.<slug>-<port>.localhost:<port> \
+FYSO_TEST_WEB_PASSWORD_FILE=<file> FYSO_TEST_PROJECT_ROOT=<project> \
+  node <framework-checkout>/tests/silverbullet-panel-browser.cjs
+```
 
 ## Verification recorded on 2026-11-10
 

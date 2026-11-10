@@ -1,0 +1,33 @@
+{
+  "kb": {
+    "title": "Knowledge",
+    "lead": "What the project knows: decisions, procedures and references. People and bots read and write the same pages.",
+    "guideShow": "How to feed it",
+    "guideHide": "Hide guide",
+    "openTab": "Open in a new tab",
+    "write": {
+      "title": "Write it",
+      "body": "Edit in the editor below: it saves by itself. To create a page, write its name in double brackets, for example [[Decisions]], and click the link."
+    },
+    "ask": {
+      "title": "Ask a bot",
+      "body": "A bot with access reads these pages before working and updates them when you ask.",
+      "example": "Document in the knowledge base how we deploy to production.",
+      "none": "This project has no bots yet.",
+      "on": "Has access",
+      "pending": "Not applied",
+      "give": "Give access",
+      "review": "Review and apply the changes",
+      "giveTip": "Opens the bot's profile: switch the project-knowledge skill on and apply the changes."
+    },
+    "files": {
+      "title": "Bring what you already have",
+      "body": "Copy Markdown files (.md) into this project folder. They show up here right away and bots see them too."
+    },
+    "note": "Each page is a file in project/wiki/ and enters the project history with the backup (Git). Do not store passwords or keys.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "frame": "Knowledge editor",
+    "unavailable": "The knowledge base is not available. Check in Apps that it is running."
+  }
+}
