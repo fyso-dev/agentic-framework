@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D55; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D56; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -57,6 +57,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: shared wiki files, official filesystem MCP, per-bot skill, install and verification (D53, D54) | [silverbullet-extension.md](silverbullet-extension.md) |
+| Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
@@ -90,6 +91,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-10 | **Project distributions (D56).** A project publishes its committed configuration, documents and bot memory as a versioned Copier template (`dist:publish`, tags `vN`); clients `dist:add` / `dist:update` (`copier copy`/`recopy`: the distribution wins over local configuration), memory merges three-way with `git merge-file --union`, chosen secrets travel SOPS-encrypted for the clients' age keys. Verified with real git, Copier, SOPS, age and gitleaks in `tests/test_distribution.py`, and live on generated projects (Dagu `fyso-dist-update` merged into OMB's live memory; doctor green). Findings: Dagu step ids take no dashes; Dagu steps need the age key path passed explicitly. [Contract](distribution.md) · [Evidence](../artifacts/delivery-evidence/distribution/README.md) |
 | 2026-11-10 | **Bots with a tool selection could not run on OpenMausBot 0.1.141 (fixed, D55).** OMB gates each MCP server of a scoped bot and validates the server URL before expanding placeholders, so `http://127.0.0.1:${FYSO_DAGU_PORT}/mcp` was rejected and every Claude turn of the default bots failed with "Tool selection requires a supported MCP server". `mcp-config.cjs` now writes the project's port numbers literally in server URLs; credentials stay placeholders. Verified on a generated project (port block 29500): after `down`/`up` the Workflow Architect listed workflows through `mcp__dagu__dagu_read`, and `doctor` passed. |
 | 2026-11-10 | **SilverBullet knowledge extension (D53) and extension skills per bot (D54).** Bundled opt-in extension: SilverBullet 2.12.1 over `project/wiki/`, official filesystem MCP 2.2.0 confined to that folder, `project-knowledge` skill. The bot detail toggles an extension skill and, for bots with a tool allow-list, the extension's MCP server. Verified on a project generated from this branch (port block 29500): hot install, doctor, browser toggle → OMB plan → apply → commit, no drift, and a bot answered from the wiki through `mcp__silverbullet__*`. [Contract and evidence](silverbullet-extension.md). The bot turn needed the port written literally in the local `.mcp.json`; that defect is fixed by D55 (entry above). |
 | 2026-11-06 | Shared agent operating context: local guide, MCP initialization and offline `fyso_context`, CLI entry point, desktop prompt and all default bot roles including Chief. Existing project-owned profiles require explicit adoption. See [agent surface](agent-surface.md#shared-operating-context). |

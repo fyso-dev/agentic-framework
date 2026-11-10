@@ -129,6 +129,10 @@ mise run doctor
 
 A fresh `.data/` restores versioned bots and memory from `state/` when available. Chat and usage history require the separate runtime backup. Host CLI logins are local to that machine and must be authenticated there.
 
+## Prepare a project for a client
+
+To hand a configured project to someone else and keep sending improvements (configuration, documents and bot memory, without cloning your repository), publish it as a distribution: [guide-share-project.md](guide-share-project.md).
+
 ## Troubleshooting
 
 | Symptom | Check |

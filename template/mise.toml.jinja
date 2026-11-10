@@ -145,6 +145,26 @@ run = "framework/scripts/ext.sh update"
 description = "List project extensions"
 run = "framework/scripts/ext.sh list"
 
+[tasks."dist:publish"]
+description = "Publish this project's configuration, documents and memory as a new distribution version: mise run dist:publish [version]"
+run = "framework/scripts/dist.sh publish"
+
+[tasks."dist:add"]
+description = "Install a distribution in this project (its files win): mise run dist:add <repo> [version]"
+run = "framework/scripts/dist.sh add"
+
+[tasks."dist:update"]
+description = "Update to the latest distribution version (or the one given), merging bot memory"
+run = "framework/scripts/dist.sh update"
+
+[tasks."dist:status"]
+description = "Show the installed distribution and whether a newer version exists"
+run = "framework/scripts/dist.sh status"
+
+[tasks."dist:key"]
+description = "Print this installation's public key, for a publisher who sends secrets"
+run = "framework/scripts/dist.sh key"
+
 [tasks."ext:search"]
 description = "Search the extension catalogs: mise run ext:search [text]"
 run = "framework/scripts/ext.sh search"
