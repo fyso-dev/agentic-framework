@@ -1,5 +1,46 @@
 # SilverBullet extension verification
 
+## Import with AI (2026-11-10, D56)
+
+Same generated project (slug `sbint`, port block 29600, macOS, Claude engine),
+extension reapplied from the `feat/silverbullet-import` branch. Synthetic
+documents of a fictional company; one real agent turn per run (two runs, both
+passed).
+
+| Check | Observed result |
+|---|---|
+| Install | `ext:add … --overwrite` installed tusd 2.10.1, Uppy 6.0.7, extract-zip 2.0.1 and pandoc 3.13 through mise and started `ext-silverbullet-upload`; `mise run doctor` passed |
+| Picker | Folder, zip and file picker inside the Knowledge page; "Turn into pages" disabled until something is uploaded |
+| Upload | A folder (text, 2 Markdown, Word; a hidden file left out) and a zip: 5 resumable uploads stored outside the wiki, tagged with one batch |
+| Agent | Started by the person from the page; 7 pages by topic in 4 folders, linked to each other, each with its source line |
+| Facts | "PostGIS", "21 días", "acme rollback" and "9:30" (from Markdown, the zip, text and Word) are in the written pages |
+| Report | `Importaciones/<date time>` links every new page; the home page links `Importaciones`; the editor opens the report |
+| Leftovers | Upload and work directories empty after the run |
+| Credential | A document with a credential-shaped value: the import failed in `prepare` ("possible credentials in: claves.md"), no page changed, the document was not kept |
+
+`tests/silverbullet-import-browser.cjs` produced the screenshots and printed:
+
+```json
+{"picker":true,"folderAndZipUploaded":5,"pagesWritten":7,"factsKept":4,"reportLinksPages":true,"homeLinksImports":true,"uploadsCleared":true,"editorShowsReport":true,"credentialRefused":true,"pageErrors":0}
+```
+
+| Screenshot | Shows |
+|---|---|
+| [import-picker.png](import-picker.png) | The import opened from "Trae lo que ya tienes" |
+| [import-uploaded.png](import-uploaded.png) | Folder and zip uploaded, ready to convert |
+| [import-running.png](import-running.png) | The agent writing pages |
+| [import-report.png](import-report.png) | Result and the report page in the editor |
+| [import-report-link.png](import-report-link.png) | "Ver el informe" after a panel reload: the editor scrolls into view on the report (1440×800) |
+| [import-refused.png](import-refused.png) | A document with a credential, refused |
+
+Suites: `node --test tests/*.test.cjs` 114 passed (5 new in
+`silverbullet-import.test.cjs`); `silverbullet-panel-browser.cjs` passed again;
+`test_silverbullet.py` 4 passed; `check-paths.sh` passed.
+
+**Not verified here:** the Codex engine, PDFs, folders near the limits (200
+files, 4 MB of text), whether the agent's permission rules hold against a
+hostile document (only the output gate is tested), Linux/Windows.
+
 ## Knowledge inside the panel (2026-11-10, D55)
 
 Project generated from the `feat/silverbullet-integrated` branch (slug `sbint`,
