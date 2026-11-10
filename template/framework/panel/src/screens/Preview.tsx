@@ -1,5 +1,4 @@
-// "Vista previa de cambios": run fyso-bots-plan with the draft, show OMB's plan lines
-// verbatim, then fyso-bots-apply (snapshot → write → apply → commit, contract §3).
+// Preview the native team plan and scoped bot removals before applying the draft.
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS, type ApplyResult, type Plan } from "../api/types";
@@ -30,16 +29,18 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
   const applyLogs = useLogsUrl(apply.dag);
   // Empty TEAM_B64 means "the current file" (contract §3).
   const teamB64 = useMemo(() => (s.draft ? base64Utf8(s.draft) : ""), [s.draft]);
+  const baseB64 = useMemo(() => s.draftBase === null ? "" : base64Utf8(s.draftBase), [s.draftBase]);
+  const currentBase = !s.draftConflict && s.team.status === "ok";
   const applied = useRef(false);
 
-  const runPlan = () => void plan.start({ TEAM_B64: teamB64 });
+  const runPlan = () => void plan.start({ TEAM_B64: teamB64, TEAM_BASE_B64: baseB64 });
   useEffect(() => {
-    if (!open || !s.draftReady) return;
+    if (!open || !s.draftReady || !currentBase) return;
     applied.current = false;
     apply.reset();
     runPlan();
     // Re-plan each time the dialog opens (only `open` matters here).
-  }, [open, s.draftReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, s.draftReady, currentBase]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -88,7 +89,8 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
   }
 
   let body;
-  if (plan.phase === "running" || plan.phase === "never")
+  if (s.draftConflict) body = <p role="alert" className="banner banner-warn">{t("bots.draftConflict")}</p>;
+  else if (!currentBase || plan.phase === "running" || plan.phase === "never")
     body = (
       <p role="status" className="center-block mute" style={{ flexDirection: "row", justifyContent: "center", padding: "28px 0" }}>
         <Spinner size={14} /> {t("preview.planning")}
@@ -138,11 +140,14 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
             </ul>
           </div>
         )}
+        {p.deleted > 0 && (
+          <p className="banner banner-warn">{t("preview.deleteHistoryWarning")}</p>
+        )}
         <p className="callout"><IconCommit />{t("preview.snapshotNote")}</p>
       </>
     );
 
-  const canApply = plan.phase === "ok" && total > 0 && !applying;
+  const canApply = currentBase && plan.phase === "ok" && total > 0 && !applying;
   return (
     <Modal open={open} onClose={close} labelledBy="pv-t">
       <div className="modal-head">
@@ -169,7 +174,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
           <span className="grow" />
         )}
         <button type="button" className="btn btn-soft" onClick={close} disabled={applying}>{t("common.cancel")}</button>
-        {plan.phase === "failed" ? (
+        {currentBase && plan.phase === "failed" ? (
           <button type="button" className="btn btn-pri" onClick={runPlan}>{t("common.retry")}</button>
         ) : (
           <button
@@ -177,7 +182,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
             className="btn btn-pri"
             disabled={!canApply}
             aria-busy={applying}
-            onClick={() => void apply.start({ TEAM_B64: teamB64 })}
+            onClick={() => void apply.start({ TEAM_B64: teamB64, TEAM_BASE_B64: baseB64, REMOVAL_REVISION: p?.removalRevision ?? "" })}
           >
             {applying ? t("preview.applying") : apply.phase === "failed" ? t("common.retry") : t("preview.apply")}
           </button>

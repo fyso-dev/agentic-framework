@@ -1,4 +1,4 @@
-import type { RuntimeBot } from "../api/types";
+import type { BotAppearance, RuntimeBot } from "../api/types";
 import type { BotRow } from "./team";
 
 export type RosterRow = {
@@ -9,6 +9,7 @@ export type RosterRow = {
   name: string;
   title: string;
   model: string;
+  appearance?: BotAppearance;
   configuration?: BotRow;
 };
 
@@ -30,6 +31,7 @@ export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null)
       key: bot.id,
       nativeId: bot.id,
       team: bot.section || "",
+      appearance: bot,
       ambiguous: !unique,
       name: pending ? config.bot.name : bot.name,
       title: pending ? config.bot.title : bot.title || "",
@@ -46,4 +48,11 @@ export function versionStatus(row: RosterRow, inventory: import('../api/types').
   if (!inventory?.commit || row.ambiguous) return 'unknown';
   const recorded = inventory.bots.find(bot => bot.name === row.name && bot.team === (row.team || ''));
   return recorded?.project ? 'project' : recorded?.snapshot ? 'snapshot' : 'native';
+}
+
+/** A committed bot missing from the current form data is still synchronizing. */
+export function unmatchedVersion(row: RosterRow, inventory: import('../api/types').BotVersioning | undefined, synchronized: boolean) {
+  const status = versionStatus(row, inventory);
+  if (status === 'project') return 'syncing';
+  return synchronized ? status : 'unknown';
 }

@@ -190,7 +190,7 @@ function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
 }
 
 /** Update the bot at `index`, or append a new one when `index` is null. */
-export function upsertBot(doc: Document, index: number | null, input: BotInput) {
+export function upsertBot(doc: Document, index: number | null, input: BotInput, declaredName?: string) {
   let seq = botsSeq(doc);
   if (!seq) {
     seq = doc.createNode([]) as YAMLSeq;
@@ -207,6 +207,7 @@ export function upsertBot(doc: Document, index: number | null, input: BotInput) 
   }
   const map = seq.get(index, true);
   if (!isMap(map)) throw new Error(`bots[${index}] is not a map`);
+  if (declaredName && declaredName !== input.name.trim()) map.set("was", declaredName);
   applyInput(doc, map, input);
 }
 
