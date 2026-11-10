@@ -1,0 +1,27 @@
+# Update this project from its distribution (D56, docs/distribution.md).
+# Owned by the framework; project/workflows/fyso-dist-update.yaml links here.
+# fetch: snapshot, then Copier recopy (the distribution's files win) and received secrets.
+# merge-memory: three-way union of the delivered memory into each bot's own memory.
+# apply: bots, extensions and memory into the running services, then one commit.
+description: Update this project from its distribution
+type: graph
+max_active_runs: 1
+params:
+  - VERSION: ""
+env:
+  - ROOT: ${FYSO_ROOT}
+  # run-dagu.sh passes the project's age key path; mise needs it to decrypt the secrets.
+  - MISE_SOPS_AGE_KEY_FILE: ${FYSO_COMPOSIO_AGE_KEY_FILE}
+working_dir: ${ROOT}
+steps:
+  # mise exec: Dagu steps start from a cleared environment (ports, secrets, tools).
+  # VERSION reaches the script as an env var, never through the shell command line.
+  - id: fetch
+    command: mise exec -- framework/scripts/dist.sh fetch
+  - id: merge_memory
+    command: mise exec -- framework/scripts/dist.sh merge-memory
+    depends: [fetch]
+  - id: apply
+    command: mise exec -- framework/scripts/dist.sh apply
+    depends: [merge_memory]
+    output: RESULT

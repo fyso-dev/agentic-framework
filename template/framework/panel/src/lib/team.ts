@@ -1,6 +1,7 @@
 // Read and edit OpenMausBot's team file with the `yaml` Document API, which keeps
 // comments and key order (contract §4). Only the form's fields are touched.
 import { Document, isMap, isScalar, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq } from "yaml";
+import type { ToolScope } from './connector-access';
 
 // team.yaml holds `${VAR}` placeholders that the framework substitutes before calling
 // OMB. Inside a YAML flow map (`soul: { file: ${FYSO_ROOT}/… }`) the braces are not
@@ -16,6 +17,8 @@ export const SOUL_MAX_BYTES = 24000;
 export const SOUL_WARN_BYTES = 22000;
 export const NAME_MAX = 100;
 
+export type Approval = "ask" | "full";
+
 export type Soul = { kind: "inline"; text: string } | { kind: "file"; file: string } | { kind: "none" };
 
 export type Bot = {
@@ -27,9 +30,14 @@ export type Bot = {
   engine: string;
   modelId: string;
   chief: boolean;
+  /** OMB approval mode: ask before acting, or act without asking. */
+  approval: Approval;
   soul: Soul;
   skills: string[];
+  /** `file` of each skill entry, as written in team.yaml (`${FYSO_ROOT}/…`). */
+  skillFiles: string[];
   usesWorkflows: boolean;
+  tools?: ToolScope;
   /** Canonical JSON of the bot node, to compare a draft with the file. */
   fingerprint: string;
 };
@@ -41,7 +49,17 @@ export type BotInput = {
   /** New inline instructions, or null to keep the current soul untouched. */
   soulText: string | null;
   usesWorkflows: boolean;
+  /** Omit to keep the current value. */
+  approval?: Approval;
+  /** Omit to preserve the existing native selection. */
+  tools?: ToolScope;
+  /** Extension skills to switch on or off, by team file path. Others stay untouched. */
+  skills?: { file: string; on: boolean }[];
 };
+
+/** Team file path of a skill shipped by an extension (extensions-contract §2). */
+export const extensionSkillFile = (ext: string, skill: string) =>
+  `\${FYSO_ROOT}/extensions/${ext}/skills/${skill}/SKILL.md`;
 
 export function parseTeam(text: string): Document {
   return parseDocument(encodeEnv(text));
@@ -79,11 +97,38 @@ function readSoul(node: unknown): Soul {
 
 function readSkills(node: unknown): string[] {
   if (!isSeq(node)) return [];
-  return node.items.map((it) => {
+  return node.items.filter(skillEnabled).map((it) => {
     if (isScalar(it)) return decodeEnv(str(it.value));
-    if (isMap(it)) return decodeEnv(str(it.get("name") ?? it.get("id") ?? it.get("path")));
+    if (isMap(it)) return skillLabel(decodeEnv(str(it.get("file") ?? it.get("name") ?? it.get("id") ?? it.get("path"))));
     return "";
   }).filter(Boolean);
+}
+
+/** `…/skills/<name>/SKILL.md` → `<name>`: OMB's native entries are `{ file }`. */
+const skillLabel = (v: string) => /([^/]+)\/SKILL\.md$/.exec(v)?.[1] ?? v;
+
+const skillFile = (it: unknown) => (isMap(it) ? decodeEnv(str(it.get("file"))) : "");
+/** OMB's native switch: an entry is on unless it says `enabled: false`. */
+const skillEnabled = (it: unknown) => !(isMap(it) && it.get("enabled") === false);
+
+function readSkillFiles(node: unknown): string[] {
+  return isSeq(node) ? node.items.filter(skillEnabled).map(skillFile).filter(Boolean) : [];
+}
+
+// OMB's team apply only adds and updates: a skill left out of the file stays installed
+// and on. So switching off keeps the entry with the native `enabled: false`.
+function setSkill(doc: Document, map: YAMLMap, file: string, on: boolean) {
+  const node: unknown = map.get("skills", true);
+  const entry = isSeq(node) ? node.items.find((it) => skillFile(it) === file) : undefined;
+  if (isMap(entry)) {
+    if (on) entry.delete("enabled");
+    else entry.set("enabled", false);
+    return;
+  }
+  if (!on) return;
+  const seq = isSeq(node) ? node : (doc.createNode([]) as YAMLSeq);
+  if (seq !== node) map.set("skills", seq);
+  seq.add(doc.createNode({ file: encodeEnv(file) }));
 }
 
 export function readBots(doc: Document): Bot[] {
@@ -94,6 +139,7 @@ export function readBots(doc: Document): Bot[] {
     if (!isMap(item)) return [];
     const model = str(item.get("model"));
     const cwd = item.has("cwd") ? str(item.get("cwd")) : rootCwd;
+    const tools = item.has("tools") ? item.get("tools",true) : doc.getIn(["defaults","tools"],true);
     return [{
       index,
       name: decodeEnv(str(item.get("name"))),
@@ -102,9 +148,12 @@ export function readBots(doc: Document): Bot[] {
 
       ...splitModel(model),
       chief: item.get("chief") === true,
+      approval: (item.has("approval") ? str(item.get("approval")) : str(doc.getIn(["defaults", "approval"]))) === "full" ? "full" : "ask",
       soul: readSoul(item.get("soul", true)),
       skills: readSkills(item.get("skills", true)),
+      skillFiles: readSkillFiles(item.get("skills", true)),
       usesWorkflows: cwd === ROOT_CWD,
+      tools: isMap(tools) ? tools.toJSON() as ToolScope : undefined,
       fingerprint: JSON.stringify(item.toJSON()),
     }];
   });
@@ -120,10 +169,12 @@ function soulNode(doc: Document, text: string): Scalar {
 }
 
 function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
+  if(input.tools!==undefined)map.set('tools',doc.createNode(input.tools));
   map.set("name", input.name.trim());
   if (input.title.trim()) map.set("title", input.title.trim());
   else map.delete("title");
   map.set("model", input.model);
+  if (input.approval !== undefined) map.set("approval", input.approval);
   if (input.soulText !== null) {
     if (input.soulText.trim()) map.set("soul", soulNode(doc, input.soulText));
     else map.delete("soul");
@@ -135,6 +186,7 @@ function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
       else map.set("cwd", ROOT_CWD);
     }
   }
+  for (const k of input.skills ?? []) setSkill(doc, map, k.file, k.on);
 }
 
 /** Update the bot at `index`, or append a new one when `index` is null. */

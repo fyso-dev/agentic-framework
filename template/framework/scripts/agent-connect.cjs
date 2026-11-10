@@ -3,6 +3,7 @@
 //
 //   node agent-connect.cjs [connect|disconnect] [claude-desktop] [codex] [claude-code] [--list]
 //   node agent-connect.cjs open [codex|claude-desktop]   (new conversation about this project)
+//   node agent-connect.cjs status                         (JSON: which agents are installed and connected)
 //
 // Without targets: the desktop apps found on this Mac (Claude Desktop; Codex, whose app and
 // CLI share ~/.codex/config.toml). Claude Code CLI is opt-in. The server is named
@@ -20,6 +21,8 @@ const SLUG = process.env.FYSO_PROJECT || path.basename(ROOT);
 const NAME = `fyso-${SLUG}`;
 const OPEN = process.env.FYSO_OPEN || '/usr/bin/open';   // tests replace it
 const CLAUDE_DESKTOP = path.join(HOME, 'Library/Application Support/Claude/claude_desktop_config.json');
+const CODEX_CONFIG = path.join(process.env.CODEX_HOME || path.join(HOME, '.codex'), 'config.toml');
+const CLAUDE_CODE = path.join(HOME, '.claude.json');
 
 function which(cmd) {
   const r = spawnSync('/bin/sh', ['-c', `command -v ${cmd}`], {encoding: 'utf8'});
@@ -36,6 +39,7 @@ const TARGETS = {
     label: 'Claude Desktop',
     desktop: true,
     found: () => fs.existsSync('/Applications/Claude.app') || fs.existsSync(path.dirname(CLAUDE_DESKTOP)),
+    connected: () => !!readJson(CLAUDE_DESKTOP)?.mcpServers?.[NAME],
     connect() {
       const data = fs.existsSync(CLAUDE_DESKTOP) ? JSON.parse(fs.readFileSync(CLAUDE_DESKTOP, 'utf8')) : {};
       if (fs.existsSync(CLAUDE_DESKTOP)) fs.copyFileSync(CLAUDE_DESKTOP, CLAUDE_DESKTOP + '.fyso-backup');
@@ -56,6 +60,8 @@ const TARGETS = {
     label: 'Codex (app and CLI)',
     desktop: true,
     found: () => !!codexCli() || fs.existsSync(path.join(HOME, '.codex')),
+    // config.toml table header: [mcp_servers.<name>] or [mcp_servers."<name>"].
+    connected: () => { try { return new RegExp(`^\\[mcp_servers\\.("?)${NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1\\]\\s*$`, 'm').test(fs.readFileSync(CODEX_CONFIG, 'utf8')); } catch { return false; } },
     connect() {
       const codex = codexCli();
       if (!codex) throw Error('codex CLI not found (install Codex or the ChatGPT app)');
@@ -74,6 +80,7 @@ const TARGETS = {
     label: 'Claude Code (CLI)',
     desktop: false,
     found: () => !!which('claude'),
+    connected: () => !!readJson(CLAUDE_CODE)?.mcpServers?.[NAME],   // user scope lives at the top level
     connect() {
       const claude = which('claude');
       if (!claude) throw Error('claude CLI not found');
@@ -95,6 +102,9 @@ function codexCli() {
   return which('codex') || ['/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex', '/Applications/Codex.app/Contents/Resources/codex']
     .find(p => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
 }
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+}
 function run(cmd, args) {
   const r = spawnSync(cmd, args, {encoding: 'utf8'});
   if (r.status !== 0) throw Error(`${path.basename(cmd)} ${args.slice(0, 2).join(' ')} failed: ${(r.stderr || r.stdout).trim().split('\n').pop()}`);
@@ -110,8 +120,8 @@ function write(file, data) {
 function firstPrompt() {
   const name = process.env.FYSO_PROJECT_NAME || SLUG;
   return process.env.FYSO_LANG === 'en'
-    ? `Use the ${NAME} tools to look at my Fyso project "${name}": read fyso_context, then start with fyso_status and tell me what I have and what to set up first.`
-    : `Usá las herramientas de ${NAME} para revisar mi proyecto Fyso "${name}": leé fyso_context, después empezá con fyso_status y contame qué tengo y qué conviene configurar primero.`;
+    ? `Use the ${NAME} tools to look at my Fyso project "${name}": read fyso_context, then fyso_project and fyso_status, and tell me what I have and what to set up first.`
+    : `Usa las herramientas de ${NAME} para revisar mi proyecto Fyso "${name}": lee fyso_context, después fyso_project y fyso_status, y dime qué tengo y qué conviene configurar primero.`;
 }
 // Deep links registered by the apps (read from their bundles): Codex opens a new thread in the
 // project folder with the prompt; Claude Desktop opens a new chat with it. Claude Desktop loads
@@ -138,6 +148,11 @@ function main(argv) {
     const id = argv[1] || ['codex', 'claude-desktop'].find(t => TARGETS[t].found());
     if (!id) throw Error('no desktop agent found');
     console.log(`✓ ${openAgent(id)}`);
+    return 0;
+  }
+  if (argv[0] === 'status') {
+    const agents = Object.entries(TARGETS).map(([id, t]) => ({id, label: t.label, desktop: t.desktop, found: t.found(), connected: t.connected()}));
+    console.log(JSON.stringify({server: NAME, agents}));
     return 0;
   }
   const action = ['connect', 'disconnect'].includes(argv[0]) ? argv.shift() : 'connect';

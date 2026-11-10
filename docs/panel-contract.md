@@ -131,7 +131,7 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
 - `tools`
 
-Skills are out of scope for v1: they are listed read-only. "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
+Skills are listed read-only, except the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
 
 ## 5. i18n
 
@@ -164,3 +164,20 @@ artifacts without structured data retain unknown consumption.
 `GET /config/bot-versioning.json` is an exact read-only Caddy file route. It contains `{collectedAt, commit, bots:[{name,team,project,snapshot}]}`, derived from committed `project/bots/team.yaml` and `state/bots/team.yaml`; no instructions, chat or secret values are exported. The panel polls every five seconds. The file refreshes at startup, snapshot commit, native import and observability collection (two-minute schedule); the commit and collection time identify its evidence. Missing evidence or ambiguous identities produce an unverified label and disable import.
 
 Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract with `{OP:"import",BOT_ID:"<native ID>"}` and returns `{action,botId,name,commit,replayed}`. The panel reloads configuration after success, without resetting a draft. Drafts disable this action until applied or discarded.
+
+
+### Bot form connector selection
+
+`Bot.tools` reads the effective native team-file allow/deny selection, including
+team defaults. `BotInput.tools` is optional: omission preserves the existing YAML
+node. An explicit change writes only that node and preserves other bot fields,
+file references and unrelated profiles. Native draft preview/apply remains the
+existing `fyso-bots-plan` / `fyso-bots-apply` workflow, not an immediate API patch.
+The live native scope is used for initial form visibility when there is no draft;
+subsequent roster polling never overwrites a connector selection the person edited.
+
+### `fyso-agent-connect` — assistant MCP registration
+
+Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
+
+The MCP page enqueues this DAG and uses the shared action state, errors and Dagu log links. The workflow changes the configuration of the OS user running Dagu on that host, not the browser's machine. It does not launch or restart assistants. Demo mode explicitly labels simulated actions.

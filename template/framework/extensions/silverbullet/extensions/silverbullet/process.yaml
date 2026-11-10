@@ -1,0 +1,9 @@
+version: "0.5"
+processes:
+  ext-silverbullet:
+    command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/start.sh
+    readiness_probe:
+      exec:
+        command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/doctor.sh
+      initial_delay_seconds: 2
+      period_seconds: 5

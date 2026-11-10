@@ -23,7 +23,7 @@ class LinuxHeaders(unittest.TestCase):
             omb=binary/'openmausbot'
             omb.write_text('#!/usr/bin/env python3\nimport json,os\nprint(json.dumps({"header":os.environ["DAGU_MCP_AUTH"]}))\n');omb.chmod(0o755)
             env={**os.environ,'PATH':str(binary)+os.pathsep+os.environ['PATH'],'FYSO_DATA':str(root/'.data'),
-                 'FYSO_ADMIN_USER':'fixture-user','FYSO_ADMIN_PASSWORD':'x'*120,
+                 'FYSO_WEB_DOMAIN':'fixture.localhost','FYSO_ADMIN_USER':'fixture-user','FYSO_ADMIN_PASSWORD':'x'*120,
                  **{f'FYSO_{name}_PORT':str(8500+i) for i,name in enumerate(['OMB','OMB_WEBHOOK','HTTP','DAGU'])}}
             r=subprocess.run(['bash',str(scripts/'run-omb.sh')],env=env,capture_output=True,text=True,check=True)
             header=json.loads(r.stdout)['header']

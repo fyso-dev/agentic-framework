@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+from socketserver import ThreadingUnixStreamServer
 import subprocess
 import tempfile
 import threading
@@ -77,6 +78,11 @@ class WebAuthHTTP(unittest.TestCase):
             server = ThreadingHTTPServer(('127.0.0.1', cls.port + offset), Echo)
             cls.servers.append(server)
             threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.setup_socket = Path('/tmp') / f'fyso-auth-setup-{cls.port}.sock'
+        server = ThreadingUnixStreamServer(str(cls.setup_socket), Echo)
+        cls.servers.append(server)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.addClassCleanup(lambda: cls.setup_socket.unlink(missing_ok=True))
         binary_dir = cls.root / 'bin'; binary_dir.mkdir()
         (binary_dir / 'yaml').symlink_to(ROOT / 'template/framework/panel/node_modules/yaml/bin.mjs')
         config_env = {**os.environ, 'PATH': str(binary_dir) + os.pathsep + os.environ['PATH'],
@@ -91,7 +97,7 @@ class WebAuthHTTP(unittest.TestCase):
             'FYSO_WEB_DOMAIN': cls.domain, 'FYSO_AUTH_PORT': str(cls.port + 9),
             'FYSO_DAGU_PORT': str(cls.port + 1), 'FYSO_OMB_PORT': str(cls.port + 4),
             'FYSO_CADDY_ADMIN_PORT': str(cls.port + 8), 'FYSO_BIND': '127.0.0.1',
-            'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
+            'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
         cls.start([os.environ['FYSO_TEST_CADDY'], 'run', '--config', str(cls.root / 'Caddyfile')], env)
         cls.wait_port(cls.port)
 
@@ -150,6 +156,24 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertIn(f'Domain={self.domain}', cookie)
         self.assertIn('HttpOnly', cookie); self.assertIn('SameSite=Lax', cookie)
         return cookie.split(';')[0]
+
+    def test_connector_setup_uses_web_session_and_private_technical_upstream(self):
+        route = '/api/composio/setup'
+        self.assertEqual(self.request('panel', route, 'POST', {'apiKey':'fixture-key'})[0], 401)
+        cookie = self.login()
+        origin = f'http://panel.{self.domain}:{self.port}'
+        status, _, body = self.request('panel', route, 'POST', {'apiKey':'fixture-key'}, Cookie=cookie, Origin=origin, Authorization='Bearer forged')
+        self.assertEqual(status, 200)
+        echo = json.loads(body)
+        self.assertTrue(echo['daguCredential'])
+        self.assertFalse(echo['webCookieLeaked'])
+        self.assertEqual(self.request('panel', route, 'POST', {}, Cookie=cookie, Origin='https://foreign.invalid')[0], 403)
+        self.assertEqual(self.request('panel', '/api/composio/private', Cookie=cookie)[0], 404)
+        status, _, body = self.request('panel', '/api/connectors/mcp', 'POST', {'name':'fixture'}, Cookie=cookie, Origin=origin)
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)['daguCredential'])
+        self.assertFalse(json.loads(body)['webCookieLeaked'])
+        self.assertEqual(self.request('panel', '/api/connectors/mcp', 'POST', {})[0], 401)
 
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:

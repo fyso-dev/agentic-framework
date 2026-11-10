@@ -77,7 +77,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
             {r?.commit && <> · <span className="mono" style={{ fontSize: 12 }}>{r.commit}</span></>}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 6 }}>
-            <button type="button" className="btn btn-lg btn-ghost" onClick={onClose}>{t("common.close")}</button>
+            <button type="button" className="btn btn-lg btn-soft" onClick={onClose}>{t("common.close")}</button>
             {s.project.data && (
               <External href={s.project.data.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>
             )}
@@ -97,7 +97,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
   else if (plan.phase === "failed" || !p)
     body = (
       <div role="alert" className="action-error" style={{ display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px" }}>
-        <p style={{ fontWeight: 700, color: "var(--down)" }}>× {t("preview.planFailed")}</p>
+        <p style={{ fontWeight: 700, color: "var(--fy-down)" }}>× {t("preview.planFailed")}</p>
         {plan.error && <p className="mono" style={{ fontSize: 12 }}>{plan.error}</p>}
         <p><External href={planLogs}>{t("common.logs")} </External></p>
       </div>
@@ -105,7 +105,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
   else if (total === 0)
     body = (
       <div className="center-block">
-        <span aria-hidden="true" className="plan-glyph pill-unk" style={{ width: 40, height: 40, borderRadius: 999 }}>=</span>
+        <span aria-hidden="true" className="plan-glyph pill-unk" style={{ width: 40, height: 40, borderRadius: "var(--fy-radius-pill)" }}>=</span>
         <p style={{ fontWeight: 700, fontSize: 16 }}>{t("preview.emptyTitle")}</p>
         <p className="mute">{t("preview.emptyBody")}</p>
       </div>
@@ -132,7 +132,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
         </ul>
         {p.warnings && p.warnings.length > 0 && (
           <div className="banner banner-warn" style={{ padding: "10px 12px", fontSize: 13 }}>
-            <p><strong style={{ color: "var(--warn)" }}>{t("preview.warnings")}</strong></p>
+            <p><strong style={{ color: "var(--fy-warn)" }}>{t("preview.warnings")}</strong></p>
             <ul style={{ margin: 0, paddingLeft: 18 }} lang="en">
               {p.warnings.map((w, i) => <li key={i} className="mono" style={{ fontSize: 12 }}>{warningText(w)}</li>)}
             </ul>
@@ -153,7 +153,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
         {body}
         {apply.phase === "failed" && (
           <div role="alert" className="action-error" style={{ display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px" }}>
-            <p style={{ fontWeight: 700, color: "var(--down)" }}>× {t("preview.failedTitle")}</p>
+            <p style={{ fontWeight: 700, color: "var(--fy-down)" }}>× {t("preview.failedTitle")}</p>
             {apply.error && <p style={{ fontSize: 13 }} lang="en">{apply.error}</p>}
             <p><External href={applyLogs}>{t("common.logs")} </External></p>
           </div>
@@ -168,7 +168,7 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
         ) : (
           <span className="grow" />
         )}
-        <button type="button" className="btn btn-ghost" onClick={close} disabled={applying}>{t("common.cancel")}</button>
+        <button type="button" className="btn btn-soft" onClick={close} disabled={applying}>{t("common.cancel")}</button>
         {plan.phase === "failed" ? (
           <button type="button" className="btn btn-pri" onClick={runPlan}>{t("common.retry")}</button>
         ) : (

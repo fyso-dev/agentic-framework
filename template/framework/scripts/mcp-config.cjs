@@ -1,4 +1,6 @@
-// Generate the cwd MCP config without expanding Claude Code placeholders.
+// Generate the cwd MCP config. Claude Code placeholders stay as written, except this
+// project's own port numbers in a server `url`: OpenMausBot validates that URL before
+// expanding anything, and rejects the server for bots with a tool selection.
 const fs = require('node:fs');
 function write() {
   const servers = Object.create(null), owners = new Map();
@@ -10,6 +12,10 @@ function write() {
     for (const [name, config] of Object.entries(data.mcpServers)) {
       if (owners.has(name)) throw Error(`Duplicate MCP server ${name}: ${owners.get(name)} and ${file}`);
       owners.set(name,file); servers[name] = config;
+      if (config && typeof config.url === 'string') {
+        servers[name] = {...config, url: config.url.replace(/\$\{(FYSO_[A-Z0-9_]*_PORT)\}/g,
+          (placeholder, variable) => /^\d+$/.test(process.env[variable] || '') ? process.env[variable] : placeholder)};
+      }
     }
   }
   const temporary = '.mcp.json.tmp';

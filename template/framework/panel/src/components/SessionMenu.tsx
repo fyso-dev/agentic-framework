@@ -58,7 +58,7 @@ export function SessionMenu() {
   }
   return <div className="session-menu">
     {identity && <span className="only-desktop" title={identity.username}>{identity.name || identity.username}</span>}
-    <button type="button" className="btn btn-sm" disabled={busy || !identity} onClick={() => void logout()}>{t("session.logout")}</button>
+    <button type="button" className="btn btn-sm btn-ghost" disabled={busy || !identity} onClick={() => void logout()}>{t("session.logout")}</button>
     {error && <span role="status">{t("session.unavailable")}</span>}
   </div>;
 }

@@ -1,8 +1,11 @@
 // The platform's own MCP server (D33): typed tools for what the panel does, so an agent
-// can inspect and configure this project. Every change goes through the same Dagu
-// workflows as the panel; nothing here edits project files directly.
+// can understand, inspect and configure this project. Every change goes through the same
+// Dagu workflows as the panel; nothing here edits project files directly.
+// It also forwards Dagu's own MCP tools (D57), so an agent that reaches only this server
+// (a desktop app) can build and run workflows. `--no-dagu` turns that off where the Dagu
+// MCP is already a server of its own (the project's .mcp.json).
 // Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.
-// Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs`.
+// Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs --no-dagu`.
 const fs = require('node:fs');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
@@ -10,6 +13,12 @@ const {execFileSync} = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../..');
 const VERSION = '1';
 const context = () => fs.readFileSync(path.join(ROOT, 'framework/agent-context.md'), 'utf8');
+const project = require('./project-map.cjs');
+// The guide explains how Fyso works; the brief says what this project contains.
+const instructions = () => { try { return `${context()}\n${project.brief(ROOT)}`; } catch { return context(); } };
+const FORWARD_DAGU = !process.argv.includes('--no-dagu');
+let forwarder;
+const daguMcp = () => forwarder ||= require('./dagu-mcp.cjs').forwarder();
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 process.chdir(ROOT);
 
@@ -17,9 +26,11 @@ const dagu = () => require('./dagu-client.cjs').client();
 const b64 = value => Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
 const readJson = file => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null);
 const health = name => { try { execFileSync('framework/scripts/health.sh', [name], {stdio: 'ignore', timeout: 8000}); return 'ok'; } catch { return 'down'; } };
+const workflow = async (name, params) => (await dagu().run(name, params, {output: 'RESULT', timeoutMs: 180000})).output;
 const architect = async params => (await dagu().run('fyso-bot-architect', params, {output: 'RESULT', timeoutMs: 180000})).output;
 
 const str = (description, extra = {}) => ({type: 'string', description, ...extra});
+const bool = description => ({type: 'boolean', description});
 const obj = (properties = {}, required = []) => ({type: 'object', properties, required, additionalProperties: false});
 
 // name → {description, inputSchema, annotations, run(args)}
@@ -29,6 +40,24 @@ const TOOLS = {
     inputSchema: obj(),
     annotations: {readOnlyHint: true},
     run: () => ({guide: context()}),
+  },
+  fyso_project: {
+    description: 'Map of what this project contains: declared bots, workflows (owner, description, schedule, params), launcher apps, installed extensions with their guides and skills, MCP servers declared for bots, wiki pages, readable guides and recent commits. Read from the repository, so it works with the stack down. Read it before designing a change; then read the files it names with fyso_file_read.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => project.map(ROOT),
+  },
+  fyso_files: {
+    description: 'List the project\'s readable files under a folder: project/ (workflows, bots, apps, wiki, MCP and catalog configuration), extensions/, AGENTS.md, README.md and the framework guides, skills, examples and bot souls. Without a path, lists those roots. Login users, hidden files, secrets, runtime data and snapshots are never listed.',
+    inputSchema: obj({path: str('Project-relative folder, e.g. "project/workflows"')}),
+    annotations: {readOnlyHint: true},
+    run: ({path: folder = ''}) => project.list(ROOT, folder),
+  },
+  fyso_file_read: {
+    description: 'Read one text file of the project by its project-relative path (from fyso_project or fyso_files), e.g. "project/workflows/hello.yaml", "AGENTS.md", "extensions/<id>/README.md". Read-only; the same files fyso_files lists. Up to 256 KB.',
+    inputSchema: obj({path: str('Project-relative file path')}, ['path']),
+    annotations: {readOnlyHint: true},
+    run: ({path: file}) => project.read(ROOT, file),
   },
   fyso_status: {
     description: 'Project overview: name and URLs, health of Dagu/OpenMausBot/gateway, apps, installed extensions (with which declared secrets are set, never their values) and how bots are versioned in git. Read-only; start here.',
@@ -56,6 +85,12 @@ const TOOLS = {
       catch (e) { return {ok: false, output: `${e.stdout || ''}${e.stderr || ''}`}; }
     },
   },
+  fyso_connections: {
+    description: 'List this project native OpenMausBot and declared MCP connections, without credentials or endpoints. Shows enabled state and whether definitions are in project files; does not test tools. Connect/authenticate services in this project OpenMausBot Apps UI, then assign tools through fyso_bot_plan.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => architect({OP: 'connections'}),
+  },
   fyso_bots_list: {
     description: 'List the native OpenMausBot bots of this project (id, name, title, model, busy).',
     inputSchema: obj(),
@@ -69,7 +104,7 @@ const TOOLS = {
     run: ({bot_id}) => architect({OP: 'read', BOT_ID: bot_id}),
   },
   fyso_bot_plan: {
-    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"). Delete needs the exact bot_id.',
+    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"), tools (native allow/deny selectors; discover servers with fyso_connections). Delete needs the exact bot_id.',
     inputSchema: obj({
       action: str('What to do', {enum: ['create', 'update', 'delete']}),
       bot_id: str('Exact native bot id; required for update and delete'),
@@ -88,6 +123,57 @@ const TOOLS = {
     description: 'Bring a bot that exists only in OpenMausBot (or only in a snapshot) into the versioned project configuration, by exact native id. Does not change its running profile.',
     inputSchema: obj({bot_id: str('Exact native bot id')}, ['bot_id']),
     run: ({bot_id}) => architect({OP: 'import', BOT_ID: bot_id}),
+  },
+  fyso_app_access: {
+    description: 'Read which connected applications (native OpenMausBot connectors) one bot may use, and the revision a later plan is based on. Applications are authorized by a person in this project\'s OpenMausBot; this only reads the bot\'s permissions.',
+    inputSchema: obj({bot_id: str('Exact native bot id (from fyso_bots_list)')}, ['bot_id']),
+    annotations: {readOnlyHint: true},
+    run: ({bot_id}) => workflow('fyso-app-access', {OP: 'read', BOT_ID: bot_id}),
+  },
+  fyso_app_access_plan: {
+    description: 'Preview a change to one bot\'s application permissions. Changes nothing: returns a planId. `changes` maps an application slug to "off", "read" or "write"; an application must already be authorized to be granted. Needs the revision from fyso_app_access.',
+    inputSchema: obj({
+      bot_id: str('Exact native bot id'),
+      revision: str('revision returned by fyso_app_access'),
+      changes: {type: 'object', description: 'Application slug → "off" | "read" | "write", e.g. {"gmail":"read"}'},
+    }, ['bot_id', 'revision', 'changes']),
+    annotations: {readOnlyHint: true},
+    run: ({bot_id, revision, changes}) => workflow('fyso-app-access', {OP: 'plan', BOT_ID: bot_id, REVISION: revision, CHANGES_B64: b64(changes)}),
+  },
+  fyso_app_access_apply: {
+    description: 'Apply a plan from fyso_app_access_plan by its exact planId: updates the bot in OpenMausBot, verifies it and commits the permission file. Fails if anything changed since the plan; then read and plan again.',
+    inputSchema: obj({plan_id: str('planId returned by fyso_app_access_plan')}, ['plan_id']),
+    annotations: {destructiveHint: true},
+    run: ({plan_id}) => workflow('fyso-app-access', {OP: 'apply', PLAN_ID: plan_id}),
+  },
+  fyso_connector_preferences: {
+    description: 'Read whether this project\'s Claude bots also load the person\'s own Claude Code MCP servers and skills (two native OpenMausBot switches), and whether that choice is versioned.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => workflow('fyso-connector-preferences', {OP: 'read'}),
+  },
+  fyso_connector_preferences_save: {
+    description: 'Set one or both switches read by fyso_connector_preferences and commit them to project/omb-connectors.json. Only when the person asked for it: it changes what every Claude bot of the project can reach.',
+    inputSchema: obj({claudeUserMcp: bool('Bots load the person\'s Claude Code MCP servers'), claudeUserSkills: bool('Bots load the person\'s Claude Code skills')}),
+    annotations: {destructiveHint: true},
+    run(features) {
+      if (!Object.keys(features).length) throw new Error('set claudeUserMcp, claudeUserSkills or both');
+      return workflow('fyso-connector-preferences', {OP: 'save', SETTINGS_B64: b64(features)});
+    },
+  },
+  fyso_logs: {
+    description: 'Last lines of one process of this project\'s stack (as `mise run logs`, without following): dagu, omb, caddy, web-auth or an extension\'s process. Without a process, lists the processes. For a failed workflow run read its step log through dagu_read instead.',
+    inputSchema: obj({process: str('Process name; omit to list them'), lines: {type: 'integer', description: 'Lines from the end (default 100, at most 500)'}}),
+    annotations: {readOnlyHint: true},
+    run({process: name, lines = 100}) {
+      const pc = args => execFileSync('framework/scripts/pc.sh', args, {encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 8 * 1024 * 1024});
+      let processes;
+      try { processes = pc(['process', 'list']).split('\n').map(line => line.trim()).filter(line => /^[A-Za-z0-9][\w.-]*$/.test(line)); }
+      catch { throw new Error('the stack is not running: a person starts it with `mise run up`'); }
+      if (!name) return {processes};
+      if (!processes.includes(name)) throw new Error(`unknown process: ${name}. Running: ${processes.join(', ')}`);
+      return {process: name, lines: pc(['process', 'logs', name, '-n', String(Math.min(Math.max(lines, 1), 500))]).split('\n').filter(Boolean)};
+    },
   },
   fyso_ext_search: {
     description: 'Search the extension catalogs (project/marketplaces.yaml): id, description, latest version and whether it is installed or has an update. Reads git catalogs over the network.',
@@ -132,6 +218,8 @@ function validate(schema, args) {
     const prop = schema.properties?.[key];
     if (!prop) throw new Error(`unknown argument: ${key}`);
     if (prop.type === 'string' && typeof value !== 'string') throw new Error(`${key} must be a string`);
+    if (prop.type === 'boolean' && typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
+    if (prop.type === 'integer' && !Number.isInteger(value)) throw new Error(`${key} must be an integer`);
     if (prop.type === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) throw new Error(`${key} must be an object`);
     if (prop.enum && !prop.enum.includes(value)) throw new Error(`${key} must be one of ${prop.enum.join(', ')}`);
   }
@@ -143,13 +231,21 @@ async function handle(msg) {
     case 'initialize': {
       const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
       return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso', version: VERSION},
-        instructions: context()};
+        instructions: instructions()};
     }
     case 'ping': return {};
-    case 'tools/list':
-      return {tools: Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}))};
+    case 'tools/list': {
+      const own = Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
+      let forwarded = [];
+      if (FORWARD_DAGU) try { forwarded = await daguMcp().tools(); } catch {}
+      return {tools: [...own, ...forwarded]};
+    }
     case 'tools/call': {
       const tool = TOOLS[params.name];
+      if (!tool && FORWARD_DAGU && /^dagu_[a-z_]+$/.test(params.name || '')) {
+        try { return await daguMcp().call(params.name, params.arguments || {}); }
+        catch (e) { return {isError: true, content: [{type: 'text', text: e.message}]}; }
+      }
       if (!tool) throw Object.assign(new Error(`unknown tool: ${params.name}`), {code: -32602});
       try {
         const args = params.arguments || {};
