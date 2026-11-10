@@ -91,6 +91,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-10 | **Longer default local web sessions.** New projects use 30 days for native Tinyauth session expiry and maximum lifetime to avoid hourly logins. Existing project-owned authentication settings are preserved; adoption and memorable passphrases are documented in [web authentication](web-auth.md). |
 |---|---|
 | 2026-11-10 | **Panel roster refresh and exact bot removal.** The panel refreshes the declaration alongside the native roster, retains stale drafts without applying them and shows native avatars when available. Bot deletion previews identify exact runtime IDs and warn about conversation history loss. [Contract](panel-contract.md#3-action-workflows) |
 | 2026-11-10 | Product vocabulary: project assistants are **Agentes** (Spanish) / **Agents** (English) in panel and Knowledge UI copy. Native product/profile names and technical identifiers remain stable. [Vocabulary contract](panel-spec.md#product-vocabulary). |

@@ -36,8 +36,12 @@ Do not bypass that gate by editing the generated runtime file.
 5. The panel checks its identity on focus and periodically. A changed identity
    reloads the page instead of retaining the previous user's in-memory state.
 
-Sessions expire after one hour with an eight-hour maximum lifetime in the generated
-native configuration. Five failed attempts lock an account for five minutes.
+New projects use a 30-day session expiry and maximum lifetime (2592000 seconds)
+in the native configuration. Sign out and credential changes still invalidate sessions.
+Existing projects keep their project-owned settings; to adopt these defaults, set
+`auth.sessionExpiry` and `auth.sessionMaxLifetime` to `2592000` in
+`project/auth/tinyauth.yaml` and restart the project. Five failed attempts lock an
+account for five minutes.
 TOTP is available natively but is not automatically provisioned or required.
 
 ## Configuration and ownership
@@ -52,7 +56,8 @@ TOTP is available natively but is not automatically provisioned or required.
 | `.data/web-auth/bin/` | Rebuildable native binary; no machine-global auth service |
 
 `mise run setup` creates the first human login with a hidden password prompt
-(12–72 bytes), or the installer's private `FYSO_INITIAL_PASSWORD_FILE`. It never
+(12–72 bytes; spaces are allowed, so a memorable passphrase works), or the
+installer's private `FYSO_INITIAL_PASSWORD_FILE`. It never
 falls back to `admin/admin`. Initial human passwords and Dagu's new random
 technical password are separate. Existing projects retain their technical
 credential until it is explicitly rotated.

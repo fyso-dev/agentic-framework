@@ -260,7 +260,7 @@ class WebAuthHTTP(unittest.TestCase):
         config = self.root / 'web-auth/runtime/config.yaml'
         original = config.read_text()
         self.auth.terminate(); self.auth.wait(timeout=10)
-        config.write_text(original.replace('sessionExpiry: 3600', 'sessionExpiry: 1').replace('sessionMaxLifetime: 28800', 'sessionMaxLifetime: 2'))
+        config.write_text(original.replace('sessionExpiry: 2592000', 'sessionExpiry: 1').replace('sessionMaxLifetime: 2592000', 'sessionMaxLifetime: 2'))
         try:
             self.start_auth(); cookie = self.login(); time.sleep(2.1)
             self.assertEqual(self.request('dagu', '/api/probe', cookie=cookie)[0], 401)
