@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D56; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D57; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -60,7 +60,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
-| Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |
+| Agent surface: the `fyso` platform MCP (project map and file reads, typed tools over the panel workflows, forwarded Dagu tools for desktop agents) and Dagu's MCP + skill for coding agents (D33, D57) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
 
 ## Layer 4 — Execution
@@ -80,7 +80,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz and generic extension pages verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
-| 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents | ✅ verified locally · [contract](agent-surface.md) |
+| 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents; project understanding and 93% action coverage for desktop agents (D57) | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
 | 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -91,6 +91,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-10 | **Agent understanding and MCP coverage (D57).** A desktop agent saw 14 tools, a guide identical for every project and no project file; of 28 in-scope actions it covered 12. Now: a project brief at `initialize`, `fyso_project`, read-only file access, application access, connector preferences, logs, and Dagu's own three tools forwarded unchanged (workflows, runs, wiki, `fyso-dev-task`): 26 tools, 26 of 28 actions. Verified on a disposable project (port block 29700): an agent-shaped run built and ran a workflow, wrote the wiki and produced a code branch through `fyso` alone; doctor green. Findings: Dagu's MCP is session-based (404 after a restart) and already serves `project/wiki/`; desktop apps list tools once, so the last good Dagu list is cached. Open: custom MCP servers have no workflow to wrap; the panel's opening prompt is unchanged. [Contract](agent-surface.md#understanding-the-project-d57) · [evidence](../artifacts/delivery-evidence/agent-mcp-coverage/README.md). |
 | 2026-11-10 | **Project distributions (D56).** A project publishes its committed configuration, documents and bot memory as a versioned Copier template (`dist:publish`, tags `vN`); clients `dist:add` / `dist:update` (`copier copy`/`recopy`: the distribution wins over local configuration), memory merges three-way with `git merge-file --union`, chosen secrets travel SOPS-encrypted for the clients' age keys. Verified with real git, Copier, SOPS, age and gitleaks in `tests/test_distribution.py`, and live on generated projects (Dagu `fyso-dist-update` merged into OMB's live memory; doctor green). Findings: Dagu step ids take no dashes; Dagu steps need the age key path passed explicitly. [Contract](distribution.md) · [Evidence](../artifacts/delivery-evidence/distribution/README.md) |
 | 2026-11-10 | **Bots with a tool selection could not run on OpenMausBot 0.1.141 (fixed, D55).** OMB gates each MCP server of a scoped bot and validates the server URL before expanding placeholders, so `http://127.0.0.1:${FYSO_DAGU_PORT}/mcp` was rejected and every Claude turn of the default bots failed with "Tool selection requires a supported MCP server". `mcp-config.cjs` now writes the project's port numbers literally in server URLs; credentials stay placeholders. Verified on a generated project (port block 29500): after `down`/`up` the Workflow Architect listed workflows through `mcp__dagu__dagu_read`, and `doctor` passed. |
 | 2026-11-10 | **SilverBullet knowledge extension (D53) and extension skills per bot (D54).** Bundled opt-in extension: SilverBullet 2.12.1 over `project/wiki/`, official filesystem MCP 2.2.0 confined to that folder, `project-knowledge` skill. The bot detail toggles an extension skill and, for bots with a tool allow-list, the extension's MCP server. Verified on a project generated from this branch (port block 29500): hot install, doctor, browser toggle → OMB plan → apply → commit, no drift, and a bot answered from the wiki through `mcp__silverbullet__*`. [Contract and evidence](silverbullet-extension.md). The bot turn needed the port written literally in the local `.mcp.json`; that defect is fixed by D55 (entry above). |
