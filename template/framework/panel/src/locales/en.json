@@ -222,7 +222,10 @@
     "errNameLong": "Use at most {{max}} characters.",
     "errNameDup": "A bot with that name already exists. Choose another one.",
     "errSoulLong": "The text is too long: {{extra}} bytes over. Move long data to a file and reference it.",
-    "notFound": "That bot is not in team.yaml."
+    "notFound": "That bot is not in team.yaml.",
+    "skillFrom": "{{ext}} extension",
+    "skillsExt": "They come from the installed extensions. They are applied with the bot’s other changes.",
+    "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them."
   },
   "preview": {
     "title": "Preview of changes",
