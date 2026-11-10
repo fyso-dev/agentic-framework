@@ -28,6 +28,18 @@ export function useTheme(): [Theme, () => void] {
     m.addEventListener("change", on);
     return () => m.removeEventListener("change", on);
   }, []);
+  useEffect(() => {
+    if (parent === window) return;
+    const receive = (event: MessageEvent) => {
+      if (event.source !== parent || event.origin !== location.origin ||
+          event.data?.type !== "fyso-panel-theme" ||
+          !["light", "dark"].includes(event.data.theme)) return;
+      setChoice(event.data.theme);
+    };
+    addEventListener("message", receive);
+    parent.postMessage({type: "fyso-panel-theme-ready"}, location.origin);
+    return () => removeEventListener("message", receive);
+  }, []);
   const theme = choice ?? sys;
   useEffect(() => {
     document.documentElement.className = `fy-${theme}`;

@@ -199,6 +199,18 @@ Output: `{ id, mode, version: string | null, commit: string }`.
 
 ## 9. Extension-owned tabs and pages
 
+### Live theme messages (SDK v1, optional)
+
+SDK pages announce `{type: "fyso-panel-theme-ready"}` to their same-origin
+parent. The panel checks the exact iframe window and origin, then sends
+`{type: "fyso-panel-theme", theme: "light" | "dark"}` on readiness and later
+mode changes. SDK `useTheme` validates the parent window, origin and enum before
+updating the page class. The iframe's initial theme URL stays stable so editor
+state is retained. Plain HTML pages that do not announce readiness keep the
+existing theme-query reload behavior. This is additive to SDK v1.
+
+
+
 An installed extension may contribute **zero, one or multiple pages**. The framework is a generic host; extension business screens, translations and assets are never imported by the host SPA.
 
 | Slot | Native consumer |
