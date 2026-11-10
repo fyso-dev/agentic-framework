@@ -4,6 +4,10 @@ Status: **v2**, 2026-11-05. It replaces v1 (launcher + chat): the panel is now a
 
 UI copy is **Spanish by default, with English included** (simple i18n, PLAN D12). Quoted strings below are the intended Spanish copy. Design for text that can be about 30% longer in other languages: no fixed-width buttons or labels.
 
+## Product vocabulary
+
+Use **Agente / Agentes** in Spanish and **Agent / Agents** in English for project assistants throughout the panel and extension pages. Native product names such as OpenMausBot and the existing Bot Architect profile keep their names so people can find them. Internal translation keys, routes, CLI commands and native configuration fields retain their existing identifiers. This vocabulary supersedes the older Bot/Bots copy in this design study.
+
 ## Purpose
 
 The panel is where **the person customizing a Fyso project** sets it up. From it they:
