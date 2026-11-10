@@ -13,6 +13,7 @@ export { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 export { useTranslation } from 'react-i18next';
 export { useDaguAction } from './lib/useDaguAction';
 export { useStore } from './store';
+export { botRoster } from './lib/botRoster';
 export { ActionButton, ActionStatus } from './components/Action';
 export { External, RelTime } from './components/ui';
 export const PANEL_API_VERSION = extensionApi.version;

@@ -8,7 +8,13 @@ mise run ext:add ./framework/extensions/silverbullet -- --defaults
 mise run doctor
 ```
 
-Open `http://docs.<slug>-<port>.localhost:<port>` with the project's web login.
+The panel gets a **Conocimiento** (Knowledge) section with the editor and the
+ways to feed it: write, ask a bot, or copy Markdown files into `project/wiki/`.
+**Importar con IA** uploads a folder or zip (Uppy + tusd) and the
+`ext-silverbullet-import` workflow turns it into pages with the project's
+engine; it never overwrites a page.
+The full-window editor is `http://docs.<slug>-<port>.localhost:<port>`, for the
+people who may open the panel.
 The service serves `project/wiki/`, without replacing existing pages. Removal
 retains those project-owned files. Native MCP is not available in the pinned
 stable release: the extension uses the official filesystem MCP instead.

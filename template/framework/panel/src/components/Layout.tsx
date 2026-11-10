@@ -6,7 +6,7 @@ import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
-import { IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
+import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
 
@@ -137,7 +137,7 @@ export function TopBar(props: ThemeProps) {
   );
 }
 
-type NavItem = { id:string; href:string; icon:typeof IconBot; label?:string };
+type NavItem = { id:string; href:string; icon:(p:{size?:number})=>ReactNode; label?:string };
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
@@ -146,7 +146,7 @@ const ITEMS: NavItem[] = [
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
-const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:page.icon === "workflow" ? IconWorkflow : IconApps})));
+const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
   return r.name === "bot" ? "bots" : r.name;

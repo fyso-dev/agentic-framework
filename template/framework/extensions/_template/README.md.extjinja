@@ -48,8 +48,8 @@ Write **only** these paths. Never edit files another template owns (`mise.toml`,
   asked in `copier.yml` as the question `extension_port` (the installer fills it with a free port) and exposed as `FYSO_EXT_<EXT>_PORT` (id in upper case,
   `-` → `_`). Listen on `127.0.0.1`; Caddy is the only entry point.
 - **Web login:** keep `import fyso_login` and use `[[ extension_id ]].${FYSO_WEB_DOMAIN}`.
-  Add the app's explicit user allowlist to `project/auth/tinyauth.yaml`; unknown apps
-  are denied. Native application roles remain separate. The framework strips its
+  People who may open the panel may open the extension's site; a project restricts it
+  by declaring the app in `project/auth/tinyauth.yaml`. Native application roles remain separate. The framework strips its
   shared login cookie after authentication, before proxying to application servers.
 - **Secrets:** users set values with `mise run secrets` in the project (sops + age).
 - **Pin versions** of every tool in the conf.d file; never `latest`.
