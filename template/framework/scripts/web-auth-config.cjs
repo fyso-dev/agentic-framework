@@ -3,7 +3,7 @@
 const fs = require('node:fs'), path = require('node:path');
 
 /**
- * Apps routed by installed extensions (D55). Whoever may open the panel can already
+ * Apps routed by installed extensions (D58). Whoever may open the panel can already
  * install and run extensions, so an extension's app inherits the panel's access rule
  * unless the project declares that app in project/auth/tinyauth.yaml.
  */

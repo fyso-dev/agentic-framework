@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Upload receiver for the import (D56): tusd (resumable uploads, tus protocol) on a
+# Upload receiver for the import (D59): tusd (resumable uploads, tus protocol) on a
 # Unix socket behind the gateway's web login. No extra port. Uploads stay in runtime
 # data until the import workflow moves them; nothing here writes into the wiki.
 set -euo pipefail

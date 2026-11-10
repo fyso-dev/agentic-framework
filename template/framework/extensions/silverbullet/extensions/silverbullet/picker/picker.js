@@ -1,4 +1,4 @@
-// Folder / zip picker for the knowledge import (D56). It runs on the knowledge base's
+// Folder / zip picker for the knowledge import (D59). It runs on the knowledge base's
 // own origin, framed by the panel's Knowledge page, because the gateway refuses writes
 // from another origin. Uppy picks and uploads (tus); this file only wires it and tells
 // the panel which batch finished. The panel starts the workflow, never this page.

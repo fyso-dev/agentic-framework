@@ -74,6 +74,20 @@ mise run ext:remove foo                                # keeps .data/ext/foo and
 
 Set the secrets it declares with `mise run secrets`; the panel's Apps page shows which are missing. To write one, start from `framework/extensions/_template` (see its README).
 
+## Share this project (distributions)
+
+Prepare a project for someone else and keep sending them improvements. Configuration, documents (`project/wiki/`) and bot memory travel; conversations, web logins and secrets you did not choose stay. Their configuration follows yours on every update; their bots keep what they learned (memory is merged). Contract: https://github.com/fyso-dev/agentic-framework/blob/main/docs/distribution.md
+
+```bash
+# Publisher: project/distribution.yaml → repo: gh:org/acme-fyso  (optional: secrets: [NAME], recipients: [age1…])
+mise run dist:publish                                  # committed files only; tags v1, v2, …
+# Client (its own project, after `mise run setup`):
+mise run dist:key                                      # public key, if it will receive secrets
+mise run dist:add gh:org/acme-fyso                     # install
+mise run dist:status                                   # installed vs latest version
+mise run dist:update                                   # or the fyso-dist-update workflow in Dagu
+```
+
 ## See what is running
 
 Several projects on one Mac? A menu bar icon lists every running Fyso project with its health, links (panel, Dagu, OpenMausBot, extension apps), processes, and restart / stop actions; stopped projects stay listed with a Start action. It is a plugin for [SwiftBar](https://github.com/swiftbar/SwiftBar) (macOS):

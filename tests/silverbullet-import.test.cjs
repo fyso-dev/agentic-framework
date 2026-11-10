@@ -1,4 +1,4 @@
-// Glue steps of the knowledge import (D56): what may enter the agent's work directory
+// Glue steps of the knowledge import (D59): what may enter the agent's work directory
 // and what may leave it. The secret scanner is stubbed; the live test uses the real one.
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');

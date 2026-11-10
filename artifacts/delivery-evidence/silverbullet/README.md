@@ -1,6 +1,6 @@
 # SilverBullet extension verification
 
-## Import with AI (2026-11-10, D56)
+## Import with AI (2026-11-10, D59)
 
 Same generated project (slug `sbint`, port block 29600, macOS, Claude engine),
 extension reapplied from the `feat/silverbullet-import` branch. Synthetic
@@ -41,7 +41,7 @@ Suites: `node --test tests/*.test.cjs` 114 passed (5 new in
 files, 4 MB of text), whether the agent's permission rules hold against a
 hostile document (only the output gate is tested), Linux/Windows.
 
-## Knowledge inside the panel (2026-11-10, D55)
+## Knowledge inside the panel (2026-11-10, D58)
 
 Project generated from the `feat/silverbullet-integrated` branch (slug `sbint`,
 port block 29600, macOS), full stack running, extension installed with

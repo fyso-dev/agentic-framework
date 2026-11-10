@@ -1,4 +1,4 @@
-// Live acceptance of the AI import of the SilverBullet extension (D56) against a generated,
+// Live acceptance of the AI import of the SilverBullet extension (D59) against a generated,
 // running, throwaway project with the extension installed and its engine logged in.
 // It runs one real agent turn and leaves the imported pages in that project's wiki.
 //   FYSO_TEST_WEB_PANEL=http://panel.<slug>-<port>.localhost:<port>

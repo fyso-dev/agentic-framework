@@ -3,8 +3,8 @@
 An opt-in bundled Copier extension, under `template/framework/extensions/silverbullet/`.
 It fills the existing extension slots ([contract](extensions-contract.md)) without
 changing a project's team file or framework configuration. Decisions: **D53**
-(the extension), **D54** (per-bot skill toggle), **D55** (panel page and
-web access) and **D56** (AI import), [PLAN](PLAN.md).
+(the extension), **D54** (per-bot skill toggle), **D58** (panel page and
+web access) and **D59** (AI import), [PLAN](PLAN.md).
 
 ## Components and source of truth
 
@@ -14,7 +14,7 @@ web access) and **D56** (AI import), [PLAN](PLAN.md).
 | Agent tools | Official `@modelcontextprotocol/server-filesystem` **2.2.0**, installed through mise |
 | Documents | **`project/wiki/`**, already used by Dagu and included in the framework snapshot paths |
 | Panel section | **Conocimiento / Knowledge**, an extension-owned page (`pages/knowledge.yaml`, `panel/`) that embeds the editor and explains how to feed it |
-| Browser access | `http://docs.<slug>-<port_base>.localhost:<port_base>`, behind the framework's web login (`import fyso_login`); panel users may open it (D55) |
+| Browser access | `http://docs.<slug>-<port_base>.localhost:<port_base>`, behind the framework's web login (`import fyso_login`); panel users may open it (D58) |
 | Process | `ext-silverbullet`, loopback only, on the extension port (first free port of `port_base + 10…19`) |
 | Agent instructions | `project-knowledge` skill, enabled per bot in the panel |
 | Import: upload | [tusd](https://github.com/tus/tusd) **2.10.1** (process `ext-silverbullet-upload`, Unix socket, no port) and the [Uppy](https://uppy.io) **6.0.7** picker |
@@ -75,7 +75,7 @@ on request (document, note, remember), updating an existing page before
 creating one, linking new pages from the home page and reporting which page
 changed.
 
-### Web access (D55)
+### Web access (D58)
 
 Web login denies apps that no rule names. An extension cannot edit the
 project-owned `project/auth/tinyauth.yaml`, so the framework gives each
@@ -94,7 +94,7 @@ apps:
 `ext:add` and `ext:update` restart the login authority so the rule applies at
 once. Existing web sessions survive that restart.
 
-## Import with AI (D56)
+## Import with AI (D59)
 
 **Import with AI**, on the third card of the Knowledge page, turns documents a
 team already has into pages:
@@ -217,7 +217,7 @@ To remove, run `mise run ext:remove silverbullet` and restart the project's
 stack. `project/wiki/` and `.data/ext/silverbullet/` remain. Switch the skill
 off on the bots that used it first.
 
-## Verification of the AI import (2026-11-10, D56)
+## Verification of the AI import (2026-11-10, D59)
 
 On the same generated project (macOS, Claude engine),
 `tests/silverbullet-import-browser.cjs` uploaded a folder (text, Markdown,
@@ -231,7 +231,7 @@ covers the glue steps without network or agent. Results and screenshots:
 same environment variables as the test below and runs one real agent turn.
 Not verified: the Codex engine, PDFs, folders near the limits, Linux.
 
-## Verification of the panel page and web access (2026-11-10, D55)
+## Verification of the panel page and web access (2026-11-10, D58)
 
 On a project generated from the branch (slug `sbint`, port block 29600, macOS),
 `tests/silverbullet-panel-browser.cjs` drove a real browser through the login,
@@ -270,9 +270,8 @@ On a project generated from this branch (slug `sbmain`, port block 29500, macOS)
 - Asked a question answerable only from a synthetic wiki page, without naming
   any tool, the Workflow Architect (Claude) called
   `mcp__silverbullet__search_files` and `read_file`, answered correctly and
-  cited the page. **Caveat:** this turn needed `${FYSO_DAGU_PORT}` written
-  literally in the local `.mcp.json`; see the 2026-11-10 finding in the
-  [docs index](README.md) about bots with a tool allow-list on OpenMausBot 0.1.141.
+  cited the page. At that time the turn needed `${FYSO_DAGU_PORT}` written
+  literally in the local `.mcp.json`; the generator does that itself since D55.
 
 An earlier run (2026-11-09, before the port to the current template) is kept as
 [sanitized tool evidence](../artifacts/delivery-evidence/silverbullet/agent-mcp-proof.json).

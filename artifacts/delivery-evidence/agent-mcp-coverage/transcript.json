@@ -1,0 +1,317 @@
+{
+  "note": "Real run against a disposable generated project (port block 29700, Dagu 2.24.0, OpenMausBot 0.1.141), driving framework/scripts/fyso-mcp.cjs over stdio exactly as agent:connect registers it (mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs, started from /). Results are shortened; machine paths are replaced.",
+  "before": {
+    "tools": [
+      "fyso_context",
+      "fyso_status",
+      "fyso_check",
+      "fyso_doctor",
+      "fyso_connections",
+      "fyso_bots_list",
+      "fyso_bot_read",
+      "fyso_bot_plan",
+      "fyso_bot_apply",
+      "fyso_bot_import",
+      "fyso_ext_search",
+      "fyso_ext_install",
+      "fyso_snapshot",
+      "fyso_observability"
+    ],
+    "instructionsChars": 5888,
+    "projectSpecificInstructions": false,
+    "resources": "method not found: resources/list"
+  },
+  "after": {
+    "tools": [
+      "fyso_context",
+      "fyso_project",
+      "fyso_files",
+      "fyso_file_read",
+      "fyso_status",
+      "fyso_check",
+      "fyso_doctor",
+      "fyso_connections",
+      "fyso_bots_list",
+      "fyso_bot_read",
+      "fyso_bot_plan",
+      "fyso_bot_apply",
+      "fyso_bot_import",
+      "fyso_app_access",
+      "fyso_app_access_plan",
+      "fyso_app_access_apply",
+      "fyso_connector_preferences",
+      "fyso_connector_preferences_save",
+      "fyso_logs",
+      "fyso_ext_search",
+      "fyso_ext_install",
+      "fyso_snapshot",
+      "fyso_observability",
+      "dagu_change",
+      "dagu_execute",
+      "dagu_read"
+    ],
+    "instructionsChars": 8062,
+    "projectBrief": "## This project: Agent MCP Fixture (agent-mcp-fx)\n\n- Declared bots: MausBot, Workflow Architect (Designs and fixes Dagu workflows), Run Operator (Watches runs, explains failures, retries), Builder (Turns requests into branches and PRs (fyso-dev-task)), Bot Architect (Creates and maintains project bots through versioned native plans).\n- Project workflows: hello, welcome-customer; 12 framework/extension workflows.\n- Extensions: none. Project apps: none. Wiki pages: 1.\n- MCP servers declared for bots: dagu, fyso.\n- `fyso_project` returns this map in full; `fyso_files` / `fyso_file_read` read the project's own files and guides.\n"
+  },
+  "steps": [
+    {
+      "step": "Understand: project map",
+      "tool": "fyso_project",
+      "arguments": {},
+      "ms": 74,
+      "error": false,
+      "result": "{\n  \"project\": {\n    \"name\": \"Agent MCP Fixture\",\n    \"slug\": \"agent-mcp-fx\"\n  },\n  \"bots\": {\n    \"source\": \"project/bots/team.yaml (declared; live roster: fyso_bots_list)\",\n    \"declared\": [\n      {\n        \"name\": \"MausBot\",\n        \"model\": \"claude/claude-sonnet-5\",\n        \"chief\": true\n      },\n      {\n        \"name\": \"Workflow Architect\",\n        \"title\": \"Designs and fixes Dagu workflows\",\n        \"model\": \"claude/claude-sonnet-5\"\n      },\n      {\n        \"name\": \"Run Operator\",\n        \"title\": \"Watches runs, explains failures, retries\",\n        \"model\": \"claude/claude-haiku-4-5\"\n      },\n      {\n        \"name\": \"Builder\",\n        \"title\": \"Turns requests into branches and PRs (fyso- …[4143 more chars]"
+    },
+    {
+      "step": "Understand: list project files",
+      "tool": "fyso_files",
+      "arguments": {
+        "path": "project"
+      },
+      "ms": 2,
+      "error": false,
+      "result": "{\n  \"path\": \"project\",\n  \"entries\": [\n    {\n      \"path\": \"project/bots/team.yaml\",\n      \"type\": \"file\",\n      \"bytes\": 2034\n    },\n    {\n      \"path\": \"project/marketplaces.yaml\",\n      \"type\": \"file\",\n      \"bytes\": 176\n    },\n    {\n      \"path\": \"project/observability.json\",\n      \"type\": \"file\",\n      \"bytes\": 101\n    },\n    {\n      \"path\": \"project/wiki/customers/onboarding.md\",\n      \"type\": \"file\",\n      \"bytes\": 101\n    },\n    {\n      \"path\": \"project/workflows/fyso-agent-connect.yaml\",\n      \"type\": \"file\",\n      \"bytes\": 326\n    },\n    {\n      \"path\": \"project/workflows/fyso-app-access.yaml\",\n      \"type\": \"file\",\n      \"bytes\": 318\n    },\n    {\n      \"path\": \"project/workflows/fy …[1290 more chars]"
+    },
+    {
+      "step": "Understand: read the project guide",
+      "tool": "fyso_file_read",
+      "arguments": {
+        "path": "AGENTS.md"
+      },
+      "ms": 1,
+      "error": false,
+      "result": "{\n  \"path\": \"AGENTS.md\",\n  \"bytes\": 2218,\n  \"content\": \"# AGENTS.md — Agent MCP Fixture\\n\\nA project generated from the Fyso Agentic Framework template. Read README.md and `framework/agent-context.md` first. The latter is the shared operating guide for architecture, ownership, tool selection and safe procedures; role-specific permissions still apply.\\n\\n- **Principle:** orchestrate existing software; never reinvent; keep it simple.\\n- **Change `project/`, not `framework/`.** `framework/` is replaced by `copier update`.\\n- **Isolation:** never connect to another Dagu or OpenMausBot on this machine. Every `openmausbot` CLI call targets this project (`OPENMAUSBOT_URL` is set by mise; never drop …[1586 more chars]"
+    },
+    {
+      "step": "Boundary: encrypted secrets are not readable",
+      "tool": "fyso_file_read",
+      "arguments": {
+        "path": "secrets.enc.yaml"
+      },
+      "ms": 0,
+      "error": true,
+      "result": "not readable: secrets.enc.yaml. Readable: AGENTS.md, README.md, project, extensions, framework/agent-context.md, framework/docs, framework/skills, framework/examples, framework/bots/souls"
+    },
+    {
+      "step": "Boundary: login users are not readable",
+      "tool": "fyso_file_read",
+      "arguments": {
+        "path": "project/auth/tinyauth.yaml"
+      },
+      "ms": 1,
+      "error": true,
+      "result": "not readable: project/auth/tinyauth.yaml (login, hidden or secret-like file)"
+    },
+    {
+      "step": "Boundary: runtime data is not readable",
+      "tool": "fyso_file_read",
+      "arguments": {
+        "path": "project/../.data/dagu/config.yaml"
+      },
+      "ms": 0,
+      "error": true,
+      "result": "not readable: .data/dagu/config.yaml. Readable: AGENTS.md, README.md, project, extensions, framework/agent-context.md, framework/docs, framework/skills, framework/examples, framework/bots/souls"
+    },
+    {
+      "step": "Diagnose: stack processes",
+      "tool": "fyso_logs",
+      "arguments": {},
+      "ms": 135,
+      "error": false,
+      "result": "{\n  \"processes\": [\n    \"caddy\",\n    \"connector-setup\",\n    \"dagu\",\n    \"omb\",\n    \"web-auth\"\n  ]\n}"
+    },
+    {
+      "step": "Diagnose: last Dagu log lines",
+      "tool": "fyso_logs",
+      "arguments": {
+        "process": "dagu",
+        "lines": 3
+      },
+      "ms": 1118,
+      "error": false,
+      "result": "{\n  \"process\": \"dagu\",\n  \"lines\": [\n    \"time=2026-11-10T09:16:01.592-03:00 level=INFO msg=\\\"Processing batch of items\\\" queue=fyso-observability count=1 max-concurrency=1 alive=0\",\n    \"time=2026-11-10T09:16:01.593-03:00 level=WARN msg=\\\"Queued item has been waiting for dispatch\\\" queue=fyso-observability run-id=catchup-aab0b88f029a-20261110T062400 dag=fyso-observability queue_age=5h52m1.593108s\",\n    \"time=2026-11-10T09:16:02.095-03:00 level=INFO msg=\\\"DAG execution has started or finished\\\" queue=fyso-observability run-id=catchup-aab0b88f029a-20261110T062400 status=succeeded\"\n  ]\n}"
+    },
+    {
+      "step": "Bots: application access of one bot",
+      "tool": "fyso_app_access",
+      "arguments": {
+        "bot_id": "a3673258-c26a-44e0-8cd7-8543bc20b3ef"
+      },
+      "ms": 1149,
+      "error": false,
+      "result": "{\n  \"botId\": \"a3673258-c26a-44e0-8cd7-8543bc20b3ef\",\n  \"revision\": \"b7c3921e80743ec8bbbea8be847c7a012fcc8f92b3c209eeb2f4d2f1777db74c\",\n  \"composio\": true,\n  \"connectorScopes\": null,\n  \"connectorTools\": null\n}"
+    },
+    {
+      "step": "Bots: connector preferences",
+      "tool": "fyso_connector_preferences",
+      "arguments": {},
+      "ms": 3148,
+      "error": false,
+      "result": "{\n  \"features\": {\n    \"claudeUserMcp\": false,\n    \"claudeUserSkills\": false\n  },\n  \"versioned\": false\n}"
+    },
+    {
+      "step": "Workflows: read the authoring reference",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "reference",
+        "name": "authoring"
+      },
+      "ms": 6,
+      "error": false,
+      "result": "Dagu read completed.\n{\"type\":\"resource_link\",\"mimeType\":\"text/markdown\",\"uri\":\"dagu://reference/authoring\",\"name\":\"dagu_reference\",\"title\":\"Dagu reference\",\"description\":\"Dagu MCP reference.\"}\n{\"data\":{\"mimeType\":\"text/markdown\",\"text\":\"# Dagu DAG authoring\\n\\nDAGs are YAML workflow definitions. Use dagu_change for edits:\\n\\n1. Call dagu_change with mode=preview, type=upsert_dag, name, and spec.\\n2. Fix validation errors if valid=false.\\n3. Call dagu_change again with mode=apply only after the user intends to write.\\n\\nKeep generated DAGs explicit and small. Prefer clear step names, dependencies, and command bodies over clever shell composition. Preserve existing schedules, labels, parameter …[26507 more chars]"
+    },
+    {
+      "step": "Workflows: preview a new workflow",
+      "tool": "dagu_change",
+      "arguments": {
+        "mode": "preview",
+        "name": "orders-summary",
+        "spec": "description: Sends the weekly orders summary (built by an agent over the fyso MCP)\nparams:\n  - SHOP: main\nsteps:\n  - name: summarize\n    command: echo \"Orders summary for ${SHOP}\"\n    output: SUMMARY\n"
+      },
+      "ms": 5,
+      "error": false,
+      "result": "DAG spec is valid. Re-run with mode=apply to write it.\n{\"type\":\"resource_link\",\"mimeType\":\"application/yaml\",\"uri\":\"dagu://dags/orders-summary/spec\",\"name\":\"dag_spec\",\"title\":\"DAG spec\",\"description\":\"Current YAML spec for this DAG.\"}"
+    },
+    {
+      "step": "Workflows: apply it",
+      "tool": "dagu_change",
+      "arguments": {
+        "mode": "apply",
+        "name": "orders-summary",
+        "spec": "description: Sends the weekly orders summary (built by an agent over the fyso MCP)\nparams:\n  - SHOP: main\nsteps:\n  - name: summarize\n    command: echo \"Orders summary for ${SHOP}\"\n    output: SUMMARY\n"
+      },
+      "ms": 33,
+      "error": false,
+      "result": "DAG change applied.\n{\"type\":\"resource_link\",\"mimeType\":\"application/yaml\",\"uri\":\"dagu://dags/orders-summary/spec\",\"name\":\"dag_spec\",\"title\":\"DAG spec\",\"description\":\"Current YAML spec for this DAG.\"}\n{\"applied\":true,\"created\":true,\"dag\":{\"defaultParams\":\"SHOP=\\\"main\\\"\",\"description\":\"Sends the weekly orders summary (built by an agent over the fyso MCP)\",\"env\":[],\"histRetentionDays\":30,\"maxActiveRuns\":1,\"maxActiveSteps\":10,\"name\":\"orders-summary\",\"paramDefs\":[{\"default\":\"main\",\"name\":\"SHOP\",\"type\":\"string\"}],\"params\":[\"SHOP=main\"],\"preconditions\":[],\"schedule\":[],\"steps\":[{\"commands\":[{\"args\":[\"Orders summary for ${SHOP}\"],\"command\":\"echo\"}],\"executorConfig\":{\"config\":{}},\"name\":\"summarize\",\" …[303 more chars]"
+    },
+    {
+      "step": "Workflows: the file is in project/workflows",
+      "tool": "fyso_file_read",
+      "arguments": {
+        "path": "project/workflows/orders-summary.yaml"
+      },
+      "ms": 0,
+      "error": false,
+      "result": "{\n  \"path\": \"project/workflows/orders-summary.yaml\",\n  \"bytes\": 200,\n  \"content\": \"description: Sends the weekly orders summary (built by an agent over the fyso MCP)\\nparams:\\n  - SHOP: main\\nsteps:\\n  - name: summarize\\n    command: echo \\\"Orders summary for ${SHOP}\\\"\\n    output: SUMMARY\\n\"\n}"
+    },
+    {
+      "step": "Workflows: run it and wait",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "orders-summary",
+        "params": {
+          "SHOP": "north"
+        },
+        "wait": true
+      },
+      "ms": 2119,
+      "error": false,
+      "result": "Dagu execute action completed. The run finished with status succeeded.\n{\"type\":\"resource_link\",\"mimeType\":\"application/json\",\"uri\":\"dagu://runs/orders-summary/034v9o7rdHT5bPAJCRt8yo\",\"name\":\"dag_run\",\"title\":\"DAG-run details\",\"description\":\"Subscribe to this resource for completion notification.\"}\n{\"type\":\"resource_link\",\"mimeType\":\"application/json\",\"uri\":\"dagu://runs/orders-summary/034v9o7rdHT5bPAJCRt8yo/logs\",\"name\":\"dag_run_logs\",\"title\":\"DAG-run logs\",\"description\":\"Logs for this DAG-run.\"}"
+    },
+    {
+      "step": "Workflows: run history",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "runs",
+        "query": "name=orders-summary"
+      },
+      "ms": 19,
+      "error": false,
+      "result": "Dagu read completed.\n{\"data\":{\"items\":[{\"dagRunId\":\"034v9o7rdHT5bPAJCRt8yo\",\"finishedAt\":\"2026-11-10T09:17:05-03:00\",\"name\":\"orders-summary\",\"startedAt\":\"2026-11-10T09:17:05-03:00\",\"status\":4,\"statusLabel\":\"succeeded\",\"uri\":\"dagu://runs/orders-summary/034v9o7rdHT5bPAJCRt8yo\"}]},\"references\":[\"dagu://reference/authoring\",\"dagu://reference/tools\",\"dagu://reference/notifications\"],\"target\":\"runs\"}"
+    },
+    {
+      "step": "Workflows: a missing workflow is a tool error",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "does-not-exist"
+      },
+      "ms": 25,
+      "error": true,
+      "result": "DAG does-not-exist not found\n{\"action\":\"start\",\"code\":\"resource_not_found\",\"dagName\":\"does-not-exist\",\"message\":\"DAG does-not-exist not found\",\"targetType\":\"dag\"}"
+    },
+    {
+      "step": "Knowledge: write a wiki page",
+      "tool": "dagu_change",
+      "arguments": {
+        "mode": "apply",
+        "type": "upsert_wiki_page",
+        "workspace": "default",
+        "path": "operations/orders-summary",
+        "content": "# Orders summary\n\nThe orders-summary workflow takes SHOP and prints the weekly summary.\n"
+      },
+      "ms": 18,
+      "error": false,
+      "result": "Wiki page change applied.\n{\"type\":\"resource_link\",\"mimeType\":\"text/markdown\",\"uri\":\"dagu://wiki/default/operations%2Forders-summary\",\"name\":\"wiki_page\",\"title\":\"Wiki page\",\"description\":\"Current Markdown content for this Wiki page.\"}\n{\"applied\":true,\"contentBytes\":88,\"created\":true,\"docUri\":\"dagu://wiki/default/operations%2Forders-summary\",\"mode\":\"apply\",\"path\":\"operations/orders-summary\",\"references\":[\"dagu://reference/authoring\",\"dagu://reference/tools\",\"dagu://reference/notifications\"],\"type\":\"upsert_wiki_page\",\"updated\":false,\"valid\":true,\"wikiPageUri\":\"dagu://wiki/default/operations%2Forders-summary\",\"workspace\":\"default\"}"
+    },
+    {
+      "step": "Knowledge: search the wiki",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "wiki_search",
+        "search": "weekly summary",
+        "workspace": "all"
+      },
+      "ms": 3,
+      "error": false,
+      "result": "Dagu read completed.\n{\"data\":{\"hasMore\":false,\"results\":[{\"description\":\"\",\"hasMoreMatches\":false,\"id\":\"operations/orders-summary\",\"matches\":[{\"line\":\"# Orders summary\\n\\nThe orders-summary workflow takes SHOP and prints the weekly summary.\",\"lineNumber\":3,\"startLine\":1}],\"modifiedAt\":\"2026-11-10T09:17:07.424785938-03:00\",\"title\":\"orders-summary\",\"uri\":\"dagu://wiki/default/operations%2Forders-summary\"}]},\"references\":[\"dagu://reference/authoring\",\"dagu://reference/tools\",\"dagu://reference/notifications\"],\"target\":\"wiki_search\",\"workspace\":\"all\"}"
+    },
+    {
+      "step": "Code: build a change on a branch (fyso-dev-task, Claude Code)",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "enqueue",
+        "name": "fyso-dev-task",
+        "wait": true,
+        "params": {
+          "TASK": "Declare a launcher app: create the file project/apps/orders/app.yaml with exactly these keys: id: orders, name: Orders, description: Weekly orders summary, url: https://example.com/orders. Change nothing else.",
+          "PROVIDER": "claude",
+          "BRANCH": "agent/orders-app",
+          "PUBLISH": "false"
+        }
+      },
+      "ms": 14148,
+      "error": false,
+      "result": "Dagu execute action completed. The run finished with status succeeded.\n{\"type\":\"resource_link\",\"mimeType\":\"application/json\",\"uri\":\"dagu://runs/fyso-dev-task/034v9oBIEfuZEw6d8d7Eli\",\"name\":\"dag_run\",\"title\":\"DAG-run details\",\"description\":\"Subscribe to this resource for completion notification.\"}\n{\"type\":\"resource_link\",\"mimeType\":\"application/json\",\"uri\":\"dagu://runs/fyso-dev-task/034v9oBIEfuZEw6d8d7Eli/logs\",\"name\":\"dag_run_logs\",\"title\":\"DAG-run logs\",\"description\":\"Logs for this DAG-run.\"}"
+    },
+    {
+      "step": "Understand: the map now shows the new workflow and wiki page",
+      "tool": "fyso_project",
+      "arguments": {},
+      "ms": 72,
+      "error": false,
+      "result": "{\n  \"project\": {\n    \"name\": \"Agent MCP Fixture\",\n    \"slug\": \"agent-mcp-fx\"\n  },\n  \"bots\": {\n    \"source\": \"project/bots/team.yaml (declared; live roster: fyso_bots_list)\",\n    \"declared\": [\n      {\n        \"name\": \"MausBot\",\n        \"model\": \"claude/claude-sonnet-5\",\n        \"chief\": true\n      },\n      {\n        \"name\": \"Workflow Architect\",\n        \"title\": \"Designs and fixes Dagu workflows\",\n        \"model\": \"claude/claude-sonnet-5\"\n      },\n      {\n        \"name\": \"Run Operator\",\n        \"title\": \"Watches runs, explains failures, retries\",\n        \"model\": \"claude/claude-haiku-4-5\"\n      },\n      {\n        \"name\": \"Builder\",\n        \"title\": \"Turns requests into branches and PRs (fyso- …[4384 more chars]"
+    }
+  ],
+  "stackStopped": {
+    "tools": 26,
+    "steps": [
+      {
+        "tool": "fyso_project",
+        "error": false,
+        "result": "{\n  \"project\": {\n    \"name\": \"Agent MCP Fixture\",\n    \"slug\": \"agent-mcp-fx\"\n  },\n  \"bots\": {\n    \"source\": \"project/bots/team.yaml (declared; live roster: fyso …[4924 more chars]"
+      },
+      {
+        "tool": "fyso_file_read",
+        "error": false,
+        "result": "{\n  \"path\": \"project/workflows/orders-summary.yaml\",\n  \"bytes\": 200,\n  \"content\": \"description: Sends the weekly orders summary (built by an agent over the fyso …[135 more chars]"
+      },
+      {
+        "tool": "dagu_read",
+        "error": true,
+        "result": "fetch failed"
+      },
+      {
+        "tool": "fyso_logs",
+        "error": true,
+        "result": "the stack is not running: a person starts it with `mise run up`"
+      },
+      {
+        "tool": "fyso_status",
+        "error": false,
+        "result": "{\n  \"project\": {\n    \"name\": \"Agent MCP Fixture\",\n    \"slug\": \"agent-mcp-fx\",\n    \"env\": \"local\",\n    \"urls\": {\n      \"panel\": \"http://panel.agent-mcp-fx-29700. …[1831 more chars]"
+      }
+    ]
+  }
+}

@@ -18,7 +18,9 @@
       "pending": "Sin aplicar",
       "give": "Dar acceso",
       "review": "Revisar y aplicar los cambios",
-      "giveTip": "Abre el perfil del bot: activa la skill project-knowledge y aplica los cambios."
+      "giveTip": "Abre el perfil del bot: activa la skill project-knowledge y aplica los cambios.",
+      "import": "Importar primero",
+      "importTip": "Este bot se creó en OpenMausBot y no está en el archivo del equipo. Impórtalo en Bots y luego dale acceso."
     },
     "files": {
       "title": "Trae lo que ya tienes",

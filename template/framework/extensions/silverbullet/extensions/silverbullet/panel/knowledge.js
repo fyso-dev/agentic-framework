@@ -1,7 +1,7 @@
 // Knowledge page (extensions-contract §9): the SilverBullet editor inside the panel,
 // with a short guide on how pages get there. No build step: panel SDK v1 as an ES module.
 const sdk = await import(new URL('/assets/extension-sdk.js', location.origin).href);
-const {mountExtensionPage, createElement: h, useState, useEffect, useTranslation, useStore, useDaguAction, ActionButton, ActionStatus} = sdk;
+const {mountExtensionPage, createElement: h, useState, useEffect, useTranslation, useStore, useDaguAction, ActionButton, ActionStatus, botRoster} = sdk;
 
 const EXT = 'silverbullet';
 const SKILL = '${FYSO_ROOT}/extensions/silverbullet/skills/project-knowledge/SKILL.md';
@@ -29,16 +29,23 @@ const panelLink = (hash, className, label, tip) =>
 
 function Bots() {
   const {t} = useTranslation();
-  const {rows} = useStore();
-  const bots = rows.filter(r => r.state !== 'deleted');
-  if (!bots.length) return h('p', null, t('kb.ask.none'));
-  return h('ul', {className: 'kb-bots'}, bots.map(({bot, state}) => {
-    const on = bot.skillFiles.includes(SKILL);
+  const {rows, runtimeBots, mock} = useStore();
+  // The same roster as the Bots screen: live OpenMausBot bots plus unapplied drafts.
+  // A bot created natively has no team-file entry yet: it is imported first, on Bots.
+  const roster = botRoster(rows, mock ? null : runtimeBots.data ?? null)
+    .filter(r => r.configuration?.state !== 'deleted');
+  if (!roster.length) return h('p', null, t('kb.ask.none'));
+  return h('ul', {className: 'kb-bots'}, roster.map(({key, name, configuration}) => {
     let status;
-    if (on && state === 'applied') status = h('span', {className: 'pill pill-ok'}, t('kb.ask.on'));
-    else if (on) status = panelLink('#/bots/review', 'pill pill-warn', t('kb.ask.pending'), t('kb.ask.review'));
-    else status = panelLink(`#/bots/${bot.index}?tab=perfil`, 'btn btn-sm btn-soft', t('kb.ask.give'), t('kb.ask.giveTip'));
-    return h('li', {key: bot.index}, h('span', {className: 'name'}, bot.name), status);
+    if (!configuration) status = panelLink('#/bots', 'btn btn-sm btn-soft', t('kb.ask.import'), t('kb.ask.importTip'));
+    else {
+      const {bot, state} = configuration;
+      const on = bot.skillFiles.includes(SKILL);
+      if (on && state === 'applied') status = h('span', {className: 'pill pill-ok'}, t('kb.ask.on'));
+      else if (on) status = panelLink('#/bots/review', 'pill pill-warn', t('kb.ask.pending'), t('kb.ask.review'));
+      else status = panelLink(`#/bots/${bot.index}?tab=perfil`, 'btn btn-sm btn-soft', t('kb.ask.give'), t('kb.ask.giveTip'));
+    }
+    return h('li', {key}, h('span', {className: 'name'}, name), status);
   }));
 }
 
@@ -47,7 +54,7 @@ function Way({n, title, body, children}) {
     h('h2', null, h('span', {className: 'kb-num', 'aria-hidden': 'true'}, n), title), h('p', null, body), children);
 }
 
-// Import with AI (D56): the picker (on the knowledge base's own origin) uploads a folder
+// Import with AI (D59): the picker (on the knowledge base's own origin) uploads a folder
 // or zip and reports its batch; this page starts the workflow and shows what it wrote.
 function Import({app, onReport}) {
   const {t, i18n} = useTranslation();

@@ -1,4 +1,4 @@
-# Turn an uploaded folder or zip into knowledge base pages with an AI agent (D56).
+# Turn an uploaded folder or zip into knowledge base pages with an AI agent (D59).
 # Started by the panel's Knowledge page after the upload; same agent action as
 # fyso-dev-task. The agent works in a private directory: it reads work/source and
 # writes work/out. Only the glue steps touch project/wiki, and they never overwrite.

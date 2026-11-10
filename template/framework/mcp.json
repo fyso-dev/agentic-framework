@@ -8,7 +8,7 @@
     "fyso": {
       "type": "stdio",
       "command": "mise",
-      "args": ["exec", "--", "node", "framework/scripts/fyso-mcp.cjs"]
+      "args": ["exec", "--", "node", "framework/scripts/fyso-mcp.cjs", "--no-dagu"]
     }
   }
 }

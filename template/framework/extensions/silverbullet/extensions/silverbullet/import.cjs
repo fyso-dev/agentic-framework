@@ -1,4 +1,4 @@
-// Glue steps of `ext-silverbullet-import` (D56). The AI agent only ever sees a private
+// Glue steps of `ext-silverbullet-import` (D59). The AI agent only ever sees a private
 // work directory; these steps decide what goes in (prepare) and what comes out (gate,
 // publish). They run from the project checkout, so the agent cannot change them.
 //   prepare   uploads of one batch -> work/source (unzip, convert, secret scan, limits)

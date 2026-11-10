@@ -57,7 +57,7 @@ falls back to `admin/admin`. Initial human passwords and Dagu's new random
 technical password are separate. Existing projects retain their technical
 credential until it is explicitly rotated.
 
-**Extension apps (D55).** An installed extension's site
+**Extension apps (D58).** An installed extension's site
 (`http://<app>.{$FYSO_WEB_DOMAIN}` in `extensions/*/Caddyfile`) gets a copy of
 the `panel` rule in the runtime configuration, unless `apps.<app>` is declared
 in `project/auth/tinyauth.yaml`. Panel users can already install and run

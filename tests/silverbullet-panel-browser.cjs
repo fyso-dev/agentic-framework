@@ -75,7 +75,7 @@ fs.mkdirSync(folder, {recursive:true});
     assert.equal((await context.request.get(`${base}/extensions/silverbullet/panel/knowledge.js`)).status(), 200);
     assert.equal((await context.request.get(`${base}/extensions/silverbullet/mcp.sh`)).status(), 404);
 
-    // 7. Installing or updating an extension restarts the login authority (D55): the
+    // 7. Installing or updating an extension restarts the login authority (D58): the
     // session survives it, and the full-window editor opens without the "unauthorized" page.
     execFileSync('mise', ['exec', '--', 'framework/scripts/pc.sh', 'process', 'restart', 'web-auth'], {cwd:root, stdio:'ignore'});
     let status = 0;

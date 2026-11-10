@@ -12,7 +12,7 @@ processes:
     availability:
       restart: on_failure
       backoff_seconds: 3
-  # Import (D56): receives the folder or zip a person picks, before the AI workflow reads it.
+  # Import (D59): receives the folder or zip a person picks, before the AI workflow reads it.
   ext-silverbullet-upload:
     command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/start-upload.sh
     readiness_probe:
