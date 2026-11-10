@@ -20,7 +20,7 @@ function fakeDagu(outputs,mcpTools) {
         if(msg.method==='initialize'){const id=`s${++state.opened}`;state.sessions.add(id);res.setHeader('Mcp-Session-Id',id);return send({jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'dagu',version:'t'}}});}
         if(!state.sessions.has(sid)){res.statusCode=404;return res.end('session not found');}
         if(msg.id===undefined){res.statusCode=202;return res.end();}
-        const result=msg.method==='tools/list'?{tools:mcpTools}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
+        const result=msg.method==='tools/list'?{tools:mcpTools}:msg.params?.arguments?.target==='runs'?{content:[{type:'text',text:'Dagu read completed.'}],structuredContent:{data:{items:[{name:'orders',dagRunId:'r1'},{name:'orders-secret',dagRunId:'r2'}]},target:'runs'}}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
         if(msg.method==='tools/call')mcpCalls.push({...msg.params,session:sid});
         if(state.sse){res.setHeader('Content-Type','text/event-stream');return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc:'2.0',method:'notifications/progress',params:{}})}\n\nevent: message\ndata: ${JSON.stringify({jsonrpc:'2.0',id:msg.id,result})}\n\n`);}
         return send({jsonrpc:'2.0',id:msg.id,result});
@@ -169,7 +169,8 @@ test('the project map says what the project contains, from the repository alone'
     // Parsed fields need the pinned yaml package (mise); without it the map still lists names.
     if(m.bots.declared.length) {
       assert.deepEqual(m.bots.declared,[{name:'Support',title:'Answers customers',model:'claude/x'}]);
-      assert.deepEqual(m.workflows[2],{name:'orders',owner:'project',description:'Sync orders',schedule:'0 * * * *',params:['SHOP']});
+      assert.deepEqual(m.workflows[2],{name:'orders',owner:'project',class:'project',description:'Sync orders',schedule:'0 * * * *',params:['SHOP']});
+      assert.deepEqual(m.workflows.map(w=>w.class),['system','system','project']);assert.deepEqual(m.workflowScopes,[]);
       assert.deepEqual(m.apps,[{id:'shop',name:'Tienda',file:'project/apps/shop/app.yaml'}]);
       assert.equal(m.extensions[0].version,'v1.2.0');
     }
@@ -273,6 +274,121 @@ test('the action inventory is covered by tools that exist',async()=>{
     }
     const scope=actions.filter(a=>a.by!=='person');
     assert.deepEqual({total:actions.length,person:actions.length-scope.length,before:actions.filter(a=>a.before).length,after:scope.filter(a=>a.tool).length,gaps:scope.filter(a=>!a.tool).length},
-      {total:35,person:7,before:12,after:26,gaps:2});
+      {total:37,person:7,before:12,after:28,gaps:2});
   } finally {c.close();srv.close();}
+});
+
+// D60: workflow scopes.
+const scopesLib=require('../template/framework/scripts/workflow-scopes.cjs');
+const {guard}=require('../template/framework/scripts/dagu-scope.cjs');
+const hasYaml=(()=>{try{scopesLib.workflows(path.resolve(__dirname,'../template'));return true;}catch{return false;}})();
+const {execFileSync}=require('node:child_process');
+
+test('a workflow scope allows reading and running its workflows and refuses everything else',()=>{
+  const names=new Map([['orders',{name:'orders',class:'project',description:'Sync'}],['fyso-dev-task',{name:'fyso-dev-task',class:'system'}]]);
+  const g=guard('/nowhere','ventas',['fyso-dev-task'],()=>names);
+  const ok=(tool,args)=>assert.doesNotThrow(()=>g.check(tool,args),JSON.stringify(args));
+  const no=(tool,args,why)=>assert.throws(()=>g.check(tool,args),why||/not in scope|not available|only dagu:|accepts only/,JSON.stringify(args));
+  assert.deepEqual(g.tools([{name:'dagu_read'},{name:'dagu_execute'},{name:'dagu_change'},{name:'other'}]).map(t=>t.name),['dagu_read','dagu_execute']);
+  // The list comes from the repository, not from Dagu.
+  assert.deepEqual(g.check('dagu_read',{target:'dags'}).structuredContent.data.items.map(i=>[i.name,i.class]),[['orders','project'],['fyso-dev-task','system']]);
+  for(const args of [{target:'dag_spec',name:'orders'},{target:'run',name:'orders',dagRunId:'r'},{target:'step_log',name:'orders',dagRunId:'r',stepName:'s',query:'tail=50'},{target:'runs',name:'fyso-dev-task'},
+    {target:'references'},{target:'reference',name:'authoring'},{uri:'dagu://dags/orders/spec'},{uri:'dagu://runs/orders/r1/logs'},{uri:'dagu://reference/authoring'}])ok('dagu_read',args);
+  for(const args of [{action:'start',name:'orders',params:{A:'1'},wait:true},{action:'enqueue',name:'fyso-dev-task',params:'{"TASK":"x"}'},{action:'stop',name:'orders',dagRunId:'r'},{action:'approve',name:'orders',dagRunId:'r',stepName:'s',attemptId:'a',inputs:{}}])ok('dagu_execute',args);
+  for(const args of [{target:'dag_spec',name:'hello'},{target:'dag_spec',name:'fyso-snapshot'},{target:'dag_spec'},{target:'runs'},{target:'runs',name:'orders',query:'name=hello'},{target:'dags',query:'page=2'},
+    {target:'dag_search',search:'x'},{target:'wiki',workspace:'all'},{target:'wiki_page',workspace:'default',path:'x'},{target:'workbook',path:'/etc/passwd'},{target:'dag_profile',name:'orders'},{target:'made_up',name:'orders'},
+    {target:'run_logs',name:'orders',dagRunId:'r',query:'name=hello'},{target:'dag_spec',name:'orders',workspace:'all'},{target:'dag_spec',name:'orders',uri:'dagu://dags/hello/spec'},
+    {uri:'dagu://dags/hello/spec'},{uri:'dagu://dags/orders/../hello/spec'},{uri:'dagu://dags/orders%2F..%2Fhello/spec'},{uri:'dagu://wiki/default/x'},{uri:'dagu://dags/orders/spec?x=1'},{uri:'https://example.com'},{}])no('dagu_read',args);
+  for(const args of [{action:'start',name:'hello'},{action:'start',name:'fyso-snapshot'},{action:'start'},{action:'start',name:'orders',spec:'steps: []'},{action:'start',name:'orders',targetType:'inline_spec'},
+    {action:'enqueue',name:'orders',queue:'other'},{action:'start',name:'orders',labels:['workspace=ops']},{action:'start',name:'orders',somethingNew:true}])no('dagu_execute',args);
+  no('dagu_change',{mode:'apply',name:'orders',spec:'x'},/does not change/);no('dagu_anything',{});
+  // Run lists: only the requested workflow goes to Dagu and comes back; an unknown shape is refused.
+  assert.deepEqual(g.rewrite('dagu_read',{target:'runs',name:'orders'}),{target:'runs',query:'name=orders'});
+  const shaped=g.shape('dagu_read',{target:'runs',name:'orders'},{structuredContent:{data:{items:[{name:'orders'},{name:'orders-secret'}]}}});
+  assert.deepEqual(shaped.structuredContent.data.items,[{name:'orders'}]);assert.ok(!shaped.content[0].text.includes('secret'));
+  assert.throws(()=>g.shape('dagu_read',{target:'runs',name:'orders'},{content:[{type:'text',text:'everything'}]}),/unexpected run list/);
+});
+
+function scopeProject() {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-scope-'));
+  const put=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+  put('framework/mcp.json','{"mcpServers":{"dagu":{"type":"http","url":"http://127.0.0.1:1/mcp"}}}');
+  fs.mkdirSync(path.join(root,'framework/scripts'),{recursive:true});
+  fs.copyFileSync(path.resolve(__dirname,'../template/framework/scripts/check-paths.sh'),path.join(root,'framework/scripts/check-paths.sh'));fs.chmodSync(path.join(root,'framework/scripts/check-paths.sh'),0o755);
+  put('framework/workflows/snapshot.yaml','description: Save\nlabels:\n  - workspace=ventas\n');   // a label on a system workflow is ignored
+  put('project/workflows/orders.yaml','# keep this comment\ndescription: Sync orders\nlabels:\n  - team=sales\nsteps:\n  - command: echo hi\n');
+  put('project/workflows/invoices.yaml','description: Invoices\nsteps:\n  - command: echo hi\n');
+  put('project/workflows/ext-sample-check.yaml','description: Check\n');
+  fs.symlinkSync('../../framework/workflows/snapshot.yaml',path.join(root,'project/workflows/fyso-snapshot.yaml'));
+  put('project/bots/team.yaml','version: 1\nbots:\n  - name: All\n    tools: { allow: ["native:*", "mcp:dagu:*"] }\n');
+  const git=(...a)=>execFileSync('git',['-c','user.name=T','-c','user.email=t@example.invalid',...a],{cwd:root});
+  git('init','-q','-b','main');git('add','.');git('commit','-qm','init');
+  // The commits made by save/remove need an identity in this repository.
+  git('config','user.name','T');git('config','user.email','t@example.invalid');
+  return {root,put,git};
+}
+
+test('scopes are saved as Dagu labels plus a project MCP entry, committed, and removed again',{skip:!hasYaml&&'needs the pinned yaml package (mise)'},()=>{
+  const {root,put,git}=scopeProject();
+  try {
+    assert.deepEqual(scopesLib.read(root).system,['ext-sample-check','fyso-snapshot']);
+    assert.deepEqual(scopesLib.read(root).unscoped.map(w=>w.name),['invoices','orders']);
+    const saved=scopesLib.save(root,{scope:'ventas',workflows:['orders'],system:['fyso-snapshot']});
+    assert.deepEqual([saved.server,saved.workflows,saved.system,saved.bots],['dagu-ventas',['orders'],['fyso-snapshot'],[]]);
+    const text=fs.readFileSync(path.join(root,'project/workflows/orders.yaml'),'utf8');
+    assert.match(text,/# keep this comment/);assert.match(text,/- team=sales\n  - workspace=ventas/);
+    const entry=JSON.parse(fs.readFileSync(path.join(root,'project/mcp.json'),'utf8')).mcpServers['dagu-ventas'];
+    assert.deepEqual(entry,{type:'stdio',command:'node',args:['framework/scripts/fyso-mcp.cjs','--scope','ventas','--system','fyso-snapshot']});   // no mise: bots have no decrypted secrets
+    assert.ok(JSON.parse(fs.readFileSync(path.join(root,'.mcp.json'),'utf8')).mcpServers['dagu-ventas']);
+    assert.equal(String(git('status','--porcelain','--','project')),'');assert.match(String(git('log','-1','--format=%s')),/workflows: scope ventas/);
+    // The label of a system workflow never puts it in a scope; only the grant does.
+    assert.deepEqual([...scopesLib.allowed(root,'ventas',[]).keys()],['orders']);
+    assert.deepEqual([...scopesLib.allowed(root,'ventas',['fyso-snapshot','invoices']).keys()],['fyso-snapshot','orders']);
+    // Replacing the scope moves the label; a workflow is in one scope at most.
+    scopesLib.save(root,{scope:'ventas',workflows:['invoices']});
+    assert.deepEqual(scopesLib.read(root).scopes[0].workflows,['invoices']);assert.doesNotMatch(fs.readFileSync(path.join(root,'project/workflows/orders.yaml'),'utf8'),/workspace=/);
+    assert.deepEqual(scopesLib.save(root,{scope:'ops',workflows:['invoices']}).moved,[{name:'invoices',from:'ventas'}]);
+    for(const [input,why] of [[{scope:'ventas',workflows:['fyso-snapshot']},/system workflow/],[{scope:'ventas',workflows:['nope']},/unknown workflow/],[{scope:'ventas',workflows:[],system:['orders']},/not a system workflow/],
+      [{scope:'system',workflows:[]},/invalid scope name/],[{scope:'Bad Name',workflows:[]},/invalid scope name/]])assert.throws(()=>scopesLib.save(root,input),why);
+    put('project/workflows/orders.yaml','description: edited by hand\n');
+    assert.throws(()=>scopesLib.save(root,{scope:'ventas',workflows:['orders']}),/commit or discard existing edits/);
+    git('checkout','--','project/workflows/orders.yaml');
+    // A scope a declared bot selects cannot be removed.
+    put('project/bots/team.yaml','version: 1\nbots:\n  - name: Seller\n    tools: { allow: ["native:*", "mcp:dagu-ops:*"] }\n');git('commit','-qam','bot');
+    assert.deepEqual(scopesLib.read(root).scopes.find(s=>s.scope==='ops').bots,['Seller']);
+    assert.throws(()=>scopesLib.remove(root,{scope:'ops'}),/bots still use dagu-ops: Seller/);
+    assert.deepEqual(scopesLib.remove(root,{scope:'ventas'}).removed,'ventas');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root,'project/mcp.json'),'utf8')).mcpServers['dagu-ventas'],undefined);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('the scope server gives a bot Dagu read and execute for its scope only, with OpenMausBot\'s header',{skip:!hasYaml&&'needs the pinned yaml package (mise)'},async()=>{
+  const {root}=scopeProject();scopesLib.save(root,{scope:'ventas',workflows:['orders']});
+  // The server serves the project it is installed in: install it in the fixture.
+  for(const file of ['fyso-mcp.cjs','project-map.cjs','dagu-mcp.cjs','dagu-scope.cjs','workflow-scopes.cjs','mcp-config.cjs'])fs.copyFileSync(path.join(path.dirname(server),file),path.join(root,'framework/scripts',file));
+  fs.writeFileSync(path.join(root,'framework/agent-context.md'),'guide');
+  const {srv,mcpCalls,port}=await fakeDagu({},DAGU_TOOLS);
+  // As a bot's process has it: the port and the header, no login and no mise.
+  const child=spawn(process.execPath,[path.join(root,'framework/scripts/fyso-mcp.cjs'),'--scope','ventas'],{env:{PATH:process.env.PATH,FYSO_DAGU_PORT:String(port),DAGU_MCP_AUTH:'Basic '+Buffer.from('admin:pw').toString('base64'),FYSO_DATA:fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mcp-'))},cwd:root});
+  let buf='',seq=0;const waiting=new Map();
+  child.stdout.on('data',d=>{buf+=d;for(let i;(i=buf.indexOf('\n'))>=0;){const m=JSON.parse(buf.slice(0,i));buf=buf.slice(i+1);waiting.get(m.id)?.(m);}});
+  const call=(method,params)=>new Promise(r=>{const id=++seq;waiting.set(id,r);child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
+  const tool=async(name,args)=>(await call('tools/call',{name,arguments:args})).result;
+  try {
+    const init=(await call('initialize',{protocolVersion:'2025-06-18'})).result;
+    assert.equal(init.serverInfo.name,'fyso-dagu-ventas');
+    assert.deepEqual((await call('tools/list')).result.tools.map(t=>t.name),['dagu_read','dagu_execute']);
+    assert.equal((await call('tools/call',{name:'fyso_status',arguments:{}})).error.code,-32602);
+    for(const [name,args] of [['dagu_execute',{action:'start',name:'hello'}],['dagu_execute',{action:'start',name:'orders',spec:'x'}],['dagu_change',{mode:'apply',name:'orders',spec:'x'}],['dagu_read',{target:'dag_search',search:'x'}]])
+      assert.equal((await tool(name,args)).isError,true,JSON.stringify(args));
+    assert.equal(mcpCalls.length,0);   // nothing refused reached Dagu
+    assert.match(init.instructions,/read and run these workflows only: orders\./);
+    assert.deepEqual((await tool('dagu_read',{target:'dags'})).structuredContent.data.items.map(i=>i.name),['orders']);
+    assert.equal(mcpCalls.length,0);   // the list is answered from the repository
+    const run=await tool('dagu_execute',{action:'start',name:'orders',params:{SHOP:'x'},wait:true});
+    assert.equal(run.isError,undefined);assert.deepEqual(mcpCalls.at(-1).arguments,{action:'start',name:'orders',params:{SHOP:'x'},wait:true});
+    const runs=await tool('dagu_read',{target:'runs',name:'orders'});
+    assert.deepEqual(mcpCalls.at(-1).arguments,{target:'runs',query:'name=orders'});
+    assert.deepEqual(runs.structuredContent.data.items,[{name:'orders',dagRunId:'r1'}]);   // Dagu also returned orders-secret
+  } finally {child.stdin.end();srv.close();fs.rmSync(root,{recursive:true,force:true});}
 });

@@ -1,4 +1,6 @@
 description: Panel setup-check
+labels:
+  - fyso=system
 type: graph
 max_active_runs: 1
 env:

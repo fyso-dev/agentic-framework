@@ -35,7 +35,8 @@ function map(root, env = process.env) {
       : extensions.some(e => name.startsWith(`ext-${e.id}-`)) ? 'extension' : 'project';
     const params = Array.isArray(spec.params) ? spec.params.flatMap(p => p && typeof p === 'object' ? Object.keys(p) : [String(p).split('=')[0]])
       : spec.params && typeof spec.params === 'object' ? Object.keys(spec.params) : [];
-    return {name, owner, ...(spec.description && {description: String(spec.description)}), ...(spec.schedule && {schedule: spec.schedule}), ...(params.length && {params})};
+    const workspace = owner === 'project' ? (Array.isArray(spec.labels) ? spec.labels.map(String) : []).find(l => l.startsWith('workspace='))?.slice(10) : undefined;
+    return {name, owner, class: owner === 'project' ? 'project' : 'system', ...(workspace && {scope: workspace}), ...(spec.description && {description: String(spec.description)}), ...(spec.schedule && {schedule: spec.schedule}), ...(params.length && {params})};
   });
   const team = parse('project/bots/team.yaml');
   const servers = {};
@@ -50,6 +51,7 @@ function map(root, env = process.env) {
     apps: glob('project/apps/*/app.yaml').map(file => { const app = parse(file); return {id: app.id || file.split('/')[2], name: text(app.name) || null, file}; }),
     extensions,
     mcpServers: servers,
+    workflowScopes: attempt(() => require('./workflow-scopes.cjs').read(root).scopes.map(sc => ({scope: sc.scope, server: sc.server, workflows: sc.workflows, system: sc.system, bots: sc.bots})), []),
     wiki: {folder: 'project/wiki', pages: wiki.length, paths: wiki.slice(0, 100).map(f => f.slice('project/wiki/'.length, -3))},
     guides: ['AGENTS.md', 'README.md', 'framework/agent-context.md', ...glob('framework/docs/*.md'), ...glob('framework/skills/*/SKILL.md'),
       ...extensions.flatMap(e => [e.readme, ...e.skills])].filter(f => f && fs.existsSync(at(f))),
@@ -67,6 +69,7 @@ function brief(root, env = process.env) {
     `- Declared bots: ${list(m.bots.declared.map(b => b.title ? `${b.name} (${b.title})` : b.name))}.`,
     `- Project workflows: ${list(own)}; ${m.workflows.length - own.length} framework/extension workflows.`,
     `- Extensions: ${list(m.extensions.map(e => e.id))}. Project apps: ${list(m.apps.map(a => a.id))}. Wiki pages: ${m.wiki.pages}.`,
+    `- Workflow scopes (subsets for bot groups): ${list(m.workflowScopes.map(sc => `${sc.scope} (${sc.workflows.length + sc.system.length} workflows)`))}; see \`fyso_workflow_scopes\`.`,
     `- MCP servers declared for bots: ${list(Object.keys(m.mcpServers))}.`,
     '- `fyso_project` returns this map in full; `fyso_files` / `fyso_file_read` read the project\'s own files and guides.', ''].join('\n');
 }

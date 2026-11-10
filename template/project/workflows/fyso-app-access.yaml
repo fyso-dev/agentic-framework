@@ -1,4 +1,6 @@
 description: Preview, apply and version native application permissions for one bot
+labels:
+  - fyso=system
 type: graph
 max_active_runs: 1
 params:
