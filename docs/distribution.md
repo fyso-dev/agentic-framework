@@ -67,3 +67,5 @@ A project that already started must be running for `add`/`update` (its bots and 
 ## 5. Verification
 
 `tests/test_distribution.py` (real git, Copier 9.19.1, SOPS, age, gitleaks): publish v1 with a secret for the client → add (configuration, documents, memory, secret; no auth, no logs, no publisher settings) → the client's bot learns and someone edits the wiki → publish v2 (wiki change, deleted file, new memory line, new secret value) → update (wiki replaced, file removed, memory has all three lines, secret updated, the client's own password kept) → a second update and a second publish change nothing. Private secrets are refused.
+
+Live, on generated projects with a running client stack: `dist:add`, then `fyso-dist-update` through the Dagu API merged the publisher's new memory line into the bot's live OMB memory next to what the client's bot had learned, and `doctor` stayed green. [Evidence](../artifacts/delivery-evidence/distribution/README.md).
