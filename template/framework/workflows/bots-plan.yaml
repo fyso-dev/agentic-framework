@@ -5,6 +5,7 @@ type: graph
 max_active_runs: 1
 params:
   - TEAM_B64: ""
+  - TEAM_BASE_B64: ""
 env:
   - ROOT: ${FYSO_ROOT}
 working_dir: ${ROOT}

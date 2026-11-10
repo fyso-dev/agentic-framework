@@ -141,6 +141,7 @@
     "bannerBody": "OpenMausBot sigue usando la versión anterior hasta que los apliques.",
     "review": "Revisar y aplicar",
     "discard": "Descartar cambios",
+    "draftConflict": "Cambió la configuración del proyecto. Tu borrador sigue guardado. Revisalo o descartalo antes de aplicar cambios.",
     "discardTitle": "¿Descartar los cambios sin aplicar?",
     "discardBody": "Se vuelve a lo que dice team.yaml en el proyecto. OpenMausBot no cambia.",
     "state": {
@@ -169,6 +170,7 @@
     "runtimeOpen": "Abrir OpenMausBot",
     "configurationTitle": "Configuración y borradores",
     "version": {
+      "syncing": "Actualizando configuración",
       "project": "En el proyecto",
       "snapshot": "En snapshot",
       "native": "Solo OpenMausBot",
@@ -213,7 +215,7 @@
     "delete": "Eliminar agente",
     "deleteShort": "Eliminar",
     "deleteTitle": "¿Eliminar “{{name}}”?",
-    "deleteBody": "Se quita del panel ahora. En OpenMausBot deja de estar cuando apliques los cambios. Su historial de conversaciones no se borra.",
+    "deleteBody": "El bot quedará marcado para eliminar. Al aplicar los cambios, OpenMausBot eliminará definitivamente el bot y su historial de conversaciones.",
     "saveNote": "Guardar no aplica: queda pendiente hasta “Revisar y aplicar”.",
     "save": "Guardar",
     "errors_one": "Revisa {{count}} campo antes de guardar.",
@@ -228,6 +230,7 @@
     "skillsNeedRoot": "Necesitan las herramientas del proyecto: activa «Usa workflows» para poder usarlas."
   },
   "preview": {
+    "deleteHistoryWarning": "Eliminar un bot de OpenMausBot borra definitivamente su historial de conversaciones. La copia de la configuración no incluye ese historial.",
     "title": "Vista previa de cambios",
     "planning": "Calculando el plan… se ejecuta en Dagu",
     "planFailed": "No se pudo calcular el plan",

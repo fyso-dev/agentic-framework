@@ -141,6 +141,7 @@
     "bannerBody": "OpenMausBot keeps using the previous version until you apply them.",
     "review": "Review and apply",
     "discard": "Discard changes",
+    "draftConflict": "The project configuration changed. Your draft is saved. Review it or discard it before applying new changes.",
     "discardTitle": "Discard the unapplied changes?",
     "discardBody": "The panel goes back to the project’s team.yaml. OpenMausBot does not change.",
     "state": {
@@ -169,6 +170,7 @@
     "runtimeOpen": "Open OpenMausBot",
     "configurationTitle": "Configuration and drafts",
     "version": {
+      "syncing": "Refreshing configuration",
       "project": "In project",
       "snapshot": "In snapshot",
       "native": "OpenMausBot only",
@@ -213,7 +215,7 @@
     "delete": "Delete agent",
     "deleteShort": "Delete",
     "deleteTitle": "Delete “{{name}}”?",
-    "deleteBody": "It is removed from the panel now. It leaves OpenMausBot when you apply the changes. Its conversation history is not deleted.",
+    "deleteBody": "The bot is marked for removal. Applying the changes permanently deletes the bot and its conversation history in OpenMausBot.",
     "saveNote": "Saving does not apply: it stays pending until “Review and apply”.",
     "save": "Save",
     "errors_one": "Check {{count}} field before saving.",
@@ -228,6 +230,7 @@
     "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them."
   },
   "preview": {
+    "deleteHistoryWarning": "Deleting a bot from OpenMausBot permanently removes its conversation history. The configuration snapshot does not contain that history.",
     "title": "Preview of changes",
     "planning": "Computing the plan… running in Dagu",
     "planFailed": "Could not compute the plan",

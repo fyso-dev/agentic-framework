@@ -99,7 +99,7 @@ export type SetupCheck = {
   dagu: { ok: boolean; botsConnected: number };
 };
 
-/** Output `plan` of `fyso-bots-plan` (`openmausbot team apply --dry-run --json`). */
+/** Output `plan` of `fyso-bots-plan`, including scoped removals. */
 export type Plan = {
   plan: string[];
   created: number;
@@ -107,6 +107,7 @@ export type Plan = {
   unchanged: number;
   deleted: number;
   warnings?: unknown[];
+  removalRevision?: string;
 };
 
 /** Output `apply` of `fyso-bots-apply`. */
@@ -135,7 +136,11 @@ export const DAGS = {
   extInstall: "fyso-ext-install",
 } as const;
 
-export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string };toolScope?:import('../lib/connector-access').ToolScope;mcpServers?:string[]|null };
+export type BotAppearance = {
+  avatarUrl?: string | null; color?: string; mascotBody?: string | null; mascotFaceColor?: string | null;
+  avatarCrop?: string | null; avatarZoom?: number; avatarFocusX?: number; avatarFocusY?: number;
+};
+export type RuntimeBot = BotAppearance & { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string };toolScope?:import('../lib/connector-access').ToolScope;mcpServers?:string[]|null };
 
 export type BotVersioning = { collectedAt: string; commit: string | null; projectDirty?: boolean; bots: {name: string; team: string; project: boolean; snapshot: boolean}[] };
 

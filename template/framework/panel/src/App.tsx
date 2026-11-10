@@ -26,7 +26,7 @@ export function App() {
   let screen;
   switch (route.name) {
     case "bots":
-      screen = <Bots review={!!route.review} native={route.native} />;
+      screen = <Bots review={!!route.review} native={route.native} tab={route.tab} />;
       break;
     case "bot":
       screen = <Bots review={false} index={route.index} tab={route.tab} />;
