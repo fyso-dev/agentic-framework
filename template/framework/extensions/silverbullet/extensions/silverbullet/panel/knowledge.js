@@ -52,7 +52,8 @@ function Way({n, title, body, children}) {
 function Import({app, onReport}) {
   const {t, i18n} = useTranslation();
   const {backend} = useStore();
-  const action = useDaguAction(backend, IMPORT_DAG, 'RESULT');
+  // loadLast: the last import's result and its report link survive a reload.
+  const action = useDaguAction(backend, IMPORT_DAG, 'RESULT', {loadLast: true});
   const [upload, setUpload] = useState(null);
   const [round, setRound] = useState(0);
   const origin = new URL(app.url).origin;
@@ -76,11 +77,11 @@ function Import({app, onReport}) {
     setRound(n => n + 1);
     if (result?.report) onReport(result.report);
   };
-  const result = action.phase === 'ok' && action.output;
+  const result = (action.phase === 'ok' || action.phase === 'idle') && action.output?.report && action.output;
   let status = h(ActionStatus, {action});
   if (!running && ready) status = h('span', {className: 'action-status', role: 'status'}, t('kb.import.ready', {count: upload.files}));
   else if (!running && upload?.pending) status = h('span', {className: 'action-status', role: 'status'}, t('kb.import.uploading'));
-  else if (action.phase === 'never') status = h('span', {className: 'action-status'}, t('kb.import.waiting'));
+  else if (action.phase === 'never' || action.phase === 'loading') status = h('span', {className: 'action-status'}, t('kb.import.waiting'));
   return h('section', {className: 'card kb-import', 'aria-label': t('kb.import.title')},
     h('iframe', {key: round, className: 'kb-picker', title: t('kb.import.frame'),
       src: `${origin}/.kb/picker/index.html?lang=${lang}&theme=${theme}`}),
@@ -106,7 +107,13 @@ function Page() {
   const {apps} = useStore();
   const [guide, setGuide] = useState(() => stored() !== '0');
   const [importing, setImporting] = useState(false);
-  const [page, setPage] = useState('');
+  // The page the editor shows. `n` changes on every request, so asking for the same
+  // report again reloads the editor on it and brings it into view.
+  const [page, setPage] = useState({path: '', n: 0});
+  const open = path => setPage(p => ({path, n: p.n + 1}));
+  useEffect(() => {
+    if (page.n) document.querySelector('.kb-frame')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }, [page.n]);
   const toggle = () => {
     try { localStorage.setItem(GUIDE_KEY, guide ? '0' : '1'); } catch { /* storage is optional */ }
     setGuide(!guide);
@@ -126,9 +133,10 @@ function Page() {
         app && h('button', {type: 'button', className: 'btn btn-sm btn-pri kb-import-open', 'aria-expanded': importing,
           onClick: () => setImporting(!importing)}, t(importing ? 'kb.import.close' : 'kb.import.open')),
         h(Copy, {text: FOLDER, code: true})),
-      importing && app && h(Import, {app, onReport: setPage}),
+      importing && app && h(Import, {app, onReport: open}),
       h('p', {className: 'kb-note'}, t('kb.note'))),
-    app ? h('iframe', {className: 'kb-frame', title: t('kb.frame'), src: page ? `${app.url.replace(/\/$/, '')}/${encodeURI(page)}` : app.url})
+    app ? h('iframe', {key: page.n, className: 'kb-frame', title: t('kb.frame'),
+        src: page.path ? `${app.url.replace(/\/$/, '')}/${encodeURI(page.path)}` : app.url})
       : apps.status !== 'loading' && h('p', {className: 'kb-empty', role: 'alert'}, t('kb.unavailable')));
 }
 

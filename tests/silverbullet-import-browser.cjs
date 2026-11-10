@@ -35,7 +35,7 @@ fs.mkdirSync(folder, {recursive: true});
 (async () => {
   const browser = await chromium.launch({headless: true});
   try {
-    const context = await browser.newContext({locale: 'es-AR', viewport: {width: 1440, height: 1100}});
+    const context = await browser.newContext({locale: 'es-AR', viewport: {width: 1440, height: 800}});
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message.slice(0, 120)));
     await page.goto(base + '/?lang=es');
@@ -87,6 +87,18 @@ fs.mkdirSync(folder, {recursive: true});
     const editor = kb.frameLocator('iframe[title="Editor de conocimiento"]');
     await editor.locator('.cm-content').filter({hasText: 'Páginas nuevas'}).waitFor({timeout: 30_000});
     await page.screenshot({path: path.join(folder, 'import-report.png')});
+    // "Ver el informe" always brings the report back: after moving elsewhere in the editor,
+    // after a reload of the panel, and with the editor scrolled out of view.
+    await page.reload();
+    await kb.getByRole('button', {name: 'Importar con IA', exact: true}).click();
+    await editor.locator('.cm-content').filter({hasText: /\S/}).waitFor({timeout: 30_000});
+    assert.equal(await editor.locator('.cm-content').filter({hasText: 'Páginas nuevas'}).count(), 0, 'the editor is on the home page');
+    await kb.getByRole('button', {name: 'Ver el informe'}).click();
+    await editor.locator('.cm-content').filter({hasText: 'Páginas nuevas'}).waitFor({timeout: 30_000});
+    await page.waitForTimeout(800);
+    const box = await kb.locator('iframe[title="Editor de conocimiento"]').boundingBox();
+    assert.ok(box.y < 400 && box.height >= 400, `the editor is in view (y ${Math.round(box.y)}, height ${Math.round(box.height)})`);
+    await page.screenshot({path: path.join(folder, 'import-report-link.png')});
 
     // 5. A document with a credential stops the import before the agent sees it.
     const pagesBefore = pagesOf(wiki);

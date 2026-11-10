@@ -30,6 +30,7 @@ passed).
 | [import-uploaded.png](import-uploaded.png) | Folder and zip uploaded, ready to convert |
 | [import-running.png](import-running.png) | The agent writing pages |
 | [import-report.png](import-report.png) | Result and the report page in the editor |
+| [import-report-link.png](import-report-link.png) | "Ver el informe" after a panel reload: the editor scrolls into view on the report (1440×800) |
 | [import-refused.png](import-refused.png) | A document with a credential, refused |
 
 Suites: `node --test tests/*.test.cjs` 114 passed (5 new in
