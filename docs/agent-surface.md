@@ -66,7 +66,8 @@ A desktop app cannot use the `dagu` entry of `.mcp.json`: it needs the project l
 1. **Custom MCP servers for bots.** The panel adds and removes them through the gateway (`managed-mcp.cjs`), not through a workflow, so there is nothing to wrap. Proposal: a `fyso-managed-mcp` workflow with the same plan/apply shape as bots, then `fyso_mcp_plan` / `fyso_mcp_apply`; header values stay a person's job (sops).
 2. **Writing project files** (`project/apps/*/app.yaml`, `project/mcp.json`, soul files). Proposal: no write tool. `fyso-dev-task` already does it on a branch that a person merges, verified in the real run; a direct write tool would be the first path that changes project files without the panel's workflows or a review.
 3. **Distributions (D56)** merged while this was built: `dist:publish`, `dist:add` and `dist:update` are not in the inventory and have no tool. They replace `project/**` wholesale, so they look like a person's task; decide before adding them.
-4. **The panel's opening prompt** (`#/mcp`) still names only `fyso_context` and `fyso_status`; align it with `agent-connect.cjs` in the next panel build.
+4. **A subset of workflows per bot.** Dagu does it natively with workspaces and scoped API keys ([spike](adr/spikes/dagu-workspaces.md)): enforced over MCP, free for two keys, but it needs builtin auth in place of basic auth (D19). Proposed as one decision together with that auth change; nothing in this change depends on it.
+5. **The panel's opening prompt** (`#/mcp`) still names only `fyso_context` and `fyso_status`; align it with `agent-connect.cjs` in the next panel build.
 
 ## 2. Dagu for coding agents
 
