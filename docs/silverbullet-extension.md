@@ -1,6 +1,7 @@
 # SilverBullet knowledge extension
 
-An opt-in bundled Copier extension, under `template/framework/extensions/silverbullet/`.
+An opt-in Copier extension published as [fyso-ext-silverbullet](https://github.com/fyso-dev/fyso-ext-silverbullet), starting at **v0.1.0**.
+A bundled copy remains under `template/framework/extensions/silverbullet/`.
 It fills the existing extension slots ([contract](extensions-contract.md)) without
 changing a project's team file or framework configuration. Decisions: **D53**
 (the extension), **D54** (per-bot skill toggle), **D58** (panel page and
@@ -34,17 +35,24 @@ a custom adapter or pinning an unreleased build.
 ## Install in a generated project
 
 ```sh
-mise run ext:add ./framework/extensions/silverbullet -- --defaults
+mise run ext:add silverbullet -- --defaults
 mise run doctor
 ```
 
 `ext:add` picks the first free extension port, installs the pinned tools and,
 when the stack is running, loads the process and the gateway route without a
-restart. The extension is installed **by path** because it ships inside the
-template; it is not in a marketplace catalog yet, so the panel's marketplace
-does not list it for install. The framework template preserves the bundled
-`copier.yml` and uses `.slotjinja` internally, so outer Copier rendering does
-not consume its variables.
+restart. The official catalog lists `silverbullet`; its source is
+`gh:fyso-dev/fyso-ext-silverbullet`, with versions from Git tags. The panel
+marketplace can install it. To pin this release without catalog lookup:
+
+```sh
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --vcs-ref v0.1.0
+```
+
+The bundled copy can still be installed with
+`mise run ext:add ./framework/extensions/silverbullet -- --defaults`.
+The framework template preserves its `copier.yml` and uses `.slotjinja`
+internally, so outer Copier rendering does not consume its variables.
 
 ## In the panel
 
@@ -200,18 +208,27 @@ sandbox for a compromised process.
 
 ## Update and remove
 
-This bundled template is installed from a **local directory**, so its extension
-inventory version is `null`, and Copier's VCS-based `ext:update` cannot update
-it. After updating the parent framework, reapply the bundled extension:
+For catalog or Git-source installations:
 
 ```sh
-mise run ext:add ./framework/extensions/silverbullet -- --defaults --overwrite
+mise run ext:update silverbullet -- --defaults
+mise run doctor
+```
+
+An existing **bundled local-directory** installation has inventory version
+`null`, so Copier's VCS-based `ext:update` cannot update it. After updating
+the parent framework, migrate it to the published source explicitly:
+
+```sh
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --overwrite --vcs-ref v0.1.0
 ```
 
 Existing answers are reused and wiki pages are outside the extension payload.
-Do not use `silverbullet upgrade` or `upgrade-edge`: versions belong to the mise
-template. For independently tagged distribution, move the bundled source into
-its own Git repository and add it to a catalog (extensions-contract §8).
+Review and commit pending project changes before the next `ext:update`.
+To stay on the bundled source, reapply it with
+`mise run ext:add ./framework/extensions/silverbullet -- --defaults --overwrite`.
+Do not use `silverbullet upgrade` or `upgrade-edge`: versions belong to the
+extension's pinned mise configuration.
 
 To remove, run `mise run ext:remove silverbullet` and restart the project's
 stack. `project/wiki/` and `.data/ext/silverbullet/` remain. Switch the skill
