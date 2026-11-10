@@ -102,7 +102,14 @@ class DistributionTests(unittest.TestCase):
         write(c, ".config/mise/conf.d/ext-own.toml", '[env]\nFYSO_EXT_OWN_PORT = "29810"\n')
         write(c, "state/bots/team.yaml", "version: 1\nbots:\n  - name: Old\n")
         self.commit(c, ce, "client init")
+        # An untracked local page at a path the distribution delivers: replaced, but backed up.
+        write(c, "project/wiki/index.md", "# Mine, never committed\n")
         self.dist(c, ce, "add", "../dist.git")   # relative: an absolute path would fail check-paths
+        import tarfile
+        backups = sorted((c / ".data/dist").glob("local-*-untracked.tgz"))
+        self.assertEqual(len(backups), 1)
+        with tarfile.open(backups[0]) as archive:
+            self.assertEqual(archive.extractfile("project/wiki/index.md").read(), b"# Mine, never committed\n")
         self.assertIn('FYSO_EXT_WIKI_PORT = "29811"', (c / ".config/mise/conf.d/ext-wiki.toml").read_text())
         self.assertIn("extension_port: 29811", (c / ".copier-answers.ext-wiki.yml").read_text())
         self.assertIn('"29810"', (c / ".config/mise/conf.d/ext-own.toml").read_text())

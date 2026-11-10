@@ -33,9 +33,13 @@ fetch() {  # fetch <add|update> [repo] [version]
   git rev-parse -q --verify HEAD > "$work/base" || : > "$work/base"
   # The distribution wins over local edits; keep uncommitted ones as a patch, never lost.
   if [ -s "$work/base" ] && [ -n "$(git status --porcelain -- project state extensions)" ]; then
-    patch="$work/local-$(date -u +%Y%m%dT%H%M%SZ).patch"
-    git diff HEAD -- project state extensions > "$patch"
-    echo "local changes saved to ${patch#"$FYSO_ROOT"/}"
+    stamp="$work/local-$(date -u +%Y%m%dT%H%M%SZ)"
+    git diff HEAD -- project state extensions > "$stamp.patch"
+    # A diff leaves out untracked files, which a delivered file may replace just the same.
+    if [ -n "$(git ls-files --others --exclude-standard -- project state extensions)" ]; then
+      git ls-files -z --others --exclude-standard -- project state extensions | tar --null -T - -czf "$stamp-untracked.tgz"
+    fi
+    echo "local changes saved to ${stamp#"$FYSO_ROOT"/}.*"
   fi
   if [ "$mode" = add ]; then
     copier copy --trust --defaults --overwrite ${version:+--vcs-ref "$version"} "$repo" .
@@ -70,7 +74,8 @@ apply() {
     framework/scripts/snapshot.sh bots
     node framework/scripts/app-access.cjs restore
     node framework/scripts/connector-preferences.cjs restore
-    framework/scripts/connect-extensions.sh
+    # A fresh mise environment: secrets received in fetch are not in this shell's (as ext.sh).
+    mise exec -- framework/scripts/connect-extensions.sh
     if [ -s "$work/memory-bots" ]; then
       openmausbot bots --json --port "$FYSO_OMB_PORT" | node -e '
         let s = ""; process.stdin.on("data", d => s += d).on("end", () => {

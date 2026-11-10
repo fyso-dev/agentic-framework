@@ -87,7 +87,7 @@ mise run dist:update       # or run fyso-dist-update in Dagu
 
 What happens on update:
 
-- Your configuration and documents **replace** theirs. If they had uncommitted edits, a patch is kept in `.data/dist/local-<time>.patch`; send it to you if something there should become part of the distribution.
+- Your configuration and documents **replace** theirs. If they had uncommitted edits, they are kept in `.data/dist/` (`local-<time>.patch`, plus `local-<time>-untracked.tgz` for files never committed); send it to you if something there should become part of the distribution.
 - Memory is **merged**: what you added appears next to what their bots learned; nothing of theirs is removed.
 - Files you deleted are deleted on their side too.
 - Bots they created only on their side stay as they are.
@@ -126,4 +126,4 @@ One distribution repository per offer. Clients that need different configuration
 | Client: `start the project first (mise run up)` | The project already ran once; start it, then update. |
 | Client: `failed to decrypt` on update | Their key is not in `recipients`, or it changed. Add the current `dist:key` output and publish again. |
 | Client: `published with framework …, this project has …` | Their framework is older or newer than yours. Update the framework (installation.md, *Update an existing generated project*) if something is missing. |
-| A client change disappeared after an update | Expected: configuration follows the publisher. Recover it from `.data/dist/local-*.patch` or the client's Git history and add it on the publisher side. |
+| A client change disappeared after an update | Expected: configuration follows the publisher. Recover it from `.data/dist/local-*` (patch and untracked archive) or the client's Git history and add it on the publisher side. |
