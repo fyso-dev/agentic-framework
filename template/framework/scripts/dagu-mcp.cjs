@@ -7,10 +7,13 @@ const path = require('node:path');
 const PROTOCOL = '2025-06-18';
 
 function forwarder(env = process.env) {
-  if (!env.FYSO_DAGU_PORT || !env.FYSO_ADMIN_USER || !env.FYSO_ADMIN_PASSWORD) throw Error('Dagu is not configured: run through mise');
+  // Bots get DAGU_MCP_AUTH from OpenMausBot (run-omb.sh), with no access to the decrypted login;
+  // everything else runs through mise and has the login itself.
+  const auth = env.DAGU_MCP_AUTH || (env.FYSO_ADMIN_USER && env.FYSO_ADMIN_PASSWORD && 'Basic ' + Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
+  if (!env.FYSO_DAGU_PORT || !auth) throw Error('Dagu is not configured: run through mise, or inside OpenMausBot (FYSO_DAGU_PORT, DAGU_MCP_AUTH)');
   const url = `http://127.0.0.1:${env.FYSO_DAGU_PORT}/mcp`;
   const cache = path.join(env.FYSO_DATA || '.data', 'panel', 'dagu-mcp-tools.json');
-  const headers = {Authorization: 'Basic ' + Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'),
+  const headers = {Authorization: auth,
     'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': PROTOCOL};
   let session = null, seq = 0;
 

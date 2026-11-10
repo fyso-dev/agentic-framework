@@ -1,0 +1,299 @@
+{
+  "note": "Real run on the disposable project (port block 29700). The scope \"ventas\" was created through fyso_workflow_scope_save; this is its server, started as project/mcp.json declares it, with the grant of one system workflow. Results are shortened.",
+  "configured": {
+    "scopes": [
+      {
+        "scope": "ventas",
+        "server": "dagu-ventas",
+        "selector": "mcp:dagu-ventas:*",
+        "workflows": [
+          "orders-summary",
+          "welcome-customer"
+        ],
+        "system": [
+          "fyso-setup-check"
+        ],
+        "bots": [
+          "Ventas Operator"
+        ]
+      }
+    ],
+    "system": [
+      "fyso-agent-connect",
+      "fyso-app-access",
+      "fyso-bot-architect",
+      "fyso-bots-apply",
+      "fyso-bots-plan",
+      "fyso-connector-preferences",
+      "fyso-dev-task",
+      "fyso-ext-catalog",
+      "fyso-ext-install",
+      "fyso-observability",
+      "fyso-setup-check",
+      "fyso-snapshot",
+      "fyso-workflow-scopes"
+    ],
+    "unscoped": [
+      {
+        "name": "hello"
+      }
+    ],
+    "fullAccess": {
+      "server": "dagu",
+      "bots": [
+        "Workflow Architect",
+        "Run Operator",
+        "Builder"
+      ]
+    },
+    "rules": "A bot with a scope server reads and runs only that scope (no changes, no inline specs). A bot with the dagu server reaches every workflow. Assign a server to a bot with fyso_bot_plan (tools.allow)."
+  },
+  "server": {
+    "name": "fyso-dagu-ventas",
+    "instructions": "Dagu workflows of scope \"ventas\" in this project. You can read and run these workflows only: fyso-setup-check, orders-summary, welcome-customer. List them with dagu_read target=dags. Changing workflows, inline specs, searches and the wiki are not available here.",
+    "tools": [
+      "dagu_execute",
+      "dagu_read"
+    ]
+  },
+  "steps": [
+    {
+      "step": "list workflows",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "dags"
+      },
+      "allowed": true,
+      "result": "{ \"scope\": \"ventas\", \"items\": [ { \"name\": \"fyso-setup-check\", \"description\": \"Panel setup-check\", \"class\": \"system\", \"uri\": \"dagu://dags/fyso-setup-check/spec\" }, { \"name\": \"orders-summary\", \"description\": \"Sends the weekly orders summary (built by an agent ov"
+    },
+    {
+      "step": "read spec in scope",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "dag_spec",
+        "name": "orders-summary"
+      },
+      "allowed": true,
+      "result": "Dagu read completed."
+    },
+    {
+      "step": "read spec of a project workflow outside",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "dag_spec",
+        "name": "hello"
+      },
+      "allowed": false,
+      "result": "hello is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "read spec of a system workflow",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "dag_spec",
+        "name": "fyso-snapshot"
+      },
+      "allowed": false,
+      "result": "fyso-snapshot is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "run in scope and wait",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "orders-summary",
+        "params": {
+          "SHOP": "sur"
+        },
+        "wait": true
+      },
+      "allowed": true,
+      "result": "Dagu execute action completed. The run finished with status succeeded."
+    },
+    {
+      "step": "run outside",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "hello",
+        "wait": true
+      },
+      "allowed": false,
+      "result": "hello is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "run a system workflow",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "enqueue",
+        "name": "fyso-bots-apply"
+      },
+      "allowed": false,
+      "result": "fyso-bots-apply is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "run an inline spec",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "orders-summary",
+        "spec": "steps:\n  - command: id\n",
+        "wait": true
+      },
+      "allowed": false,
+      "result": "spec is not available for dagu_execute in a workflow scope"
+    },
+    {
+      "step": "run with targetType inline_spec",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "start",
+        "name": "orders-summary",
+        "targetType": "inline_spec"
+      },
+      "allowed": false,
+      "result": "targetType is not available for dagu_execute in a workflow scope"
+    },
+    {
+      "step": "run history in scope",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "runs",
+        "name": "orders-summary"
+      },
+      "allowed": true,
+      "result": "{ \"items\": [ { \"dagRunId\": \"034vAbGz9cu2P7ELEjejqh\", \"finishedAt\": \"2026-11-10T09:49:23-03:00\", \"labels\": [ \"workspace=ventas\" ], \"name\": \"orders-summary\", \"startedAt\": \"2026-11-10T09:49:23-03:00\", \"status\": 4, \"statusLabel\": \"succeeded\", \"uri\": \"dagu://runs/o"
+    },
+    {
+      "step": "run history without a name",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "runs"
+      },
+      "allowed": false,
+      "result": "that workflow is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "run history with a free query",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "runs",
+        "name": "orders-summary",
+        "query": "name=hello"
+      },
+      "allowed": false,
+      "result": "query is not available for target runs in a workflow scope"
+    },
+    {
+      "step": "read by uri in scope",
+      "tool": "dagu_read",
+      "arguments": {
+        "uri": "dagu://dags/orders-summary/spec"
+      },
+      "allowed": true,
+      "result": "Dagu read completed."
+    },
+    {
+      "step": "read by uri outside",
+      "tool": "dagu_read",
+      "arguments": {
+        "uri": "dagu://dags/fyso-snapshot/spec"
+      },
+      "allowed": false,
+      "result": "fyso-snapshot is not in scope \"ventas\". Available: fyso-setup-check, orders-summary, welcome-customer"
+    },
+    {
+      "step": "read by uri with a path escape",
+      "tool": "dagu_read",
+      "arguments": {
+        "uri": "dagu://dags/orders-summary/../fyso-snapshot/spec"
+      },
+      "allowed": false,
+      "result": "only dagu://dags/<workflow>, dagu://runs/<workflow> and dagu://reference URIs are available in a workflow scope"
+    },
+    {
+      "step": "run a granted system workflow",
+      "tool": "dagu_execute",
+      "arguments": {
+        "action": "enqueue",
+        "name": "fyso-setup-check",
+        "wait": true
+      },
+      "allowed": true,
+      "result": "Dagu execute action completed. The run finished with status succeeded."
+    },
+    {
+      "step": "read by uri: wiki",
+      "tool": "dagu_read",
+      "arguments": {
+        "uri": "dagu://wiki/default/operations%2Forders-summary"
+      },
+      "allowed": false,
+      "result": "only dagu://dags/<workflow>, dagu://runs/<workflow> and dagu://reference URIs are available in a workflow scope"
+    },
+    {
+      "step": "search workflows",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "dag_search",
+        "search": "snapshot"
+      },
+      "allowed": false,
+      "result": "target dag_search is not available in a workflow scope. Available: dags, dag, dag_spec, runs, run, run_logs, step_log, foreach_items, foreach_item, references, reference"
+    },
+    {
+      "step": "read wiki",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "wiki",
+        "workspace": "all"
+      },
+      "allowed": false,
+      "result": "target wiki is not available in a workflow scope. Available: dags, dag, dag_spec, runs, run, run_logs, step_log, foreach_items, foreach_item, references, reference"
+    },
+    {
+      "step": "authoring reference",
+      "tool": "dagu_read",
+      "arguments": {
+        "target": "reference",
+        "name": "authoring"
+      },
+      "allowed": true,
+      "result": "Dagu read completed."
+    },
+    {
+      "step": "change a workflow",
+      "tool": "dagu_change",
+      "arguments": {
+        "mode": "apply",
+        "name": "orders-summary",
+        "spec": "steps:\n  - command: id\n"
+      },
+      "allowed": false,
+      "result": "dagu_change is not available in a workflow scope: this bot reads and runs workflows, it does not change them"
+    },
+    {
+      "step": "platform tool",
+      "tool": "fyso_status",
+      "arguments": {},
+      "allowed": false,
+      "result": "{\"code\":-32602,\"message\":\"unknown tool: fyso_status\"}"
+    }
+  ],
+  "bot": {
+    "name": "Ventas Operator",
+    "engine": "claude/claude-haiku-4-5",
+    "tools": [
+      "native:*",
+      "mcp:dagu-ventas:*"
+    ],
+    "asked": "list the workflows; run orders-summary with SHOP=este; try to run fyso-snapshot; try to read the spec of hello",
+    "reported": [
+      "dagu_read target=dags: fyso-setup-check (system), orders-summary, welcome-customer",
+      "dagu_execute start orders-summary SHOP=este wait=true: succeeded, run 034vAVTU25B3cVmBFJJFMk",
+      "dagu_execute start fyso-snapshot: fyso-snapshot is not in scope \"ventas\"",
+      "dagu_read dag_spec hello: hello is not in scope \"ventas\""
+    ],
+    "confirmedInDagu": "run 034vAVTU25B3cVmBFJJFMk of orders-summary, SHOP=este, succeeded"
+  }
+}

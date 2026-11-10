@@ -63,7 +63,9 @@ Feasible and not complex in itself: no code of ours filters anything. Do it only
 2. Workflows opt in with `labels: [workspace=<name>]`; `fyso-*` and `ext-*` stay unlabelled and therefore out of every scoped key.
 3. Up to two bot groups, each an `operator` key in a `BOT_*` secret and its own entry in `project/mcp.json`; the default `dagu` entry stays for bots that need everything (Workflow Architect, Run Operator, Builder).
 
-Not worth doing: a proxy of ours that filters workflows, or scoping by tool selector (it selects tools, not workflows).
+Not worth doing: scoping by tool selector (it selects tools, not workflows).
+
+**Outcome (same day, D60):** the auth change was judged too large for the need. Scopes were built with the same `workspace=` labels, enforced by a small filter in the platform MCP at operator level instead of by Dagu keys: no key limit, basic auth unchanged. This spike remains the path if bots must write workflows inside a subset or a real boundary is required.
 
 ## Not verified
 

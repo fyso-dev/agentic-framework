@@ -4,6 +4,8 @@
 // It also forwards Dagu's own MCP tools (D57), so an agent that reaches only this server
 // (a desktop app) can build and run workflows. `--no-dagu` turns that off where the Dagu
 // MCP is already a server of its own (the project's .mcp.json).
+// With `--scope <name> [--system a,b]` it serves only Dagu's read and execute tools, limited
+// to one workflow scope (D60): the entry a group of bots gets instead of the `dagu` server.
 // Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.
 // Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs --no-dagu`.
 const fs = require('node:fs');
@@ -16,7 +18,11 @@ const context = () => fs.readFileSync(path.join(ROOT, 'framework/agent-context.m
 const project = require('./project-map.cjs');
 // The guide explains how Fyso works; the brief says what this project contains.
 const instructions = () => { try { return `${context()}\n${project.brief(ROOT)}`; } catch { return context(); } };
-const FORWARD_DAGU = !process.argv.includes('--no-dagu');
+const option = name => { const at = process.argv.indexOf(name); return at < 0 ? null : process.argv[at + 1] || ''; };
+const SCOPE = option('--scope');
+const scopeGuard = SCOPE === null ? null : require('./dagu-scope.cjs').guard(ROOT, SCOPE, (option('--system') || '').split(',').filter(Boolean));
+const FORWARD_DAGU = !!scopeGuard || !process.argv.includes('--no-dagu');
+const scopes = require('./workflow-scopes.cjs');
 let forwarder;
 const daguMcp = () => forwarder ||= require('./dagu-mcp.cjs').forwarder();
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -161,6 +167,28 @@ const TOOLS = {
       return workflow('fyso-connector-preferences', {OP: 'save', SETTINGS_B64: b64(features)});
     },
   },
+  fyso_workflow_scopes: {
+    description: 'Which workflows are system ones (framework and extension: fyso-*, ext-*) and which named scopes exist: for each scope its MCP server, the project workflows it holds (Dagu label workspace=<scope>), the system workflows it grants, and the bots that use it. Also the project workflows in no scope and the bots with full Dagu access. Read from the repository; works with the stack down.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => scopes.read(ROOT),
+  },
+  fyso_workflow_scope_save: {
+    description: 'Create or replace a workflow scope: a subset of workflows a group of bots may read and run, and nothing else in Dagu. `workflows` are project workflows; after saving exactly those carry the label workspace=<scope> (a workflow is in one scope at most). `system` grants system workflows by name (e.g. "fyso-dev-task"); none by default. Writes the labels and the dagu-<scope> entry of project/mcp.json and commits them. Then assign it to bots with fyso_bot_plan (tools.allow "mcp:dagu-<scope>:*").',
+    inputSchema: obj({
+      scope: str('Scope name: lowercase letters, digits, dashes'),
+      workflows: {type: 'array', description: 'Project workflow names in the scope', items: {type: 'string'}},
+      system: {type: 'array', description: 'System workflow names the scope may also read and run', items: {type: 'string'}},
+    }, ['scope', 'workflows']),
+    annotations: {destructiveHint: true},
+    run: ({scope, workflows, system = []}) => workflow('fyso-workflow-scopes', {OP: 'save', INPUT_B64: b64({scope, workflows, system})}),
+  },
+  fyso_workflow_scope_delete: {
+    description: 'Remove a workflow scope: its dagu-<scope> entry and its labels, committed. Refused while a declared bot still selects it; change that bot first with fyso_bot_plan.',
+    inputSchema: obj({scope: str('Scope name')}, ['scope']),
+    annotations: {destructiveHint: true},
+    run: ({scope}) => workflow('fyso-workflow-scopes', {OP: 'delete', INPUT_B64: b64({scope})}),
+  },
   fyso_logs: {
     description: 'Last lines of one process of this project\'s stack (as `mise run logs`, without following): dagu, omb, caddy, web-auth or an extension\'s process. Without a process, lists the processes. For a failed workflow run read its step log through dagu_read instead.',
     inputSchema: obj({process: str('Process name; omit to list them'), lines: {type: 'integer', description: 'Lines from the end (default 100, at most 500)'}}),
@@ -220,6 +248,7 @@ function validate(schema, args) {
     if (prop.type === 'string' && typeof value !== 'string') throw new Error(`${key} must be a string`);
     if (prop.type === 'boolean' && typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
     if (prop.type === 'integer' && !Number.isInteger(value)) throw new Error(`${key} must be an integer`);
+    if (prop.type === 'array' && (!Array.isArray(value) || value.some(item => typeof item !== 'string'))) throw new Error(`${key} must be a list of strings`);
     if (prop.type === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) throw new Error(`${key} must be an object`);
     if (prop.enum && !prop.enum.includes(value)) throw new Error(`${key} must be one of ${prop.enum.join(', ')}`);
   }
@@ -230,21 +259,27 @@ async function handle(msg) {
   switch (method) {
     case 'initialize': {
       const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
+      if (scopeGuard) return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: `fyso-dagu-${SCOPE}`, version: VERSION},
+        instructions: `Dagu workflows of scope "${SCOPE}" in this project. You can read and run these workflows only: ${[...scopeGuard.names().keys()].join(', ') || 'none yet'}. List them with dagu_read target=dags. Changing workflows, inline specs, searches and the wiki are not available here.`};
       return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso', version: VERSION},
         instructions: instructions()};
     }
     case 'ping': return {};
     case 'tools/list': {
-      const own = Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
+      const own = scopeGuard ? [] : Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
       let forwarded = [];
       if (FORWARD_DAGU) try { forwarded = await daguMcp().tools(); } catch {}
-      return {tools: [...own, ...forwarded]};
+      return {tools: [...own, ...(scopeGuard ? scopeGuard.tools(forwarded) : forwarded)]};
     }
     case 'tools/call': {
-      const tool = TOOLS[params.name];
+      const tool = scopeGuard ? undefined : TOOLS[params.name];
       if (!tool && FORWARD_DAGU && /^dagu_[a-z_]+$/.test(params.name || '')) {
-        try { return await daguMcp().call(params.name, params.arguments || {}); }
-        catch (e) { return {isError: true, content: [{type: 'text', text: e.message}]}; }
+        try {
+          const args = params.arguments || {};
+          if (!scopeGuard) return await daguMcp().call(params.name, args);
+          const local = scopeGuard.check(params.name, args);   // throws when outside the scope
+          return local || scopeGuard.shape(params.name, args, await daguMcp().call(params.name, scopeGuard.rewrite(params.name, args)));
+        } catch (e) { return {isError: true, content: [{type: 'text', text: e.message}]}; }
       }
       if (!tool) throw Object.assign(new Error(`unknown tool: ${params.name}`), {code: -32602});
       try {

@@ -1,4 +1,6 @@
 description: Panel ext-catalog (extension marketplace, D31)
+labels:
+  - fyso=system
 type: graph
 max_active_runs: 1
 env:

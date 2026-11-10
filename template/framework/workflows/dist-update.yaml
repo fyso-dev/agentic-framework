@@ -4,6 +4,8 @@
 # merge-memory: three-way union of the delivered memory into each bot's own memory.
 # apply: bots, extensions and memory into the running services, then one commit.
 description: Update this project from its distribution
+labels:
+  - fyso=system
 type: graph
 max_active_runs: 1
 params:
