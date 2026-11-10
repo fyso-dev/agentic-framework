@@ -126,7 +126,8 @@ class SilverBulletIntegration(unittest.TestCase):
         child.wait(timeout=10)
         self.start()
         self.assertEqual(self.space.joinpath('index.md').read_text(), '# Existing home\n')
-        result = subprocess.run(['bash', 'extensions/silverbullet/doctor.sh'],
+        # Only the editor runs here; the upload receiver is covered by the project doctor.
+        result = subprocess.run(['bash', 'extensions/silverbullet/doctor.sh', 'editor'],
                                 cwd=self.root, env=self.env, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
 

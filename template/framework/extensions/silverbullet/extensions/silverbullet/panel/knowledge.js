@@ -1,12 +1,14 @@
 // Knowledge page (extensions-contract §9): the SilverBullet editor inside the panel,
 // with a short guide on how pages get there. No build step: panel SDK v1 as an ES module.
 const sdk = await import(new URL('/assets/extension-sdk.js', location.origin).href);
-const {mountExtensionPage, createElement: h, useState, useTranslation, useStore} = sdk;
+const {mountExtensionPage, createElement: h, useState, useEffect, useTranslation, useStore, useDaguAction, ActionButton, ActionStatus} = sdk;
 
 const EXT = 'silverbullet';
 const SKILL = '${FYSO_ROOT}/extensions/silverbullet/skills/project-knowledge/SKILL.md';
 const FOLDER = 'project/wiki/';
 const GUIDE_KEY = 'fyso.ext.silverbullet.guide';
+const IMPORT_DAG = 'ext-silverbullet-import';
+const BATCH = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const stored = () => { try { return localStorage.getItem(GUIDE_KEY); } catch { return null; } };
 
 function Copy({text, code}) {
@@ -45,10 +47,66 @@ function Way({n, title, body, children}) {
     h('h2', null, h('span', {className: 'kb-num', 'aria-hidden': 'true'}, n), title), h('p', null, body), children);
 }
 
+// Import with AI (D56): the picker (on the knowledge base's own origin) uploads a folder
+// or zip and reports its batch; this page starts the workflow and shows what it wrote.
+function Import({app, onReport}) {
+  const {t, i18n} = useTranslation();
+  const {backend} = useStore();
+  const action = useDaguAction(backend, IMPORT_DAG, 'RESULT');
+  const [upload, setUpload] = useState(null);
+  const [round, setRound] = useState(0);
+  const origin = new URL(app.url).origin;
+  useEffect(() => {
+    const listen = event => {
+      const d = event.data;
+      if (event.origin !== origin || d?.type !== 'fyso-kb-import' || !BATCH.test(d.batch)) return;
+      setUpload({batch: d.batch, files: Number(d.files) || 0, pending: Number(d.pending) || 0});
+    };
+    addEventListener('message', listen);
+    return () => removeEventListener('message', listen);
+  }, [origin]);
+  const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
+  const theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light';
+  const running = action.phase === 'running';
+  const ready = !!upload && upload.files > 0 && upload.pending === 0;
+  const run = async () => {
+    const result = await action.start({BATCH: upload.batch, LANG_UI: lang});
+    // The workflow consumed the batch either way: a fresh picker, with a new one.
+    setUpload(null);
+    setRound(n => n + 1);
+    if (result?.report) onReport(result.report);
+  };
+  const result = action.phase === 'ok' && action.output;
+  let status = h(ActionStatus, {action});
+  if (!running && ready) status = h('span', {className: 'action-status', role: 'status'}, t('kb.import.ready', {count: upload.files}));
+  else if (!running && upload?.pending) status = h('span', {className: 'action-status', role: 'status'}, t('kb.import.uploading'));
+  else if (action.phase === 'never') status = h('span', {className: 'action-status'}, t('kb.import.waiting'));
+  return h('section', {className: 'card kb-import', 'aria-label': t('kb.import.title')},
+    h('iframe', {key: round, className: 'kb-picker', title: t('kb.import.frame'),
+      src: `${origin}/.kb/picker/index.html?lang=${lang}&theme=${theme}`}),
+    h('div', {className: 'kb-import-side'},
+      h('h2', null, t('kb.import.title')),
+      h('p', null, t('kb.import.lead')),
+      h('p', {className: 'kb-privacy'}, t('kb.import.privacy')),
+      h('div', {className: 'kb-import-run'},
+        ready || running
+          ? h(ActionButton, {action, label: t('kb.import.run'), busyLabel: t('kb.import.running'), onRun: run, primary: true})
+          : h('button', {type: 'button', className: 'btn btn-sm btn-pri', disabled: true}, t('kb.import.run')),
+        status),
+      action.phase === 'failed' && h('p', {role: 'alert', className: 'action-error'},
+        h('strong', null, action.error || t('kb.import.failed'))),
+      result && h('p', {className: 'kb-result', role: 'status'},
+        t('kb.import.done', {count: result.created.length}),
+        result.conflicts.length > 0 && ` ${t('kb.import.conflicts', {count: result.conflicts.length})}`, ' ',
+        h('button', {type: 'button', className: 'kb-link', onClick: () => onReport(result.report)}, t('kb.import.report')))));
+}
+
 function Page() {
   const {t} = useTranslation();
   const {apps} = useStore();
   const [guide, setGuide] = useState(() => stored() !== '0');
+  const [importing, setImporting] = useState(false);
+  const [page, setPage] = useState('');
   const toggle = () => {
     try { localStorage.setItem(GUIDE_KEY, guide ? '0' : '1'); } catch { /* storage is optional */ }
     setGuide(!guide);
@@ -64,9 +122,13 @@ function Page() {
     guide && h('div', {className: 'kb-guide'},
       h(Way, {n: 1, title: t('kb.write.title'), body: t('kb.write.body')}),
       h(Way, {n: 2, title: t('kb.ask.title'), body: t('kb.ask.body')}, h(Bots), h(Copy, {text: t('kb.ask.example')})),
-      h(Way, {n: 3, title: t('kb.files.title'), body: t('kb.files.body')}, h(Copy, {text: FOLDER, code: true})),
+      h(Way, {n: 3, title: t('kb.files.title'), body: t('kb.files.body')},
+        app && h('button', {type: 'button', className: 'btn btn-sm btn-pri kb-import-open', 'aria-expanded': importing,
+          onClick: () => setImporting(!importing)}, t(importing ? 'kb.import.close' : 'kb.import.open')),
+        h(Copy, {text: FOLDER, code: true})),
+      importing && app && h(Import, {app, onReport: setPage}),
       h('p', {className: 'kb-note'}, t('kb.note'))),
-    app ? h('iframe', {className: 'kb-frame', title: t('kb.frame'), src: app.url})
+    app ? h('iframe', {className: 'kb-frame', title: t('kb.frame'), src: page ? `${app.url.replace(/\/$/, '')}/${encodeURI(page)}` : app.url})
       : apps.status !== 'loading' && h('p', {className: 'kb-empty', role: 'alert'}, t('kb.unavailable')));
 }
 

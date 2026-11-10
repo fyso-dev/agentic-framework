@@ -19,10 +19,20 @@ html, body, #root { height: 100%; margin: 0; }
 .kb-bots .btn { height: 26px; padding: 0 10px; font-size: 12px; }
 .kb-bots .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kb-note { grid-column: 1 / -1; font-size: 12px; color: var(--fy-mute); padding: 0 4px; }
+.kb-import-open { align-self: flex-start; }
+.kb-import { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; padding: 14px 16px; }
+.kb-picker { width: 100%; height: 254px; border: 0; background: transparent; }
+.kb-import-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.kb-import-side h2 { font-size: 14px; font-weight: 700; }
+.kb-import-side p { font-size: 13px; color: var(--fy-mute); }
+.kb-import-side .kb-privacy { font-size: 12px; }
+.kb-import-run { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
+.kb-import-side .kb-result { color: inherit; }
+.kb-link { padding: 0; border: 0; background: none; color: var(--fy-accent-text); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .kb-frame { flex: 1; min-height: 0; width: 100%; border: 0; border-top: 1px solid var(--fy-edge); background: var(--fy-surface); }
 .kb-empty { padding: 24px 20px; color: var(--fy-mute); }
 @media (max-width: 900px) {
   .kb { height: auto; }
-  .kb-guide { grid-template-columns: 1fr; }
+  .kb-guide, .kb-import { grid-template-columns: 1fr; }
   .kb-frame { flex: none; height: 75dvh; }
 }

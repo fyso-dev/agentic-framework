@@ -3,8 +3,8 @@
 An opt-in bundled Copier extension, under `template/framework/extensions/silverbullet/`.
 It fills the existing extension slots ([contract](extensions-contract.md)) without
 changing a project's team file or framework configuration. Decisions: **D53**
-(the extension), **D54** (per-bot skill toggle) and **D55** (panel page and
-web access), [PLAN](PLAN.md).
+(the extension), **D54** (per-bot skill toggle), **D55** (panel page and
+web access) and **D56** (AI import), [PLAN](PLAN.md).
 
 ## Components and source of truth
 
@@ -17,6 +17,8 @@ web access), [PLAN](PLAN.md).
 | Browser access | `http://docs.<slug>-<port_base>.localhost:<port_base>`, behind the framework's web login (`import fyso_login`); panel users may open it (D55) |
 | Process | `ext-silverbullet`, loopback only, on the extension port (first free port of `port_base + 10…19`) |
 | Agent instructions | `project-knowledge` skill, enabled per bot in the panel |
+| Import: upload | [tusd](https://github.com/tus/tusd) **2.10.1** (process `ext-silverbullet-upload`, Unix socket, no port) and the [Uppy](https://uppy.io) **6.0.7** picker |
+| Import: conversion | `ext-silverbullet-import` workflow: `extract-zip` **2.0.1**, pandoc **3.13**, gitleaks, and Dagu's `harness.run` agent (Claude Code or Codex) |
 
 SilverBullet reads and edits the same Markdown files that agents access. The
 extension creates an initial `index.md` on startup only if it does not exist.
@@ -60,7 +62,8 @@ framework's panel has no SilverBullet code. It shows:
      access, changed but not applied, or a **Give access** link that opens the
      bot's profile at the `project-knowledge` switch of D54) and an example
      request to copy.
-  3. *Bring what you already have*: copy Markdown files into `project/wiki/`.
+  3. *Bring what you already have*: **Import with AI** (below), or copy
+     Markdown files into `project/wiki/`.
 - The guide folds away; the choice is remembered in that browser.
 
 The first home page (`index.md`, written only when absent) repeats the three
@@ -90,6 +93,48 @@ apps:
 
 `ext:add` and `ext:update` restart the login authority so the rule applies at
 once. Existing web sessions survive that restart.
+
+## Import with AI (D56)
+
+**Import with AI**, on the third card of the Knowledge page, turns documents a
+team already has into pages:
+
+1. **Pick.** Drop or choose a folder, a zip or single files. The picker is Uppy;
+   uploads are resumable (tus) and go to `.data/ext/silverbullet/uploads/`, not
+   into the wiki. Hidden files, `node_modules` and `__MACOSX` are left out.
+2. **Convert.** The person presses **Turn into pages**. Nothing runs before
+   that: the page says that the content goes to the project's AI provider.
+3. **Read the report.** The editor opens `Importaciones/<date time>` (`Imports/…`
+   in English): new pages, pages not imported because the name existed, files
+   not read, and the agent's notes. The home page gets one link to the list of
+   imports.
+
+The workflow `ext-silverbullet-import` (params `BATCH`, `PROVIDER`, `MODEL`,
+`LANG_UI`; output `RESULT`) is the same shape as `fyso-dev-task`:
+
+| Step | What it does |
+|---|---|
+| `prepare` | Moves the uploads of that batch into a private work directory (`.data/ext/silverbullet/import/<run>/source`), with client names reduced to safe relative paths. Extracts zips, converts `.docx .odt .rtf .epub .html` to Markdown with pandoc, keeps text formats and PDFs, lists the rest as not read. Fails on a credential (gitleaks, file names only) and over the limits |
+| `agent_claude` / `agent_codex` | Dagu `harness.run` in the work directory: reads `source/`, writes pages by topic in `out/` with links and a source line, and optional `notes.md`. It gets the list of existing pages to link to and not to reuse |
+| `gate` | `out/` must hold only Markdown pages with safe names, within the size limits and without credentials. Links are removed, never followed |
+| `publish` | Copies pages that do **not** exist yet into `project/wiki/`; existing pages are never changed. Writes the report, links it, removes the work directory, prints `RESULT` (`report`, `created`, `conflicts`, `skipped`, `files`) |
+
+On failure the uploaded originals are deleted; pages the agent already wrote
+stay in the work directory for inspection. Uploads nobody converted are dropped
+after a day, on the next import.
+
+Limits of this first version: **200 files** and **4 MB of text** per import
+(import a smaller folder, more than once), 1 GB per uploaded file, 300 pages
+written. PDFs are passed to the agent unconverted: Claude Code reads them,
+Codex may list them as not read. Scanned documents get no OCR. There is no
+review step before pages appear: they are additive, the report lists them, and
+the project's Git history is the undo.
+
+The agent's file access is narrowed with the engine's own permission rules
+(Claude: read below the work directory, write below `out/`; Codex:
+`workspace-write` sandbox). That is not an OS sandbox, and uploaded documents
+are untrusted text: the prompt tells the agent to treat them as data, and the
+gate checks what comes out, but review imported pages before relying on them.
 
 ## Connect agents
 
@@ -171,6 +216,20 @@ its own Git repository and add it to a catalog (extensions-contract §8).
 To remove, run `mise run ext:remove silverbullet` and restart the project's
 stack. `project/wiki/` and `.data/ext/silverbullet/` remain. Switch the skill
 off on the bots that used it first.
+
+## Verification of the AI import (2026-11-10, D56)
+
+On the same generated project (macOS, Claude engine),
+`tests/silverbullet-import-browser.cjs` uploaded a folder (text, Markdown,
+Word) and a zip through the picker, started the workflow from the page and
+checked the result on disk: 7 pages by topic that kept the facts of the
+sources, a report linking each of them, one link from the home page, and no
+upload left behind. A document with a credential-shaped value was refused
+before the agent ran and wrote nothing. `tests/silverbullet-import.test.cjs`
+covers the glue steps without network or agent. Results and screenshots:
+[evidence](../artifacts/delivery-evidence/silverbullet/README.md). It takes the
+same environment variables as the test below and runs one real agent turn.
+Not verified: the Codex engine, PDFs, folders near the limits, Linux.
 
 ## Verification of the panel page and web access (2026-11-10, D55)
 
