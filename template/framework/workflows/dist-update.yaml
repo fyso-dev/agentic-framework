@@ -10,6 +10,8 @@ params:
   - VERSION: ""
 env:
   - ROOT: ${FYSO_ROOT}
+  # run-dagu.sh passes the project's age key path; mise needs it to decrypt the secrets.
+  - MISE_SOPS_AGE_KEY_FILE: ${FYSO_COMPOSIO_AGE_KEY_FILE}
 working_dir: ${ROOT}
 steps:
   # mise exec: Dagu steps start from a cleared environment (ports, secrets, tools).
