@@ -16,6 +16,7 @@ import { ExtensionSetup } from "../components/ExtensionSetup";
 import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { CopyLine } from "../components/ui";
 import { localized } from "../lib/i18n";
+import { extensionSkillFile, listedBots } from "../lib/team";
 import { go, href, type AppsTab } from "../lib/router";
 import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { useStore } from "../store";
@@ -236,7 +237,7 @@ function InstallOutcome({ entry, market, where }: { entry: MarketplaceEntry; mar
 function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: MarketplaceEntry; market: Market }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { reload } = useStore();
+  const { reload, workingBots, team, draft } = useStore();
   const missing = ext.secrets.filter((x) => x.required && !x.set);
   const caps = [
     { n: ext.mcpServers.length, tip: t("ext.mcpTip"), Icon: IconPlug },
@@ -285,6 +286,15 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
           {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
         </ul>
       )}
+      {(team.status === "ok" || draft !== null) && ext.skills.map((skill) => {
+        const file = extensionSkillFile(ext.id, skill);
+        const count = listedBots(workingBots).filter((bot) => bot.skillFiles.includes(file)).length;
+        return (
+          <p key={skill} className="sub">
+            <span className="mono">{skill}</span> · {t("ext.skillBots", { count })} · <a href={href.bots}>{t("ext.skillChoose")}</a>
+          </p>
+        );
+      })}
       <ExtensionSetup ext={ext} onSaved={reload} />
       <div className="ap-foot">
         <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>

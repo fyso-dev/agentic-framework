@@ -434,7 +434,11 @@
       "example": "That looks like an example, not your key ({{names}}). Create a new key on the keys page and copy the block shown in the key's dialog: it is shown in full only once."
     },
     "run": "Run now",
-    "running": "Running…"
+    "running": "Running…",
+    "skillBots_zero": "no bot uses it",
+    "skillBots_one": "{{count}} bot uses it",
+    "skillBots_other": "{{count}} bots use it",
+    "skillChoose": "Choose bots"
   },
   "market": {
     "title": "Marketplace",
