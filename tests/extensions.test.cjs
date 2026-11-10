@@ -16,13 +16,18 @@ function fixture(fn) {
   const run=(args,extra={})=>spawnSync(args[0]==='node'?process.execPath:args[0],args.slice(1),{cwd:root,env:{...env,...extra},encoding:'utf8'});
   try {fn({root,put,run,env});}finally{fs.rmSync(root,{recursive:true,force:true});}
 }
-test('MCP merges framework, project and sorted extensions, preserving placeholders',()=>fixture(({root,put,run})=>{
-  put('project/mcp.json',JSON.stringify({mcpServers:{project:{url:'${TOKEN}'}}}));
-  put('extensions/sample/mcp.json',JSON.stringify({mcpServers:{sample:{url:'${FYSO_EXT_SAMPLE_PORT}'}}}));
-  const result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
+test('MCP merges framework, project and sorted extensions, preserving placeholders except project ports in URLs',()=>fixture(({root,put,run})=>{
+  put('project/mcp.json',JSON.stringify({mcpServers:{project:{url:'${TOKEN}',headers:{'X-Port':'${FYSO_DAGU_PORT}'}}}}));
+  put('extensions/sample/mcp.json',JSON.stringify({mcpServers:{sample:{url:'http://127.0.0.1:${FYSO_EXT_SAMPLE_PORT}/mcp?next=${FYSO_EXT_ABSENT_PORT}'}}}));
+  const result=run(['node','framework/scripts/mcp-config.cjs'],{FYSO_DAGU_PORT:'8401',FYSO_EXT_SAMPLE_PORT:'8410',DAGU_MCP_AUTH:'Basic secret'});assert.equal(result.status,0,result.stderr);
   const config=JSON.parse(fs.readFileSync(path.join(root,'.mcp.json')));
   assert.deepEqual(Object.keys(config.mcpServers),['dagu','fyso','project','sample']);
   assert.equal(config.mcpServers.project.url,'${TOKEN}');
+  // OMB rejects a URL with a placeholder port for bots with a tool selection.
+  assert.equal(config.mcpServers.dagu.url,'http://127.0.0.1:8401/mcp');assert.doesNotThrow(()=>new URL(config.mcpServers.dagu.url));
+  assert.equal(config.mcpServers.sample.url,'http://127.0.0.1:8410/mcp?next=${FYSO_EXT_ABSENT_PORT}');
+  assert.equal(config.mcpServers.dagu.headers.Authorization,'${DAGU_MCP_AUTH}','secrets are never written');
+  assert.equal(config.mcpServers.project.headers['X-Port'],'${FYSO_DAGU_PORT}','only URLs are touched');
 }));
 test('MCP duplicate reports both owners and leaves previous output intact',()=>fixture(({root,put,run})=>{
   put('.mcp.json','original');put('extensions/sample/mcp.json','{"mcpServers":{"dagu":{}}}');
