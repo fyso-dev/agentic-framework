@@ -71,6 +71,16 @@ function brief(root, env = process.env) {
     '- `fyso_project` returns this map in full; `fyso_files` / `fyso_file_read` read the project\'s own files and guides.', ''].join('\n');
 }
 
+// Where a link really points must pass the same exclusions as the link itself: inside the
+// project, not hidden (.data, .git), not snapshots (state), not login or secret-like files.
+// Framework workflow links (project/workflows -> framework/workflows) stay readable.
+function safeTarget(base, real) {
+  if (real === base) return true;
+  if (!real.startsWith(base + path.sep)) return false;
+  const target = path.relative(base, real).split(path.sep).join('/');
+  return !/^state(\/|$)/.test(target) && !DENIED.some(pattern => pattern.test(target));
+}
+
 // A readable project-relative path, or an error. Symlinks must stay inside the project.
 function resolve(root, relative = '') {
   const clean = path.posix.normalize(String(relative).replaceAll('\\', '/')).replace(/^(\.\/)+/, '').replace(/\/$/, '');
@@ -82,6 +92,7 @@ function resolve(root, relative = '') {
   if (!fs.existsSync(absolute)) throw Error(`not found: ${clean}`);
   const real = fs.realpathSync(absolute), base = fs.realpathSync(root);
   if (real !== base && !real.startsWith(base + path.sep)) throw Error(`not readable: ${clean} points outside the project`);
+  if (!safeTarget(base, real)) throw Error(`not readable: ${clean} points to a login, hidden, runtime or secret-like file`);
   return {clean, absolute};
 }
 
@@ -96,7 +107,7 @@ function list(root, relative = '') {
       if (DENIED.some(pattern => pattern.test(entry))) continue;
       // Linked files inside the project are listed (framework workflows); linked folders are never followed.
       const link = fs.lstatSync(absolute).isSymbolicLink(), stat = fs.statSync(absolute, {throwIfNoEntry: false});
-      if (!stat || (link && (stat.isDirectory() || !fs.realpathSync(absolute).startsWith(base + path.sep)))) continue;
+      if (!stat || (link && (stat.isDirectory() || !safeTarget(base, fs.realpathSync(absolute))))) continue;
       if (entries.length >= MAX_ENTRIES) return;
       if (stat.isDirectory()) walk(entry); else entries.push({path: entry, type: 'file', bytes: stat.size});
     }

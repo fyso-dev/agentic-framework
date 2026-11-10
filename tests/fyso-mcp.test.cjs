@@ -149,6 +149,10 @@ function sampleProject() {
   put('extensions/sample/skills/help/SKILL.md','Help');put('extensions/sample/mcp.json','{"mcpServers":{"sample":{}}}');
   put('secrets.enc.yaml','x: ENC');put('.data/panel/project.json','{}');put('outside.txt','no');
   fs.symlinkSync(path.join(root,'..'),path.join(root,'project/escape'));
+  // Allowed names that point at excluded files inside the project.
+  fs.symlinkSync('auth/tinyauth.yaml',path.join(root,'project/guide.yaml'));
+  fs.symlinkSync('../.data/panel/project.json',path.join(root,'project/runtime.json'));
+  fs.symlinkSync('../secrets.enc.yaml',path.join(root,'project/settings.yaml'));
   return root;
 }
 
@@ -182,8 +186,9 @@ test('files are read-only and confined: no secrets, logins, runtime data, hidden
     assert.ok(projectMap.list(root).entries.some(e=>e.path==='project'&&e.type==='dir'));
     const listed=projectMap.list(root,'project').entries.map(e=>e.path);
     assert.ok(listed.includes('project/wiki/customers/onboarding.md'));
-    for(const hidden of ['project/auth/tinyauth.yaml','project/api-token.txt'])assert.ok(!listed.includes(hidden),hidden);
-    for(const denied of ['secrets.enc.yaml','.data/panel/project.json','outside.txt','project/auth/tinyauth.yaml','project/api-token.txt','project/../secrets.enc.yaml','../x','/etc/hosts','project/escape/x','.copier-answers.ext-sample.yml','framework/scripts/x.cjs'])
+    for(const hidden of ['project/auth/tinyauth.yaml','project/api-token.txt','project/guide.yaml','project/runtime.json','project/settings.yaml'])assert.ok(!listed.includes(hidden),hidden);
+    assert.ok(listed.includes('project/workflows/fyso-snapshot.yaml'));   // framework workflow link stays listed
+    for(const denied of ['project/guide.yaml','project/runtime.json','project/settings.yaml','secrets.enc.yaml','.data/panel/project.json','outside.txt','project/auth/tinyauth.yaml','project/api-token.txt','project/../secrets.enc.yaml','../x','/etc/hosts','project/escape/x','.copier-answers.ext-sample.yml','framework/scripts/x.cjs'])
       assert.throws(()=>projectMap.read(root,denied),/not readable|relative to the project|not found/,denied);
     assert.throws(()=>projectMap.read(root,'project/logo.bin'),/not a text file/);
     assert.throws(()=>projectMap.read(root,'project'),/folder/);
