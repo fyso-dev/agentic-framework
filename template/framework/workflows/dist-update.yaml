@@ -16,10 +16,10 @@ steps:
   # VERSION reaches the script as an env var, never through the shell command line.
   - id: fetch
     command: mise exec -- framework/scripts/dist.sh fetch
-  - id: merge-memory
+  - id: merge_memory
     command: mise exec -- framework/scripts/dist.sh merge-memory
     depends: [fetch]
   - id: apply
     command: mise exec -- framework/scripts/dist.sh apply
-    depends: [merge-memory]
+    depends: [merge_memory]
     output: RESULT
