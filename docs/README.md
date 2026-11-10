@@ -57,7 +57,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: shared wiki files, official filesystem MCP, per-bot skill, install and verification (D53, D54) | [silverbullet-extension.md](silverbullet-extension.md) |
-| Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D55) | [distribution.md](distribution.md) |
+| Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D55) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
 | Agent surface: the `fyso` platform MCP (typed tools over the panel workflows) and Dagu's MCP + skill for coding agents (D33) | [agent-surface.md](agent-surface.md) |

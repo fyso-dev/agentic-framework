@@ -8,7 +8,7 @@ publisher project  ──dist:publish──▶ distribution repo (tags v1, v2, �
                                      └──dist:add / dist:update──▶ client projects
 ```
 
-Flow is one-way: publisher → clients. Clients do not send changes back (not in scope yet).
+Flow is one-way: publisher → clients. Clients do not send changes back (not in scope yet). Step-by-step for a real client: [guide-share-project.md](guide-share-project.md).
 
 ## 1. What travels
 
