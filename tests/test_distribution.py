@@ -1,4 +1,4 @@
-"""Project distributions (D55): publish → add → local changes → publish v2 → update.
+"""Project distributions (D56): publish → add → local changes → publish v2 → update.
 
 Real git, Copier 9.19.1 (uvx), SOPS and age; no running stack (the client has never
 started, so `up` would restore bots and memory from git).

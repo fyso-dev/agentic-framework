@@ -1,4 +1,4 @@
-# Project distributions (D55)
+# Project distributions (D56)
 
 Prepare a Fyso project the way a client needs it, publish it, and let the client install it and keep receiving your improvements. It works like `copier update` for the framework, one level down: the framework brings the machinery, a **distribution** brings a project's configuration, documents and bot memory.
 

@@ -1,4 +1,4 @@
-# Evidence — project distributions (D55)
+# Evidence — project distributions (D56)
 
 Contract: [docs/distribution.md](../../../docs/distribution.md). Date: 2026-11-10.
 

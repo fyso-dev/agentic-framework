@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live check of D55 on generated projects: publisher (not running) -> client (running stack).
+# Live check of D56 on generated projects: publisher (not running) -> client (running stack).
 # Works in .data/dist-check (gitignored) with its own age keys; never touches the user's key or
 # services. Port blocks 29700 (client, started and left running) and 29720 (publisher, never started).
 # Run from the repo, with the branch committed:

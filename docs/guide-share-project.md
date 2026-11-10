@@ -2,7 +2,7 @@
 
 You set up a Fyso project the way a client needs it (bots, workflows, extensions, documents, what the bots already know), hand it over, and keep sending improvements. The client works with it every day; your next version arrives without wiping what their bots learned.
 
-How it works and every rule in detail: [distribution.md](distribution.md) (D55). This page is the step-by-step.
+How it works and every rule in detail: [distribution.md](distribution.md) (D56). This page is the step-by-step.
 
 | | You (publisher) | The client |
 |---|---|---|

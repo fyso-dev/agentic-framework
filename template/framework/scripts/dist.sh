@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Project distributions (D55, docs/distribution.md): one project publishes its configuration,
+# Project distributions (D56, docs/distribution.md): one project publishes its configuration,
 # documents and bot memory as a versioned Copier template; other projects install it and
 # update from it. The distribution's files win; delivered memory merges with local memory.
 #   dist.sh publish [version]       publisher: export committed files to project/distribution.yaml's repo

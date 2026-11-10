@@ -1,4 +1,4 @@
-# Update this project from its distribution (D55, docs/distribution.md).
+# Update this project from its distribution (D56, docs/distribution.md).
 # Owned by the framework; project/workflows/fyso-dist-update.yaml links here.
 # fetch: snapshot, then Copier recopy (the distribution's files win) and received secrets.
 # merge-memory: three-way union of the delivered memory into each bot's own memory.
