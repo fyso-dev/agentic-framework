@@ -142,9 +142,8 @@ On a project generated from this branch (slug `sbmain`, port block 29500, macOS)
 - Asked a question answerable only from a synthetic wiki page, without naming
   any tool, the Workflow Architect (Claude) called
   `mcp__silverbullet__search_files` and `read_file`, answered correctly and
-  cited the page. **Caveat:** this turn needed `${FYSO_DAGU_PORT}` written
-  literally in the local `.mcp.json`; see the 2026-11-10 finding in the
-  [docs index](README.md) about bots with a tool allow-list on OpenMausBot 0.1.141.
+  cited the page. At that time the turn needed `${FYSO_DAGU_PORT}` written
+  literally in the local `.mcp.json`; the generator does that itself since D55.
 
 An earlier run (2026-11-09, before the port to the current template) is kept as
 [sanitized tool evidence](../artifacts/delivery-evidence/silverbullet/agent-mcp-proof.json).

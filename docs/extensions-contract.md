@@ -87,7 +87,7 @@ processes:
 2. `project/mcp.json` (owned by the project, optional);
 3. `extensions/*/mcp.json`.
 
-A duplicate server name fails, naming both files. `${VAR}` placeholders are kept as they are (Claude Code expands them). `.mcp.json` is in `.gitignore`; its sources are in git.
+A duplicate server name fails, naming both files. `${VAR}` placeholders are kept as they are (Claude Code expands them), with one exception (D55): in a server `url`, `${FYSO_…_PORT}` is replaced with the project's port number when that variable is set. OpenMausBot validates the URL before expanding placeholders and rejects the server for bots with a tool selection. Ports are not secrets; credentials such as `${DAGU_MCP_AUTH}` are never written. `.mcp.json` is in `.gitignore`; its sources are in git.
 
 ## 5. Panel data
 
