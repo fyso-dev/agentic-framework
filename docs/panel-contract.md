@@ -131,7 +131,7 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
 - `tools`
 
-Skills are out of scope for v1: they are listed read-only. "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
+Skills are listed read-only, except the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
 
 ## 5. i18n
 

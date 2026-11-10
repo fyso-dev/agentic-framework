@@ -11,6 +11,7 @@ _exclude:
   - "copier.yaml"
   - "copier.yml"
   - "!framework/extensions/_template/copier.yml"
+  - "!framework/extensions/silverbullet/copier.yml"
   - "~*"
   - "*.py[co]"
   - "__pycache__"

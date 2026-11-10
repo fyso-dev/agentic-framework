@@ -10,12 +10,12 @@ import {
   IconAlert, IconArrowUpRight, IconBack, IconBolt, IconBulb, IconChat, IconCommit, IconDoc, IconHand, IconLayers,
   IconPerson, IconPlay, IconPlug, IconShield, IconSparkle, IconTrash, IconTrend, IconUndo, IconWrench, Spinner,
 } from "../components/Icons";
-import { Avatar, Modal } from "../components/ui";
+import { Avatar, Modal, Switch } from "../components/ui";
 import { botActivity } from "../lib/bot-activity";
-import { accessFor, type ToolScope } from "../lib/connector-access";
+import { accessFor, selectServer, type ToolScope } from "../lib/connector-access";
 import { go, href, type BotTab } from "../lib/router";
 import {
-  byteLength, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
+  byteLength, extensionSkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
   SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
@@ -72,10 +72,32 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const [approval, setApproval] = useState<Approval>(initial.approval);
   const [soul, setSoul] = useState(initial.soul);
   const [uses, setUses] = useState(initial.uses);
+  // Skills shipped by installed extensions are switched per bot (D54); other skills
+  // of the team file stay read-only.
+  const extSkills = useMemo(
+    () => (s.extensions.data ?? []).flatMap((e) => e.skills.map((k) => ({ ext: e.id, name: k, file: extensionSkillFile(e.id, k), servers: e.mcpServers }))),
+    [s.extensions.data],
+  );
+  const [skillsOn, setSkillsOn] = useState<Record<string, boolean>>({});
+  const hasSkill = (file: string) => !!bot?.skillFiles.includes(file);
+  const skillOn = (file: string) => skillsOn[file] ?? hasSkill(file);
+  const skillsChanged = extSkills.some((k) => skillOn(k.file) !== hasSkill(k.file));
   const [scope, setScope] = useState<ToolScope | undefined>(runtime?.toolScope ?? bot?.tools);
   const [scopeChanged, setScopeChanged] = useState(false);
   const [appChanges, setAppChanges] = useState<Record<string, Level>>({});
   useEffect(() => { if (!scopeChanged && !s.draft) setScope(runtime ? runtime.toolScope : bot?.tools); }, [runtime, scopeChanged, s.draft, bot?.tools]);
+  // A skill is useless without its extension's tools. For a bot with a tool allow-list,
+  // switching it on also selects the extension's MCP servers and switching it off drops
+  // that whole-server selection. Connectors shows the result and refines it.
+  const toggleSkill = (k: (typeof extSkills)[number], on: boolean) => {
+    setSkillsOn((prev) => ({ ...prev, [k.file]: on }));
+    let next = scope;
+    for (const name of k.servers) {
+      if (on && accessFor(next, name) === "none") next = selectServer(next, name, true);
+      else if (!on && next?.allow?.includes(`mcp:${name}:*`)) next = { ...next, allow: next.allow.filter((x) => x !== `mcp:${name}:*`) };
+    }
+    if (next !== scope) { setScope(next); setScopeChanged(true); }
+  };
 
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
@@ -95,7 +117,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const num = new Intl.NumberFormat(i18n.language);
 
   const teamDirty = !bot || name !== initial.name || title !== initial.title || engine !== initial.engine || model !== initial.model
-    || approval !== initial.approval || soul !== initial.soul || uses !== initial.uses || scopeChanged;
+    || approval !== initial.approval || soul !== initial.soul || uses !== initial.uses || scopeChanged || skillsChanged;
   const appsDirty = Object.keys(appChanges).length > 0;
   const dirty = teamDirty || appsDirty;
 
@@ -116,7 +138,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const discard = () => {
     setName(initial.name); setTitle(initial.title); setEngine(initial.engine); setModel(initial.model);
     setApproval(initial.approval); setSoul(initial.soul); setUses(initial.uses);
-    setScope(runtime ? runtime.toolScope : bot?.tools); setScopeChanged(false); setAppChanges({});
+    setScope(runtime ? runtime.toolScope : bot?.tools); setScopeChanged(false); setAppChanges({}); setSkillsOn({});
     setErrors({}); setSaveFailed(false);
   };
 
@@ -136,10 +158,12 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         soulText: soulChanged ? soul : null,
         usesWorkflows: uses,
         ...(scopeChanged ? { tools: scope || {} } : {}),
+        // A skill needs the project's MCP servers, which a bot only loads from the root.
+        skills: extSkills.map((k) => ({ file: k.file, on: uses && skillOn(k.file) })),
       });
       if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
       s.setDraft(serializeTeam(doc));
-      setScopeChanged(false);
+      setScopeChanged(false); setSkillsOn({});
     }
     if (appsDirty) {
       const ok = await apps.save(appChanges);
@@ -264,6 +288,22 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
               </div>
             </div>
             {errors.model && <p className="field-err">× {errors.model}</p>}
+
+            {extSkills.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <p className="label" style={{ marginBottom: 6 }}>{t("form.skills")}</p>
+                {extSkills.map((k) => (
+                  <div key={k.file} className="toggle-row">
+                    <p className="grow" style={{ fontSize: 13 }}>
+                      <span className="mono">{k.name}</span> <span className="mute">· {t("form.skillFrom", { ext: k.ext })}</span>
+                    </p>
+                    <Switch checked={uses && skillOn(k.file)} onChange={(v) => toggleSkill(k, v)}
+                      label={k.name} disabled={!uses} describedBy={`${id}-skills-ext`} />
+                  </div>
+                ))}
+                <p id={`${id}-skills-ext`} className="hint" style={{ paddingTop: 6 }}>{t(uses ? "form.skillsExt" : "form.skillsNeedRoot")}</p>
+              </div>
+            )}
 
             {bot && (
               <div className="bd-meta">

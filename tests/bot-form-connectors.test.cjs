@@ -26,3 +26,26 @@ test('the bot detail reads and writes approval, falling back to defaults and to 
   assert.equal(doc.getIn(['bots',0,'approval']),undefined,'omitting approval keeps the inherited default');
   assert.ok(serializeTeam(doc).includes('# keep this comment'));
 });
+test('the bot form switches one extension skill as a native file entry and leaves other skills alone',async()=>{
+  const {parseTeam,readBots,upsertBot,serializeTeam,extensionSkillFile}=await import('../template/framework/panel/src/lib/team.ts');
+  const file=extensionSkillFile('silverbullet','project-knowledge');
+  assert.equal(file,'${FYSO_ROOT}/extensions/silverbullet/skills/project-knowledge/SKILL.md');
+  const text='version: 1\nbots:\n  - name: One\n    model: claude/model\n    skills:\n      - file: skills/one/own/SKILL.md\n  - name: Two\n    model: claude/model\n';
+  const doc=parseTeam(text),input={title:'',model:'claude/model',soulText:null,usesWorkflows:false};
+  const untouched=readBots(doc)[0].fingerprint;
+  upsertBot(doc,0,{...input,name:'One'});
+  assert.equal(readBots(doc)[0].fingerprint,untouched,'omitting skills keeps them');
+  for(let i=0;i<2;i++)for(const index of [0,1])upsertBot(doc,index,{...input,name:index?'Two':'One',skills:[{file,on:true}]});
+  assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md',file],[file]]);
+  assert.deepEqual(readBots(doc)[0].skills,['own','project-knowledge']);
+  assert.ok(serializeTeam(doc).includes(`- file: ${file}`));
+  // OMB's team apply never removes an omitted skill: off is the native `enabled: false`.
+  for(const index of [0,1])upsertBot(doc,index,{...input,name:index?'Two':'One',skills:[{file,on:false}]});
+  assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md'],[]]);
+  assert.deepEqual(readBots(doc)[0].skills,['own']);
+  assert.ok(serializeTeam(doc).includes(`- file: ${file}\n        enabled: false`));
+  upsertBot(doc,1,{...input,name:'Two',skills:[{file,on:true}]});
+  assert.equal(doc.getIn(['bots',1,'skills',0,'enabled']),undefined);assert.deepEqual(readBots(doc)[1].skillFiles,[file]);
+  const never=parseTeam(text);upsertBot(never,1,{...input,name:'Two',skills:[{file,on:false}]});
+  assert.equal(never.getIn(['bots',1,'skills']),undefined,'switching off a skill that was never listed writes nothing');
+});
