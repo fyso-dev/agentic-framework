@@ -182,6 +182,30 @@ not `project/wiki/index.md`. Writes are immediate shared-file edits; there is
 no separate proposal/review queue. Do not treat the folder allow-list as an OS
 sandbox for a compromised process.
 
+## Theme alignment
+
+The generic panel SDK opts into `fyso-panel-theme` messages rather than reloading
+its iframe on a mode change ([extension contract](extensions-contract.md#9-extension-owned-tabs-and-pages)).
+The Knowledge page observes that mode and sends `fyso-kb-theme` to the editor and
+Uppy, accepting readiness messages only from their exact iframe window and origin.
+The editor trusts only its immediate parent at the configured panel sibling
+origin; it applies a fixed color-token allow-list with CSS color validation.
+No arbitrary CSS, URL, script or wiki operation is accepted through messages.
+
+The extension uses SilverBullet 2.12.1's native
+[`SB_HEAD_HTML`](https://github.com/silverbulletmd/silverbullet/blob/2.12.1/bin/silverbullet/src/config.rs)
+to load `theme/head.html`. CSS maps native theme variables; Gilroy fonts are
+served from the framework's existing font assets, behind web login. `theme/`
+belongs to the extension and survives normal Copier updates; `project/wiki/`
+remains project-owned. Existing project Space Style is neither rewritten nor
+removed. No tool versions or service execution settings change.
+
+Verified with both branches on a generated stack: `mise run doctor`, real web
+login and a live theme switch without a frame reload. A separate executable
+browser fixture covers the native editor save/command picker, Uppy theme/window
+preservation, foreign-origin and wrong-source rejection, mobile and non-SDK HTML
+fallback. [Test commands and screenshots](https://github.com/fyso-dev/fyso-ext-silverbullet/blob/feat/panel-theme/docs/evidence/panel-theme/README.md).
+
 ## Security and operational limits
 
 - The service explicitly runs `--single`; the framework's `fyso_login` snippet
@@ -199,8 +223,15 @@ sandbox for a compromised process.
   filesystem. macOS verification does not prove case-insensitive path behavior.
 - Markdown is the agent-readable source. Uploading a PDF does not add OCR,
   extraction, embeddings or retrieval automatically.
-- The embedded editor is a frame of the `docs.` site. It keeps SilverBullet's
-  own look and does not follow the panel's dark theme or language.
+- The embedded editor is a frame of the `docs.` site. Extension-owned CSS maps
+  its native variables to the panel's typography and palette; `SB_HEAD_HTML`
+  loads these assets without writing a wiki page. The panel sends only a fixed
+  allow-list of color tokens and light/dark mode, with both origin and window
+  validation. Live SDK theme messages preserve the editor and upload picker
+  windows. The full-window link starts in the current mode, then native mode
+  changes win. A direct URL without a theme parameter uses native preferences.
+  Project Space Style can still override the appearance. SilverBullet keeps its
+  native UI language.
 - Hot install reaches bots on the next start: a bot gets the `silverbullet`
   MCP server after `mise run up` restarts OpenMausBot (extensions-contract §6).
 - Concurrent browser and MCP edits can race. Read before editing, coordinate
