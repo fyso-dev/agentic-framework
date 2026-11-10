@@ -12,7 +12,7 @@ import { Avatar, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import { accessFor } from "../lib/connector-access";
 import { splitModel, type BotState } from "../lib/team";
-import { botRoster, versionStatus } from "../lib/botRoster";
+import { botRoster, unmatchedVersion } from "../lib/botRoster";
 import { useDaguAction } from "../lib/useDaguAction";
 import { ActionStatus, ActionError } from "../components/Action";
 import { useStore } from "../store";
@@ -67,6 +67,9 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   const runtime = s.runtimeBots.data ?? null;
   const runtimeError = s.runtimeBots.status === "error";
   const rows = botRoster(s.rows, s.mock ? null : runtime);
+  const inventory = s.botVersioning.status === "ok" ? s.botVersioning.data : undefined;
+  const synchronized = s.team.status === "ok" && s.runtimeBots.status === "ok" && !s.draftConflict;
+  const omb = s.project.data?.urls.omb;
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const unapplied = unappliedCount(s);
   const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
@@ -80,7 +83,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   const selectedIndex = index !== undefined ? index : native ? undefined : fallback;
   const selectedRow = native ? rows.find((r) => r.nativeId === native)
     : selectedIndex === null ? undefined : rows.find((r) => r.configuration?.bot.index === selectedIndex && r.configuration?.state !== "deleted");
-  const selectedBot = selectedIndex === null ? null : s.workingBots.find((b) => b.index === selectedIndex);
+  const selectedBot = native ? selectedRow?.configuration?.bot : selectedIndex === null ? null : s.workingBots.find((b) => b.index === selectedIndex);
   const runtimeFor = (name: string) => { const matches = (runtime || []).filter((b) => b.name === name); return matches.length === 1 ? matches[0] : undefined; };
 
   const logos = (row: (typeof rows)[number]) => {
@@ -113,7 +116,12 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
         {!s.mock && runtimeError && <p role="alert" className="banner banner-down">{t("bots.runtimeError")}</p>}
         {!s.mock && s.botVersioning.status === "error" && <p role="alert" className="banner banner-warn">{t("bots.versionUnavailable")}</p>}
 
-        {unapplied > 0 && (
+        {s.draftConflict && <div role="alert" className="banner banner-warn">
+          <p>{t("bots.draftConflict")}</p>
+          <button type="button" className="btn btn-sm btn-soft" onClick={() => setConfirmDiscard(true)}>{t("bots.discard")}</button>
+        </div>}
+
+        {!s.draftConflict && unapplied > 0 && (
           <div role="status" className="bots-pending">
             <p><strong>{t("bots.banner", { count: unapplied })}</strong></p>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -143,12 +151,15 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
           <ul className="bots-picks">
             {rows.map((row) => {
               const state = row.configuration?.state ?? "applied";
-              const target = state === "deleted" ? undefined : row.configuration ? href.bot(row.configuration.bot.index) : row.nativeId && !row.ambiguous ? href.nativeBot(row.nativeId) : undefined;
+              const target = state === "deleted" || row.ambiguous ? undefined
+                : row.nativeId ? href.nativeBot(row.nativeId)
+                : row.configuration ? href.bot(row.configuration.bot.index) : undefined;
+              const version = unmatchedVersion(row, inventory, synchronized);
               const current = row === selectedRow;
               const servers = logos(row);
               const content = (
                 <>
-                  <Avatar name={row.name} />
+                  <Avatar name={row.name} omb={omb} appearance={row.appearance} />
                   <span className="bots-pick-text">
                     <span className="bots-pick-name ellipsis">{row.name}</span>
                     {servers.length > 0 && (
@@ -159,7 +170,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
                     )}
                   </span>
                   {state !== "applied" ? <span className={`bots-state is-${state}`} title={t(`bots.state.${state}`)}><span className="sr-only">{t(`bots.state.${state}`)}</span></span>
-                    : !row.configuration && <span className="bots-native" title={t("bots.version.native")}><span className="sr-only">{t("bots.version.native")}</span></span>}
+                    : !row.configuration && <span className="bots-native" title={t(`bots.version.${version}`)}><span className="sr-only">{t(`bots.version.${version}`)}</span></span>}
                 </>
               );
               return (
@@ -180,12 +191,12 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
 
       <div className="bots-detail">
         {selectedRow && !selectedRow.configuration && selectedRow.nativeId ? (
-          <NativeBot row={selectedRow} canImport={!!selectedRow.nativeId && !selectedRow.ambiguous && versionStatus(selectedRow, s.botVersioning.status === "ok" ? s.botVersioning.data : undefined) !== "project"}
+          <NativeBot row={selectedRow} version={unmatchedVersion(selectedRow, inventory, synchronized)}
             importing={importing} onImport={() => void importBot(selectedRow.nativeId!)} />
         ) : selectedIndex === null ? (
           <BotDetail key="new" bot={null} tab={tab} observation={observation} />
         ) : selectedBot ? (
-          <BotDetail key={selectedBot.index} bot={selectedBot} tab={tab} runtime={runtimeFor(selectedBot.name)} observation={observation} />
+          <BotDetail key={`${selectedBot.index}:${selectedBot.fingerprint}`} bot={selectedBot} tab={tab} runtime={runtimeFor(selectedBot.name)} observation={observation} />
         ) : index !== undefined && s.team.status === "ok" ? (
           <div className="card empty"><p>{t("form.notFound")}</p><a href={href.bots}>← {t("form.back")}</a></div>
         ) : null}
@@ -206,16 +217,16 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
 }
 
 /** A bot that lives only in OpenMausBot: it can be imported into the project, not edited here. */
-function NativeBot({ row, canImport, importing, onImport }: { row: ReturnType<typeof botRoster>[number]; canImport: boolean; importing: ReturnType<typeof useDaguAction<{ botId: string; commit: string }>>; onImport: () => void }) {
+function NativeBot({ row, version, importing, onImport }: { row: ReturnType<typeof botRoster>[number]; version: ReturnType<typeof unmatchedVersion>; importing: ReturnType<typeof useDaguAction<{ botId: string; commit: string }>>; onImport: () => void }) {
   const { t } = useTranslation();
   const s = useStore();
-  const version = versionStatus(row, s.botVersioning.status === "ok" ? s.botVersioning.data : undefined);
+  const canImport = version === "native" || version === "snapshot";
   const { modelId } = splitModel(row.model);
   return (
     <section className="card bd">
       <div className="bd-hero">
         <a href={href.bots} className="bd-ib bd-back" aria-label={t("form.backAria")}><IconBack size={18} /></a>
-        <span className="bd-ava" aria-hidden="true"><Avatar name={row.name} large /></span>
+        <span className="bd-ava" aria-hidden="true"><Avatar name={row.name} omb={s.project.data?.urls.omb} appearance={row.appearance} large /></span>
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="bd-title"><h2 className="ellipsis">{row.name}</h2><span className={`pill ${version === "native" ? "pill-warn" : "pill-outline"}`} title={t("bots.versionHint")}>{t(`bots.version.${version}`)}</span></div>
           <p className="mute ellipsis">{row.title || "—"}</p>
@@ -227,7 +238,7 @@ function NativeBot({ row, canImport, importing, onImport }: { row: ReturnType<ty
         {s.draft && <p className="note">{t("bots.importDraftHint")}</p>}
         {s.botVersioning.data?.projectDirty && <p className="note">{t("bots.importDirtyHint")}</p>}
         {importing.phase !== "never" && <div><ActionStatus action={importing} /><ActionError action={importing} /></div>}
-        {canImport && <button type="button" className="btn btn-pri" style={{ alignSelf: "flex-start" }} disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running" || version === "unknown"} onClick={onImport} aria-label={t("bots.importNamed", { name: row.name })}>{t("bots.import")}</button>}
+        {canImport && <button type="button" className="btn btn-pri" style={{ alignSelf: "flex-start" }} disabled={!!s.draft || !!s.botVersioning.data?.projectDirty || !s.draftReady || importing.phase === "running"} onClick={onImport} aria-label={t("bots.importNamed", { name: row.name })}>{t("bots.import")}</button>}
       </div>
     </section>
   );

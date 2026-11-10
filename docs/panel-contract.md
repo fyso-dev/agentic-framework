@@ -34,7 +34,7 @@ type App = {
 
 ### Native live bot roster (D28)
 
-`GET /api/omb/bots` forwards exactly `/api/bots?messages=0` to the project OMB with the server-held session and project basic login. Writes return 405; other `/api/omb/*` paths return 404. This is the native authenticated response, which can include profile and queued-message metadata; no general OMB administration proxy is exposed. The SPA displays only ID, name, title and model. It polls every five seconds without overlapping requests, includes the chief, and marks failed refreshes explicitly. Runtime discovery never rewrites the local draft or `project/bots/team.yaml`. One list joins native IDs with uniquely named configuration entries; unchanged entries use current native display metadata, while pending drafts remain visible. Every bot row offers the OMB gateway link. Configured bots additionally offer an explicit manual edit action, and eligible native-only bots offer import. Actions are sibling controls rather than nested links. Ambiguous names never select an arbitrary form; native edits are versioned through existing snapshots, while Bot Architect writes its selected project entry.
+`GET /api/omb/bots` forwards exactly `/api/bots?messages=0` to the project OMB with the server-held session and project basic login. Writes return 405; other `/api/omb/*` paths return 404. This is the native authenticated response, which can include profile and queued-message metadata; no general OMB administration proxy is exposed. The SPA reads the roster, team declaration and version inventory together every five seconds and on window focus. It retains the last successful reads and marks refresh errors. A project bot without matching form data shows a synchronization status. Live bot links use the native ID, including when a bot changes position in the declaration. The list and detail show the native avatar from the authenticated OMB origin when it is a stored raster attachment. When the bot has no image or uses mascot mode, the panel draws the native standard silhouette and color as a static avatar. The source geometry is from OpenMausBot 0.1.141 under Apache-2.0. Bots with no native profile data show initials. A draft retains its original declaration and cannot be applied after that declaration changes. One list joins native IDs with uniquely named configuration entries; unchanged entries use current native display metadata, while pending drafts remain visible. Every bot row offers the OMB gateway link. Configured bots additionally offer an explicit manual edit action, and eligible native-only bots offer import. Actions are sibling controls rather than nested links. Ambiguous names never select an arbitrary form; native edits are versioned through existing snapshots, while Bot Architect writes its selected project entry.
 
 ## 2. Dagu API (through `/api/dagu/`)
 
@@ -91,26 +91,35 @@ Output `check`:
 
 The fourth checklist step (last save to git) does not come from here: the panel reads the last `fyso-snapshot` run.
 
-### `fyso-bots-plan` — preview (param `TEAM_B64`)
+### `fyso-bots-plan` — preview (params `TEAM_B64`, `TEAM_BASE_B64`)
 
 - `TEAM_B64`: base64 (UTF-8) of the proposed `team.yaml`. Empty means the current file.
+- `TEAM_BASE_B64`: optional base64 of the declaration the panel draft was edited against. A different current declaration rejects the draft.
 - Nothing is written.
 
-Output `plan` is the `openmausbot team apply --dry-run --json` result as-is:
+Output `plan` combines the native dry run with removals of bots omitted from the
+proposed project declaration. Native team apply keeps omitted bots by default.
+For each removed declaration, the panel resolves a unique exact name to a native
+ID, or reports that the bot is already absent. Protected and active bots are
+rejected. A rename uses the native `was` field and preserves the bot ID.
 
 ```ts
-{ plan: string[], created: number, changed: number, unchanged: number, deleted: number, warnings?: unknown[] }
+{ plan: string[], created: number, changed: number, unchanged: number, deleted: number, warnings?: unknown[], removalRevision?: string }
 ```
 
-The plan lines are OMB's English prose (spike `omb`). The panel shows them verbatim inside the preview and does not translate them.
+The panel shows native plan lines verbatim and adds lines for explicit removals.
+The revision binds those removals to the reviewed declaration, draft and runtime IDs.
 
-### `fyso-bots-apply` — apply (param `TEAM_B64`)
+### `fyso-bots-apply` — apply (params `TEAM_B64`, `TEAM_BASE_B64`, `REMOVAL_REVISION`)
 
-Steps, in this order (D13 rule 4):
-1. Snapshot: export bots and memory and commit them, so tuning done in OMB is kept.
-2. Write `TEAM_B64` to `project/bots/team.yaml`, after validating it with `--dry-run`. If validation fails, nothing is written.
-3. `openmausbot team apply`.
-4. Commit `project/bots/team.yaml` with the message `bots: update from panel`.
+1. Snapshot bots and memory before applying.
+2. Validate the proposed team and recompute the removal revision. Require the revision from the preview if any declaration is being removed.
+3. Apply the native team changes. Recheck each reviewed removal and delete by exact runtime ID. Verify that the ID disappeared.
+4. Write and commit `project/bots/team.yaml` with the message `bots: update from panel`. Drop consumed rename aliases.
+
+Native deletion removes the bot's conversation history. The snapshot covers configuration
+and memory. If an apply stops partway through, open a fresh preview. A bot already
+absent can still be removed from the declaration after review.
 
 Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
 

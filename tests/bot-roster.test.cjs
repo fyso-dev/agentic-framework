@@ -42,3 +42,26 @@ test('version badges require committed evidence and keep snapshots distinct from
   assert.equal(versionStatus({...row,ambiguous:true},saved),'unknown');
   assert.equal(versionStatus(row,{...saved,bots:[{...saved.bots[0],project:true}]}),'project');
 });
+test('unmatched rows stay provisional while project configuration is refreshing',async()=>{
+  const {unmatchedVersion}=await load();
+  const row={key:'native',name:'Renamed',team:''};
+  const missing={commit:'abc',bots:[]};
+  const recorded={commit:'def',bots:[{name:'Renamed',team:'',project:true,snapshot:true}]};
+  assert.equal(unmatchedVersion(row,missing,false),'unknown');
+  assert.equal(unmatchedVersion(row,recorded,true),'syncing');
+  assert.equal(unmatchedVersion(row,missing,true),'native');
+});
+test('native avatar metadata survives the roster join and only native attachment paths are usable',async()=>{
+  const {botRoster}=await load();
+  const {botAvatarSrc,botAvatarColor}=await import('../template/framework/panel/src/lib/botAvatar.ts');
+  const path='/api/attachments/123-abc.png';
+  const [row]=botRoster([config('Agent')],[{...native('id','Agent'),avatarUrl:path,color:'teal'}]);
+  assert.equal(row.appearance.avatarUrl,path);
+  assert.equal(botAvatarColor(row.appearance.color),'#01A492');
+  assert.equal(botAvatarColor('constructor'),undefined);
+  const omb='http://omb.example.localhost:8400';
+  assert.equal(botAvatarSrc(omb,path),omb+path);
+  for(const invalid of ['https://other.invalid/p.png','//other.invalid/p.png','/api/attachments/x.svg','/api/attachments/../a.jpg',path+'?q=x',null]){
+    assert.equal(botAvatarSrc(omb,invalid),undefined);
+  }
+});

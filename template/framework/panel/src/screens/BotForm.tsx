@@ -62,7 +62,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   useEffect(() => { if (tab) setTab(tab); }, [tab]);
   const pickTab = (next: BotTab) => {
     setTab(next);
-    history.replaceState(null, "", href.botTab(bot?.index ?? null, next));
+    history.replaceState(null, "", runtime?.id ? href.nativeBot(runtime.id, next) : href.botTab(bot?.index ?? null, next));
   };
 
   const [name, setName] = useState(initial.name);
@@ -152,6 +152,9 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
     if (teamDirty) {
       const doc = parseTeam(s.workingText ?? "version: 1\nbots: []\n");
       const soulChanged = bot?.soul.kind === "file" ? soul.trim() !== "" : soul !== initial.soul;
+      const previousName = index === null ? undefined : doc.getIn(["bots", index, "was"]);
+      const declaredName = s.baseBots.find((entry) => entry.name === bot?.name)?.name
+        ?? s.baseBots.find((entry) => entry.name === previousName)?.name;
       upsertBot(doc, index, {
         name, title, approval,
         model: engine ? `${engine}/${model}` : model,
@@ -160,7 +163,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         ...(scopeChanged ? { tools: scope || {} } : {}),
         // A skill needs the project's MCP servers, which a bot only loads from the root.
         skills: extSkills.map((k) => ({ file: k.file, on: uses && skillOn(k.file) })),
-      });
+      }, declaredName);
       if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
       s.setDraft(serializeTeam(doc));
       setScopeChanged(false); setSkillsOn({});
@@ -209,7 +212,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
     <section className="card bd" aria-labelledby={`${id}-h`}>
       <div className="bd-hero">
         <a href={href.bots} className="bd-ib bd-back" aria-label={t("form.backAria")}><IconBack size={18} /></a>
-        <span className="bd-ava" aria-hidden="true"><Avatar name={bot ? bot.name : name || "+"} large /></span>
+        <span className="bd-ava" aria-hidden="true"><Avatar name={bot ? bot.name : name || "+"} omb={omb} appearance={runtime} large /></span>
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="bd-title">
             <h2 id={`${id}-h`} className="ellipsis">{heading}</h2>

@@ -14,7 +14,7 @@ export type AppsTab = "open" | "ext";
 
 export type Route =
   | { name: "setup" }
-  | { name: "bots"; review?: boolean; native?: string }
+  | { name: "bots"; review?: boolean; native?: string; tab?: BotTab }
   | { name: "bot"; index: number | null; tab?: BotTab }
   | { name: "connectors"; botId?:string }
   | { name: "extension"; extensionId:string; pageId:string }
@@ -37,7 +37,7 @@ export function parseHash(hash: string): Route {
     if (parts[1] === "new") return { name: "bot", index: null, ...(tab ? { tab } : {}) };
     if (parts[1] && /^\d+$/.test(parts[1])) return { name: "bot", index: Number(parts[1]), ...(tab ? { tab } : {}) };
     const native = params.get("native");
-    return { name: "bots", ...(native ? { native } : {}) };
+    return { name: "bots", ...(native ? { native, tab } : {}) };
   }
   return { name: "setup" };
 }
@@ -50,7 +50,7 @@ export const href = {
   bot: (index: number) => `#/bots/${index}`,
   botConnectors: (index:number) => `#/bots/${index}?tab=conectores`,
   botTab: (index: number | null, tab: BotTab) => `#/bots/${index ?? "new"}?tab=${tab}`,
-  nativeBot: (id: string) => `#/bots?native=${encodeURIComponent(id)}`,
+  nativeBot: (id: string, tab?: BotTab) => `#/bots?native=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ""}`,
   connectors: "#/connectors",
   connectorsForBot: (id:string) => `#/connectors?bot=${encodeURIComponent(id)}`,
   extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,
