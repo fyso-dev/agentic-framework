@@ -1,6 +1,7 @@
 # SilverBullet knowledge extension
 
-An opt-in bundled Copier extension, under `template/framework/extensions/silverbullet/`.
+An opt-in Copier extension published as [fyso-ext-silverbullet](https://github.com/fyso-dev/fyso-ext-silverbullet), starting at **v0.1.0**.
+A bundled copy remains under `template/framework/extensions/silverbullet/`.
 It fills the existing extension slots ([contract](extensions-contract.md)) without
 changing a project's team file or framework configuration. Decisions: **D53**
 (the extension), **D54** (per-bot skill toggle), **D58** (panel page and
@@ -34,17 +35,24 @@ a custom adapter or pinning an unreleased build.
 ## Install in a generated project
 
 ```sh
-mise run ext:add ./framework/extensions/silverbullet -- --defaults
+mise run ext:add silverbullet -- --defaults
 mise run doctor
 ```
 
 `ext:add` picks the first free extension port, installs the pinned tools and,
 when the stack is running, loads the process and the gateway route without a
-restart. The extension is installed **by path** because it ships inside the
-template; it is not in a marketplace catalog yet, so the panel's marketplace
-does not list it for install. The framework template preserves the bundled
-`copier.yml` and uses `.slotjinja` internally, so outer Copier rendering does
-not consume its variables.
+restart. The official catalog lists `silverbullet`; its source is
+`gh:fyso-dev/fyso-ext-silverbullet`, with versions from Git tags. The panel
+marketplace can install it. To pin this release without catalog lookup:
+
+```sh
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --vcs-ref v0.1.0
+```
+
+The bundled copy can still be installed with
+`mise run ext:add ./framework/extensions/silverbullet -- --defaults`.
+The framework template preserves its `copier.yml` and uses `.slotjinja`
+internally, so outer Copier rendering does not consume its variables.
 
 ## In the panel
 
@@ -174,6 +182,30 @@ not `project/wiki/index.md`. Writes are immediate shared-file edits; there is
 no separate proposal/review queue. Do not treat the folder allow-list as an OS
 sandbox for a compromised process.
 
+## Theme alignment
+
+The generic panel SDK opts into `fyso-panel-theme` messages rather than reloading
+its iframe on a mode change ([extension contract](extensions-contract.md#9-extension-owned-tabs-and-pages)).
+The Knowledge page observes that mode and sends `fyso-kb-theme` to the editor and
+Uppy, accepting readiness messages only from their exact iframe window and origin.
+The editor trusts only its immediate parent at the configured panel sibling
+origin; it applies a fixed color-token allow-list with CSS color validation.
+No arbitrary CSS, URL, script or wiki operation is accepted through messages.
+
+The extension uses SilverBullet 2.12.1's native
+[`SB_HEAD_HTML`](https://github.com/silverbulletmd/silverbullet/blob/2.12.1/bin/silverbullet/src/config.rs)
+to load `theme/head.html`. CSS maps native theme variables; Gilroy fonts are
+served from the framework's existing font assets, behind web login. `theme/`
+belongs to the extension and survives normal Copier updates; `project/wiki/`
+remains project-owned. Existing project Space Style is neither rewritten nor
+removed. No tool versions or service execution settings change.
+
+Verified with both branches on a generated stack: `mise run doctor`, real web
+login and a live theme switch without a frame reload. A separate executable
+browser fixture covers the native editor save/command picker, Uppy theme/window
+preservation, foreign-origin and wrong-source rejection, mobile and non-SDK HTML
+fallback. [Test commands and screenshots](https://github.com/fyso-dev/fyso-ext-silverbullet/blob/feat/panel-theme/docs/evidence/panel-theme/README.md).
+
 ## Security and operational limits
 
 - The service explicitly runs `--single`; the framework's `fyso_login` snippet
@@ -191,8 +223,15 @@ sandbox for a compromised process.
   filesystem. macOS verification does not prove case-insensitive path behavior.
 - Markdown is the agent-readable source. Uploading a PDF does not add OCR,
   extraction, embeddings or retrieval automatically.
-- The embedded editor is a frame of the `docs.` site. It keeps SilverBullet's
-  own look and does not follow the panel's dark theme or language.
+- The embedded editor is a frame of the `docs.` site. Extension-owned CSS maps
+  its native variables to the panel's typography and palette; `SB_HEAD_HTML`
+  loads these assets without writing a wiki page. The panel sends only a fixed
+  allow-list of color tokens and light/dark mode, with both origin and window
+  validation. Live SDK theme messages preserve the editor and upload picker
+  windows. The full-window link starts in the current mode, then native mode
+  changes win. A direct URL without a theme parameter uses native preferences.
+  Project Space Style can still override the appearance. SilverBullet keeps its
+  native UI language.
 - Hot install reaches bots on the next start: a bot gets the `silverbullet`
   MCP server after `mise run up` restarts OpenMausBot (extensions-contract §6).
 - Concurrent browser and MCP edits can race. Read before editing, coordinate
@@ -200,18 +239,27 @@ sandbox for a compromised process.
 
 ## Update and remove
 
-This bundled template is installed from a **local directory**, so its extension
-inventory version is `null`, and Copier's VCS-based `ext:update` cannot update
-it. After updating the parent framework, reapply the bundled extension:
+For catalog or Git-source installations:
 
 ```sh
-mise run ext:add ./framework/extensions/silverbullet -- --defaults --overwrite
+mise run ext:update silverbullet -- --defaults
+mise run doctor
+```
+
+An existing **bundled local-directory** installation has inventory version
+`null`, so Copier's VCS-based `ext:update` cannot update it. After updating
+the parent framework, migrate it to the published source explicitly:
+
+```sh
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --overwrite --vcs-ref v0.1.0
 ```
 
 Existing answers are reused and wiki pages are outside the extension payload.
-Do not use `silverbullet upgrade` or `upgrade-edge`: versions belong to the mise
-template. For independently tagged distribution, move the bundled source into
-its own Git repository and add it to a catalog (extensions-contract §8).
+Review and commit pending project changes before the next `ext:update`.
+To stay on the bundled source, reapply it with
+`mise run ext:add ./framework/extensions/silverbullet -- --defaults --overwrite`.
+Do not use `silverbullet upgrade` or `upgrade-edge`: versions belong to the
+extension's pinned mise configuration.
 
 To remove, run `mise run ext:remove silverbullet` and restart the project's
 stack. `project/wiki/` and `.data/ext/silverbullet/` remain. Switch the skill

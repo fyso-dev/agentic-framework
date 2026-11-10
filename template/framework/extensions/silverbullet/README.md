@@ -1,10 +1,11 @@
 # SilverBullet extension
 
 See the framework's `docs/silverbullet-extension.md` for the contract and evidence.
-From a generated project, install this bundled template with:
+Published independently as [fyso-ext-silverbullet](https://github.com/fyso-dev/fyso-ext-silverbullet), starting at **v0.1.0**, in the official catalog.
+From a generated project, install the tagged extension with:
 
 ```sh
-mise run ext:add ./framework/extensions/silverbullet -- --defaults
+mise run ext:add silverbullet -- --defaults
 mise run doctor
 ```
 
@@ -24,7 +25,8 @@ it on per bot in the panel (Bots → a bot → Profile → Skills), then review 
 apply. For bots with a tool allow-list the toggle also selects the
 `silverbullet` MCP server.
 
-This bundled source has no independent Git tag. After updating the framework,
-reapply it with `mise run ext:add ./framework/extensions/silverbullet -- --defaults
---overwrite`. Wiki pages are preserved. VCS-based `ext:update` requires an
-independently tagged extension source.
+For catalog/Git installations, use `mise run ext:update silverbullet -- --defaults`.
+The bundled copy remains available by path. Existing bundled installations can
+migrate with `mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults
+--overwrite --vcs-ref v0.1.0`. Wiki pages are preserved. See the full contract
+for update and migration details.
