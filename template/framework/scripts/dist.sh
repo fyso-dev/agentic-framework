@@ -111,7 +111,7 @@ case "$action" in
     [ "$#" -gt 0 ] || fail 'Usage: mise run dist:add <repo> [version]'
     [ ! -f "$answers" ] || fail "a distribution is already installed; use 'mise run dist:update'"
     repo=$1
-    case $repo in /*|"~"/*|./*|../*)
+    case $repo in /*|"~"/*)
       printf 'warning: %s is a path of this machine; it is saved in %s and fails check-paths (snapshots). Use the Git URL.\n' "$repo" "$answers" >&2 ;;
     esac
     fetch add "$repo" "${2:-}"; merge_memory; apply
