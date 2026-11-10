@@ -43,6 +43,8 @@ fetch() {  # fetch <add|update> [repo] [version]
     copier recopy --trust --force --answers-file "$answers" ${version:+--vcs-ref "$version"} .
   fi
   dist prune "$(cat "$work/base")"
+  # Extension ports come in with the publisher's block; move them into this project's.
+  dist ports "$(cat "$work/base")"
   dist secrets
 }
 
@@ -61,9 +63,11 @@ apply() {
     pc project update >&2
     pc process restart caddy >&2
     node framework/scripts/managed-mcp.cjs
-    # Same source as restore.sh: the snapshot is the most complete picture of the bots.
-    src=project/bots/team.yaml; [ ! -s state/bots/team.yaml ] || src=state/bots/team.yaml
-    framework/scripts/bots.sh apply "$src"
+    # The delivered team: its bot snapshot when it has one, else its project file. Never this
+    # project's own snapshot, taken before the update (fetch).
+    framework/scripts/bots.sh apply "$(dist team-source)"
+    # Re-export, so state/bots/ (what restore.sh applies on a fresh start) matches the bots now.
+    framework/scripts/snapshot.sh bots
     node framework/scripts/app-access.cjs restore
     node framework/scripts/connector-preferences.cjs restore
     framework/scripts/connect-extensions.sh
@@ -101,6 +105,11 @@ commit() {
   git add -A -- "${paths[@]}"
   version=$(node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._commit||"")' "$answers")
   if git diff --cached --quiet; then echo "already at $version"; return; fi
+  # Same checks as a snapshot: local files staged here were never scanned by the publisher.
+  if ! gitleaks git --staged --no-banner --redact . >&2 || ! framework/scripts/check-paths.sh >&2; then
+    git reset -q -- "${paths[@]}"
+    fail "checks failed; the distribution is in place but nothing was committed (see the log above)"
+  fi
   git commit -q -m "dist: $version" -m "Installed from $(node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._src_path||"")' "$answers")."
   echo "distribution $version installed ($(git rev-parse --short HEAD))"
 }

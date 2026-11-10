@@ -193,6 +193,51 @@ function prune(base) {
     console.error(`note: published with framework ${framework}, this project has ${mine}; update the framework (copier update) if something is missing`);
 }
 
+/**
+ * Extension ports belong to each installation's block (PLAN §3.1): the publisher's values are
+ * replaced by ports of this project's extension range (base + 10..19), keeping the one this
+ * project already used for that extension. Only the slots that hold them change: the
+ * `FYSO_EXT_*_PORT` lines of `.config/mise/conf.d/ext-<id>.toml` and `extension_port` in the
+ * extension's answers file (docs/extensions-contract.md).
+ */
+function ports(base,env=process.env) {
+  const first=Number(env.FYSO_HTTP_PORT)+10;
+  if(!Number.isInteger(first)||first<=10)fail('FYSO_HTTP_PORT is not set; run this through mise');
+  const range=new Set(Array.from({length:10},(_,i)=>first+i));
+  const LINE=/^(FYSO_EXT_[A-Z0-9_]*_PORT)\s*=\s*"?(\d+)"?\s*$/gm;
+  const read=text=>Object.fromEntries([...String(text||'').matchAll(LINE)].map(m=>[m[1],Number(m[2])]));
+  const delivered=new Set(fs.existsSync(MANIFEST)?manifestFiles(fs.readFileSync(MANIFEST)):[]);
+  const files=fs.globSync('.config/mise/conf.d/ext-*.toml').sort();
+  // Ports this project keeps: extensions it installed itself, and its earlier allocations.
+  const used=new Set();
+  for(const file of files)if(!delivered.has(file))for(const port of Object.values(read(fs.readFileSync(file,'utf8'))))used.add(port);
+  for(const file of files.filter(file=>delivered.has(file))) {
+    const before=read(show(base,file)),text=fs.readFileSync(file,'utf8'),now=read(text),moved={};
+    for(const [name,port] of Object.entries(now)) {
+      let next=range.has(before[name])&&!used.has(before[name])?before[name]:null;
+      if(next===null)next=[...range].find(candidate=>!used.has(candidate));
+      if(next===undefined)fail(`no free extension port left in ${first}-${first+9} for ${name}`);
+      used.add(next);
+      if(next!==port)moved[name]=[port,next];
+    }
+    if(!Object.keys(moved).length)continue;
+    fs.writeFileSync(file,text.replace(LINE,(line,name)=>moved[name]?`${name} = "${moved[name][1]}"`:line));
+    const id=/ext-(.+)\.toml$/.exec(file)[1],answers=`.copier-answers.ext-${id}.yml`;
+    if(fs.existsSync(answers)) {
+      const remap=new Map(Object.values(moved));
+      const content=fs.readFileSync(answers,'utf8');
+      fs.writeFileSync(answers,content.replace(/^(extension_port:\s*)(\d+)\s*$/m,(line,key,port)=>remap.has(Number(port))?`${key}${remap.get(Number(port))}`:line));
+    }
+    for(const [name,[from,to]] of Object.entries(moved))console.log(`port ${name}: ${from} → ${to}`);
+  }
+}
+
+/** The team to apply: the delivered snapshot when the distribution has one, else its project file. */
+function teamSource() {
+  const delivered=fs.existsSync(MANIFEST)?manifestFiles(fs.readFileSync(MANIFEST)):[];
+  console.log(delivered.includes('state/bots/team.yaml')?'state/bots/team.yaml':'project/bots/team.yaml');
+}
+
 /** Received secrets overwrite this project's values with the same name, re-encrypted for it. */
 function secrets() {
   if(!fs.existsSync(SECRETS))return;
@@ -271,6 +316,8 @@ if(require.main===module) {
     if(command==='publish')publish(arg);
     else if(command==='prune')prune(arg);
     else if(command==='secrets')secrets();
+    else if(command==='ports')ports(arg);
+    else if(command==='team-source')teamSource();
     else if(command==='merge-memory')mergeMemory(arg);
     else if(command==='status')status();
     else if(command==='clone-url')console.log(cloneUrl(arg));
@@ -280,4 +327,4 @@ if(require.main===module) {
     process.exit(1);
   }
 }
-module.exports={target,cloneUrl,nextVersion,union,config};
+module.exports={target,cloneUrl,nextVersion,union,config,ports};

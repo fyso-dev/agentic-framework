@@ -46,6 +46,7 @@ class DistributionTests(unittest.TestCase):
 
     def project(self, name):
         root = self.tmp / name
+        port_base = {"publisher": "29820", "client": "29800"}[name]
         shutil.copytree(ROOT / "template/framework/scripts", root / "framework/scripts")
         write(root, ".gitignore", ".data/\n")
         key = self.tmp / f"{name}.age"
@@ -53,7 +54,7 @@ class DistributionTests(unittest.TestCase):
         public = mise("age-keygen", "-y", str(key), cwd=self.tmp).stdout.strip()
         write(root, ".sops.yaml", f"creation_rules:\n  - path_regex: secrets\\.enc\\.yaml$\n    age: {public}\n")
         env = dict(os.environ, **IDENTITY, FYSO_ROOT=str(root), FYSO_DATA=str(root / ".data"),
-                   FYSO_PROJECT=name, FYSO_HTTP_PORT="0", SOPS_AGE_KEY_FILE=str(key))
+                   FYSO_PROJECT=name, FYSO_HTTP_PORT=port_base, SOPS_AGE_KEY_FILE=str(key))
         env.pop("MISE_SOPS_AGE_KEY_FILE", None)
         setattr(self, f"{name}_env", env)
         setattr(self, f"{name}_key", public)
@@ -85,6 +86,10 @@ class DistributionTests(unittest.TestCase):
         write(p, "state/memory/Ventas/MEMORY.md", "- fact one\n")
         write(p, "state/memory/Ventas/memory/log/2026-11-10.md", "user said something private\n")
         write(p, "project/distribution.yaml", f"repo: {self.repo}\nsecrets: [API_KEY]\nrecipients: [{self.client_key}]\n")
+        # An installed extension with a port of the publisher's block (29820 + 10).
+        write(p, ".copier-answers.ext-wiki.yml", "_src_path: gh:org/fyso-ext-wiki\nextension_port: 29830\n")
+        write(p, ".config/mise/conf.d/ext-wiki.toml", '[env]\nFYSO_EXT_WIKI_PORT = "29830"\n')
+        write(p, "extensions/wiki/README.md", "wiki\n")
         self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "publisher-pass", "API_KEY": "key-1"})
         self.commit(p, pe, "publisher v1")
         out = self.dist(p, pe, "publish").stdout
@@ -92,8 +97,17 @@ class DistributionTests(unittest.TestCase):
 
         self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "client-pass"})
         write(c, "project/bots/team.yaml", "version: 1\nbots: []\n")
+        # The client's own extension already holds the first port of its block (29800 + 10),
+        # and it has an older bot snapshot of its own.
+        write(c, ".config/mise/conf.d/ext-own.toml", '[env]\nFYSO_EXT_OWN_PORT = "29810"\n')
+        write(c, "state/bots/team.yaml", "version: 1\nbots:\n  - name: Old\n")
         self.commit(c, ce, "client init")
-        self.dist(c, ce, "add", str(self.repo))
+        self.dist(c, ce, "add", "../dist.git")   # relative: an absolute path would fail check-paths
+        self.assertIn('FYSO_EXT_WIKI_PORT = "29811"', (c / ".config/mise/conf.d/ext-wiki.toml").read_text())
+        self.assertIn("extension_port: 29811", (c / ".copier-answers.ext-wiki.yml").read_text())
+        self.assertIn('"29810"', (c / ".config/mise/conf.d/ext-own.toml").read_text())
+        team = mise("node", "framework/scripts/dist.cjs", "team-source", cwd=c, env=ce).stdout.strip()
+        self.assertEqual(team, "project/bots/team.yaml", "the delivered team, not the client's old snapshot")
         self.assertEqual((c / "project/wiki/index.md").read_text(), "# Cliente\nv1\n")
         self.assertIn("Ventas", (c / "project/bots/team.yaml").read_text())   # the distribution wins
         self.assertFalse((c / "project/auth/tinyauth.yaml").exists())         # instance login stays home
@@ -132,10 +146,31 @@ class DistributionTests(unittest.TestCase):
         self.assertIn("_commit: v2", (c / ".copier-answers.dist.yml").read_text())
         log = subprocess.run(["git", "log", "--format=%s", "-1"], cwd=c, capture_output=True, text=True).stdout
         self.assertEqual(log.strip(), "dist: v2")
+        # The client's port allocation survives updates (the delivered file says 29830 again).
+        self.assertIn('FYSO_EXT_WIKI_PORT = "29811"', (c / ".config/mise/conf.d/ext-wiki.toml").read_text())
 
         # Updating again changes nothing: the client's merged memory is kept.
         self.assertIn("already at v2", self.dist(c, ce, "update").stdout)
         self.assertEqual((c / "state/memory/Ventas/MEMORY.md").read_text(), memory)
+
+    def test_client_credentials_are_never_committed(self):
+        p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
+        write(p, "project/wiki/index.md", "x\n")
+        write(p, "project/distribution.yaml", f"repo: {self.repo}\n")
+        self.commit(p, pe, "init")
+        self.dist(p, pe, "publish")
+        self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "client-pass"})
+        self.commit(c, ce, "client init")
+        # A client-only file with a plaintext token, never seen by the publisher's scan.
+        token = "ghp_" + "Z3kQ9mVt7RbX2pLw8NcY5hJd4FsA6uEo1TiG"
+        write(c, "project/apps/svc/config.env", f"GITHUB_TOKEN={token}\n")
+        result = mise(str(c / "framework/scripts/dist.sh"), "add", "../dist.git", cwd=c, env=ce, check=False)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("nothing was committed", result.stderr)
+        log = subprocess.run(["git", "log", "--format=%s"], cwd=c, capture_output=True, text=True).stdout
+        self.assertEqual(log.strip(), "client init")
+        staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=c, capture_output=True, text=True).stdout
+        self.assertEqual(staged, "")
 
     def test_private_secrets_are_never_sent(self):
         p, pe = self.publisher, self.publisher_env
