@@ -1,4 +1,4 @@
-description: Connect or disconnect the project MCP in an assistant on the Dagu host
+description: Status, connect, disconnect or open the project MCP in the desktop and CLI agents of the Dagu host
 type: graph
 max_active_runs: 1
 params:

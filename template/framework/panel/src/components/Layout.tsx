@@ -139,7 +139,6 @@ export function TopBar(props: ThemeProps) {
 
 type NavItem = { id:string; href:string; icon:typeof IconBot; label?:string };
 const ITEMS: NavItem[] = [
-  { id: "mcp", href: href.mcp, icon: IconWorkflow },
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconWorkflow },

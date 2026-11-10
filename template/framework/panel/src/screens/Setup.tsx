@@ -251,6 +251,19 @@ function ExtensionStep({ ext, state }: { ext: Extension; state: StepState }) {
   );
 }
 
+function McpCard() {
+  const { t } = useTranslation();
+  return (
+    <section className="card as-setup" aria-labelledby="as-setup-t">
+      <div className="grow">
+        <h2 id="as-setup-t">{t("mcp.setupTitle")}</h2>
+        <p className="mute">{t("mcp.setupBody")}</p>
+      </div>
+      <a href={href.mcp} className="btn btn-sm btn-soft">{t("mcp.setupLink")} <span aria-hidden="true">→</span></a>
+    </section>
+  );
+}
+
 export function Setup() {
   const { t } = useTranslation();
   const s = useStore();
@@ -290,6 +303,7 @@ export function Setup() {
           </h2>
           {steps}
         </section>
+        <McpCard />
       </main>
     );
 
@@ -322,6 +336,7 @@ export function Setup() {
         </section>
       )}
       {steps}
+      <McpCard />
     </main>
   );
 }
