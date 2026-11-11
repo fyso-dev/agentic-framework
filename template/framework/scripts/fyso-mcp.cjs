@@ -7,6 +7,9 @@
 // With `--scope <name> [--system a,b]` it serves only Dagu's read and execute tools, limited
 // to one workflow scope (D60): the entry a group of bots gets instead of the `dagu` server.
 // Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.
+// With `--http <unix socket>` it serves the same tools over MCP Streamable HTTP for remote
+// clients (D63): stateless JSON answers behind the gateway's /mcp route, a bearer token,
+// only when the project has an HTTPS provider, and never Dagu's forwarded tools (D57).
 // Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs --no-dagu`.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -21,7 +24,8 @@ const instructions = () => { try { return `${context()}\n${project.brief(ROOT)}`
 const option = name => { const at = process.argv.indexOf(name); return at < 0 ? null : process.argv[at + 1] || ''; };
 const SCOPE = option('--scope');
 const scopeGuard = SCOPE === null ? null : require('./dagu-scope.cjs').guard(ROOT, SCOPE, (option('--system') || '').split(',').filter(Boolean));
-const FORWARD_DAGU = !!scopeGuard || !process.argv.includes('--no-dagu');
+const HTTP_SOCKET = option('--http');
+const FORWARD_DAGU = HTTP_SOCKET === null && (!!scopeGuard || !process.argv.includes('--no-dagu'));
 const scopes = require('./workflow-scopes.cjs');
 let forwarder;
 const daguMcp = () => forwarder ||= require('./dagu-mcp.cjs').forwarder();
@@ -297,23 +301,86 @@ async function handle(msg) {
   }
 }
 
-const send = msg => process.stdout.write(JSON.stringify(msg) + '\n');
-let buffer = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => {
-  buffer += chunk;
-  for (let i; (i = buffer.indexOf('\n')) >= 0;) {
-    const line = buffer.slice(0, i).trim();
-    buffer = buffer.slice(i + 1);
-    if (!line) continue;
-    let msg;
-    try { msg = JSON.parse(line); } catch { send({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'parse error'}}); continue; }
-    handle(msg).then(result => {
-      if (msg.id !== undefined && result !== undefined) send({jsonrpc: '2.0', id: msg.id, result});
-    }, e => {
-      if (msg.id !== undefined) send({jsonrpc: '2.0', id: msg.id, error: {code: e.code || -32603, message: e.message}});
-    });
+// One JSON-RPC message in, its answer out (undefined for a notification).
+async function answer(msg) {
+  try {
+    const result = await handle(msg);
+    return msg.id !== undefined && result !== undefined ? {jsonrpc: '2.0', id: msg.id, result} : undefined;
+  } catch (e) {
+    return msg.id !== undefined ? {jsonrpc: '2.0', id: msg.id, error: {code: e.code || -32603, message: e.message}} : undefined;
   }
-});
-process.stdin.on('end', () => process.exit(0));
-module.exports = {TOOLS};
+}
+
+function serveStdio() {
+  const send = msg => process.stdout.write(JSON.stringify(msg) + '\n');
+  let buffer = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    buffer += chunk;
+    for (let i; (i = buffer.indexOf('\n')) >= 0;) {
+      const line = buffer.slice(0, i).trim();
+      buffer = buffer.slice(i + 1);
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { send({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'parse error'}}); continue; }
+      answer(msg).then(reply => { if (reply) send(reply); });
+    }
+  });
+  process.stdin.on('end', () => process.exit(0));
+}
+
+// Remote clients (D63). The gateway routes only /mcp here, without the web login: the
+// bearer token is the credential, compared in constant time. Browsers are refused (they
+// send Origin; CLI clients do not), which also closes DNS rebinding.
+const MAX_BODY = 1024 * 1024;
+function serveHttp(socket, env = process.env) {
+  const crypto = require('node:crypto');
+  const token = env.FYSO_MCP_TOKEN || '';
+  const off = env.FYSO_WEB_SCHEME !== 'https' ? 'Remote MCP is off: this project has no HTTPS provider extension.'
+    : token.length < 32 ? 'Remote MCP is off: run "mise run agent:remote" on the project\'s machine to create its token.' : null;
+  const expected = Buffer.from(`Bearer ${token}`);
+  const authorized = header => {
+    const given = Buffer.from(String(header || ''));
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+  };
+  const server = require('node:http').createServer((req, res) => {
+    const reply = (status, body, headers = {}) => {
+      res.writeHead(status, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers});
+      res.end(body === undefined ? '' : JSON.stringify(body));
+    };
+    if (req.url === '/health') return reply(200, {ok: true, enabled: !off});
+    if (req.url !== '/mcp') return reply(404, {error: 'not found'});
+    if (off) return reply(404, {error: off});
+    if (req.headers.origin) return reply(403, {error: 'This endpoint is for MCP clients, not browsers.'});
+    if (!authorized(req.headers.authorization)) return reply(401, {error: 'Missing or wrong bearer token.'}, {'WWW-Authenticate': 'Bearer'});
+    if (req.method !== 'POST') return reply(405, {error: 'Use POST.'}, {Allow: 'POST'});
+    let size = 0;
+    const chunks = [];
+    // Too large: answer once and let the rest drain (the caller already proved the token).
+    req.on('data', chunk => {
+      if (size > MAX_BODY) return;
+      size += chunk.length;
+      if (size > MAX_BODY) reply(413, {error: 'Request too large.'}, {Connection: 'close'}); else chunks.push(chunk);
+    });
+    req.on('end', async () => {
+      if (size > MAX_BODY) return;
+      let body;
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return reply(400, {jsonrpc: '2.0', id: null, error: {code: -32700, message: 'parse error'}}); }
+      const batch = Array.isArray(body);
+      const replies = (await Promise.all((batch ? body : [body]).map(answer))).filter(Boolean);
+      if (!replies.length) return reply(202);
+      reply(200, batch ? replies : replies[0]);
+    });
+  });
+  fs.rmSync(socket, {force: true});
+  const mask = process.umask(0o177);   // the socket is this user's only
+  server.listen(socket, () => { process.umask(mask); console.error(off || `Remote MCP ready on ${socket}.`); });
+  return server;
+}
+
+if (require.main === module) {
+  if (HTTP_SOCKET === null) serveStdio();
+  else if (!HTTP_SOCKET) { console.error('usage: fyso-mcp.cjs --http <unix socket path>'); process.exitCode = 1; }
+  else serveHttp(HTTP_SOCKET);
+}
+module.exports = {TOOLS, serveHttp};

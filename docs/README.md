@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D62; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D63; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -216,3 +216,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | D61 marketplace compatibility requires SilverBullet `v0.1.2` or newer for HTTP import batches; install/migration examples use that patch version. Updating the framework does not replace an independently installed extension. [Extension guide](silverbullet-extension.md#custom-http-domains-d61) |
 
 | 2026-11-11 | **HTTPS through a provider extension (D62).** The core gains the public scheme (`FYSO_WEB_SCHEME`, set by a provider's conf.d file) and one address rule (`web_origin`); the gateway stays loopback HTTP and the core issues no certificates. Real Caddy + Tinyauth pass the gateway suite in both modes. Spike against a self-hosted NetBird reverse proxy: a service on a nested name (`panel.<host>.<cluster domain>`) is accepted, gets a Let's Encrypt certificate in seconds and reaches the peer's gateway, so `web_domain = <host>.<cluster domain>` gives the login a parent domain of its own; that cluster reports `supports_private: false`, so its services are public and restricting them is its administrator's task. `fyso-ext-netbird` v0.2 failed for lack of this contract (login redirects and origin checks assumed `http` and the port). Not built yet: the provider mode of `fyso-ext-netbird`, the remote MCP of D52, a browser session through a real provider. [Contract](web-auth.md#https-through-a-provider-extension-d62) |
+
+| 2026-11-11 | **Remote MCP (D63).** `https://panel.<web_domain>/mcp` serves the platform tools to agents on other machines: bearer token per project, only behind an HTTPS provider (D62), no Dagu tools. `mise run agent:remote` creates the token and prints the command for Claude Code and Codex. Finding: mise redacts secrets in task output unless the task is `raw`, so that task is. Server and real-gateway tests pass; a real client through a real provider is not verified yet. [Agent surface](agent-surface.md#remote-clients-d63) |

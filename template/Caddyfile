@@ -68,6 +68,11 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 
 # Panel files and same-origin Dagu API.
 http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	# Remote MCP clients (D63) carry a bearer token instead of a web session: this
+	# route runs before the login and the endpoint checks the token itself.
+	route /mcp {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
 	import fyso_login
 	handle /api/session {
 		rewrite * /api/context/user

@@ -58,6 +58,9 @@ stack_running() { [ -S "$PC_SOCKET" ] && pc process list >/dev/null 2>&1; }
 # A private Unix socket avoids competing with web-auth for base + 9.
 connector_setup_socket() { printf '/tmp/fyso-connectors-%s.sock\n' "$FYSO_HTTP_PORT"; }
 
+# Remote MCP endpoint (D63), behind the gateway's /mcp route.
+mcp_socket() { printf '/tmp/fyso-mcp-%s.sock\n' "$FYSO_HTTP_PORT"; }
+
 # Web login this project trusts (D61): its own Tinyauth, or a shared one on this host.
 auth_upstream() { printf '%s' "${FYSO_AUTH_UPSTREAM:-127.0.0.1:$FYSO_AUTH_PORT}"; }
 shared_login() { [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; }

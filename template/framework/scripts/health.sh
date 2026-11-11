@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Readiness checks used by process-compose and doctor: health.sh <dagu|omb|web-auth|caddy>
+# Readiness checks used by process-compose and doctor: health.sh <dagu|omb|web-auth|caddy|connector-setup|mcp-remote>
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 case "${1:-}" in
+  mcp-remote) curl -fsS -o /dev/null --unix-socket "$(mcp_socket)" http://localhost/health ;;
   connector-setup) curl -fsS -o /dev/null --unix-socket "$(connector_setup_socket)" http://localhost/health ;;
   web-auth) curl -fsS -o /dev/null "http://$(auth_upstream)/api/healthz" ;;
   dagu)  curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" \

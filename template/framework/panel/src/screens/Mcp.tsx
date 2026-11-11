@@ -2,7 +2,8 @@
 // to the desktop and CLI agents of the Dagu host through the fyso-agent-connect workflow.
 // MODE=status says which agents are installed and connected; connect, disconnect and open act
 // on one. Those apps live on the Dagu host, so when the panel is opened from another machine the
-// actions are hidden: remote access goes through an HTTP MCP with a token (D52, not built yet).
+// actions are hidden. Over HTTPS (an HTTPS provider extension, D62) the page points to the remote
+// MCP endpoint and the terminal task that prints its token (D63); over plain HTTP it says what is missing.
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DAGS } from "../api/types";
@@ -182,10 +183,20 @@ export function Mcp() {
       {local ? <LocalAgents server={setServer} /> : (
         <section className="as-remote" aria-labelledby="as-remote-t">
           <span aria-hidden="true" className="as-logo"><IconHost /></span>
-          <div className="grow">
-            <h2 id="as-remote-t">{t("mcp.remoteTitle")}</h2>
-            <p className="mute">{t("mcp.remoteBody")}</p>
-          </div>
+          {location.protocol === "https:" ? (
+            <div className="grow">
+              <h2 id="as-remote-t">{t("mcp.remoteReadyTitle")}</h2>
+              <p className="mute">{t("mcp.remoteReadyBody")}</p>
+              <CopyLine text="mise run agent:remote" />
+              <p className="mute">{t("mcp.remoteAddress")}</p>
+              <CopyLine text={`${location.origin}/mcp`} />
+            </div>
+          ) : (
+            <div className="grow">
+              <h2 id="as-remote-t">{t("mcp.remoteTitle")}</h2>
+              <p className="mute">{t("mcp.remoteBody")}</p>
+            </div>
+          )}
         </section>
       )}
 

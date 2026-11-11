@@ -56,6 +56,20 @@ processes:
       restart: on_failure
       backoff_seconds: 3
 
+  # Remote MCP endpoint (D63). It answers "off" until the project has an HTTPS
+  # provider extension and a token (mise run agent:remote).
+  mcp-remote:
+    command: framework/scripts/run-mcp-remote.sh
+    log_location: .data/logs/mcp-remote.log
+    readiness_probe:
+      exec:
+        command: framework/scripts/health.sh mcp-remote
+      initial_delay_seconds: 1
+      period_seconds: 2
+    availability:
+      restart: on_failure
+      backoff_seconds: 3
+
   caddy:
     command: framework/scripts/run-caddy.sh
     log_location: .data/logs/caddy.log

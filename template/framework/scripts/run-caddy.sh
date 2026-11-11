@@ -26,6 +26,6 @@ clean_exec \
   FYSO_DAGU_AUTH="$dagu_auth" FYSO_AUTH_UPSTREAM="$(auth_upstream)" FYSO_WEB_DOMAIN="$FYSO_WEB_DOMAIN" \
   FYSO_WEB_SCHEME="$(web_scheme)" FYSO_WEB_PORT_SUFFIX="$(web_port_suffix)" \
   FYSO_BIND="${FYSO_BIND:-127.0.0.1}" FYSO_HTTP_PORT="$FYSO_HTTP_PORT" FYSO_CADDY_ADMIN_PORT="$FYSO_CADDY_ADMIN_PORT" \
-  FYSO_CONNECTOR_SETUP_SOCKET="$(connector_setup_socket)" \
+  FYSO_CONNECTOR_SETUP_SOCKET="$(connector_setup_socket)" FYSO_MCP_SOCKET="$(mcp_socket)" \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" FYSO_OMB_PORT="$FYSO_OMB_PORT" FYSO_OMB_TOKEN="$omb_token" \
   caddy run --config Caddyfile --adapter caddyfile

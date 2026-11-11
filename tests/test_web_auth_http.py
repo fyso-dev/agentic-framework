@@ -75,6 +75,7 @@ class WebAuthHTTP(unittest.TestCase):
             def do_GET(self):
                 body = json.dumps({
                     'path': self.path,
+                    'bearer': self.headers.get('Authorization') == 'Bearer fixture-mcp-token',
                     'daguCredential': self.headers.get('Authorization') == cls.dagu_auth,
                     'ombCredential': self.headers.get('Authorization') == 'Bearer fixture-omb-token',
                     'user': self.headers.get('Remote-User'),
@@ -93,9 +94,13 @@ class WebAuthHTTP(unittest.TestCase):
             cls.servers.append(server)
             threading.Thread(target=server.serve_forever, daemon=True).start()
         cls.setup_socket = Path('/tmp') / f'fyso-auth-setup-{cls.port}.sock'
-        server = ThreadingUnixStreamServer(str(cls.setup_socket), Echo)
-        cls.servers.append(server)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.mcp_socket = Path('/tmp') / f'fyso-auth-mcp-{cls.port}.sock'
+        for socket_path in [cls.setup_socket, cls.mcp_socket]:
+            socket_path.unlink(missing_ok=True)
+            server = ThreadingUnixStreamServer(str(socket_path), Echo)
+            cls.servers.append(server)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.addClassCleanup(lambda: cls.mcp_socket.unlink(missing_ok=True))
         cls.addClassCleanup(lambda: cls.setup_socket.unlink(missing_ok=True))
         binary_dir = cls.root / 'bin'; binary_dir.mkdir()
         (binary_dir / 'yaml').symlink_to(ROOT / 'template/framework/panel/node_modules/yaml/bin.mjs')
@@ -113,7 +118,7 @@ class WebAuthHTTP(unittest.TestCase):
             'FYSO_WEB_SCHEME': cls.scheme, 'FYSO_WEB_PORT_SUFFIX': '' if cls.scheme == 'https' else f':{cls.port}',
             'FYSO_DAGU_PORT': str(cls.port + 1), 'FYSO_OMB_PORT': str(cls.port + 4),
             'FYSO_CADDY_ADMIN_PORT': str(cls.port + 8), 'FYSO_BIND': '127.0.0.1',
-            'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
+            'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_MCP_SOCKET': str(cls.mcp_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
         cls.start([os.environ['FYSO_TEST_CADDY'], 'run', '--config', str(cls.root / 'Caddyfile')], env)
         cls.wait_port(cls.port)
 
@@ -191,6 +196,18 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertTrue(json.loads(body)['daguCredential'])
         self.assertFalse(json.loads(body)['webCookieLeaked'])
         self.assertEqual(self.request('panel', '/api/connectors/mcp', 'POST', {})[0], 401)
+
+    def test_00_remote_mcp_route_skips_the_login_and_only_exists_on_the_panel(self):
+        # D63: the endpoint authenticates its own bearer token; the gateway must hand it over untouched.
+        status, _, body = self.request('panel', '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')
+        self.assertEqual(status, 200); seen = json.loads(body)
+        self.assertEqual(seen['path'], '/mcp'); self.assertTrue(seen['bearer'])
+        status, _, body = self.request('panel', '/mcp', 'POST', {}, **{'Remote-User': 'admin'})
+        self.assertEqual(status, 200); self.assertFalse(json.loads(body)['bearer'])
+        for path in ['/mcp/', '/mcp/x', '/mcpx']:
+            self.assertEqual(self.request('panel', path, 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, path)
+        for app in ['dagu', 'omb']:
+            self.assertEqual(self.request(app, '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, app)
 
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:

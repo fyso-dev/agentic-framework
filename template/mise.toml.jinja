@@ -131,6 +131,11 @@ run = "node framework/scripts/agent-connect.cjs connect"
 description = "Open Codex or Claude Desktop with a new conversation about this project (after agent:connect)"
 run = "node framework/scripts/agent-connect.cjs open"
 
+[tasks."agent:remote"]
+description = "Connect an agent on another machine to this project's MCP: prints its address and token (needs an HTTPS provider extension)"
+raw = true   # the token is printed on purpose; mise would redact it otherwise
+run = "framework/scripts/agent-remote.sh"
+
 [tasks."agent:disconnect"]
 description = "Remove this project's fyso MCP from Claude Desktop / Codex / Claude Code"
 run = "node framework/scripts/agent-connect.cjs disconnect"
