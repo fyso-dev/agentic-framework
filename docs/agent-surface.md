@@ -177,8 +177,11 @@ address and the task to run, not the token.
 Verified (2026-11-11): `tests/mcp-remote.test.cjs` (initialize, tools without `dagu_*`,
 token, Origin, method, size and "off" cases against the real server on a socket) and
 `tests/test_web_auth_http.py` (real Caddy: `/mcp` skips the login on the panel host only,
-in both schemes). Not verified: a real Claude Code or Codex client through a real HTTPS
-provider, and `agent:remote` creating the token with sops in a generated project.
+in both schemes). `agent:remote` was run by hand in a throwaway folder with real sops
+3.13.3 and an age key: it stored a 43-character token encrypted, kept the existing
+secret and printed the commands. Not verified: a real Claude Code or Codex client
+through a real HTTPS provider, and the task inside a generated, running project
+(the `mcp-remote` restart).
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment. Desktop agents reach its tools through `fyso-<slug>` instead (forwarded, D57).
 
