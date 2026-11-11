@@ -13,11 +13,11 @@ COPIER = ['uvx', '--from', 'copier==9.19.1', 'copier']
 
 class RelativeExtensionSource(unittest.TestCase):
     def test_upgrade_paths_with_replacement_metacharacters(self):
-        for name in ['plain', 'R&D', 'release#1', 'R&D #1']:
+        for name in ['plain', 'R&D', 'release#1', 'R&D #1', 'quoted: path']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp) / name
                 base.mkdir()
-                source, project, toolbin = [base / n for n in ['fyso-ext-foo', 'project', 'bin']]
+                source, project, toolbin = [base / n for n in ['fyso-ext-' + name, 'project', 'bin']]
                 source.mkdir()
                 project.mkdir()
                 toolbin.mkdir()
@@ -46,7 +46,7 @@ class RelativeExtensionSource(unittest.TestCase):
                 run(['git', 'init', '-q'], source)
                 commit(source)
                 run(['git', 'tag', 'v1.0.0'], source)
-                run(COPIER + ['copy', '--trust', '--defaults', '../fyso-ext-foo', '.'])
+                run(COPIER + ['copy', '--trust', '--defaults', '../' + source.name, '.'])
                 scripts = project / 'framework/scripts'
                 scripts.mkdir(parents=True)
                 for script in ['ext.sh', 'lib.sh', 'extensions.cjs']:
@@ -72,7 +72,7 @@ class RelativeExtensionSource(unittest.TestCase):
                 answers = json.loads(run(['node', '-e',
                     'console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").read(process.argv[1])))',
                     '.copier-answers.ext-foo.yml']))
-                self.assertEqual(answers['_src_path'], '../fyso-ext-foo')
+                self.assertEqual(answers['_src_path'], '../' + source.name)
                 self.assertEqual(run(['git', 'rev-list', '--count', initial + '..HEAD']).strip(), '1')
                 self.assertEqual(run(['git', 'status', '--porcelain']).strip(), '?? unrelated.txt')
                 self.assertEqual(len(run(['git', 'worktree', 'list']).splitlines()), 1)
