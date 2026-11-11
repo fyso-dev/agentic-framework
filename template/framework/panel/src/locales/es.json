@@ -833,5 +833,20 @@
     "setupTitle": "Maneja el proyecto desde tu IA",
     "setupBody": "Opcional: conecta Claude o Codex para configurar el proyecto conversando.",
     "setupLink": "Conectar"
+  },
+  "update": {
+    "title": "Framework",
+    "unknown": "sin versión",
+    "ref": "Versión",
+    "refTip": "Tag, rama o commit del template; vacío: el último tag",
+    "run": "Actualizar",
+    "running": "Actualizando…",
+    "advanced": "Fuente alternativa",
+    "src": "Fuente de Copier para esta actualización",
+    "srcPlaceholder": "Ruta de un clon local, si este host no puede leer el repositorio",
+    "srcTip": "Repositorio del template",
+    "versionTip": "Commit del template instalado",
+    "done": "Actualizado {{from}} → {{to}} (commit {{commit}}). Si cambiaron Dagu, OpenMausBot o Caddy, reiniciá el stack.",
+    "current": "Ya estaba al día ({{to}})."
   }
 }

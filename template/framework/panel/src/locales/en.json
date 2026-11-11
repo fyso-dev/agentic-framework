@@ -833,5 +833,20 @@
     "setupTitle": "Run the project from your AI",
     "setupBody": "Optional: connect Claude or Codex to configure the project by chatting.",
     "setupLink": "Connect"
+  },
+  "update": {
+    "title": "Framework",
+    "unknown": "no version",
+    "ref": "Version",
+    "refTip": "Template tag, branch or commit; empty: the latest tag",
+    "run": "Update",
+    "running": "Updating…",
+    "advanced": "Alternative source",
+    "src": "Copier source for this update",
+    "srcPlaceholder": "Path of a local clone, when this host cannot read the repository",
+    "srcTip": "Template repository",
+    "versionTip": "Installed template commit",
+    "done": "Updated {{from}} → {{to}} (commit {{commit}}). If Dagu, OpenMausBot or Caddy changed, restart the stack.",
+    "current": "Already up to date ({{to}})."
   }
 }

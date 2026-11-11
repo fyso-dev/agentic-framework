@@ -28,7 +28,9 @@ if (process.argv[2] === 'config') {
     return {enabled:true, ...app};
   });
   fs.mkdirSync('.data/panel', {recursive:true});
-  fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls}));
+  const answers = fs.existsSync('.copier-answers.yml') ? read('.copier-answers.yml') : {};
+  const framework = {commit:answers._commit ? String(answers._commit) : null, src:answers._src_path || null};
+  fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls, framework}));
   fs.writeFileSync('.data/panel/apps.json', JSON.stringify(apps));
   fs.writeFileSync('.data/panel/extensions.json', JSON.stringify(extensions.inventory(apps.map((app,i) => ({id:app.id,file:appFiles[i]})))));
 } else if (process.argv[2] === 'engines') {

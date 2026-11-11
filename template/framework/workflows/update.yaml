@@ -1,0 +1,17 @@
+description: Update this project to a newer framework revision (one commit, fast-forward)
+labels:
+  - fyso=system
+type: graph
+max_active_runs: 1
+params:
+  - REF: ""                  # template tag, branch or commit; empty: latest tag (or HEAD)
+  - SRC: ""                  # another Copier source for this run only (e.g. a local clone)
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  # mise exec: Dagu steps start from a cleared environment (tools, ports, secrets).
+  # REF and SRC reach the script as env vars, never through the shell command line.
+  - id: update
+    command: mise exec -- framework/scripts/update.sh
+    output: RESULT

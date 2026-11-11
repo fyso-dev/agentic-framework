@@ -13,6 +13,7 @@ const PROJECT: Project = {
   slug: "foo-project",
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
+  framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -292,6 +293,23 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     };
   }
 
+  function connectAgent(dag: string, id: string, createdAt: number, params?: Record<string, string>) {
+    const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
+    if (mode === "status") {
+      add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+        mode, server: `fyso-${PROJECT.slug}`,
+        agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
+      }) }) });
+      return;
+    }
+    const failed = scenario === "failed" && mode === "connect";
+    if (!failed && mode === "connect") agentsOn.add(target);
+    if (mode === "disconnect") agentsOn.delete(target);
+    add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
+      error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
+      outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+  }
+
   return {
     initialDraft: scenario === "failed" || scenario === "applyfail" ? DRAFT : null,
 
@@ -325,23 +343,9 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const createdAt = Date.now();
       const proposed = params?.TEAM_B64 ? fromBase64Utf8(params.TEAM_B64) : team;
       switch (dag) {
-        case DAGS.agentConnect: {
-          const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
-          if (mode === "status") {
-            add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
-              mode, server: `fyso-${PROJECT.slug}`,
-              agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
-            }) }) });
-            break;
-          }
-          const failed = scenario === "failed" && mode === "connect";
-          if (!failed && mode === "connect") agentsOn.add(target);
-          if (mode === "disconnect") agentsOn.delete(target);
-          add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
-            error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
-            outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+        case DAGS.agentConnect:
+          connectAgent(dag, id, createdAt, params);
           break;
-        }
         case DAGS.setupCheck:
           add({ dag, id, createdAt, duration: 3500, outcome: "succeeded", outputs: () => ({ check: JSON.stringify(check()) }) });
           break;
@@ -385,6 +389,15 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
               installed.add(ext);
               if (latest) versions.set(ext, latest);
             },
+          });
+          break;
+        }
+        case DAGS.update: {
+          const fail = scenario === "failed";
+          add({
+            dag, id, createdAt, duration: 4200, outcome: fail ? "failed" : "succeeded",
+            error: fail ? "error: the update conflicts with local changes; nothing was applied: ./Caddyfile" : undefined,
+            outputs: () => ({ result: JSON.stringify({ from: "58f57cf", to: "73b74c2", commit: "1dcf4be", changed: true }) }),
           });
           break;
         }
