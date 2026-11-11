@@ -4,7 +4,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_DATA FYSO_ROOT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD FYSO_HTTP_PORT FYSO_OMB_PORT
 require_env FYSO_WEB_DOMAIN FYSO_AUTH_PORT
-[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "HTTP web login is local-only. Remote HTTPS deployment is not configured."
+web_scheme >/dev/null
+[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "The gateway listens on loopback only. Remote access goes through a private forwarder or an HTTPS provider extension."
 mkdir -p "$FYSO_DATA/caddy"
 panel_root="$FYSO_ROOT/framework/panel-placeholder"
 [ ! -d "$FYSO_ROOT/framework/panel/dist" ] || panel_root="$FYSO_ROOT/framework/panel/dist"
@@ -23,6 +24,7 @@ clean_exec \
   XDG_DATA_HOME="$FYSO_DATA/caddy" XDG_CONFIG_HOME="$FYSO_DATA/caddy" \
   FYSO_ROOT="$FYSO_ROOT" FYSO_DATA="$FYSO_DATA" FYSO_PANEL_ROOT="$panel_root" \
   FYSO_DAGU_AUTH="$dagu_auth" FYSO_AUTH_UPSTREAM="$(auth_upstream)" FYSO_WEB_DOMAIN="$FYSO_WEB_DOMAIN" \
+  FYSO_WEB_SCHEME="$(web_scheme)" FYSO_WEB_PORT_SUFFIX="$(web_port_suffix)" \
   FYSO_BIND="${FYSO_BIND:-127.0.0.1}" FYSO_HTTP_PORT="$FYSO_HTTP_PORT" FYSO_CADDY_ADMIN_PORT="$FYSO_CADDY_ADMIN_PORT" \
   FYSO_CONNECTOR_SETUP_SOCKET="$(connector_setup_socket)" \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" FYSO_OMB_PORT="$FYSO_OMB_PORT" FYSO_OMB_TOKEN="$omb_token" \

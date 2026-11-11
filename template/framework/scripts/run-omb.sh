@@ -6,6 +6,7 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_DATA FYSO_OMB_PORT FYSO_OMB_WEBHOOK_PORT FYSO_HTTP_PORT FYSO_DAGU_PORT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD
+web_scheme >/dev/null
 mkdir -p "$FYSO_DATA/omb" "$FYSO_DATA/npm-cache"
 bot_env=()
 while IFS='=' read -r name _; do
@@ -34,6 +35,6 @@ clean_exec \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" \
   DAGU_MCP_AUTH="Basic $(printf '%s:%s' "$FYSO_ADMIN_USER" "$FYSO_ADMIN_PASSWORD" | base64 | tr -d '\n')" \
   OMB_WEBHOOK_PORT="$FYSO_OMB_WEBHOOK_PORT" \
-  OMB_PUBLIC_URL="http://omb.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT" \
+  OMB_PUBLIC_URL="$(web_origin omb)" \
   npm_config_cache="$FYSO_DATA/npm-cache" \
   openmausbot serve --port "$FYSO_OMB_PORT" --data-dir "$FYSO_DATA/omb" --no-pair --no-open

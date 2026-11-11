@@ -61,3 +61,24 @@ connector_setup_socket() { printf '/tmp/fyso-connectors-%s.sock\n' "$FYSO_HTTP_P
 # Web login this project trusts (D61): its own Tinyauth, or a shared one on this host.
 auth_upstream() { printf '%s' "${FYSO_AUTH_UPSTREAM:-127.0.0.1:$FYSO_AUTH_PORT}"; }
 shared_login() { [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; }
+
+# Public web addresses (D62). The gateway always listens on loopback HTTP; an HTTPS
+# provider extension sets FYSO_WEB_SCHEME=https in its conf.d file, read fresh because
+# a process restarted after `ext:add` still has the environment of `mise run up`.
+web_scheme() {
+  local scheme="${FYSO_WEB_SCHEME:-$(mise exec -- printenv FYSO_WEB_SCHEME 2>/dev/null || true)}"
+  case "${scheme:-http}" in
+    http|https) printf '%s' "${scheme:-http}" ;;
+    *) fail "FYSO_WEB_SCHEME must be http or https, not \"$scheme\"" ;;
+  esac
+}
+# A failure inside $(…) only ends that subshell: each helper stops on its own, and
+# scripts call `web_scheme >/dev/null` once before using them as arguments.
+web_port_suffix() {
+  local scheme; scheme=$(web_scheme) || exit 1
+  [ "$scheme" = https ] || printf ':%s' "$FYSO_HTTP_PORT"
+}
+web_origin() {
+  local scheme suffix; scheme=$(web_scheme) || exit 1; suffix=$(web_port_suffix) || exit 1
+  printf '%s://%s.%s%s' "$scheme" "$1" "$FYSO_WEB_DOMAIN" "$suffix"
+}
