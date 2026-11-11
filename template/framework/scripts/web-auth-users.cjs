@@ -9,6 +9,15 @@ function run(args, input) {
   if (result.status !== 0) throw Error('SOPS could not update the encrypted users; secrets were not changed');
   return result.stdout;
 }
+// sops reads a file, and on Linux /dev/stdin cannot be opened when stdin is the socket node provides.
+function encrypt(args, text) {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'fyso-sops-'));
+  try {
+    const file = path.join(dir, 'plain');
+    fs.writeFileSync(file, text, {mode:0o600});
+    return run([...args, file]);
+  } finally { fs.rmSync(dir, {recursive:true, force:true}); }
+}
 try {
   if (!['init','add','remove'].includes(action) || !/^[a-zA-Z][a-zA-Z0-9_.-]{1,63}$/.test(username || '')) throw Error('Invalid action or username');
   const original = fs.readFileSync('secrets.enc.yaml', 'utf8');
@@ -26,7 +35,7 @@ try {
     users.set(username, entry);
   }
   secrets.FYSO_AUTH_USERS = [...users.values()].join(',');
-  const encrypted = run(['encrypt', '--filename-override', 'secrets.enc.yaml', '--input-type', 'yaml', '--output-type', 'yaml', '/dev/stdin'], yaml.stringify(secrets));
+  const encrypted = encrypt(['encrypt', '--filename-override', 'secrets.enc.yaml', '--input-type', 'yaml', '--output-type', 'yaml'], yaml.stringify(secrets));
   // A concurrent editor must never be overwritten.
   if (fs.readFileSync('secrets.enc.yaml', 'utf8') !== original) throw Error('Secrets changed concurrently; retry');
   const temporary = `secrets.enc.yaml.${process.pid}.tmp`;

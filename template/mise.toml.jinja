@@ -28,7 +28,9 @@ FYSO_PROJECT_NAME = "{{ project_name }}"
 FYSO_ROOT = "{% raw %}{{ config_root }}{% endraw %}"
 FYSO_DATA = "{% raw %}{{ config_root }}{% endraw %}/.data"
 FYSO_ADMIN_USER = "{{ admin_user }}"
-FYSO_WEB_DOMAIN = "{{ project_slug }}-{{ port_base }}.localhost"
+FYSO_WEB_DOMAIN = "{{ web_domain or (project_slug ~ '-' ~ port_base ~ '.localhost') }}"
+# Empty: this project runs its own web login. Otherwise the shared login it trusts (D61).
+FYSO_AUTH_UPSTREAM = "{{ auth_upstream }}"
 FYSO_TINYAUTH_VERSION = "5.2.0"
 FYSO_TINYAUTH_SHA256 = "5fec14cb1a7cf43ef5c9dafc9fa9fba6fcbc2d8fd328cd5a78dd42aae4c0efde" # gitleaks:allow public source checksum
 

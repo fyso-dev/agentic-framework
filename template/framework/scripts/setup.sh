@@ -41,4 +41,8 @@ else
 fi
 
 # Local browser users have their own encrypted hashes; existing projects migrate here.
-framework/scripts/web-auth-users.sh init
+if [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; then
+  echo "✓ Web users belong to the shared login at $FYSO_AUTH_UPSTREAM"
+else
+  framework/scripts/web-auth-users.sh init
+fi

@@ -2,7 +2,8 @@
 # Start the project in the background and wait until the gateway answers.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-require_env FYSO_ADMIN_PASSWORD FYSO_DATA FYSO_AUTH_USERS FYSO_WEB_DOMAIN
+require_env FYSO_ADMIN_PASSWORD FYSO_DATA FYSO_WEB_DOMAIN
+shared_login || require_env FYSO_AUTH_USERS
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "HTTP web login is local-only. Remote HTTPS deployment is not configured."
 
 node framework/scripts/mcp-config.cjs
@@ -24,7 +25,7 @@ busy=()
 for p in $(block_ports); do port_in_use "$p" && busy+=("$p"); done
 [ ${#busy[@]} -eq 0 ] || fail "ports in use: ${busy[*]}. Another program (or project) uses this block; change port_base."
 
-framework/scripts/install-web-auth.sh
+shared_login || framework/scripts/install-web-auth.sh
 mkdir -p "$FYSO_DATA/logs"
 pc up --detached >>"$FYSO_DATA/logs/up.log" 2>&1
 
@@ -49,8 +50,9 @@ for _ in $(seq 1 120); do
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-setup-check/enqueue" || true
     curl -fsS -o /dev/null -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" -H 'Content-Type: application/json' \
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-observability/enqueue" || true
+    login="local web login"; ! shared_login || login="shared web login"
     cat <<MSG
-  Panel        http://panel.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT     (local web login)
+  Panel        http://panel.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT     ($login)
   Dagu         http://dagu.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT
   OpenMausBot  http://omb.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT         (same web session)
 

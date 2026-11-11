@@ -75,6 +75,30 @@ admin_user:
     Use 2-64 ASCII letters, digits, dots, dashes or underscores, starting with a letter.
     {% endif %}
 
+web_domain:
+  type: str
+  help: >-
+    Domain of this project's web addresses (panel.<domain>, dagu.<domain>, …).
+    Leave empty for the local default, <slug>-<port>.localhost. Any other name
+    must resolve to this host on a private network; the gateway stays on loopback (D61).
+  default: ""
+  validator: >-
+    {% if web_domain and not (web_domain | regex_search('^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$')) %}
+    Use a lowercase DNS name without scheme or port, or leave it empty.
+    {% endif %}
+
+auth_upstream:
+  type: str
+  help: >-
+    Shared web login. Leave empty and this project runs its own login (default).
+    To sign in once for several projects on this host, give the loopback address
+    of the login service they share, for example 127.0.0.1:8489 (D61).
+  default: ""
+  validator: >-
+    {% if auth_upstream and not (auth_upstream | regex_search('^127\.0\.0\.1:[0-9]{2,5}$')) %}
+    Use 127.0.0.1:<port>, or leave it empty.
+    {% endif %}
+
 engine:
   type: str
   help: >-
