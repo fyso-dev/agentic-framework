@@ -1,0 +1,40 @@
+name: Build Qt installers
+# Explicitly invoked builds only: no publication, release, signing or automatic deployment.
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: linux
+            aqt_host: linux
+          - os: windows-2022
+            target: windows
+            aqt_host: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          version: 2026.11.2
+          install: false
+      - name: Install Qt build prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-shape0 libopengl0
+      - name: Install pinned Qt Installer Framework
+        run: mise exec aqua:astral-sh/uv@0.5.1 -- uvx --from aqtinstall==3.3.0 aqt install-tool ${{ matrix.aqt_host }} desktop tools_ifw qt.tools.ifw.47 -O .data/qt
+      - name: Build native installer
+        run: python installer/qt/build.py --target ${{ matrix.target }} --ifw-root .data/qt/Tools/QtInstallerFramework/4.7
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: fyso-installer-${{ matrix.target }}
+          path: |
+            installer/qt/dist/*.run
+            installer/qt/dist/*.exe
+          if-no-files-found: error

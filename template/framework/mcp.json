@@ -4,6 +4,11 @@
       "type": "http",
       "url": "http://127.0.0.1:${FYSO_DAGU_PORT}/mcp",
       "headers": { "Authorization": "${DAGU_MCP_AUTH}" }
+    },
+    "fyso": {
+      "type": "stdio",
+      "command": "mise",
+      "args": ["exec", "--", "node", "framework/scripts/fyso-mcp.cjs", "--no-dagu"]
     }
   }
 }

@@ -4,6 +4,10 @@ Status: **v2**, 2026-11-05. It replaces v1 (launcher + chat): the panel is now a
 
 UI copy is **Spanish by default, with English included** (simple i18n, PLAN D12). Quoted strings below are the intended Spanish copy. Design for text that can be about 30% longer in other languages: no fixed-width buttons or labels.
 
+## Product vocabulary
+
+Use **Agente / Agentes** in Spanish and **Agent / Agents** in English for project assistants throughout the panel and extension pages. Native product names such as OpenMausBot and the existing Bot Architect profile keep their names so people can find them. Internal translation keys, routes, CLI commands and native configuration fields retain their existing identifiers. This vocabulary supersedes the older Bot/Bots copy in this design study.
+
 ## Purpose
 
 The panel is where **the person customizing a Fyso project** sets it up. From it they:
@@ -70,28 +74,21 @@ A vertical list of steps. Each step shows:
 
 ### 3. Bots
 
-**List:** one row or card per bot with:
-- avatar,
-- name and role,
-- engine badge: "Suscripción" or "API",
-- model,
-- state: "aplicado", "cambios sin aplicar" or "nuevo".
+Layout (D49, Claude Design B1.3): **list on the left, detail on the right**. On phones the list and the detail are separate screens with a back arrow.
 
-Plus an **"Agregar bot"** button.
+**List:** avatar, name, a stack of connector logos and a dot for unapplied state (amber pending, accent new, red deleted; hollow = only in OpenMausBot). A **"+"** creates a bot. When there are unapplied changes, a compact strip offers **"Revisar y aplicar"** and discard.
 
-**Bot form** (drawer or page) with these fields:
+**Detail:** header with avatar, name, role, state pill and a toolbar (chat in OpenMausBot, delete). Three tabs, one question each:
 
-| Field | Type | Notes |
-|---|---|---|
-| Nombre | text | Unique, at most 100 characters |
-| Rol | text | One line, e.g. "Diseña workflows de Dagu" |
-| Motor | select | Only the engines configured in the project: "Claude · suscripción", "Claude · API", "Codex · suscripción"… |
-| Modelo | select | Depends on the engine |
-| Instrucciones base | long text (Markdown) | At most 24,000 bytes. Hint: "El ajuste fino se hace después en OpenMausBot" |
-| Skills | list of toggles | Name + one line each |
-| Usa workflows (Dagu) | toggle | On by default |
+| Tab | Content |
+|---|---|
+| Perfil | Nombre, Rol; activity tiles (conversations, tools used, conversations with errors, estimated usage) from the observability snapshot; *Piensa con* (engine + model); *Autonomía* (Pregunta / Solo = `approval: ask/full`); chips for instructions file, skills and last commit |
+| Instrucciones | Markdown editor with "+ Rol / Reglas / Tono / Ejemplos" section inserts, a tip, "Probar en OpenMausBot" and the 24,000-byte counter |
+| Conectores · N | One card per active access: *Proyecto* (Dagu workflows), MCP servers (*Completo* or *Parcial*), apps (*Leer* / *Escribir*). Hover shows ✕ to remove. A dashed "+" card opens a logo picker of what can still be granted, plus "Conectar una aplicación nueva" |
 
-Buttons: **"Guardar"** and **"Eliminar bot"**. Delete asks for confirmation.
+Icons carry the meaning; secondary text goes in tooltips (`data-tip`), with an accessible name on every icon-only control. One vocabulary for access: *Leer*, *Escribir*, *Completo*.
+
+**Save:** a floating bar ("Sin guardar" · undo · **Guardar**) appears only with changes. Guardar writes the team.yaml draft and applies app grants in the same click. Delete asks for confirmation.
 
 **Apply flow** (key moment, design it carefully):
 1. After saving, a **"Vista previa de cambios"** shows the plan before anything is applied, e.g.:
@@ -100,7 +97,7 @@ Buttons: **"Guardar"** and **"Eliminar bot"**. Delete asks for confirmation.
    - "Plan: 1 a crear, 1 a cambiar, 0 a eliminar"
 2. The note: "Antes de aplicar se guardan en git los ajustes hechos en OpenMausBot".
 3. **"Aplicar"** runs it with the standard action pattern, or **"Cancelar"**.
-4. On success: "Aplicado. Ya podés usarlos en OpenMausBot" + "Abrir OpenMausBot ↗".
+4. On success: "Aplicado. Ya puedes usarlos en OpenMausBot" + "Abrir OpenMausBot ↗".
 
 **States to design:**
 - list with mixed states,
@@ -127,17 +124,21 @@ Buttons: **"Guardar"** and **"Eliminar bot"**. Delete asks for confirmation.
 
 ### 4. Apps
 
-A launcher grid with two groups:
-- **Framework:** always present. Dagu ("Workflows") and OpenMausBot ("Bots").
-- **Proyecto:** the apps the project adds.
+Two tabs, kept in the address (`#/apps`, `#/apps?tab=ext`). Details live in tooltips; the page keeps text short.
 
-**App card:**
+**Abrir:** a tile launcher in up to three groups:
+- **Framework:** always present. Dagu ("Workflows") and OpenMausBot ("Bots").
+- **Proyecto:** the apps the project adds, plus a dashed "+" tile that copies `cp -r framework/apps/_template project/apps/mi-app`.
+- **Apps de extensiones:** only when an extension adds apps.
+
+**Extensiones:** installed extensions as cards (source, ready or missing secrets, capability counts for MCP, workflows, skills and apps, secret chips, version, and "Actualizar a vX" when the catalog has a newer tag), then the catalog with search, refresh, install and update. Terminal commands sit in a collapsed "Desde la terminal" block. The tab shows a badge with the number of available updates. Connectors live in their own section, not here.
+
+**App tile:**
 - **Icon**, from a generic name such as `workflow`, `bot` or `users`.
 - **Name and a one-line description**, e.g. "Dagu · Workflows y ejecuciones".
-- **Address** in small text, e.g. `dagu.localhost`.
-- **Health dot** with 4 states: healthy, degraded (slow or erroring), down, and unknown (not checked yet).
-- **"Abrir"** button that opens a new tab. The whole card is clickable.
-- **Optional access note**, e.g. for OpenMausBot: "Usa su propio acceso: la primera vez pide emparejar el dispositivo".
+- **Health dot**; its tooltip carries the state and the address, e.g. `dagu.localhost`.
+- The whole tile opens a new tab; an arrow appears on hover.
+- **Optional flag:** "Apagada", "No responde", or the access note, e.g. for OpenMausBot: "Login del proyecto".
 
 **States to design:**
 - the 4 health states,

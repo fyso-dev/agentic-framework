@@ -4,6 +4,8 @@
 #   worktree -> agent (Claude Code or Codex) -> change gate -> checks -> commit -> PR -> remove worktree
 # A human reviews and merges. Nothing here touches the base branch.
 description: Build a task on a new branch with a coding agent (Claude Code or Codex)
+labels:
+  - fyso=system
 type: graph
 params:
   - TASK: ""                 # what to change, in plain words (the issue text)

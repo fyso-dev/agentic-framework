@@ -27,7 +27,7 @@ block_ports() {
   echo "$FYSO_HTTP_PORT" "$FYSO_DAGU_PORT" "$FYSO_DAGU_SCHEDULER_PORT" \
     "$FYSO_DAGU_WORKER_HEALTH_PORT" "$FYSO_OMB_PORT" "$FYSO_OMB_WEBHOOK_PORT" \
     "$FYSO_DAGU_COORDINATOR_PORT" "$FYSO_DAGU_COORDINATOR_HEALTH_PORT" \
-    "$FYSO_CADDY_ADMIN_PORT"
+    "$FYSO_CADDY_ADMIN_PORT" "${FYSO_AUTH_PORT:-$((FYSO_HTTP_PORT + 9))}"
   local name
   while IFS='=' read -r name _; do
     [[ $name != FYSO_EXT_*_PORT ]] || printf '%s\n' "${!name}"
@@ -54,3 +54,6 @@ pc() {
   fi
 }
 stack_running() { [ -S "$PC_SOCKET" ] && pc process list >/dev/null 2>&1; }
+
+# A private Unix socket avoids competing with web-auth for base + 9.
+connector_setup_socket() { printf '/tmp/fyso-connectors-%s.sock\n' "$FYSO_HTTP_PORT"; }

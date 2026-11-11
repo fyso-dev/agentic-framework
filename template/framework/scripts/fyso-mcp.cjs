@@ -1,0 +1,319 @@
+// The platform's own MCP server (D33): typed tools for what the panel does, so an agent
+// can understand, inspect and configure this project. Every change goes through the same
+// Dagu workflows as the panel; nothing here edits project files directly.
+// It also forwards Dagu's own MCP tools (D57), so an agent that reaches only this server
+// (a desktop app) can build and run workflows. `--no-dagu` turns that off where the Dagu
+// MCP is already a server of its own (the project's .mcp.json).
+// With `--scope <name> [--system a,b]` it serves only Dagu's read and execute tools, limited
+// to one workflow scope (D60): the entry a group of bots gets instead of the `dagu` server.
+// Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.
+// Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs --no-dagu`.
+const fs = require('node:fs');
+const path = require('node:path');
+const {execFileSync} = require('node:child_process');
+
+const ROOT = path.resolve(__dirname, '../..');
+const VERSION = '1';
+const context = () => fs.readFileSync(path.join(ROOT, 'framework/agent-context.md'), 'utf8');
+const project = require('./project-map.cjs');
+// The guide explains how Fyso works; the brief says what this project contains.
+const instructions = () => { try { return `${context()}\n${project.brief(ROOT)}`; } catch { return context(); } };
+const option = name => { const at = process.argv.indexOf(name); return at < 0 ? null : process.argv[at + 1] || ''; };
+const SCOPE = option('--scope');
+const scopeGuard = SCOPE === null ? null : require('./dagu-scope.cjs').guard(ROOT, SCOPE, (option('--system') || '').split(',').filter(Boolean));
+const FORWARD_DAGU = !!scopeGuard || !process.argv.includes('--no-dagu');
+const scopes = require('./workflow-scopes.cjs');
+let forwarder;
+const daguMcp = () => forwarder ||= require('./dagu-mcp.cjs').forwarder();
+const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+process.chdir(ROOT);
+
+const dagu = () => require('./dagu-client.cjs').client();
+const b64 = value => Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
+const readJson = file => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null);
+const health = name => { try { execFileSync('framework/scripts/health.sh', [name], {stdio: 'ignore', timeout: 8000}); return 'ok'; } catch { return 'down'; } };
+const workflow = async (name, params) => (await dagu().run(name, params, {output: 'RESULT', timeoutMs: 180000})).output;
+const architect = async params => (await dagu().run('fyso-bot-architect', params, {output: 'RESULT', timeoutMs: 180000})).output;
+
+const str = (description, extra = {}) => ({type: 'string', description, ...extra});
+const bool = description => ({type: 'boolean', description});
+const obj = (properties = {}, required = []) => ({type: 'object', properties, required, additionalProperties: false});
+
+// name → {description, inputSchema, annotations, run(args)}
+const TOOLS = {
+  fyso_context: {
+    description: 'Read the local Fyso operating guide: architecture, ownership, isolation, bot/workflow/code/extension procedures, verification and tool limitations. Available even when the stack is down; read before planning work.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => ({guide: context()}),
+  },
+  fyso_project: {
+    description: 'Map of what this project contains: declared bots, workflows (owner, description, schedule, params), launcher apps, installed extensions with their guides and skills, MCP servers declared for bots, wiki pages, readable guides and recent commits. Read from the repository, so it works with the stack down. Read it before designing a change; then read the files it names with fyso_file_read.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => project.map(ROOT),
+  },
+  fyso_files: {
+    description: 'List the project\'s readable files under a folder: project/ (workflows, bots, apps, wiki, MCP and catalog configuration), extensions/, AGENTS.md, README.md and the framework guides, skills, examples and bot souls. Without a path, lists those roots. Login users, hidden files, secrets, runtime data and snapshots are never listed.',
+    inputSchema: obj({path: str('Project-relative folder, e.g. "project/workflows"')}),
+    annotations: {readOnlyHint: true},
+    run: ({path: folder = ''}) => project.list(ROOT, folder),
+  },
+  fyso_file_read: {
+    description: 'Read one text file of the project by its project-relative path (from fyso_project or fyso_files), e.g. "project/workflows/hello.yaml", "AGENTS.md", "extensions/<id>/README.md". Read-only; the same files fyso_files lists. Up to 256 KB.',
+    inputSchema: obj({path: str('Project-relative file path')}, ['path']),
+    annotations: {readOnlyHint: true},
+    run: ({path: file}) => project.read(ROOT, file),
+  },
+  fyso_status: {
+    description: 'Project overview: name and URLs, health of Dagu/OpenMausBot/gateway, apps, installed extensions (with which declared secrets are set, never their values) and how bots are versioned in git. Read-only; start here.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    async run() {
+      execFileSync('node', ['framework/scripts/panel-data.cjs', 'config'], {stdio: 'ignore', timeout: 30000});
+      const panel = f => readJson(path.join(process.env.FYSO_DATA || '.data', 'panel', f));
+      return {project: panel('project.json'), services: {dagu: health('dagu'), omb: health('omb'), gateway: health('caddy')},
+        apps: panel('apps.json'), extensions: panel('extensions.json'), botVersioning: panel('bot-versioning.json')};
+    },
+  },
+  fyso_check: {
+    description: 'Run the setup checklist (engines logged in, bots applied, Dagu reachable) and return the result. Same as the panel\'s "Puesta a punto".',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: async () => (await dagu().run('fyso-setup-check', {}, {output: 'CHECK'})).output,
+  },
+  fyso_doctor: {
+    description: 'Run the project health checks (mise run doctor) and return their text output and whether all passed.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run() {
+      try { return {ok: true, output: execFileSync('framework/scripts/doctor.sh', [], {encoding: 'utf8', timeout: 180000, stdio: ['ignore', 'pipe', 'pipe']})}; }
+      catch (e) { return {ok: false, output: `${e.stdout || ''}${e.stderr || ''}`}; }
+    },
+  },
+  fyso_connections: {
+    description: 'List this project native OpenMausBot and declared MCP connections, without credentials or endpoints. Shows enabled state and whether definitions are in project files; does not test tools. Connect/authenticate services in this project OpenMausBot Apps UI, then assign tools through fyso_bot_plan.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => architect({OP: 'connections'}),
+  },
+  fyso_bots_list: {
+    description: 'List the native OpenMausBot bots of this project (id, name, title, model, busy).',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => architect({OP: 'list'}),
+  },
+  fyso_bot_read: {
+    description: 'Read one bot\'s native profile by its exact id (from fyso_bots_list), plus the revision a later plan is based on.',
+    inputSchema: obj({bot_id: str('Exact native bot id')}, ['bot_id']),
+    annotations: {readOnlyHint: true},
+    run: ({bot_id}) => architect({OP: 'read', BOT_ID: bot_id}),
+  },
+  fyso_bot_plan: {
+    description: 'Preview creating, updating or deleting one bot. Changes nothing: returns a planId and a preview. Inspect the preview before applying. An explicit create/update/delete request authorizes its matching plan; exploratory requests authorize preview only. Supported profile fields: name, title, description, model (native "<engine>/<model>"), soul (inline instructions), approval, computer ("off"), tools (native allow/deny selectors; discover servers with fyso_connections). Delete needs the exact bot_id.',
+    inputSchema: obj({
+      action: str('What to do', {enum: ['create', 'update', 'delete']}),
+      bot_id: str('Exact native bot id; required for update and delete'),
+      bot: {type: 'object', description: 'Native bot entry for create/update, e.g. {"name":"Support","title":"Answers customers","model":"claude/claude-sonnet-5","soul":"…"}'},
+    }, ['action']),
+    annotations: {readOnlyHint: true},
+    run: ({action, bot_id = '', bot}) => architect({OP: 'plan', ACTION: action, BOT_ID: bot_id, BOT_B64: bot ? b64(bot) : ''}),
+  },
+  fyso_bot_apply: {
+    description: 'Apply a plan from fyso_bot_plan by its exact planId: snapshots bots and memory, applies it in OpenMausBot and commits project/bots/team.yaml. Fails if the configuration changed since the plan; then plan again.',
+    inputSchema: obj({plan_id: str('planId returned by fyso_bot_plan')}, ['plan_id']),
+    annotations: {destructiveHint: true},
+    run: ({plan_id}) => architect({OP: 'apply', PLAN_ID: plan_id}),
+  },
+  fyso_bot_import: {
+    description: 'Bring a bot that exists only in OpenMausBot (or only in a snapshot) into the versioned project configuration, by exact native id. Does not change its running profile.',
+    inputSchema: obj({bot_id: str('Exact native bot id')}, ['bot_id']),
+    run: ({bot_id}) => architect({OP: 'import', BOT_ID: bot_id}),
+  },
+  fyso_app_access: {
+    description: 'Read which connected applications (native OpenMausBot connectors) one bot may use, and the revision a later plan is based on. Applications are authorized by a person in this project\'s OpenMausBot; this only reads the bot\'s permissions.',
+    inputSchema: obj({bot_id: str('Exact native bot id (from fyso_bots_list)')}, ['bot_id']),
+    annotations: {readOnlyHint: true},
+    run: ({bot_id}) => workflow('fyso-app-access', {OP: 'read', BOT_ID: bot_id}),
+  },
+  fyso_app_access_plan: {
+    description: 'Preview a change to one bot\'s application permissions. Changes nothing: returns a planId. `changes` maps an application slug to "off", "read" or "write"; an application must already be authorized to be granted. Needs the revision from fyso_app_access.',
+    inputSchema: obj({
+      bot_id: str('Exact native bot id'),
+      revision: str('revision returned by fyso_app_access'),
+      changes: {type: 'object', description: 'Application slug → "off" | "read" | "write", e.g. {"gmail":"read"}'},
+    }, ['bot_id', 'revision', 'changes']),
+    annotations: {readOnlyHint: true},
+    run: ({bot_id, revision, changes}) => workflow('fyso-app-access', {OP: 'plan', BOT_ID: bot_id, REVISION: revision, CHANGES_B64: b64(changes)}),
+  },
+  fyso_app_access_apply: {
+    description: 'Apply a plan from fyso_app_access_plan by its exact planId: updates the bot in OpenMausBot, verifies it and commits the permission file. Fails if anything changed since the plan; then read and plan again.',
+    inputSchema: obj({plan_id: str('planId returned by fyso_app_access_plan')}, ['plan_id']),
+    annotations: {destructiveHint: true},
+    run: ({plan_id}) => workflow('fyso-app-access', {OP: 'apply', PLAN_ID: plan_id}),
+  },
+  fyso_connector_preferences: {
+    description: 'Read whether this project\'s Claude bots also load the person\'s own Claude Code MCP servers and skills (two native OpenMausBot switches), and whether that choice is versioned.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => workflow('fyso-connector-preferences', {OP: 'read'}),
+  },
+  fyso_connector_preferences_save: {
+    description: 'Set one or both switches read by fyso_connector_preferences and commit them to project/omb-connectors.json. Only when the person asked for it: it changes what every Claude bot of the project can reach.',
+    inputSchema: obj({claudeUserMcp: bool('Bots load the person\'s Claude Code MCP servers'), claudeUserSkills: bool('Bots load the person\'s Claude Code skills')}),
+    annotations: {destructiveHint: true},
+    run(features) {
+      if (!Object.keys(features).length) throw new Error('set claudeUserMcp, claudeUserSkills or both');
+      return workflow('fyso-connector-preferences', {OP: 'save', SETTINGS_B64: b64(features)});
+    },
+  },
+  fyso_workflow_scopes: {
+    description: 'Which workflows are system ones (framework and extension: fyso-*, ext-*) and which named scopes exist: for each scope its MCP server, the project workflows it holds (Dagu label workspace=<scope>), the system workflows it grants, and the bots that use it. Also the project workflows in no scope and the bots with full Dagu access. Read from the repository; works with the stack down.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    run: () => scopes.read(ROOT),
+  },
+  fyso_workflow_scope_save: {
+    description: 'Create or replace a workflow scope: a subset of workflows a group of bots may read and run, and nothing else in Dagu. `workflows` are project workflows; after saving exactly those carry the label workspace=<scope> (a workflow is in one scope at most). `system` grants system workflows by name (e.g. "fyso-dev-task"); none by default. Writes the labels and the dagu-<scope> entry of project/mcp.json and commits them. Then assign it to bots with fyso_bot_plan (tools.allow "mcp:dagu-<scope>:*").',
+    inputSchema: obj({
+      scope: str('Scope name: lowercase letters, digits, dashes'),
+      workflows: {type: 'array', description: 'Project workflow names in the scope', items: {type: 'string'}},
+      system: {type: 'array', description: 'System workflow names the scope may also read and run', items: {type: 'string'}},
+    }, ['scope', 'workflows']),
+    annotations: {destructiveHint: true},
+    run: ({scope, workflows, system = []}) => workflow('fyso-workflow-scopes', {OP: 'save', INPUT_B64: b64({scope, workflows, system})}),
+  },
+  fyso_workflow_scope_delete: {
+    description: 'Remove a workflow scope: its dagu-<scope> entry and its labels, committed. Refused while a declared bot still selects it; change that bot first with fyso_bot_plan.',
+    inputSchema: obj({scope: str('Scope name')}, ['scope']),
+    annotations: {destructiveHint: true},
+    run: ({scope}) => workflow('fyso-workflow-scopes', {OP: 'delete', INPUT_B64: b64({scope})}),
+  },
+  fyso_logs: {
+    description: 'Last lines of one process of this project\'s stack (as `mise run logs`, without following): dagu, omb, caddy, web-auth or an extension\'s process. Without a process, lists the processes. For a failed workflow run read its step log through dagu_read instead.',
+    inputSchema: obj({process: str('Process name; omit to list them'), lines: {type: 'integer', description: 'Lines from the end (default 100, at most 500)'}}),
+    annotations: {readOnlyHint: true},
+    run({process: name, lines = 100}) {
+      const pc = args => execFileSync('framework/scripts/pc.sh', args, {encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 8 * 1024 * 1024});
+      let processes;
+      try { processes = pc(['process', 'list']).split('\n').map(line => line.trim()).filter(line => /^[A-Za-z0-9][\w.-]*$/.test(line)); }
+      catch { throw new Error('the stack is not running: a person starts it with `mise run up`'); }
+      if (!name) return {processes};
+      if (!processes.includes(name)) throw new Error(`unknown process: ${name}. Running: ${processes.join(', ')}`);
+      return {process: name, lines: pc(['process', 'logs', name, '-n', String(Math.min(Math.max(lines, 1), 500))]).split('\n').filter(Boolean)};
+    },
+  },
+  fyso_ext_search: {
+    description: 'Search the extension catalogs (project/marketplaces.yaml): id, description, latest version and whether it is installed or has an update. Reads git catalogs over the network.',
+    inputSchema: obj({query: str('Optional text to filter by id, name, description or tag')}),
+    annotations: {readOnlyHint: true, openWorldHint: true},
+    async run({query = ''}) {
+      const data = (await dagu().run('fyso-ext-catalog', {}, {output: 'CATALOG', timeoutMs: 180000})).output;
+      const q = query.toLowerCase();
+      const match = e => !q || [e.id, e.name, e.description, ...(e.tags || [])].join(' ').toLowerCase().includes(q);
+      return {catalogs: data.catalogs, extensions: data.extensions.filter(match)};
+    },
+  },
+  fyso_ext_install: {
+    description: 'Install (mode "add") or upgrade (mode "update") one extension from the catalogs by id. Commits only the extension\'s files and loads its processes and routes without a restart. Afterwards, tell the person to set any secrets it declares with `mise run secrets` (never ask them for secret values).',
+    inputSchema: obj({id: str('Extension id from fyso_ext_search'), mode: str('add or update', {enum: ['add', 'update']})}, ['id']),
+    annotations: {destructiveHint: false, openWorldHint: true},
+    run: async ({id, mode = 'add'}) => (await dagu().run('fyso-ext-install', {ID: id, MODE: mode}, {output: 'RESULT', timeoutMs: 900000})).output,
+  },
+  fyso_snapshot: {
+    description: 'Save bots and memory to git now (the scheduled snapshot, on demand). Returns "no changes" or the commit.',
+    inputSchema: obj(),
+    run: async () => (await dagu().run('fyso-snapshot', {}, {output: 'RESULT', timeoutMs: 300000})).output,
+  },
+  fyso_observability: {
+    description: 'Collect bot conversations, workflow execution and AI consumption figures, as shown in the panel\'s Observability page.',
+    inputSchema: obj(),
+    annotations: {readOnlyHint: true},
+    // The workflow refreshes .data/panel/observability.json and only prints refresh metadata;
+    // return the collected data itself, as the panel reads it (GET /config/observability.json).
+    async run() {
+      const refresh = (await dagu().run('fyso-observability', {}, {output: 'SUMMARY', timeoutMs: 300000})).output;
+      const data = readJson(path.join(process.env.FYSO_DATA || '.data', 'panel', 'observability.json'));
+      if (!data) throw new Error('fyso-observability succeeded but .data/panel/observability.json is missing');
+      return {refresh, ...data};
+    },
+  },
+};
+
+function validate(schema, args) {
+  for (const key of schema.required || []) if (args[key] === undefined || args[key] === '') throw new Error(`missing argument: ${key}`);
+  for (const [key, value] of Object.entries(args)) {
+    const prop = schema.properties?.[key];
+    if (!prop) throw new Error(`unknown argument: ${key}`);
+    if (prop.type === 'string' && typeof value !== 'string') throw new Error(`${key} must be a string`);
+    if (prop.type === 'boolean' && typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
+    if (prop.type === 'integer' && !Number.isInteger(value)) throw new Error(`${key} must be an integer`);
+    if (prop.type === 'array' && (!Array.isArray(value) || value.some(item => typeof item !== 'string'))) throw new Error(`${key} must be a list of strings`);
+    if (prop.type === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) throw new Error(`${key} must be an object`);
+    if (prop.enum && !prop.enum.includes(value)) throw new Error(`${key} must be one of ${prop.enum.join(', ')}`);
+  }
+}
+
+async function handle(msg) {
+  const {id, method, params = {}} = msg;
+  switch (method) {
+    case 'initialize': {
+      const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
+      if (scopeGuard) return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: `fyso-dagu-${SCOPE}`, version: VERSION},
+        instructions: `Dagu workflows of scope "${SCOPE}" in this project. You can read and run these workflows only: ${[...scopeGuard.names().keys()].join(', ') || 'none yet'}. List them with dagu_read target=dags. Changing workflows, inline specs, searches and the wiki are not available here.`};
+      return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso', version: VERSION},
+        instructions: instructions()};
+    }
+    case 'ping': return {};
+    case 'tools/list': {
+      const own = scopeGuard ? [] : Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
+      let forwarded = [];
+      if (FORWARD_DAGU) try { forwarded = await daguMcp().tools(); } catch {}
+      return {tools: [...own, ...(scopeGuard ? scopeGuard.tools(forwarded) : forwarded)]};
+    }
+    case 'tools/call': {
+      const tool = scopeGuard ? undefined : TOOLS[params.name];
+      if (!tool && FORWARD_DAGU && /^dagu_[a-z_]+$/.test(params.name || '')) {
+        try {
+          const args = params.arguments || {};
+          if (!scopeGuard) return await daguMcp().call(params.name, args);
+          const local = scopeGuard.check(params.name, args);   // throws when outside the scope
+          return local || scopeGuard.shape(params.name, args, await daguMcp().call(params.name, scopeGuard.rewrite(params.name, args)));
+        } catch (e) { return {isError: true, content: [{type: 'text', text: e.message}]}; }
+      }
+      if (!tool) throw Object.assign(new Error(`unknown tool: ${params.name}`), {code: -32602});
+      try {
+        const args = params.arguments || {};
+        validate(tool.inputSchema, args);
+        const result = await tool.run(args);
+        return {content: [{type: 'text', text: JSON.stringify(result, null, 2)}], ...(result && typeof result === 'object' && !Array.isArray(result) && {structuredContent: result})};
+      } catch (e) {
+        return {isError: true, content: [{type: 'text', text: e.message}]};
+      }
+    }
+    default:
+      if (id === undefined) return undefined; // notifications need no answer
+      throw Object.assign(new Error(`method not found: ${method}`), {code: -32601});
+  }
+}
+
+const send = msg => process.stdout.write(JSON.stringify(msg) + '\n');
+let buffer = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => {
+  buffer += chunk;
+  for (let i; (i = buffer.indexOf('\n')) >= 0;) {
+    const line = buffer.slice(0, i).trim();
+    buffer = buffer.slice(i + 1);
+    if (!line) continue;
+    let msg;
+    try { msg = JSON.parse(line); } catch { send({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'parse error'}}); continue; }
+    handle(msg).then(result => {
+      if (msg.id !== undefined && result !== undefined) send({jsonrpc: '2.0', id: msg.id, result});
+    }, e => {
+      if (msg.id !== undefined) send({jsonrpc: '2.0', id: msg.id, error: {code: e.code || -32603, message: e.message}});
+    });
+  }
+});
+process.stdin.on('end', () => process.exit(0));
+module.exports = {TOOLS};

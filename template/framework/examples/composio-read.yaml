@@ -1,0 +1,11 @@
+# Copy into project/workflows/ only after configuring the request file.
+description: Read one connected account through Composio
+type: graph
+max_active_runs: 1
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: profile
+    run: node framework/scripts/composio.cjs project/composio/profile.json
+    output: PROFILE

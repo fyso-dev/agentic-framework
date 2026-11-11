@@ -87,6 +87,13 @@ const DRAFT = TEAM.replace(
 
 const CLAUDE_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-4-5"];
 
+/** Desktop and CLI agents as `agent-connect.cjs status` reports them on the Dagu host. */
+const AGENTS = [
+  { id: "claude-desktop", label: "Claude Desktop", desktop: true, found: true },
+  { id: "codex", label: "Codex (app and CLI)", desktop: true, found: true },
+  { id: "claude-code", label: "Claude Code (CLI)", desktop: false, found: false },
+];
+
 function engines(scenario: Scenario): Engine[] {
   return [
     { id: "claude", label: "Claude", kind: "subscription", ok: true, models: CLAUDE_MODELS },
@@ -235,6 +242,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   const latest = new Map<string, MockRun>();
   let seq = 0;
   const installed = new Set(scenario === "empty" ? [] : ["sample"]);
+  const agentsOn = new Set(scenario === "empty" ? [] : ["claude-desktop"]);
   const versions = new Map(scenario === "empty" ? [] : [["sample", "v1.2.0"]]);
 
   const check = (): SetupCheck => {
@@ -318,6 +326,23 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const createdAt = Date.now();
       const proposed = params?.TEAM_B64 ? fromBase64Utf8(params.TEAM_B64) : team;
       switch (dag) {
+        case DAGS.agentConnect: {
+          const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
+          if (mode === "status") {
+            add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+              mode, server: `fyso-${PROJECT.slug}`,
+              agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
+            }) }) });
+            break;
+          }
+          const failed = scenario === "failed" && mode === "connect";
+          if (!failed && mode === "connect") agentsOn.add(target);
+          if (mode === "disconnect") agentsOn.delete(target);
+          add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
+            error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
+            outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+          break;
+        }
         case DAGS.setupCheck:
           add({ dag, id, createdAt, duration: 3500, outcome: "succeeded", outputs: () => ({ check: JSON.stringify(check()) }) });
           break;

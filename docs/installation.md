@@ -1,5 +1,7 @@
 # Install from the repository
 
+> **On macOS there is also an installer app** (prototype): `installer/macos/build.sh` builds `Fyso Installer.app`, which does every step below in a friendly window. See [installer.md](installer.md).
+
 ## Requirements
 
 - Git with a configured author name and email. Project initialization and native configuration snapshots create local commits.
@@ -8,7 +10,7 @@
 - Claude Code and Codex installed and signed in on the host for their respective subscription-backed bots. The default team uses both providers. Check `claude --version`, `codex --version` and the provider's login before startup; the framework does not create subscription accounts or install these coding CLIs. A signed-in provider can still reject work because of its own quota or model availability.
 - An unused block of ten ports. The default is 8400–8409. Each concurrent project needs a different block.
 
-The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI and GitHub CLI through mise. The panel assets are already built.
+The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI GitHub CLI, Go and pnpm through mise. The panel assets are already built.
 
 ## 1. Authenticate and generate
 
@@ -57,17 +59,21 @@ mise run up
 mise run doctor
 ```
 
-If Git has no author configured, set `git config user.name` and `git config user.email` for this project before the first commit. `mise install` downloads the pinned native tools with signature verification enabled. `setup` creates an age key if absent, `.sops.yaml` and encrypted `secrets.enc.yaml`; rerunning it preserves existing files. Back up the age key securely. Do not commit the private key or plaintext secrets.
+If Git has no author configured, set `git config user.name` and `git config user.email` for this project before the first commit. `mise install` downloads the pinned native tools with signature verification enabled. `setup` creates an age key if absent, `.sops.yaml` and encrypted `secrets.enc.yaml`; rerunning it preserves existing files and initializes local web users if they are missing. Choose a password of 12–72 bytes; there is no default human password. Back up the age key securely. Do not commit the private key or plaintext secrets.
 
-For a default project:
+For `project_slug=my-project` and `port_base=8400`:
 
 | Service | URL |
 |---|---|
-| Panel | http://panel.localhost:8400 |
-| Dagu | http://dagu.localhost:8400 |
-| OpenMausBot | http://omb.localhost:8400 |
+| Panel | http://panel.my-project-8400.localhost:8400 |
+| Dagu | http://dagu.my-project-8400.localhost:8400 |
+| OpenMausBot | http://omb.my-project-8400.localhost:8400 |
 
-All three use the chosen administrator name and initial password `admin`. OpenMausBot uses the gateway's native session: no browser pairing code is needed. The default network binding is loopback. For a different `port_base`, replace 8400 in these URLs. Change the password with `mise run secrets`; restart the stack with `mise run down` then `mise run up` to load changed credentials.
+All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The first native login build runs on `mise run up` and uses pinned source and locked dependencies.
+
+HTTP access is loopback-only. Remote deployment requires the separate HTTPS acceptance in Phase 6. See [web authentication](web-auth.md) for permissions, identity limitations and future providers.
+
+For an existing generated project, stop its stack, apply the Copier update, run `mise install` and `mise run setup` to create local users, then start it again and run doctor. No user credentials are migrated implicitly from the old shared browser password. Rotate a legacy `admin` technical password through `mise run secrets` before restarting. To add/change a human password use `mise run web-auth:users add <username>` while stopped; it invalidates all web sessions. Grant application permissions separately in `project/auth/tinyauth.yaml`.
 
 ## 3. Verify the installation
 
@@ -126,6 +132,10 @@ mise run doctor
 ```
 
 A fresh `.data/` restores versioned bots and memory from `state/` when available. Chat and usage history require the separate runtime backup. Host CLI logins are local to that machine and must be authenticated there.
+
+## Prepare a project for a client
+
+To hand a configured project to someone else and keep sending improvements (configuration, documents and bot memory, without cloning your repository), publish it as a distribution: [guide-share-project.md](guide-share-project.md).
 
 ## Troubleshooting
 

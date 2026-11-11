@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+  <class>Project</class>
+  <widget class="QWidget" name="Project">
+    <layout class="QFormLayout" name="form">
+      <item row="0" column="0">
+        <widget class="QLabel" name="nameLabel" />
+      </item>
+      <item row="0" column="1">
+        <widget class="QLineEdit" name="projectName" />
+      </item>
+      <item row="1" column="0">
+        <widget class="QLabel" name="folderLabel" />
+      </item>
+      <item row="1" column="1">
+        <widget class="QLineEdit" name="projectFolder" />
+      </item>
+      <item row="2" column="0">
+        <widget class="QLabel" name="engineLabel" />
+      </item>
+      <item row="2" column="1">
+        <widget class="QComboBox" name="projectEngine">
+          <item>
+            <property name="text">
+              <string>Claude Code</string>
+            </property>
+          </item>
+          <item>
+            <property name="text">
+              <string>Codex</string>
+            </property>
+          </item>
+        </widget>
+      </item>
+      <item row="3" column="0">
+        <widget class="QLabel" name="adminLabel" />
+      </item>
+      <item row="3" column="1">
+        <widget class="QLineEdit" name="panelUser" />
+      </item>
+      <item row="4" column="0">
+        <widget class="QLabel" name="passwordLabel" />
+      </item>
+      <item row="4" column="1">
+        <widget class="QLineEdit" name="panelPassword">
+          <property name="echoMode">
+            <enum>QLineEdit::Password</enum>
+          </property>
+        </widget>
+      </item>
+      <item row="5" column="0">
+        <widget class="QLabel" name="portLabel" />
+      </item>
+      <item row="5" column="1">
+        <widget class="QLineEdit" name="portBase" />
+      </item>
+      <item row="6" column="0">
+        <widget class="QLabel" name="distributionLabel" />
+      </item>
+      <item row="6" column="1">
+        <widget class="QLineEdit" name="distributionName" />
+      </item>
+      <item row="7" column="1">
+        <widget class="QPushButton" name="prerequisite" />
+      </item>
+      <item row="8" column="1">
+        <widget class="QLabel" name="help">
+          <property name="wordWrap">
+            <bool>true</bool>
+          </property>
+        </widget>
+      </item>
+    </layout>
+  </widget>
+</ui>

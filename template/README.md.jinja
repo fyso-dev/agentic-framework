@@ -10,13 +10,13 @@ Requirements: Git, [mise](https://mise.jdx.dev), and authenticated Claude Code /
 
 ```sh
 mise trust && mise install
-mise run setup     # once: your age key + encrypted secrets (login admin / admin)
+mise run setup     # once: age key + encrypted secrets; choose your local login password
 mise run up
 ```
 
 | What | Where |
 |---|---|
-| Panel | http://panel.localhost:{{ port_base }} |
+| Panel | http://panel.{{ project_slug }}-{{ port_base }}.localhost:{{ port_base }} |
 | Dagu (workflows) | http://dagu.localhost:{{ port_base }} |
 | OpenMausBot (bots) | http://omb.localhost:{{ port_base }} (project login, no pairing code) |
 
@@ -73,6 +73,42 @@ mise run ext:remove foo                                # keeps .data/ext/foo and
 ```
 
 Set the secrets it declares with `mise run secrets`; the panel's Apps page shows which are missing. To write one, start from `framework/extensions/_template` (see its README).
+
+## Share this project (distributions)
+
+Prepare a project for someone else and keep sending them improvements. Configuration, documents (`project/wiki/`) and bot memory travel; conversations, web logins and secrets you did not choose stay. Their configuration follows yours on every update; their bots keep what they learned (memory is merged). Contract: https://github.com/fyso-dev/agentic-framework/blob/main/docs/distribution.md
+
+```bash
+# Publisher: project/distribution.yaml → repo: gh:org/acme-fyso  (optional: secrets: [NAME], recipients: [age1…])
+mise run dist:publish                                  # committed files only; tags v1, v2, …
+# Client (its own project, after `mise run setup`):
+mise run dist:key                                      # public key, if it will receive secrets
+mise run dist:add gh:org/acme-fyso                     # install
+mise run dist:status                                   # installed vs latest version
+mise run dist:update                                   # or the fyso-dist-update workflow in Dagu
+```
+
+## See what is running
+
+Several projects on one Mac? A menu bar icon lists every running Fyso project with its health, links (panel, Dagu, OpenMausBot, extension apps), processes, and restart / stop actions; stopped projects stay listed with a Start action. It is a plugin for [SwiftBar](https://github.com/swiftbar/SwiftBar) (macOS):
+
+```sh
+brew install --cask swiftbar   # once; open SwiftBar and choose a plugin folder
+mise run tray:install          # from any project: one plugin lists them all
+```
+
+## Work with coding agents
+
+Open Claude Code or Codex in this folder (inside its mise environment: `mise activate` in your shell, or `mise exec -- claude`). Read `framework/agent-context.md` for the shared operating guide. Desktop clients receive it in MCP initialization; `fyso_context` retrieves it even when runtime services are down. Default bots load it from their role instructions, including the Chief. Existing project-owned bot profiles need an explicit update to adopt new role instructions.
+
+The project's `.mcp.json` gives the agent two MCP servers:
+
+- **`fyso`** — this platform: status, checks, bots (plan, then apply), extensions (search, install), snapshots. It runs the same workflows as the panel.
+- **`dagu`** — workflows: design, run and debug them. Install Dagu's own skill once with `mise run agent:setup`.
+
+To use `fyso` from **Claude Desktop** or **Codex** anywhere (not only in this folder): `mise run agent:connect` (desktop apps found on this Mac; add `claude-code` for the CLI). Remove it with `mise run agent:disconnect`.
+
+Secrets, removing extensions and starting/stopping the stack stay with you in the terminal.
 
 ## Observe bots and execution
 

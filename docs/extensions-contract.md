@@ -29,12 +29,16 @@ An extension writes **only** these paths. It never edits a file that another tem
 |---|---|---|
 | Tools, env, tasks | `.config/mise/conf.d/ext-<ext>.toml` | mise (verified on 2026.11.2: env and tasks load; the file needs `mise trust`) |
 | Processes | `extensions/<ext>/process.yaml` | process-compose: `up.sh` passes one extra `-f` per file (verified: merge works and `depends_on` crosses files) |
-| Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid) |
+| Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid). Each `http://<app>.{$FYSO_WEB_DOMAIN}` site inherits the panel's web-login rule unless the project declares that app (D58) |
+| Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
+| Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
+| Connection hook (optional) | `extensions/<ext>/connect.sh` | Runs through `run-ext.sh` after tools, processes and routes are loaded on install/update when running, and on `up`; native process-compose readiness probes gate the hook; missing secrets defer it. Must be idempotent and preserve unrelated project state |
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
+| Setup step (optional) | `extensions/<ext>/setup.yaml` | Panel Setup checklist, `fyso-setup-check` (D51) |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
-| Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person lists them in `team.yaml` (not automatic, see §6) |
+| Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person enables them on a bot: the panel's bot detail has one toggle per extension skill (D54), or list them in `team.yaml` by hand (not automatic, see §6) |
 | Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu (flat file; see §6 for subdirectories). Files matching a longer installed id (`ext-<ext>-other-*` when `<ext>-other` is installed) belong to that extension |
 | Ignore rules | `extensions/<ext>/.gitignore` | git (nested ignore files) |
 | Runtime data | `.data/ext/<ext>/` | the extension's own process (never committed) |
@@ -42,9 +46,10 @@ An extension writes **only** these paths. It never edits a file that another tem
 ### `secrets.yaml`
 
 ```yaml
-# Names only. Values live in secrets.enc.yaml (`mise run secrets`).
+# Names only. Values live in secrets.enc.yaml: set them in the panel (§5) or with `mise run secrets`.
 - name: SAMPLE_TOKEN
   description: {es: Token de ejemplo, en: Sample token}
+  url: https://example.com/settings/tokens   # optional, HTTPS: where the value is obtained (D50)
   required: true
 ```
 
@@ -82,7 +87,7 @@ processes:
 2. `project/mcp.json` (owned by the project, optional);
 3. `extensions/*/mcp.json`.
 
-A duplicate server name fails, naming both files. `${VAR}` placeholders are kept as they are (Claude Code expands them). `.mcp.json` is in `.gitignore`; its sources are in git.
+A duplicate server name fails, naming both files. `${VAR}` placeholders are kept as they are (Claude Code expands them), with one exception (D55): in a server `url`, `${FYSO_…_PORT}` is replaced with the project's port number when that variable is set. OpenMausBot validates the URL before expanding placeholders and rejects the server for bots with a tool selection. Ports are not secrets; credentials such as `${DAGU_MCP_AUTH}` are never written. `.mcp.json` is in `.gitignore`; its sources are in git.
 
 ## 5. Panel data
 
@@ -98,14 +103,32 @@ type Extension = {
   mcpServers: string[]        // server names from its mcp.json
   workflows: string[]         // names of project/workflows/ext-<ext>-*.yaml, without .yaml
   skills: string[]            // folder names under skills/
+  pages: {id: string; name: string; name_i18n?: Record<string,string>; icon?: string; url: string}[]
 }
 ```
 
-`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). The panel shows installed extensions read-only; installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+
+### Guided setup (D50)
+
+Each installed extension with a `secrets.yaml` shows a form in the panel, open by itself while a required value is missing. Secrets with a `url` get a button that opens that page (deep-link the provider's key page). With several secrets, one field takes the block the provider shows (`NAME="value"` lines, optional `export`, quotes and comments; undeclared names are ignored) and the individual fields stay as a fallback. A blank field keeps the current value. `POST /api/extensions/<ext>/secrets` with `{"values": {"NAME": "value"}}` goes through the web-session gateway to the private connector-setup socket (D45), never through Dagu. The adapter accepts only names declared by that installed extension, writes each value with `sops set --value-stdin`, commits only `secrets.enc.yaml` (`extensions: configure <ext>`), and restores the file on any failure. It shares the connector-settings lock and refuses to write while `secrets.enc.yaml` has uncommitted changes.
+
+Then `ext.sh configured <ext>` reloads the extension: when the stack runs, it restarts the processes in its `process.yaml` and runs connection hooks; it regenerates panel data and runs `doctor.sh` through `run-ext.sh`. The reply is `{saved, missing, check: ok|failed|none|unknown}`; doctor output is never returned. Make `doctor.sh` verify the credentials when it can, so the panel can say "saved and verified". Clearing a value stays a terminal task (`mise run secrets`).
+
+### Setup step (D51)
+
+An extension that must be configured before it works adds a step to the panel's **Setup** checklist with `extensions/<ext>/setup.yaml`:
+
+```yaml
+title: {es: Conectar Langfuse, en: Connect Langfuse}   # required
+description: {es: …, en: …}                           # optional
+```
+
+The step shows the description and the guided form above, and counts toward the checklist. Its state comes from `fyso-setup-check` (the panel's "verify" action), not from the panel: **pending** while a required secret is empty, then **failed** or **done** by the extension's `doctor.sh` run through `run-ext.sh` (no doctor: done). Saving the form runs the check again. So a key that does not authenticate never shows as done.
 
 ## 6. Known limits (v1)
 
-- **Skills are not enabled automatically.** `team.yaml` belongs to the project. The panel lists an extension's skills; a person (or the Bot Architect) adds them to a bot.
+- **Skills are not enabled automatically.** `team.yaml` belongs to the project. A person enables an extension's skill per bot in the panel's bot detail (D54), or the Bot Architect adds it. The toggle writes the native entry `- file: ${FYSO_ROOT}/extensions/<ext>/skills/<name>/SKILL.md`; for a bot with a tool allow-list it also selects `mcp:<server>:*` for the extension's MCP servers, and removes that selector when switched off. Off keeps the skill entry with `enabled: false`, because OMB's team apply does not uninstall a skill that the file omits. It is available only for bots that run in the project root.
 - **Dagu subdirectories:** supported in 2.24.0 when `DAGU_DAG_DISCOVERY_RECURSIVE=true`; discovery is flat by default. Verified against [store.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store.go) and `TestRecursiveDiscoverySupportsNestedDAGOperations` / the default root-only test in [store_test.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store_test.go). Keep flat prefixed workflow slots in v1.
 - **Hot install reaches OpenMausBot on the next start.** OMB keeps the environment it started with: MCP servers and `BOT_*` secrets of an extension installed from the panel reach bots after `mise run up`. Processes, routes, workflows and panel data load right away.
 - **Removal is manual-ish:** `ext:remove` deletes the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
@@ -173,3 +196,49 @@ The panel takes `installed`/`version`/`update` from `extensions.json` (always cu
 - Then `mise install`, and when the stack runs: `process-compose project update` with every fragment and a Caddy restart (`run-caddy.sh` reads extension ports fresh from mise). The panel tolerates the short gateway restart.
 
 Output: `{ id, mode, version: string | null, commit: string }`.
+
+## 9. Extension-owned tabs and pages
+
+### Live theme messages (SDK v1, optional)
+
+SDK pages announce `{type: "fyso-panel-theme-ready"}` to their same-origin
+parent. The panel checks the exact iframe window and origin, then sends
+`{type: "fyso-panel-theme", theme: "light" | "dark"}` on readiness and later
+mode changes. SDK `useTheme` validates the parent window, origin and enum before
+updating the page class. The iframe's initial theme URL stays stable so editor
+state is retained. Plain HTML pages that do not announce readiness keep the
+existing theme-query reload behavior. This is additive to SDK v1.
+
+
+
+An installed extension may contribute **zero, one or multiple pages**. The framework is a generic host; extension business screens, translations and assets are never imported by the host SPA.
+
+| Slot | Native consumer |
+|---|---|
+| `extensions/<ext>/pages/<page>.yaml` | `extensions.cjs inventory` → `/config/extensions.json` → generic navigation/router |
+| `extensions/<ext>/panel/**` | Caddy's authenticated, read-only static file server, only within the public panel directory |
+
+A declaration reuses app metadata's localized `name`, `icon` and `url` fields:
+
+```yaml
+# extensions/example/pages/overview.yaml
+name: {es: Mi página, en: My page}
+icon: apps
+url: /extensions/example/panel/index.html
+```
+
+The file stem is its page ID and follows the extension ID naming rule. The entry must be an existing `.html` file strictly below the same extension's `panel/` directory. Invalid paths, private slots and missing entries fail configuration generation. Labels may be strings or language maps. The extension inventory adds `pages: {id, name, name_i18n?, icon?, url}[]`; old inventories without this property contribute no pages.
+
+The host derives navigation entries from installed registrations and serves `#/extensions/<ext>/<page>`. It embeds the declared page with a standard same-origin iframe, passing `lang`, `theme` and `page` query parameters. Multiple extensions/pages require no core changes. Removing the extension removes its entries on the next configuration reload. Opening an uninstalled page displays a generic unavailable state. Caddy permits GET/HEAD on public page assets; other extension paths return 404. No new backend or plugin evaluator is involved.
+
+### Optional panel SDK v1
+
+Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
+
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `1`.
+
+The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External` and `RelTime`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
+
+This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.
+
+The SDK version is also declared in `framework/panel/extension-api.json` (the source of `PANEL_API_VERSION`). Copier extensions may use native `_external_data` to validate this capability before writing files. This makes compatibility explicit without coupling an extension to a framework repository layout or branch.

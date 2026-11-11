@@ -1,0 +1,236 @@
+{
+  "note": "What a person or agent does to understand a project and build on it, and the MCP tool that covers it. `before` is the surface of D33; `tool` null with `by` person = left to a person on purpose; null with `by` gap = not covered yet. Checked by tests/fyso-mcp.test.cjs.",
+  "actions": [
+    {
+      "area": "understand",
+      "action": "Read how the framework works",
+      "tool": "fyso_context",
+      "before": true
+    },
+    {
+      "area": "understand",
+      "action": "See what the project contains (bots, workflows, apps, extensions, wiki)",
+      "tool": "fyso_project",
+      "before": false
+    },
+    {
+      "area": "understand",
+      "action": "Read project files, guides and extension docs",
+      "tool": "fyso_file_read",
+      "before": false
+    },
+    {
+      "area": "understand",
+      "action": "List project files",
+      "tool": "fyso_files",
+      "before": false
+    },
+    {
+      "area": "understand",
+      "action": "See URLs, health, apps and extension state",
+      "tool": "fyso_status",
+      "before": true
+    },
+    {
+      "area": "diagnose",
+      "action": "Run the setup checklist",
+      "tool": "fyso_check",
+      "before": true
+    },
+    {
+      "area": "diagnose",
+      "action": "Run the health checks",
+      "tool": "fyso_doctor",
+      "before": true
+    },
+    {
+      "area": "diagnose",
+      "action": "Read conversations, execution and AI consumption",
+      "tool": "fyso_observability",
+      "before": true
+    },
+    {
+      "area": "diagnose",
+      "action": "Read a service's recent log",
+      "tool": "fyso_logs",
+      "before": false
+    },
+    {
+      "area": "diagnose",
+      "action": "Read run history and step logs",
+      "tool": "dagu_read",
+      "before": false
+    },
+    {
+      "area": "bots",
+      "action": "List and read bots",
+      "tool": "fyso_bot_read",
+      "before": true
+    },
+    {
+      "area": "bots",
+      "action": "Create, update or delete a bot",
+      "tool": "fyso_bot_apply",
+      "before": true
+    },
+    {
+      "area": "bots",
+      "action": "Version a bot created in OpenMausBot",
+      "tool": "fyso_bot_import",
+      "before": true
+    },
+    {
+      "area": "bots",
+      "action": "List connections available to bots",
+      "tool": "fyso_connections",
+      "before": true
+    },
+    {
+      "area": "bots",
+      "action": "Grant or remove a bot's access to a connected application",
+      "tool": "fyso_app_access_apply",
+      "before": false
+    },
+    {
+      "area": "bots",
+      "action": "Choose whether bots load the person's Claude MCP servers and skills",
+      "tool": "fyso_connector_preferences_save",
+      "before": false
+    },
+    {
+      "area": "bots",
+      "action": "Add or remove a custom MCP server for bots",
+      "tool": null,
+      "by": "gap",
+      "before": false
+    },
+    {
+      "area": "bots",
+      "action": "Authorize an application account (OAuth)",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "workflows",
+      "action": "List, read and search workflows",
+      "tool": "dagu_read",
+      "before": false
+    },
+    {
+      "area": "workflows",
+      "action": "Create, edit, rename or delete a workflow",
+      "tool": "dagu_change",
+      "before": false
+    },
+    {
+      "area": "workflows",
+      "action": "Run, stop, retry or approve a run",
+      "tool": "dagu_execute",
+      "before": false
+    },
+    {
+      "area": "workflows",
+      "action": "See which workflows are system ones and which scopes (subsets for bot groups) exist",
+      "tool": "fyso_workflow_scopes",
+      "before": false
+    },
+    {
+      "area": "workflows",
+      "action": "Give a group of bots a subset of workflows",
+      "tool": "fyso_workflow_scope_save",
+      "before": false
+    },
+    {
+      "area": "code",
+      "action": "Start a code task on a branch (fyso-dev-task)",
+      "tool": "dagu_execute",
+      "before": false
+    },
+    {
+      "area": "code",
+      "action": "Follow a code task to its result",
+      "tool": "dagu_read",
+      "before": false
+    },
+    {
+      "area": "code",
+      "action": "Change a project file directly (app declaration, project/mcp.json, soul file)",
+      "tool": null,
+      "by": "gap",
+      "before": false
+    },
+    {
+      "area": "knowledge",
+      "action": "Read and search the project wiki",
+      "tool": "dagu_read",
+      "before": false
+    },
+    {
+      "area": "knowledge",
+      "action": "Write a wiki page",
+      "tool": "dagu_change",
+      "before": false
+    },
+    {
+      "area": "extensions",
+      "action": "Search the extension catalogs",
+      "tool": "fyso_ext_search",
+      "before": true
+    },
+    {
+      "area": "extensions",
+      "action": "Install or upgrade an extension",
+      "tool": "fyso_ext_install",
+      "before": true
+    },
+    {
+      "area": "extensions",
+      "action": "Remove an extension",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "extensions",
+      "action": "Set an extension's secrets",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "versioning",
+      "action": "Save bots and memory to git",
+      "tool": "fyso_snapshot",
+      "before": true
+    },
+    {
+      "area": "stack",
+      "action": "Start or stop the stack",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "stack",
+      "action": "Manage web login users",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "stack",
+      "action": "Sign in the coding engines",
+      "tool": null,
+      "by": "person",
+      "before": false
+    },
+    {
+      "area": "stack",
+      "action": "Connect a desktop assistant",
+      "tool": null,
+      "by": "person",
+      "before": false
+    }
+  ]
+}

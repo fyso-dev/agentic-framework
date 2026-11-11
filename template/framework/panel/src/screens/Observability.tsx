@@ -55,7 +55,7 @@ export function Observability() {
   return <main className="page page-wide">
     <div className="page-head">
       <div className="grow"><h1>{t("observ.title")}</h1><p>{t("observ.subtitle")}</p></div>
-      <ActionButton action={action} label={t("observ.refresh")} busyLabel={t("common.verifying")} onRun={() => void action.start()} />
+      <ActionButton action={action} size="md" label={t("observ.refresh")} busyLabel={t("common.verifying")} onRun={() => void action.start()} />
     </div>
     <ActionStatus action={action} />
     {mock && <p role="status">{t("observ.mock")}</p>}
@@ -72,12 +72,12 @@ export function Observability() {
       {partial && <div className="banner banner-down" role="alert">{t("observ.partial")} {data.warnings.map(w => t(`observ.warning.${w}`)).join(" · ")}</div>}
       {(data.coverage.runsTruncated || data.coverage.tracesTruncated) && <p role="status" className="pill pill-warn">{t("observ.truncated")}</p>}
       <div className="observ-filters">
-        <label>{t("observ.bot")} <select value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.bot))].map(b=><option key={b}>{b}</option>)}</select></label>
-        <label>{t("observ.model")} <select value={model} onChange={e => setModel(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.model))].map(m=><option key={m} value={m}>{m === "unknown" ? t("observ.unknown") : m}</option>)}</select></label>
+        <label>{t("observ.bot")} <select className="select" value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.bot))].map(b=><option key={b}>{b}</option>)}</select></label>
+        <label>{t("observ.model")} <select className="select" value={model} onChange={e => setModel(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.model))].map(m=><option key={m} value={m}>{m === "unknown" ? t("observ.unknown") : m}</option>)}</select></label>
         <span className="mute">{t("observ.filterScope")}</span>
       </div>
       <section className="observ-grid" aria-label={t("observ.costs")}>
-        {usdKeys.map(key => <article key={key} className="card observ-stat"><span className="mute">{t(`observ.${key}`)}</span><strong>{money(amount(key))}</strong></article>)}
+        {usdKeys.map(key => <article key={key} className="card observ-stat"><span className="mute">{t(`observ.${key}`)}</span><strong className="stat">{money(amount(key))}</strong></article>)}
       </section>
       <p className="mute">{t("observ.costNote")}</p>
       <div className="observ-source"><span>{t("observ.turns")}: {number(amount("turns"))}</span><span>{t("observ.input")}: {number(amount("input"))}</span><span>{t("observ.output")}: {number(amount("output"))}</span><span>{t("observ.cache")}: {number(amount("cachedInput"))}</span></div>
@@ -91,7 +91,7 @@ export function Observability() {
       <section className="observ-section"><h2 className="section-title">{t("observ.conversations")}</h2>{model && <p className="mute">{t("observ.conversationModel")}</p>}<div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["bot","started","duration","tools","errors","input","output","costs","details"].map(k=><th key={k}>{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
         {traces.map(r=><tr key={r.id}><td>{r.bots.map(b=>b.name).join(", ")}</td><td title={f.exact(r.startedAt)}>{stamp(r.startedAt)}</td><td>{f.seconds(r.durationMs/1000)} {r.running && t("observ.running")}</td><td>{r.tools}</td><td>{r.errors}</td><td>{number(r.usage.input)}</td><td>{number(r.usage.output)}</td><td>{costDetail(r.usage)}</td><td><External href={traceUrl(r.id,r.startedAt)}>{t("observ.details")}</External></td></tr>)}
       </tbody></table>{!traces.length && <p className="observ-empty">{t("observ.empty")}</p>}</div></section>
-      <section className="observ-section"><h2 className="section-title">{t("observ.runs")}</h2><label className="observ-filters">{t("observ.workflow")} <select value={dag} onChange={e=>setDag(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.runs.map(r=>r.dag))].sort().map(name=><option key={name}>{name}</option>)}</select></label><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["workflow","status","started","duration","retries","input","output","costs","conversation"].map(k=><th key={k}>{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
+      <section className="observ-section"><h2 className="section-title">{t("observ.runs")}</h2><label className="observ-filters">{t("observ.workflow")} <select className="select" value={dag} onChange={e=>setDag(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.runs.map(r=>r.dag))].sort().map(name=><option key={name}>{name}</option>)}</select></label><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["workflow","status","started","duration","retries","input","output","costs","conversation"].map(k=><th key={k}>{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
         {data.runs.filter(r=>!dag || r.dag === dag).map(r=><tr key={`${r.dag}/${r.id}`}><td><External href={dagUrl(r.dag)}>{r.dag}</External><br/><span className="mute mono" title={r.id}>{r.id.length > 22 ? `${r.id.slice(0,14)}…${r.id.slice(-5)}` : r.id}</span></td><td>{t(`observ.statuses.${r.statusLabel}`,{defaultValue:r.statusLabel})}</td><td title={f.exact(r.startedAt)}>{stamp(r.startedAt)}</td><td>{Number.isFinite(Date.parse(r.startedAt)) ? f.seconds((Number.isFinite(Date.parse(r.finishedAt)) ? Date.parse(r.finishedAt)-Date.parse(r.startedAt) : now-Date.parse(r.startedAt))/1000) : t("observ.unknown")}</td><td>{r.retries}</td><td>{number(r.usage.input)}</td><td>{number(r.usage.output)}</td><td>{costDetail(r.usage)}</td><td>{r.traceId ? <External href={traceUrl(r.traceId)}>{t("observ.details")}</External> : t(r.sourceThread ? "observ.threadOnly" : "observ.unlinked")}</td></tr>)}
       </tbody></table>{!data.runs.filter(r=>!dag || r.dag === dag).length && <p className="observ-empty">{t("observ.empty")}</p>}</div></section>
     </>}
