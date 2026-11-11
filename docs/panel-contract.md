@@ -135,6 +135,8 @@ Started with `enqueue` and no params. Output `result`: `"no changes"` or `"commi
 
 Params `REF` (template tag, branch or commit; empty: Copier's latest tag) and `SRC` (another Copier source for this run only). Output `result`: `{ "from": "58f57cf", "to": "73b74c2", "commit": "1dcf4be" | null, "changed": true | false }`. The Framework card (Apps → Extensions) shows `project.framework.src` and `.commit`, a `REF` field (default `main`), `SRC` under an "alternative source" disclosure, and the result line; it reloads the config after a run. Conflicts and edited framework files fail the run before anything is applied (`framework/scripts/update.sh`).
 
+Saved local sources and the optional `SRC` override resolve against the project directory before entering the temporary worktree. The original `_src_path` spelling is restored through YAML before committing, including paths with spaces and YAML punctuation.
+
 No-change runs still install tools, regenerate configuration and reload the running stack. Retrying after an activation failure recovers these steps even when the template commit was already fast-forwarded; the result remains `changed: false` with `commit: null` when no additional commit is needed.
 
 ## 4. Editing `team.yaml` in the browser

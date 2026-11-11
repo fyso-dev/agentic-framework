@@ -12,22 +12,40 @@ source "$(dirname "$0")/lib.sh"
 ref=${REF:-}; src=${SRC:-}
 [[ -z $ref || $ref =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || fail "REF must be a tag, branch or commit"
 answers=.copier-answers.yml
-answer() { local key=$1 file=$2; sed -n "s/^$key: //p" "$file"; }
+answer() {
+  node - "$@" <<'JS'
+const fs = require('node:fs');
+const {createRequire} = require('node:module');
+const {execFileSync} = require('node:child_process');
+const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
+const [key, file, value] = process.argv.slice(2);
+const answers = yaml.parseDocument(fs.readFileSync(file, 'utf8'));
+if (answers.errors.length) throw answers.errors[0];
+if (value === undefined) process.stdout.write(String(answers.get(key) ?? ''));
+else {
+  answers.set(key, value);
+  fs.writeFileSync(file, answers.toString());
+}
+JS
+}
 from=$(answer _commit "$answers"); origin=$(answer _src_path "$answers")
+# Resolve both saved and override local sources from the project, before cd.
+src=${src:-$origin}
+if [[ -d $src ]]; then src=$(cd "$src" && pwd); fi
 base=$(git rev-parse HEAD)
 
 wt=$(mktemp -d)
 git worktree add -q --detach "$wt" HEAD >&2
 trap 'git worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
 cd "$wt"
-if [[ -n $src ]]; then
+if [[ $src != "$origin" ]]; then
   # Copier reads the source from the answers file and needs a clean tree.
-  sed -i.bak "s#^_src_path: .*#_src_path: $src#" "$answers" && rm -f "$answers.bak"
+  answer _src_path "$answers" "$src"
   git commit -q -m "tmp: template source for this update" -- "$answers" >&2
 fi
 uvx --from copier==9.19.1 copier update --trust --defaults --skip-answered ${ref:+--vcs-ref "$ref"} >&2
-if [[ -n $src ]]; then
-  sed -i.bak "s#^_src_path: .*#_src_path: $origin#" "$answers" && rm -f "$answers.bak"
+if [[ $src != "$origin" ]]; then
+  answer _src_path "$answers" "$origin"
 fi
 conflicts=$( { find . -name '*.rej' -not -path './.git/*'; \
   grep -rIlE '^(<<<<<<<|>>>>>>>) ' --exclude-dir=.git --exclude-dir=node_modules . || true; } | sort -u)

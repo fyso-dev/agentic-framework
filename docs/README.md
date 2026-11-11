@@ -203,3 +203,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 | 2026-11-11 | Framework update recovery: no-change retries rerun installation, config generation and activation after a partially applied update. Real Git/Copier regression covers installation, MCP config and panel config failures without additional commits. [Contract](panel-contract.md#fyso-update--framework-update) |
 | 2026-11-11 | Relative extension sources survive worktree upgrades: `_src_path` is read and written through YAML, including directories with `&`, `#` and spaces; the original relative source is restored and temporary source commits do not reach the project. Real Git/Copier regression covers upgrade, repeat upgrade and unrelated work preservation. |
+
+| 2026-11-11 | Framework worktree updates resolve saved and override local sources before changing directory and restore the original YAML source. Regression cases cover relative `_src_path`, relative `SRC`, special characters and no-change retries. |

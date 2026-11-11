@@ -13,11 +13,15 @@ COPIER = ['uvx', '--from', 'copier==9.19.1', 'copier']
 
 class FrameworkUpdate(unittest.TestCase):
     def test_retry_after_activation_failure_and_noop(self):
-        for failing_step in ['install', 'mcp', 'panel']:
-            with self.subTest(failing_step=failing_step), tempfile.TemporaryDirectory() as tmp:
+        cases = [('install', False, False), ('mcp', False, False), ('panel', False, False),
+                 ('', True, False), ('', False, True)]
+        for failing_step, relative, alternative in cases:
+            with self.subTest(failing_step=failing_step, relative=relative, alternative=alternative), \
+                    tempfile.TemporaryDirectory(prefix='update R&D # ') as tmp:
                 base = Path(tmp)
                 source, project, toolbin = [base / name for name in ['source', 'project', 'bin']]
                 source.mkdir()
+                project.mkdir()
                 toolbin.mkdir()
                 env = {**os.environ, 'PATH': str(toolbin) + os.pathsep + os.environ['PATH'],
                        'GIT_AUTHOR_NAME': 'Fixture', 'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
@@ -44,10 +48,12 @@ class FrameworkUpdate(unittest.TestCase):
                 run(['git', 'init', '-q'], source)
                 commit(source)
                 run(['git', 'tag', 'v1.0.0'], source)
-                run(COPIER + ['copy', '--trust', '--defaults', str(source), str(project)], base)
+                run(COPIER + ['copy', '--trust', '--defaults',
+                              '../source' if relative else str(source), '.'], project)
+                env['SRC'] = '../source' if alternative else ''
                 scripts = project / 'framework/scripts'
                 scripts.mkdir(parents=True)
-                for name in ['update.sh', 'lib.sh']:
+                for name in ['update.sh', 'lib.sh', 'extensions.cjs']:
                     shutil.copy2(ROOT / 'template/framework/scripts' / name, scripts)
                 for name, step in [('mcp-config.cjs', 'mcp'), ('panel-data.cjs', 'panel')]:
                     (scripts / name).write_text(
@@ -68,8 +74,16 @@ class FrameworkUpdate(unittest.TestCase):
                 fail = project / '.data/fail'
                 fail.write_text(failing_step)
                 failed = run(['bash', 'framework/scripts/update.sh'], check=False)
-                self.assertNotEqual(failed.returncode, 0)
+                if failing_step:
+                    self.assertNotEqual(failed.returncode, 0)
+                else:
+                    self.assertEqual(failed.returncode, 0, failed.stdout + failed.stderr)
+                    self.assertTrue(json.loads(failed.stdout)['changed'])
                 self.assertEqual((project / 'payload.txt').read_text(), 'v2\n')
+                answers = json.loads(run(['node', '-e',
+                    'console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").read(process.argv[1])))',
+                    '.copier-answers.yml']).stdout)
+                self.assertEqual(answers['_src_path'], '../source' if relative else str(source))
                 applied_head = run(['git', 'rev-parse', 'HEAD']).stdout
                 for _ in range(2):
                     fail.write_text('')
