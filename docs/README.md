@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D60; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D61; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -206,3 +206,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | Relative extension sources survive worktree upgrades: `_src_path` is read and written through YAML, including directories with `&`, `#` and spaces; the original relative source is restored and temporary source commits do not reach the project. Real Git/Copier regression covers upgrade, repeat upgrade and unrelated work preservation. |
 
 | 2026-11-11 | Framework worktree updates resolve saved and override local sources before changing directory and restore the original YAML source. Regression cases cover relative `_src_path`, relative `SRC`, special characters and no-change retries. |
+
+| 2026-11-11 | D61 integrated with current main: real Copier generation, shared-login setup and upgrade from `v0.1.0-rc.1` preserve project-owned authentication config. Two isolated macOS projects passed startup and doctor; one native Tinyauth session opened panel, Dagu and OMB in both projects, and shared logout revoked replay in both. No local login config was created for the shared client. HTTP boundary tests: 12 passed; configuration tests: 4 passed. |

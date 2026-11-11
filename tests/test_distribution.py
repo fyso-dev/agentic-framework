@@ -77,6 +77,28 @@ class DistributionTests(unittest.TestCase):
     def dist(self, root, env, *args):
         return mise(str(root / "framework/scripts/dist.sh"), *args, cwd=root, env=env)
 
+    def test_local_users_encrypt_from_node(self):
+        root, env = self.publisher, self.publisher_env
+        self.secrets(root, env, {"FYSO_ADMIN_PASSWORD": "fixture-technical-password"})
+        scratch = self.tmp / 'sops-temporary'
+        scratch.mkdir()
+        env = {**env, 'TMPDIR': str(scratch)}
+        runtime = root / '.data/web-auth/runtime'
+        runtime.mkdir(parents=True)
+        (runtime / 'sessions.db').write_text('fixture session')
+        entry = 'admin:$2b$04$' + 'a' * 53
+        result = subprocess.run(['mise', 'exec', *TOOLS, '--', 'node',
+            'framework/scripts/web-auth-users.cjs', 'init', 'admin'],
+            cwd=root, env=env, input=entry, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        saved = self.decrypt(root, env)
+        self.assertEqual(saved['FYSO_AUTH_USERS'], entry)
+        self.assertEqual(saved['FYSO_ADMIN_PASSWORD'], 'fixture-technical-password')
+        self.assertNotIn(entry, result.stdout + result.stderr)
+        self.assertEqual((root / 'secrets.enc.yaml').stat().st_mode & 0o777, 0o600)
+        self.assertFalse((runtime / 'sessions.db').exists())
+        self.assertEqual(list(scratch.iterdir()), [])
+
     def test_publish_install_update(self):
         p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
         write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n    cwd: ${FYSO_ROOT}\n")
