@@ -4,6 +4,11 @@ const {createRequire} = require('node:module');
 const {execFileSync, spawnSync} = require('node:child_process');
 const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
 const read = file => yaml.parse(fs.readFileSync(file, 'utf8'));
+function setSource(file, source) {
+  const answers = yaml.parseDocument(fs.readFileSync(file, 'utf8'));
+  answers.set('_src_path', source);
+  fs.writeFileSync(file, answers.toString());
+}
 const glob = pattern => [...fs.globSync(pattern)].sort();
 const validId = id => /^[a-z][a-z0-9-]{1,30}$/.test(id);
 function secrets(id) {
@@ -91,7 +96,7 @@ function run(id, command) {
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, glob, validId, secrets, missing, setup, workflows, inventory, check};
+module.exports = {read, setSource, glob, validId, secrets, missing, setup, workflows, inventory, check};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));
