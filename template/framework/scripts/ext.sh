@@ -107,15 +107,16 @@ case "$action" in
       git worktree add -q --detach "$wt" HEAD >&2
       trap 'git worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
       # A relative local source (../fyso-ext-foo) means the project root, not the worktree.
-      src=$(sed -n 's/^_src_path: //p' "$answers")
+      src=$(node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._src_path)' "$answers")
+      set_source() { node -e 'require("./framework/scripts/extensions.cjs").setSource(process.argv[1], process.argv[2])' "$1" "$2"; }
       if [[ $src == .* && -d $src ]]; then
-        sed -i.bak "s#^_src_path: .*#_src_path: $(cd "$src" && pwd)#" "$wt/$answers" && rm -f "$wt/$answers.bak"
+        set_source "$wt/$answers" "$(cd "$src" && pwd)"
         git -C "$wt" commit -q -m "tmp: absolute extension source" -- "$answers" >&2
       fi
       (cd "$wt" && copier update --trust --defaults --answers-file "$answers" >&2)
       version=$(read_version "$wt/$answers")
       if [[ $src == .* && -d $src ]]; then
-        sed -i.bak "s#^_src_path: .*#_src_path: $src#" "$wt/$answers" && rm -f "$wt/$answers.bak"
+        set_source "$wt/$answers" "$src"
         git -C "$wt" reset -q --soft HEAD~1
       fi
       git -C "$wt" add -A >&2
