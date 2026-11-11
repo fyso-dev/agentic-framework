@@ -293,6 +293,23 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     };
   }
 
+  function connectAgent(dag: string, id: string, createdAt: number, params?: Record<string, string>) {
+    const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
+    if (mode === "status") {
+      add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+        mode, server: `fyso-${PROJECT.slug}`,
+        agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
+      }) }) });
+      return;
+    }
+    const failed = scenario === "failed" && mode === "connect";
+    if (!failed && mode === "connect") agentsOn.add(target);
+    if (mode === "disconnect") agentsOn.delete(target);
+    add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
+      error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
+      outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+  }
+
   return {
     initialDraft: scenario === "failed" || scenario === "applyfail" ? DRAFT : null,
 
@@ -326,23 +343,9 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const createdAt = Date.now();
       const proposed = params?.TEAM_B64 ? fromBase64Utf8(params.TEAM_B64) : team;
       switch (dag) {
-        case DAGS.agentConnect: {
-          const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
-          if (mode === "status") {
-            add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
-              mode, server: `fyso-${PROJECT.slug}`,
-              agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
-            }) }) });
-            break;
-          }
-          const failed = scenario === "failed" && mode === "connect";
-          if (!failed && mode === "connect") agentsOn.add(target);
-          if (mode === "disconnect") agentsOn.delete(target);
-          add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
-            error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
-            outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+        case DAGS.agentConnect:
+          connectAgent(dag, id, createdAt, params);
           break;
-        }
         case DAGS.setupCheck:
           add({ dag, id, createdAt, duration: 3500, outcome: "succeeded", outputs: () => ({ check: JSON.stringify(check()) }) });
           break;

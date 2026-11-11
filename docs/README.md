@@ -200,3 +200,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-09 | **Maneja el proyecto desde tu IA (D52).** The MCP page becomes one card per agent with its real state (`agent-connect.cjs status`), *Conectar*, *Abrir conversación* and *Desconectar*, neutral Spanish copy, and a link from Setup instead of a menu item. Actions show only on a loopback panel; a remote panel explains that remote access will be an HTTP MCP with a token, planned behind Phase 6 HTTPS. |
 
 | 2026-11-11 | `fyso-update` workflow and the Framework card (Apps → Extensions): framework updates from the panel in a clean worktree (one commit, fast-forward, conflicts abort; `SRC` for a local clone). Verified on Etendo Next through Dagu, including a no-op run. Unlike `fyso-dist-update` (D56, a project's distribution), it updates the template. |
+
+| 2026-11-11 | Framework update recovery: no-change retries rerun installation, config generation and activation after a partially applied update. Real Git/Copier regression covers installation, MCP config and panel config failures without additional commits. [Contract](panel-contract.md#fyso-update--framework-update) |

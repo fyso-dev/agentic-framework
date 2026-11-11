@@ -376,9 +376,9 @@ function FrameworkCard() {
               aria-label={t("update.src")} placeholder={t("update.srcPlaceholder")} disabled={busy} onChange={(e) => setSrc(e.target.value)} />
           </details>
           {result && (
-            <p role="status">{result.changed
+            <output className="block">{result.changed
               ? t("update.done", { from: result.from, to: result.to, commit: result.commit })
-              : t("update.current", { to: result.to })}</p>
+              : t("update.current", { to: result.to })}</output>
           )}
           <ActionError action={update as Action<unknown>} />
         </div>
