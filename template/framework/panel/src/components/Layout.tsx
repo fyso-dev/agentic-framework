@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { LANGS, setLanguage } from "../lib/i18n";
+import { LANGS, setLanguage, localized } from "../lib/i18n";
+import type { Extension } from "../api/types";
 import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
-import { IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
+import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
+import { SessionMenu } from "./SessionMenu";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -124,53 +126,61 @@ export function TopBar(props: ThemeProps) {
         <ThemeButton {...props} />
       </span>
       {p && (
-        <External href={p.urls.omb} className="btn btn-md btn-pri">
+        <External href={p.urls.omb} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
       )}
+      <SessionMenu />
       <MoreMenu {...props} />
     </header>
   );
 }
 
-type NavItem = { id: "setup" | "bots" | "apps" | "observability"; href: string; icon: typeof IconBot };
+type NavItem = { id:string; href:string; icon:(p:{size?:number})=>ReactNode; label?:string };
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconWorkflow },
+  { id: "connectors", href: href.connectors, icon: IconApps },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
-const section = (r: Route) => (r.name === "bot" ? "bots" : r.name);
+const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
+function section(r:Route) {
+  if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
+  return r.name === "bot" ? "bots" : r.name;
+}
 
 export function SideNav({ route }: { route: Route }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const s = useStore();
+  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
   const down = downApps(s);
   const counts: Record<NavItem["id"], ReactNode> = {
 
+    connectors: null,
     observability: null,
     setup: loadingSteps(s) ? null : (
-      <span className="nav-count" style={{ color: open === 0 ? "var(--ok)" : s.anyFailed ? "var(--down)" : "var(--warn)", fontWeight: 600 }}>
-        {s.stepsDone}/4
+      <span className="nav-count" style={{ color: open === 0 ? "var(--fy-ok)" : s.anyFailed ? "var(--fy-down)" : "var(--fy-warn)", fontWeight: 700 }}>
+        {s.stepsDone}/{s.stepsTotal}
       </span>
     ),
     bots: unapplied > 0
       ? <span className="pill pill-warn">{t("nav.unapplied", { count: unapplied })}</span>
       : <span className="nav-count">{!s.mock && s.runtimeBots.data ? s.runtimeBots.data.length : s.workingBots.length}</span>,
     apps: down > 0
-      ? <span className="nav-count" style={{ color: "var(--warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
+      ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
       : <span className="nav-count">{s.apps.data?.length ?? ""}</span>,
   };
   return (
     <nav aria-label={t("nav.label")} className="sidenav">
-      {ITEMS.map(({ id, href: h, icon: Icon }) => (
+      {items.map(({ id, href: h, icon: Icon, label }) => (
         <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
           <Icon />
-          <span className="grow">{t(`nav.${id}`)}</span>
+          <span className="grow"><span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span></span>
           {counts[id]}
         </a>
       ))}
@@ -179,26 +189,28 @@ export function SideNav({ route }: { route: Route }) {
 }
 
 export function BottomNav({ route }: { route: Route }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const s = useStore();
+  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const badges: Record<NavItem["id"], [number, string]> = {
+    connectors: [0, "badge"],
     observability: [0, "badge"],
     setup: [open, s.anyFailed ? "badge" : "badge badge-warn"],
     bots: [unappliedCount(s), "badge badge-warn"],
     apps: [downApps(s), "badge"],
   };
   return (
-    <nav aria-label={t("nav.label")} className="bottomnav">
-      {ITEMS.map(({ id, href: h, icon: Icon }) => {
-        const [n, cls] = badges[id];
+    <nav aria-label={t("nav.label")} className="bottomnav" style={{gridTemplateColumns:`repeat(${items.length}, minmax(0, 1fr))`}}>
+      {items.map(({ id, href: h, icon: Icon, label }) => {
+        const [n, cls] = badges[id] ?? [0,"badge"];
         return (
           <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
             <span className="badge-wrap">
               <Icon size={22} />
               {n > 0 && <span className={cls} aria-hidden="true">{n}</span>}
             </span>
-            {t(`nav.${id}`)}
+            <span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span>
             {n > 0 && <span className="sr-only"> ({n})</span>}
           </a>
         );

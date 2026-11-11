@@ -24,6 +24,8 @@ export type Store = {
   reload(): void;
   /** Local, unapplied edits of team.yaml (null when there are none). */
   draft: string | null;
+  draftBase: string | null;
+  draftConflict: boolean;
   /** True once team.yaml is loaded and a saved draft (if any) is restored. */
   draftReady: boolean;
   setDraft(text: string | null): void;
@@ -38,7 +40,10 @@ export type Store = {
   /** Latest known check output (from the running/last run). */
   checkData?: SetupCheck;
   steps: Record<StepId, StepState>;
+  /** One step per installed extension with a setup.yaml (D51). */
+  extSteps: { ext: Extension; state: StepState }[];
   stepsDone: number;
+  stepsTotal: number;
   anyFailed: boolean;
   noData: boolean;
   afterApply(): void;
@@ -73,22 +78,42 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const [apps, setApps] = useState<Loadable<App[]>>({ status: "loading" });
   const [extensions, setExtensions] = useState<Loadable<Extension[]>>({ status: "loading" });
   const [health, setHealth] = useState<Record<string, Health>>({});
-  const [draft, setDraftState] = useState<string | null>(null);
+  const [savedDraft, setDraftState] = useState<{ base: string; draft: string } | null>(null);
+  const draft = savedDraft?.draft ?? null;
+  const draftBase = savedDraft?.base ?? null;
+  const draftConflict = draftBase !== null && team.data !== draftBase;
+  const rosterRefresh = useRef<Promise<void> | null>(null);
   const draftInit = useRef(false);
   const [draftReady, setDraftReady] = useState(false);
 
   const check = useDaguAction<SetupCheck>(backend, DAGS.setupCheck, "check", { loadLast: true });
+  // A check run elsewhere (CLI, an agent, another tab) shows up when this tab is back in view.
+  const reloadCheck = check.reload;
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") void reloadCheck(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", onVisible); };
+  }, [reloadCheck]);
   const snapshot = useDaguAction<string>(backend, DAGS.snapshot, "result", { loadLast: true });
 
-  const loadTeam = useCallback(async () => {
-    try {
-      const text = await backend.getTeam();
-      setTeam({ status: "ok", data: text });
-      return text;
-    } catch (e) {
-      setTeam({ status: "error", error: message(e) });
-      return null;
-    }
+  // Read the declaration, native roster and version inventory in one refresh.
+  const refreshRoster = useCallback(() => {
+    if (rosterRefresh.current) return rosterRefresh.current;
+    rosterRefresh.current = Promise.allSettled([
+      backend.getTeam(), backend.getRuntimeBots(), backend.getBotVersioning(),
+    ]).then(([nextTeam, nextRuntime, nextVersion]) => {
+      setTeam(previous => nextTeam.status === "fulfilled"
+        ? { status: "ok", data: nextTeam.value }
+        : { ...previous, status: "error", error: message(nextTeam.reason) });
+      setRuntimeBots(previous => nextRuntime.status === "fulfilled"
+        ? { status: "ok", data: nextRuntime.value }
+        : { ...previous, status: "error", error: message(nextRuntime.reason) });
+      setBotVersioning(previous => nextVersion.status === "fulfilled"
+        ? { status: "ok", data: nextVersion.value }
+        : { ...previous, status: "error", error: message(nextVersion.reason) });
+    }).finally(() => { rosterRefresh.current = null; });
+    return rosterRefresh.current;
   }, [backend]);
 
   const load = useCallback(() => {
@@ -96,7 +121,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
       (data) => setProject({ status: "ok", data }),
       (e) => setProject({ status: "error", error: message(e) }),
     );
-    void loadTeam();
+    void refreshRoster();
     backend.getApps().then(
       (data) => setApps({ status: "ok", data }),
       (e) => setApps({ status: "error", error: message(e) }),
@@ -105,59 +130,35 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
       (data) => setExtensions({ status: "ok", data }),
       (e) => setExtensions({ status: "error", error: message(e) }),
     );
-  }, [backend, loadTeam]);
+  }, [backend, refreshRoster]);
 
   useEffect(load, [load]);
 
   useEffect(() => {
-    let stopped = false;
-    let pending = false;
-    const refresh = async () => {
-      if (pending) return;
-      pending = true;
-      try { const data = await backend.getBotVersioning(); if (!stopped) setBotVersioning({status:"ok",data}); }
-      catch (e) { if (!stopped) setBotVersioning({status:"error",error:message(e)}); }
-      finally { pending = false; }
+    if (mock) return;
+    const onFocus = () => void refreshRoster();
+    const timer = setInterval(onFocus, 5000);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
     };
-    void refresh(); const timer = setInterval(() => void refresh(),5000);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [backend]);
+  }, [mock, refreshRoster]);
 
-  // Native discovery is independent of the team-file draft. Failed reads retain
-  // the previous roster with an explicit error; requests never overlap.
+  // Keep the original base so an external change cannot be mistaken for an edit.
   useEffect(() => {
-    let stopped = false;
-    let pending = false;
-    const refresh = async () => {
-      if (pending) return;
-      pending = true;
-      try {
-        const data = await backend.getRuntimeBots();
-        if (!stopped) setRuntimeBots({status:"ok", data});
-      } catch (e) {
-        if (!stopped) setRuntimeBots(previous => ({...previous, status:"error", error:message(e)}));
-      } finally { pending = false; }
-    };
-    void refresh();
-    const timer = setInterval(() => void refresh(), 5000);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [backend]);
-
-
-  // Restore a saved draft once project + team are known; drop it if team.yaml changed since.
-  useEffect(() => {
-    if (draftInit.current || project.status !== "ok" || team.status !== "ok") return;
+    if (draftInit.current || project.status !== "ok" || team.status !== "ok" || team.data === undefined) return;
     draftInit.current = true;
     setDraftReady(true);
     if (mock) {
-      if (loaded.initialDraft && loaded.initialDraft !== team.data) setDraftState(loaded.initialDraft);
+      if (loaded.initialDraft && loaded.initialDraft !== team.data) setDraftState({ base: team.data, draft: loaded.initialDraft });
       return;
     }
     try {
       const saved = JSON.parse(localStorage.getItem(draftKey(project.data!.slug)) ?? "null") as
         | { base: string; draft: string }
         | null;
-      if (saved && saved.base === team.data && saved.draft !== team.data) setDraftState(saved.draft);
+      if (saved && typeof saved.base === "string" && typeof saved.draft === "string" && saved.draft !== team.data) setDraftState(saved);
     } catch {
       /* ignore a broken entry */
     }
@@ -165,18 +166,19 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
 
   const setDraft = useCallback(
     (text: string | null) => {
-      const next = text === null || text === team.data ? null : text;
+      const base = draftBase ?? team.data;
+      const next = text === null || text === base || base === undefined ? null : { base, draft: text };
       setDraftState(next);
       if (mock || project.status !== "ok") return;
       try {
         const key = draftKey(project.data!.slug);
         if (next === null) localStorage.removeItem(key);
-        else localStorage.setItem(key, JSON.stringify({ base: team.data, draft: next }));
+        else localStorage.setItem(key, JSON.stringify(next));
       } catch {
         /* private mode: the draft lives in memory only */
       }
     },
-    [mock, project, team.data],
+    [mock, project, draftBase, team.data],
   );
 
   // App health: no-cors probe of each enabled app, now and every minute.
@@ -198,7 +200,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   }, [apps, backend]);
 
   const workingText = draft ?? team.data ?? null;
-  const baseBots = useMemo(() => safeBots(team.data), [team.data]);
+  const baseBots = useMemo(() => safeBots(draftBase ?? team.data), [draftBase, team.data]);
   const workingBots = useMemo(() => safeBots(workingText), [workingText]);
   const rows = useMemo(() => diffBots(baseBots, workingBots), [baseBots, workingBots]);
   const draftChanges = draft ? rows.filter((r) => r.state !== "applied").length : 0;
@@ -227,24 +229,32 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
     return { engines, bots, dagu, git };
   }, [check.phase, checkData, draftChanges, snapshot.phase]);
 
-  const values = Object.values(steps);
+  const extSteps = useMemo(() => (extensions.data ?? []).filter((ext) => ext.setup).map((ext) => {
+    const state: StepState = check.phase === "loading" ? "loading"
+      : check.phase === "running" ? "checking"
+      : !checkData ? "never"
+      : checkData.extensions?.find((e) => e.id === ext.id)?.state ?? "never";
+    return { ext, state };
+  }), [extensions.data, check.phase, checkData]);
+  const values = [...Object.values(steps), ...extSteps.map((e) => e.state)];
   const stepsDone = values.filter((s) => s === "done").length;
+  const stepsTotal = values.length;
   const anyFailed = values.includes("failed");
   const noData = check.phase === "never" && snapshot.phase === "never";
 
   const afterApply = useCallback(() => {
     setDraft(null);
-    void loadTeam();
+    void refreshRoster();
     void snapshot.reload();
     void check.start();
-  }, [setDraft, loadTeam, snapshot.reload, check.start]);
+  }, [setDraft, refreshRoster, snapshot.reload, check.start]);
 
 
   const store: Store = {
     backend, mock, project, team, runtimeBots, botVersioning, apps, extensions, health, reload: load,
-    draft, draftReady, setDraft, workingText,
+    draft, draftBase, draftConflict, draftReady, setDraft, workingText,
  baseBots, workingBots, rows, draftChanges,
-    check, snapshot, checkData, steps, stepsDone, anyFailed, noData, afterApply,
+    check, snapshot, checkData, steps, extSteps, stepsDone, stepsTotal, anyFailed, noData, afterApply,
   };
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

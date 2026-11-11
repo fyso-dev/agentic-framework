@@ -2,7 +2,9 @@
 
 The panel is a static SPA. It has **no backend of its own** (PLAN §9, D13). It reads files that Caddy serves read-only, and it acts by starting Dagu workflows and reading their outputs. This file is the contract between the SPA (`framework/panel/`) and the plumbing (`framework/workflows/`, `framework/scripts/`, `Caddyfile`).
 
-All URLs are relative to the panel origin `http://panel.localhost:<port>`. The browser is already authenticated with basic auth (D11), and Caddy forwards the same `Authorization` header to Dagu (D19).
+All URLs are relative to `http://panel.<slug>-<port>.localhost:<port>`. Caddy authorizes the native shared web session (D40) and injects Dagu’s separate technical credential server-side. Browsers never send that credential. See [web authentication](web-auth.md) for access permissions and native identity limits.
+
+`GET /api/session` exposes the native authority’s current public identity (`auth.authenticated`, `username`, `name`, `providerId`). `POST /api/session/logout` revokes the native session. Other logout methods return 405. API authentication failures return 401/403; a panel 401 reloads the page through the gateway login flow. Identity checks run on focus and every 30 seconds; a changed provider/user reloads all panel state. No credential, cookie value or upstream token is returned in project configuration.
 
 ## 1. Read-only files
 
@@ -32,7 +34,7 @@ type App = {
 
 ### Native live bot roster (D28)
 
-`GET /api/omb/bots` forwards exactly `/api/bots?messages=0` to the project OMB with the server-held session and project basic login. Writes return 405; other `/api/omb/*` paths return 404. This is the native authenticated response, which can include profile and queued-message metadata; no general OMB administration proxy is exposed. The SPA displays only ID, name, title and model. It polls every five seconds without overlapping requests, includes the chief, and marks failed refreshes explicitly. Runtime discovery never rewrites the local draft or `project/bots/team.yaml`. One list joins native IDs with uniquely named configuration entries; unchanged entries use current native display metadata, while pending drafts remain visible. Every bot row offers the OMB gateway link. Configured bots additionally offer an explicit manual edit action, and eligible native-only bots offer import. Actions are sibling controls rather than nested links. Ambiguous names never select an arbitrary form; native edits are versioned through existing snapshots, while Bot Architect writes its selected project entry.
+`GET /api/omb/bots` forwards exactly `/api/bots?messages=0` to the project OMB with the server-held session and project basic login. Writes return 405; other `/api/omb/*` paths return 404. This is the native authenticated response, which can include profile and queued-message metadata; no general OMB administration proxy is exposed. The SPA reads the roster, team declaration and version inventory together every five seconds and on window focus. It retains the last successful reads and marks refresh errors. A project bot without matching form data shows a synchronization status. Live bot links use the native ID, including when a bot changes position in the declaration. The list and detail show the native avatar from the authenticated OMB origin when it is a stored raster attachment. When the bot has no image or uses mascot mode, the panel draws the native standard silhouette and color as a static avatar. The source geometry is from OpenMausBot 0.1.141 under Apache-2.0. Bots with no native profile data show initials. A draft retains its original declaration and cannot be applied after that declaration changes. One list joins native IDs with uniquely named configuration entries; unchanged entries use current native display metadata, while pending drafts remain visible. Every bot row offers the OMB gateway link. Configured bots additionally offer an explicit manual edit action, and eligible native-only bots offer import. Actions are sibling controls rather than nested links. Ambiguous names never select an arbitrary form; native edits are versioned through existing snapshots, while Bot Architect writes its selected project entry.
 
 ## 2. Dagu API (through `/api/dagu/`)
 
@@ -89,26 +91,35 @@ Output `check`:
 
 The fourth checklist step (last save to git) does not come from here: the panel reads the last `fyso-snapshot` run.
 
-### `fyso-bots-plan` — preview (param `TEAM_B64`)
+### `fyso-bots-plan` — preview (params `TEAM_B64`, `TEAM_BASE_B64`)
 
 - `TEAM_B64`: base64 (UTF-8) of the proposed `team.yaml`. Empty means the current file.
+- `TEAM_BASE_B64`: optional base64 of the declaration the panel draft was edited against. A different current declaration rejects the draft.
 - Nothing is written.
 
-Output `plan` is the `openmausbot team apply --dry-run --json` result as-is:
+Output `plan` combines the native dry run with removals of bots omitted from the
+proposed project declaration. Native team apply keeps omitted bots by default.
+For each removed declaration, the panel resolves a unique exact name to a native
+ID, or reports that the bot is already absent. Protected and active bots are
+rejected. A rename uses the native `was` field and preserves the bot ID.
 
 ```ts
-{ plan: string[], created: number, changed: number, unchanged: number, deleted: number, warnings?: unknown[] }
+{ plan: string[], created: number, changed: number, unchanged: number, deleted: number, warnings?: unknown[], removalRevision?: string }
 ```
 
-The plan lines are OMB's English prose (spike `omb`). The panel shows them verbatim inside the preview and does not translate them.
+The panel shows native plan lines verbatim and adds lines for explicit removals.
+The revision binds those removals to the reviewed declaration, draft and runtime IDs.
 
-### `fyso-bots-apply` — apply (param `TEAM_B64`)
+### `fyso-bots-apply` — apply (params `TEAM_B64`, `TEAM_BASE_B64`, `REMOVAL_REVISION`)
 
-Steps, in this order (D13 rule 4):
-1. Snapshot: export bots and memory and commit them, so tuning done in OMB is kept.
-2. Write `TEAM_B64` to `project/bots/team.yaml`, after validating it with `--dry-run`. If validation fails, nothing is written.
-3. `openmausbot team apply`.
-4. Commit `project/bots/team.yaml` with the message `bots: update from panel`.
+1. Snapshot bots and memory before applying.
+2. Validate the proposed team and recompute the removal revision. Require the revision from the preview if any declaration is being removed.
+3. Apply the native team changes. Recheck each reviewed removal and delete by exact runtime ID. Verify that the ID disappeared.
+4. Write and commit `project/bots/team.yaml` with the message `bots: update from panel`. Drop consumed rename aliases.
+
+Native deletion removes the bot's conversation history. The snapshot covers configuration
+and memory. If an apply stops partway through, open a fresh preview. A bot already
+absent can still be removed from the declaration after review.
 
 Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
 
@@ -129,7 +140,7 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
 - `tools`
 
-Skills are out of scope for v1: they are listed read-only. "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
+Skills are listed read-only, except the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
 
 ## 5. i18n
 
@@ -162,3 +173,20 @@ artifacts without structured data retain unknown consumption.
 `GET /config/bot-versioning.json` is an exact read-only Caddy file route. It contains `{collectedAt, commit, bots:[{name,team,project,snapshot}]}`, derived from committed `project/bots/team.yaml` and `state/bots/team.yaml`; no instructions, chat or secret values are exported. The panel polls every five seconds. The file refreshes at startup, snapshot commit, native import and observability collection (two-minute schedule); the commit and collection time identify its evidence. Missing evidence or ambiguous identities produce an unverified label and disable import.
 
 Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract with `{OP:"import",BOT_ID:"<native ID>"}` and returns `{action,botId,name,commit,replayed}`. The panel reloads configuration after success, without resetting a draft. Drafts disable this action until applied or discarded.
+
+
+### Bot form connector selection
+
+`Bot.tools` reads the effective native team-file allow/deny selection, including
+team defaults. `BotInput.tools` is optional: omission preserves the existing YAML
+node. An explicit change writes only that node and preserves other bot fields,
+file references and unrelated profiles. Native draft preview/apply remains the
+existing `fyso-bots-plan` / `fyso-bots-apply` workflow, not an immediate API patch.
+The live native scope is used for initial form visibility when there is no draft;
+subsequent roster polling never overwrites a connector selection the person edited.
+
+### `fyso-agent-connect` — assistant MCP registration
+
+Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
+
+The MCP page enqueues this DAG and uses the shared action state, errors and Dagu log links. The workflow changes the configuration of the OS user running Dagu on that host, not the browser's machine. It does not launch or restart assistants. Demo mode explicitly labels simulated actions.

@@ -8,7 +8,8 @@ const env = process.env;
 const readTeam = () => yaml.parse(fs.readFileSync('project/bots/team.yaml', 'utf8').replaceAll('${FYSO_ROOT}', env.FYSO_ROOT));
 // Engines the declared bots run on: the provider prefix of each model.
 const usedEngines = team => team.bots.map(b => String(b.model || team.defaults?.model || '').split('/')[0]).filter(Boolean);
-const urls = {dagu:`http://dagu.localhost:${env.FYSO_HTTP_PORT}`, omb:`http://omb.localhost:${env.FYSO_HTTP_PORT}`};
+const domain = env.FYSO_WEB_DOMAIN || `${env.FYSO_PROJECT}-${env.FYSO_HTTP_PORT}.localhost`;
+const urls = {panel:`http://panel.${domain}:${env.FYSO_HTTP_PORT}`, auth:`http://auth.${domain}:${env.FYSO_HTTP_PORT}`, dagu:`http://dagu.${domain}:${env.FYSO_HTTP_PORT}`, omb:`http://omb.${domain}:${env.FYSO_HTTP_PORT}`};
 if (process.argv[2] === 'config') {
   require('./bot-versioning.cjs').write();
   const extensions = require('./extensions.cjs');
@@ -37,12 +38,14 @@ if (process.argv[2] === 'config') {
   const team = readTeam();
   const bots = team.bots.filter(b => b.name !== 'MausBot');
   const models = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
-  const plan = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
+  let plan;
+  try { plan = JSON.parse(fs.readFileSync(process.argv[4], 'utf8')); } catch { plan = {ok:false, error:'openmausbot team apply --dry-run returned no result'}; }
+  const invalid = plan.ok === false ? String(plan.error || 'team file rejected') : null;
   const connected = bots.filter(b => {
     const cwd = (b.cwd || team.defaults?.cwd || '').replaceAll('${FYSO_ROOT}', env.FYSO_ROOT);
     try { return !!JSON.parse(fs.readFileSync(`${cwd}/.mcp.json`)).mcpServers?.dagu; } catch {return false;}
   }).length;
-  const pending = plan.created + plan.changed + plan.deleted;
+  const pending = invalid ? bots.length : plan.created + plan.changed + plan.deleted;
   // Only the engines that matter to this project: the ones its bots use, plus the
   // framework's default engines when they are ready to be picked in the bot form.
   const used = new Set(usedEngines(team));
@@ -53,5 +56,7 @@ if (process.argv[2] === 'config') {
     models:(e.models?.options || []).map(m => m.id),
     ...(['claude','codex'].includes(e.instanceId) ? {fixHint:e.instanceId === 'claude' ? 'claude /login':'codex login --device-auth'} : {})
   })).filter(e => used.has(e.id) || (defaults.has(e.id) && e.ok));
-  console.log(JSON.stringify({checkedAt:new Date().toISOString(), engines, bots:{count:bots.length,pending,ok:pending===0}, dagu:{ok:env.FYSO_DAGU_OK==='true',botsConnected:connected}}));
+  const extensions = (process.argv[5] && fs.existsSync(process.argv[5]) ? fs.readFileSync(process.argv[5], 'utf8') : '')
+    .split('\n').filter(Boolean).map(line => line.split('\t')).filter(([, state]) => ['done','pending','failed'].includes(state)).map(([id, state]) => ({id, state}));
+  console.log(JSON.stringify({checkedAt:new Date().toISOString(), extensions, engines, bots:{count:bots.length,pending,ok:!invalid && pending===0,...(invalid && {error:invalid})}, dagu:{ok:env.FYSO_DAGU_OK==='true',botsConnected:connected}}));
 }

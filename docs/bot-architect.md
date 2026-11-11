@@ -6,7 +6,7 @@ registry. The manual panel remains a supported fallback.
 
 ## Contract
 
-The workflow accepts `OP=list|read|plan|apply`, `ACTION=create|update|delete`,
+The workflow accepts `OP=list|read|connections|plan|apply`, `ACTION=create|update|delete`,
 `BOT_ID`, `BOT_B64` (base64 JSON for one native OMB team bot entry) and `PLAN_ID`.
 List/read use native identities. This surface requires unique bot names across
 teams; duplicate names are rejected rather than resolved by guesswork. Plans for create/update are OMB native partial
@@ -21,8 +21,8 @@ receipt when retried. Dagu serializes this workflow. A concurrent manual OMB/pan
 change can invalidate a plan and requires a new preview.
 
 Only profile fields supported by this first version are accepted: name, title,
-description, model, soul (inline), approval, computer (off), cwd (project root).
-Engine keys, chief assignments, tools and remote computers are outside this CRUD
+description, model, soul (inline), approval, computer (off), cwd (project root), tools (native allow/deny lists).
+Engine keys, chief assignments, connected-app account grants and remote computers are outside this CRUD
 surface. New bots default to ask/off and this project's cwd; models remain native
 OMB identifiers. Protected framework bots cannot be deleted, and the Architect
 cannot modify its own active profile. Busy bots cannot be deleted.
@@ -72,3 +72,23 @@ The `Import and version` action submits `OP=import` with the exact native `BOT_I
 The operation creates a local configuration commit. Unlike the scheduled snapshot, import itself does not push; configure project replication deliberately. Names remain OMB's native team matching key; do not treat them as globally stable IDs.
 
 Import preserves effective native settings when the export omits native defaults. If shared project defaults would be inherited, it materializes those defaults on existing declarations and removes the shared defaults before appending the imported profile. Existing effective bot definitions remain unchanged; only the native YAML representation changes.
+
+## Native connectors (D43)
+
+`OP=connections` returns a credential-free inventory of native OMB MCP server
+names and framework/project/extension MCP source names. It does not probe servers
+or list connected-app accounts. `fyso_connections` exposes the same read operation
+to desktop agents. Use OMB Apps for connection creation, OAuth, native connection
+testing and connected-app account grants; use Bot Architect for versioned MCP
+`tools` selections. See [connectors.md](connectors.md).
+
+Tools updates replace the native selection as a whole; omit the field to preserve
+it. The native dry-run checks engine support. Codex requires `native:*` in an
+explicit allowlist because it cannot narrow engine-native tools; an allowlist
+containing only `native:*` removes MCP access. Other engines can reject different
+selections. Native validation errors are returned to the caller.
+
+Plans with tools capture the connection revision; changing a declared endpoint or
+the native connection catalog invalidates apply. Unknown, disabled native-only
+servers and native per-bot server exclusions fail before preview. Native OMB
+still controls authentication, effective tool catalogs, approvals and execution.

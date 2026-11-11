@@ -1,0 +1,14 @@
+description: Read, save or delete a workflow scope (a subset of workflows for a group of bots) and commit it
+type: graph
+max_active_runs: 1
+labels:
+  - fyso=system
+params:
+  - OP: read
+  - INPUT_B64: ""
+working_dir: ${FYSO_ROOT}
+steps:
+  # Dagu's environment carries the pinned tools (yaml) and the FYSO_* ports .mcp.json needs.
+  - id: operate
+    run: node framework/scripts/workflow-scopes.cjs
+    output: RESULT

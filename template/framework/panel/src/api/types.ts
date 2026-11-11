@@ -28,9 +28,13 @@ export type ExtensionSecret = {
   name: string;
   description?: string;
   description_i18n?: Record<string, string>;
+  /** Page where the value is obtained (HTTPS). */
+  url?: string;
   required: boolean;
   set: boolean;
 };
+
+export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string};
 
 export type Extension = {
   id: string;
@@ -41,6 +45,9 @@ export type Extension = {
   mcpServers: string[];
   workflows: string[];
   skills: string[];
+  pages?: ExtensionPageRegistration[];
+  /** Setup step the extension adds (`extensions/<ext>/setup.yaml`, D51). */
+  setup?: { title: string; title_i18n?: Record<string, string>; description?: string; description_i18n?: Record<string, string> };
 };
 
 /** Output `catalog` of `fyso-ext-catalog` (docs/extensions-contract.md §8). */
@@ -84,12 +91,15 @@ export type Engine = {
 /** Output `check` of `fyso-setup-check`. */
 export type SetupCheck = {
   checkedAt: string;
+  /** Extension Setup steps (D51): pending while a required secret is empty, then the extension's doctor. */
+  extensions?: { id: string; state: "done" | "pending" | "failed" }[];
   engines: Engine[];
-  bots: { count: number; pending: number; ok: boolean };
+  /** `error`: OpenMausBot rejected the team file (e.g. a model the engine no longer offers). */
+  bots: { count: number; pending: number; ok: boolean; error?: string };
   dagu: { ok: boolean; botsConnected: number };
 };
 
-/** Output `plan` of `fyso-bots-plan` (`openmausbot team apply --dry-run --json`). */
+/** Output `plan` of `fyso-bots-plan`, including scoped removals. */
 export type Plan = {
   plan: string[];
   created: number;
@@ -97,6 +107,7 @@ export type Plan = {
   unchanged: number;
   deleted: number;
   warnings?: unknown[];
+  removalRevision?: string;
 };
 
 /** Output `apply` of `fyso-bots-apply`. */
@@ -114,6 +125,7 @@ export type Run = {
 
 /** Action workflows (contract §3). Dagu DAG names. */
 export const DAGS = {
+  agentConnect: "fyso-agent-connect",
   botArchitect: "fyso-bot-architect",
   observability: "fyso-observability",
   setupCheck: "fyso-setup-check",
@@ -124,7 +136,11 @@ export const DAGS = {
   extInstall: "fyso-ext-install",
 } as const;
 
-export type RuntimeBot = { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string } };
+export type BotAppearance = {
+  avatarUrl?: string | null; color?: string; mascotBody?: string | null; mascotFaceColor?: string | null;
+  avatarCrop?: string | null; avatarZoom?: number; avatarFocusX?: number; avatarFocusY?: number;
+};
+export type RuntimeBot = BotAppearance & { id: string; name: string; title?: string; section?: string; modelSelection?: { instanceId?: string; model?: string };toolScope?:import('../lib/connector-access').ToolScope;mcpServers?:string[]|null };
 
 export type BotVersioning = { collectedAt: string; commit: string | null; projectDirty?: boolean; bots: {name: string; team: string; project: boolean; snapshot: boolean}[] };
 

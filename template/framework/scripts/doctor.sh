@@ -11,10 +11,13 @@ bad()  { printf '  ✗ %s\n' "$*"; failures=$((failures + 1)); }
 echo "Secrets"
 if [ -n "${FYSO_ADMIN_PASSWORD:-}" ]; then
   ok "secrets.enc.yaml decrypted"
-  [ "$FYSO_ADMIN_PASSWORD" = admin ] && warn "login is still admin / admin (fine locally; change it before exposing a server)"
+  [ "$FYSO_ADMIN_PASSWORD" = admin ] && bad "technical Dagu credential is still admin; rotate it with mise run secrets"
 else
   bad "secrets not loaded: run 'mise run setup', and check your age key"
 fi
+
+[ -n "${FYSO_AUTH_USERS:-}" ] && ok "local web users configured" || bad "run mise run setup to create local web users"
+[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || bad "HTTP web login must remain bound to loopback"
 
 echo "Extensions"
 node framework/scripts/extensions.cjs check && ok "extension ports and required secrets" || bad "extension configuration failed"
@@ -28,6 +31,10 @@ echo "Tools"
 for t in dagu openmausbot caddy process-compose sops; do
   command -v "$t" >/dev/null && ok "$t" || bad "$t missing: run 'mise install'"
 done
+
+echo "Connector setup"
+framework/scripts/health.sh connector-setup \
+  && ok "Composio setup service" || bad "Composio setup service unavailable"
 
 echo "Logins"
 # Only engines a bot uses are required; at least one must be signed in (PLAN D32).
@@ -63,14 +70,9 @@ if stack_running; then
   else
     bad "could not confirm OpenMausBot's instance (environment-id mismatch)"
   fi
-  framework/scripts/health.sh caddy && ok "gateway asks for login on panel.localhost:$FYSO_HTTP_PORT" || bad "gateway not answering"
-  code=$(curl -s -o /dev/null -w '%{http_code}' -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" \
-    -H "Host: dagu.localhost:$FYSO_HTTP_PORT" "http://127.0.0.1:$FYSO_HTTP_PORT/api/v1/dags")
-  [ "$code" = 200 ] && ok "Dagu API through the gateway with one login" || bad "Dagu through the gateway returned $code"
-  code=$(curl -s -o /dev/null -w '%{http_code}' -u "$FYSO_ADMIN_USER:$FYSO_ADMIN_PASSWORD" \
-    -H "Host: omb.localhost:$FYSO_HTTP_PORT" -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Dest: empty' \
-    "http://127.0.0.1:$FYSO_HTTP_PORT/api/bots")
-  [ "$code" = 200 ] && ok "OpenMausBot browser access through the gateway" || bad "OpenMausBot browser access returned $code"
+  framework/scripts/health.sh web-auth && ok "web login service answers" || bad "web login service is unavailable"
+  framework/scripts/health.sh caddy && ok "gateway denies unauthenticated access" || bad "gateway is not denying unauthenticated access"
+  node framework/scripts/check-web-auth.cjs && ok "web session boundary (authenticated browser E2E is a separate check)" || bad "web session verification failed"
   framework/scripts/bots.sh check >/dev/null 2>&1 && ok "bots match project/bots/team.yaml" \
     || warn "bots differ from project/bots/team.yaml (tuned in OpenMausBot? the snapshot records it in state/bots/; 'mise run bots:plan' shows the difference)"
 else

@@ -75,13 +75,14 @@ export function ActionStatus({ action }: { action: AnyAction }) {
 }
 
 /** The action's button: primary when it never ran or failed, disabled while running. */
-export function ActionButton({ action, label, busyLabel, onRun, primary, className = "" }: {
+export function ActionButton({ action, label, busyLabel, onRun, primary, size = "sm", className = "" }: {
   action: AnyAction;
   label: ReactNode;
   busyLabel: string;
   onRun: () => void;
   primary?: boolean;
-
+  /** "sm" inside step/action rows (default), "md" for page-level buttons. */
+  size?: "sm" | "md";
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -91,7 +92,7 @@ export function ActionButton({ action, label, busyLabel, onRun, primary, classNa
   return (
     <button
       type="button"
-      className={`btn ${pri ? "btn-pri" : "btn-ghost"} ${className}`}
+      className={`btn${size === "sm" ? " btn-sm" : ""} ${pri ? "btn-pri" : "btn-soft"} ${className}`}
       disabled={running || action.phase === "loading"}
       aria-busy={running}
       onClick={onRun}

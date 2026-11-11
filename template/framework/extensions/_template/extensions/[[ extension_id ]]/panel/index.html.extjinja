@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/assets/panel.css"><title></title></head>
+<body><main class="page"><h1 id="title"></h1><p id="description"></p></main>
+<script type="module">
+const params=new URLSearchParams(location.search);
+const lang=params.get('lang') === 'en' ? 'en' : 'es';
+document.documentElement.lang=lang;
+document.documentElement.className=params.get('theme') === 'dark' ? 'fy-dark' : 'fy-light';
+const messages=await (await fetch(`./locales/${lang}.json`)).json();
+document.title=messages.title;
+document.getElementById('title').textContent=messages.title;
+document.getElementById('description').textContent=messages.description;
+</script></body></html>
