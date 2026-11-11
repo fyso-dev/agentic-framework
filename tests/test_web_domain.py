@@ -40,6 +40,12 @@ class WebDomain(unittest.TestCase):
         self.assertEqual(self.config()['FYSO_WEB_DOMAIN'], 'domain-fixture-38600.localhost')
         self.assertEqual(self.config()['FYSO_AUTH_UPSTREAM'], '')
 
+    def test_localhost_is_reserved_for_legacy_redirects(self):
+        result = self.run_cli(COPIER + ['copy', '--trust', '--defaults', '--vcs-ref',
+            self.ref, '-d', 'web_domain=localhost', str(ROOT), str(self.project)], check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('localhost is reserved', result.stdout + result.stderr)
+
     def test_shared_login_setup_and_user_ownership(self):
         self.generate(None, '-d', 'web_domain=team.private.test',
                       '-d', 'auth_upstream=127.0.0.1:38709')

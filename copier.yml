@@ -83,7 +83,9 @@ web_domain:
     must resolve to this host on a private network; the gateway stays on loopback (D61).
   default: ""
   validator: >-
-    {% if web_domain and not (web_domain | regex_search('^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$')) %}
+    {% if web_domain == 'localhost' %}
+    localhost is reserved for legacy redirects; use a project-specific DNS name or leave it empty.
+    {% elif web_domain and not (web_domain | regex_search('^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$')) %}
     Use a lowercase DNS name without scheme or port, or leave it empty.
     {% endif %}
 

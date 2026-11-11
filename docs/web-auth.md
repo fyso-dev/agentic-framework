@@ -23,6 +23,8 @@ Do not bypass that gate by editing the generated runtime file.
 
 Both settings are Copier answers (`.copier-answers.yml`, changed with `copier update`).
 Empty answers give the contract above, unchanged.
+The bare value `localhost` is reserved for legacy redirects and is rejected;
+leave the answer empty for the local default or choose a project-specific domain.
 
 | Answer | Variable | Empty (default) | Set |
 |---|---|---|---|
