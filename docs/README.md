@@ -212,3 +212,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | D61 review regression: reject bare `web_domain=localhost`, which duplicates the legacy redirect sites. Verified through a real Copier validation failure; empty and project-specific domains retain their behavior. |
 
 | 2026-11-11 | D61 compatibility: the bundled SilverBullet picker generates a UUID v4 with `crypto.getRandomValues` when `randomUUID` is unavailable on custom HTTP origins. Executable picker tests cover native/fallback initialization, distinct batches and upload-status messages; existing import tests remain green. |
+
+| 2026-11-11 | D61 marketplace compatibility requires SilverBullet `v0.1.2` or newer for HTTP import batches; install/migration examples use that patch version. Updating the framework does not replace an independently installed extension. [Extension guide](silverbullet-extension.md#custom-http-domains-d61) |
