@@ -17,6 +17,12 @@ const MACHINE_PATH=/\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+\/|\/private
 const fail=message=>{const error=new Error(message);error.user=true;throw error;};
 const run=(bin,args,options={})=>execFileSync(bin,args,{stdio:['pipe','pipe','pipe'],maxBuffer:1<<28,...options});
 const git=(args,options)=>run('git',args,options);
+// sops reads a file, and on Linux /dev/stdin cannot be opened when stdin is the socket node provides.
+const sopsEncrypt=(args,text,options={})=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-sops-'));
+  try{const file=path.join(dir,'plain');fs.writeFileSync(file,text,{mode:0o600});return run('sops',[...args,file],options);}
+  finally{fs.rmSync(dir,{recursive:true,force:true});}
+};
 const readYaml=file=>require('./extensions.cjs').read(file);
 
 /** Where a committed project file goes in the distribution, or null when it stays here. */
@@ -118,7 +124,7 @@ function publish(requested) {
         // An explicit config: the project's .sops.yaml names this project's keys, not the clients'.
         const rules=path.join(work,'.git','fyso-dist-sops.yaml');
         fs.writeFileSync(rules,`creation_rules:\n  - age: ${everyone.join(',')}\n`);
-        encrypted=run('sops',['--config',rules,'encrypt','--input-type','json','--output-type','yaml','/dev/stdin'],{input:JSON.stringify(picked)});
+        encrypted=sopsEncrypt(['--config',rules,'encrypt','--input-type','json','--output-type','yaml'],JSON.stringify(picked));
       }
       fs.mkdirSync(path.join(template,DIST),{recursive:true});
       fs.writeFileSync(path.join(template,SECRETS),encrypted);
@@ -247,8 +253,8 @@ function secrets() {
   const current=decrypt('secrets.enc.yaml');
   const changed=Object.keys(incoming).filter(name=>current[name]!==incoming[name]);
   if(!changed.length)return;
-  const encrypted=run('sops',['encrypt','--filename-override','secrets.enc.yaml','--input-type','json','--output-type','yaml','/dev/stdin'],
-    {input:JSON.stringify({...current,...incoming}),env:{...process.env,SOPS_AGE_KEY_FILE:keyFile()}});
+  const encrypted=sopsEncrypt(['encrypt','--filename-override','secrets.enc.yaml','--input-type','json','--output-type','yaml'],
+    JSON.stringify({...current,...incoming}),{env:{...process.env,SOPS_AGE_KEY_FILE:keyFile()}});
   fs.writeFileSync('secrets.enc.yaml',encrypted);
   console.log(`secrets received: ${changed.join(', ')}`);
 }

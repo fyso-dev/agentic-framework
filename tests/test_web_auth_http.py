@@ -94,7 +94,7 @@ class WebAuthHTTP(unittest.TestCase):
         env = {**os.environ, 'FYSO_ROOT': str(cls.root), 'FYSO_DATA': str(cls.root),
             'XDG_CONFIG_HOME':str(cls.root / 'caddy-config'), 'XDG_DATA_HOME':str(cls.root / 'caddy-data'),
             'FYSO_PANEL_ROOT': str(cls.root / 'panel'), 'FYSO_HTTP_PORT': str(cls.port),
-            'FYSO_WEB_DOMAIN': cls.domain, 'FYSO_AUTH_PORT': str(cls.port + 9),
+            'FYSO_WEB_DOMAIN': cls.domain, 'FYSO_AUTH_UPSTREAM': f'127.0.0.1:{cls.port + 9}',
             'FYSO_DAGU_PORT': str(cls.port + 1), 'FYSO_OMB_PORT': str(cls.port + 4),
             'FYSO_CADDY_ADMIN_PORT': str(cls.port + 8), 'FYSO_BIND': '127.0.0.1',
             'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}

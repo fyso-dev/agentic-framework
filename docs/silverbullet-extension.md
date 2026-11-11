@@ -46,7 +46,7 @@ restart. The official catalog lists `silverbullet`; its source is
 marketplace can install it. To pin this release without catalog lookup:
 
 ```sh
-mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --vcs-ref v0.1.0
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --vcs-ref v0.1.2
 ```
 
 The bundled copy can still be installed with
@@ -251,7 +251,7 @@ An existing **bundled local-directory** installation has inventory version
 the parent framework, migrate it to the published source explicitly:
 
 ```sh
-mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --overwrite --vcs-ref v0.1.0
+mise run ext:add gh:fyso-dev/fyso-ext-silverbullet -- --defaults --overwrite --vcs-ref v0.1.2
 ```
 
 Existing answers are reused and wiki pages are outside the extension payload.
@@ -342,3 +342,10 @@ remote deployment or installation in a real user project is claimed.
 - [Edge MCP documentation, not the pinned release](https://edge.silverbullet.md/MCP)
 - [Official filesystem MCP](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)
 - [mise GitHub backend](https://mise.jdx.dev/dev-tools/backends/github.html)
+
+### Custom HTTP domains (D61)
+
+Use extension `v0.1.2` or newer for custom HTTP domains. Its import picker falls
+back to `crypto.getRandomValues` when the secure-context-only `randomUUID` API
+is unavailable. Existing marketplace installations need an extension update;
+updating the framework alone does not overwrite independently installed files.

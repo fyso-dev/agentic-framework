@@ -16,7 +16,11 @@ else
   bad "secrets not loaded: run 'mise run setup', and check your age key"
 fi
 
-[ -n "${FYSO_AUTH_USERS:-}" ] && ok "local web users configured" || bad "run mise run setup to create local web users"
+if [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; then
+  ok "web login is shared ($FYSO_AUTH_UPSTREAM)"
+else
+  [ -n "${FYSO_AUTH_USERS:-}" ] && ok "local web users configured" || bad "run mise run setup to create local web users"
+fi
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || bad "HTTP web login must remain bound to loopback"
 
 echo "Extensions"

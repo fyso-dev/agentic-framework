@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 export SOPS_AGE_KEY_FILE="${MISE_SOPS_AGE_KEY_FILE:-${SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}"
 action=${1:-}; username=${2:-${FYSO_ADMIN_USER:-admin}}
+shared_login && fail "this project uses the shared login at $FYSO_AUTH_UPSTREAM: manage users and app permissions there"
 case "$action" in init|add|remove) ;; *) fail "usage: web-auth:users <init|add|remove> [username]";; esac
 [[ "$username" =~ ^[a-zA-Z][a-zA-Z0-9_.-]{1,63}$ ]] || fail "invalid username (2-64 ASCII letters, digits, dots, dashes or underscores)"
 if [ "$action" = init ] && [ -n "${FYSO_AUTH_USERS:-}" ]; then exit 0; fi
