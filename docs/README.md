@@ -210,3 +210,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | D61 integrated with current main: real Copier generation, shared-login setup and upgrade from `v0.1.0-rc.1` preserve project-owned authentication config. Two isolated macOS projects passed startup and doctor; one native Tinyauth session opened panel, Dagu and OMB in both projects, and shared logout revoked replay in both. No local login config was created for the shared client. HTTP boundary tests: 12 passed; configuration tests: 4 passed. |
 
 | 2026-11-11 | D61 review regression: reject bare `web_domain=localhost`, which duplicates the legacy redirect sites. Verified through a real Copier validation failure; empty and project-specific domains retain their behavior. |
+
+| 2026-11-11 | D61 compatibility: the bundled SilverBullet picker generates a UUID v4 with `crypto.getRandomValues` when `randomUUID` is unavailable on custom HTTP origins. Executable picker tests cover native/fallback initialization, distinct batches and upload-status messages; existing import tests remain green. |
