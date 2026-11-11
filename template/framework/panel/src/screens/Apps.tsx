@@ -3,11 +3,12 @@
 // lists the installed extensions (docs/extensions-contract.md §5) and the marketplace (§8),
 // which installs and upgrades through the fyso-ext-catalog and fyso-ext-install workflows.
 // Each installed extension asks for its declared secrets (guided setup, D50) and runs its
-// workflows. Removing an extension stays a terminal task. Details live in tooltips; the page keeps text short.
+// workflows. Removing an extension stays a terminal task. The framework itself is updated
+// through fyso-update. Details live in tooltips; the page keeps text short.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DAGS, type App, type ExtInstallResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
-import { ActionError } from "../components/Action";
+import { DAGS, type App, type ExtInstallResult, type UpdateResult, type Extension, type Health, type Marketplace as Catalog, type MarketplaceEntry } from "../api/types";
+import { ActionButton, ActionError, ActionStatus } from "../components/Action";
 import {
   AppIcon, IconApps, IconArrowUpRight, IconCheck, IconDownload, IconExternal, IconFlow, IconInfo, IconLayers,
   IconLock, IconLockOpen, IconPlug, IconPlus, IconPuzzle, IconRefresh, IconSearch, IconTerminal, Spinner,
@@ -334,6 +335,58 @@ function MarketCard({ entry, market }: { entry: MarketplaceEntry; market: Market
   );
 }
 
+/** Framework update (fyso-update): one commit from a clean worktree; conflicts abort. */
+function FrameworkCard() {
+  const { t } = useTranslation();
+  const s = useStore();
+  const update = useDaguAction<UpdateResult>(s.backend, DAGS.update, "result", { loadLast: true });
+  const [ref, setRef] = useState("main");
+  const [src, setSrc] = useState("");
+  const framework = s.project.data?.framework;
+  const result = update.phase === "ok" ? update.output : undefined;
+  const busy = update.phase === "running";
+  const onRun = async () => {
+    if (await update.start({ REF: ref.trim(), SRC: src.trim() })) s.reload();
+  };
+  return (
+    <section aria-label={t("update.title")}>
+      <h2 className="ap-cap">{t("update.title")}</h2>
+      <div className="ap-ext">
+        <div className="ap-ext-head">
+          <span aria-hidden="true" className="ap-ic"><IconLayers size={22} /></span>
+          <div className="ap-ext-title">
+            <h3>{t("update.title")}</h3>
+            <p className="sub mono ellipsis" data-tip={t("update.srcTip")}>{framework?.src ?? "—"}</p>
+          </div>
+          <span className="ap-tag" data-tip={t("update.versionTip")}>{framework?.commit ?? t("update.unknown")}</span>
+        </div>
+        <div className="card action">
+          <div className="action-head">
+            <label className="grow field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <span className="label" data-tip={t("update.refTip")}>{t("update.ref")}</span>
+              <input className="input mono" style={{ flex: 1, minWidth: 0 }} value={ref} autoComplete="off" spellCheck={false}
+                disabled={busy} onChange={(e) => setRef(e.target.value)} />
+            </label>
+            <ActionStatus action={update as Action<unknown>} />
+            <ActionButton action={update as Action<unknown>} label={t("update.run")} busyLabel={t("update.running")} onRun={() => void onRun()} />
+          </div>
+          <details>
+            <summary className="mute">{t("update.advanced")}</summary>
+            <input className="input mono" style={{ marginTop: 8, width: "100%" }} value={src} autoComplete="off" spellCheck={false}
+              aria-label={t("update.src")} placeholder={t("update.srcPlaceholder")} disabled={busy} onChange={(e) => setSrc(e.target.value)} />
+          </details>
+          {result && (
+            <output className="block">{result.changed
+              ? t("update.done", { from: result.from, to: result.to, commit: result.commit })
+              : t("update.current", { to: result.to })}</output>
+          )}
+          <ActionError action={update as Action<unknown>} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ExtensionsTab({ market }: { market: Market }) {
   const { t } = useTranslation();
   const s = useStore();
@@ -396,12 +449,15 @@ function ExtensionsTab({ market }: { market: Market }) {
         )}
       </section>
 
+      <FrameworkCard />
+
       <details className="ap-term">
         <summary><IconTerminal size={16} />{t("market.terminal")}</summary>
         <div className="ap-term-body">
           <CopyLine text={t("market.hintCommand")} />
           <CopyLine text="mise run ext:update" />
           <CopyLine text="mise run secrets" />
+          <CopyLine text="mise run down && mise run up" />
           <p className="mute">{t("market.removeNote")}</p>
         </div>
       </details>
