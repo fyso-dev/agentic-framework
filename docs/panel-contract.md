@@ -148,7 +148,7 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
 - `tools`
 
-Skills are listed read-only, except the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
+Skills are listed read-only, except confirmed third-party skills (`skills.json`, D73) and the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
 
 ## 5. i18n
 
@@ -198,3 +198,7 @@ subsequent roster polling never overwrites a connector selection the person edit
 Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. `MODE=remote` (D65, no `TARGET`) makes sure the remote MCP token exists and outputs `{mode, server, url, created}`, never the token; the page then reads the per-client commands from `POST /api/agent/remote` (private setup adapter, same session and origin rules as `/api/composio/setup`). The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
 
 The MCP page enqueues this DAG and uses the shared action state, errors and Dagu log links. The workflow changes the configuration of the OS user running Dagu on that host, not the browser's machine. It does not launch or restart assistants. Demo mode explicitly labels simulated actions.
+
+## Third-party skills (D73)
+
+Apps → Skills uses `GET /config/skills.json`, `fyso-skills-catalog` and `fyso-skills-install`. Immutable preview, scan, human confirmation, states, params and native per-bot behavior: [contract](third-party-skills.md). Third-party Markdown is plain text. Pending skills cannot be switched on.

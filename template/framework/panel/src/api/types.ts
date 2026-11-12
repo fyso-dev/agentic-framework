@@ -83,6 +83,71 @@ export type UpdateResult = { from: string | null; to: string | null; commit: str
 
 export type ExtInstallResult = { id: string; mode: "add" | "update"; version: string | null; commit: string };
 
+/** Third-party skills (D64, docs/third-party-skills.md). `GET /config/skills.json` lists the installed ones. */
+export type ThirdPartySkill = {
+  name: string;
+  description: string;
+  src: string;
+  path: string;
+  /** Commit of the source the copy is pinned to. */
+  commit: string;
+  license: string | null;
+  licenseFile: string | null;
+  licenseTitle: string | null;
+  /** SHA-256 of the retained folder: what the scan and the confirmation refer to. */
+  sha256: string;
+  files: number;
+  installedAt: string;
+  scan: { at: string; warnings: string[] } | null;
+  review: { at: string } | null;
+  /** modified: edited locally · scan: not scanned yet · review: waiting for a person · ready: can be switched on per bot. */
+  state: "modified" | "scan" | "review" | "ready";
+  /** Bots of team.yaml that have it on. */
+  bots: string[];
+};
+
+export type SkillHit = {
+  name: string;
+  description?: string;
+  license?: string | null;
+  licenseFile?: string | null;
+  licenseTitle?: string | null;
+  src: string;
+  path?: string;
+  commit?: string;
+  /** source: a git repository of project/skill-sources.yaml · directory: named by skills.sh. */
+  origin: "source" | "directory";
+  installs?: number;
+  url?: string;
+  installed: boolean;
+  update?: boolean;
+};
+
+/** What a person reads before installing or confirming. `skillMd` is third-party text: shown, never rendered as HTML. */
+export type SkillDetail = Omit<SkillHit, "origin" | "installed"> & {
+  sha256: string;
+  skillMd: string;
+  licenseText?: string;
+  files: string[];
+  installed?: boolean;
+  installedCommit?: string;
+};
+
+/** Output `catalog` of `fyso-skills-catalog`: a search, one skill of a source, or one installed skill. */
+export type SkillCatalog = {
+  collectedAt: string;
+  planId?: string;
+  query?: string;
+  sources?: { source: string; count?: number; error?: string; skipped?: boolean }[];
+  skills?: SkillHit[];
+  installed?: ThirdPartySkill[];
+  preview?: SkillDetail;
+  local?: Omit<ThirdPartySkill, "files"> & { skillMd: string; licenseText?: string; files: string[] };
+};
+
+/** Output `result` of `fyso-skills-install`. */
+export type SkillResult = { op: string; name: string; commit: string | null; skill: ThirdPartySkill | null; changed?: boolean; from?: string; to?: string };
+
 export type Engine = {
   id: string;
   label: string;
@@ -138,6 +203,8 @@ export const DAGS = {
   snapshot: "fyso-snapshot",
   extCatalog: "fyso-ext-catalog",
   extInstall: "fyso-ext-install",
+  skillsCatalog: "fyso-skills-catalog",
+  skillsInstall: "fyso-skills-install",
   update: "fyso-update",
 } as const;
 
@@ -157,6 +224,7 @@ export type Backend = {
   getTeam(): Promise<string>;
   getApps(): Promise<App[]>;
   getExtensions(): Promise<Extension[]>;
+  getSkills(): Promise<ThirdPartySkill[]>;
   /** Always `enqueue`, never `start` (contract §2). Returns the dagRunId. */
   enqueue(dag: string, params?: Record<string, string>): Promise<string>;
   getRun(dag: string, runId: string): Promise<Run>;

@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D72; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D73; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -55,6 +55,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
+| Third-party skills: catalog discovery, pinned git copies, native scan and human review (D73) | [third-party-skills.md](third-party-skills.md) · [spike](adr/spikes/skills-registry.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: published [v0.1.0](https://github.com/fyso-dev/fyso-ext-silverbullet/releases/tag/v0.1.0), official marketplace, shared wiki files, panel-aligned theme, official filesystem MCP, per-bot skill, panel Knowledge page, AI import of a folder or zip, install and verification (D53, D54, D58, D59) | [silverbullet-extension.md](silverbullet-extension.md) |
 | Business-owner opt-in extensions: office documents, deliverables, knowledge skills, operations, owner loop and accounting sample (D66–D72) | [owner-extensions.md](owner-extensions.md) |
@@ -94,8 +95,9 @@ The owner extension review fixes and focused verification are recorded in [busin
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
-| 2026-11-10 | **Longer default local web sessions.** New projects use 30 days for native Tinyauth session expiry and maximum lifetime to avoid hourly logins. Existing project-owned authentication settings are preserved; adoption and memorable passphrases are documented in [web authentication](web-auth.md). |
 |---|---|
+| 2026-11-12 | **Third-party skills (D73).** skills.sh anonymous CLI endpoint verified; documented v1 requires Vercel identity. Native OMB 0.1.141 disabled import scans SKILL.md and omits supporting files. Git copies retain full provenance/license and require human confirmation; panel/MCP apply immutable previews. [Spike](adr/spikes/skills-registry.md) · [contract and verification](third-party-skills.md). |
+| 2026-11-10 | **Longer default local web sessions.** New projects use 30 days for native Tinyauth session expiry and maximum lifetime to avoid hourly logins. Existing project-owned authentication settings are preserved; adoption and memorable passphrases are documented in [web authentication](web-auth.md). |
 | 2026-11-10 | **Panel roster refresh and exact bot removal.** The panel refreshes the declaration alongside the native roster, retains stale drafts without applying them and shows native avatars when available. Bot deletion previews identify exact runtime IDs and warn about conversation history loss. [Contract](panel-contract.md#3-action-workflows) |
 | 2026-11-10 | Product vocabulary: project assistants are **Agentes** (Spanish) / **Agents** (English) in panel and Knowledge UI copy. Native product/profile names and technical identifiers remain stable. [Vocabulary contract](panel-spec.md#product-vocabulary). |
 | 2026-11-10 | **SilverBullet theme alignment.** Native `SB_HEAD_HTML` loads extension-owned CSS and a checked theme bridge; the editor uses the panel's Gilroy and palette. Generic SDK readiness opts pages into mode messages without an iframe reload, preserving the editor and Uppy; non-SDK HTML retains URL/reload behavior. Wiki pages and user Space Style are untouched. Verified: build/typecheck, 23 framework tests, standalone import tests, real Caddy/SilverBullet/Uppy browser smoke, native web-login/theme acceptance and a generated full-stack doctor. [Contract](silverbullet-extension.md#theme-alignment) · [screenshots and limitations](https://github.com/fyso-dev/fyso-ext-silverbullet/blob/feat/panel-theme/docs/evidence/panel-theme/README.md). |
@@ -230,3 +232,7 @@ The owner extension review fixes and focused verification are recorded in [busin
 | 2026-11-11 | **Owner extensions handoff review (D66–D72).** Six independent bundles use native slots and per-bot opt-in. Corrected PPTX verification guidance, Typst font selection, attachment headers for directory-index cases, resolved symlink inputs, and stale/missing spend checks. Native document/XLSX/gardener tests, generated-stack doctor, authenticated file HTTP checks and Dagu human wait/resume passed; AI and browser acceptance remain separate. Upstream document licenses allow redistribution; thin original skills avoid their extra dependencies. See [sources, verification and open spikes](owner-extensions.md). |
 
 | 2026-11-12 | **Owner extensions final integration acceptance.** Corrected the ops doctor synthetic freshness contract and added its executable regression. Reverified complete-stack doctor, authenticated downloads and private slots, Dagu human wait/resume and real rendered deliverables. [Evidence](../artifacts/delivery-evidence/owner-extensions/README.md). |
+
+| 2026-11-12 | **Skills integration acceptance (D73).** Merged current main, regenerated panel assets, removed duplicate native workflow parameters and added PR build/regression checks. Disposable-stack doctor and real authenticated browser installation/scan/confirmation passed. See [evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for final per-agent acceptance and remaining limits. |
+
+| 2026-11-12 | **Native skill scan compatibility (D73).** Combined-stack testing caught the native name/frontmatter equality requirement. Scan now keeps original text/name and binds cleanup to unique source metadata plus hash/state/timestamp; fake protocol checks enforce the same constraint. [Contract](third-party-skills.md#native-name-and-cleanup-contract). |

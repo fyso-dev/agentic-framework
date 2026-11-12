@@ -13,4 +13,12 @@ function resolveFiles(value) {
     } else resolveFiles(child);
   }
 }
-resolveFiles(team);process.stdout.write(JSON.stringify(team));
+resolveFiles(team);
+// Skills from outside the project reach OpenMausBot only with the content a person
+// confirmed (D64); entries that are off and whose file is gone are left out as well.
+const {gate}=require('./skills.cjs');
+for(const bot of [team.defaults,...(Array.isArray(team.bots)?team.bots:[])]) {
+  if(!Array.isArray(bot?.skills))continue;
+  bot.skills=bot.skills.filter(entry=>entry?.enabled !== false || !entry.file || fs.existsSync(entry.file)).map(entry=>gate(entry,bot.name) ? entry : {...entry,enabled:false});
+}
+process.stdout.write(JSON.stringify(team));

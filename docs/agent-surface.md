@@ -30,6 +30,7 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 | `fyso_workflow_scope_save`, `fyso_workflow_scope_delete` | create, replace or remove a scope: labels, `dagu-<scope>` entry, commit | `fyso-workflow-scopes` `OP=save\|delete` |
 | `fyso_logs` | processes of the stack; last lines of one (at most 500) | `pc.sh process list\|logs` (read-only) |
 | `fyso_ext_search` | catalog entries, latest version, install state | `fyso-ext-catalog` |
+| `fyso_skill_search`, `fyso_skill_plan`, `fyso_skill_install` | discover/read untrusted text, preview an immutable add/update, apply exact planId after explicit authorization; never confirm or enable | `fyso-skills-catalog` / `fyso-skills-install` ([D73](third-party-skills.md)) |
 | `fyso_ext_install` | install (`add`) or upgrade (`update`) one extension | `fyso-ext-install` |
 | `fyso_snapshot` | save bots and memory to git | `fyso-snapshot` |
 | `fyso_observability` | conversations, execution, AI consumption | `fyso-observability` |

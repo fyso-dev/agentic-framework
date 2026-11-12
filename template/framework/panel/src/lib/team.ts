@@ -53,13 +53,16 @@ export type BotInput = {
   approval?: Approval;
   /** Omit to preserve the existing native selection. */
   tools?: ToolScope;
-  /** Extension skills to switch on or off, by team file path. Others stay untouched. */
+  /** Extension and third-party skills to switch on or off, by team file path. Others stay untouched. */
   skills?: { file: string; on: boolean }[];
 };
 
 /** Team file path of a skill shipped by an extension (extensions-contract §2). */
 export const extensionSkillFile = (ext: string, skill: string) =>
   `\${FYSO_ROOT}/extensions/${ext}/skills/${skill}/SKILL.md`;
+
+/** Team file path of an installed third-party skill (docs/third-party-skills.md). */
+export const thirdPartySkillFile = (name: string) => `\${FYSO_ROOT}/project/bots/skills/${name}/SKILL.md`;
 
 export function parseTeam(text: string): Document {
   return parseDocument(encodeEnv(text));

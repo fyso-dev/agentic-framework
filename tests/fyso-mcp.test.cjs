@@ -74,6 +74,8 @@ test('tools run the panel workflows with their params and return parsed outputs'
   const {srv,calls,port}=await fakeDagu({
     'fyso-ext-install':{result:JSON.stringify({id:'sample',mode:'add',version:'v1.0.0',commit:'abc1234'})},
     'fyso-bot-architect':{result:JSON.stringify({planId:'p1',action:'create',preview:['create Support']})},
+    'fyso-skills-catalog':{catalog:JSON.stringify({preview:{name:'pdf',skillMd:'text'}})},
+    'fyso-skills-install':{result:JSON.stringify({op:'add',name:'pdf',commit:'abc1234',skill:{name:'pdf',state:'review'}})},
     'fyso-ext-catalog':{catalog:JSON.stringify({catalogs:[{name:'Fyso'}],extensions:[{id:'sample',name:'Sample',description:'demo',tags:['demo']},{id:'netbird',name:'NetBird',description:'network',tags:[]}]})},
   });
   const c=mcp(port);
@@ -87,6 +89,19 @@ test('tools run the panel workflows with their params and return parsed outputs'
     assert.deepEqual(JSON.parse(Buffer.from(sent.BOT_B64,'base64').toString()),{name:'Support',model:'claude/claude-sonnet-5'});
     const search=(await c.call('tools/call',{name:'fyso_ext_search',arguments:{query:'network'}})).result.structuredContent;
     assert.deepEqual(search.extensions.map(e=>e.id),['netbird']);
+    // Third-party skills (D64): search and install only; confirming stays with a person in the panel.
+    const skills=(await c.call('tools/call',{name:'fyso_skill_search',arguments:{source:'anthropics/skills',skill:'pdf'}})).result;
+    assert.equal(skills.structuredContent.preview.name,'pdf');
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-catalog',params:{QUERY:'',SRC:'anthropics/skills',SKILL:'pdf',COMMIT:''}});
+    const planned=(await c.call('tools/call',{name:'fyso_skill_plan',arguments:{mode:'add',source:'anthropics/skills',skill:'pdf'}})).result;
+    assert.equal(planned.isError,undefined);
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-catalog',params:{OP:'add',SRC:'anthropics/skills',SKILL:'pdf',NAME:'',COMMIT:''}});
+    const added=(await c.call('tools/call',{name:'fyso_skill_install',arguments:{planId:'abc'}})).result;
+    assert.equal(added.structuredContent.skill.state,'review');
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-install',params:{OP:'apply-plan',PLAN_ID:'abc'}});
+    const refused=(await c.call('tools/call',{name:'fyso_skill_install',arguments:{source:'anthropics/skills'}})).result;
+    assert.equal(refused.isError,true);
+    assert.ok(!(await c.call('tools/list')).result.tools.some(t=>/skill.*(confirm|enable|remove)/.test(t.name)));
   } finally {c.close();srv.close();}
 });
 
@@ -375,7 +390,9 @@ test('the scope server gives a bot Dagu read and execute for its scope only, wit
   const call=(method,params)=>new Promise(r=>{const id=++seq;waiting.set(id,r);child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
   const tool=async(name,args)=>(await call('tools/call',{name,arguments:args})).result;
   try {
-    const init=(await call('initialize',{protocolVersion:'2025-06-18'})).result;
+    const handshake=await call('initialize',{protocolVersion:'2025-06-18'});
+    assert.equal(handshake.error,undefined,JSON.stringify(handshake.error));
+    const init=handshake.result;
     assert.equal(init.serverInfo.name,'fyso-dagu-ventas');
     assert.deepEqual((await call('tools/list')).result.tools.map(t=>t.name),['dagu_read','dagu_execute']);
     assert.equal((await call('tools/call',{name:'fyso_status',arguments:{}})).error.code,-32602);

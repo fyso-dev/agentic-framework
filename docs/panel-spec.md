@@ -124,7 +124,7 @@ Icons carry the meaning; secondary text goes in tooltips (`data-tip`), with an a
 
 ### 4. Apps
 
-Two tabs, kept in the address (`#/apps`, `#/apps?tab=ext`). Details live in tooltips; the page keeps text short.
+Three tabs, kept in the address (`#/apps`, `#/apps?tab=ext`, `#/apps?tab=skills`). Details live in tooltips; the page keeps text short.
 
 **Abrir:** a tile launcher in up to three groups:
 - **Framework:** always present. Dagu ("Workflows") and OpenMausBot ("Bots").
@@ -187,3 +187,7 @@ The panel has **no chat** (people chat in OpenMausBot), no workflow editing (tha
 4. Design tokens (colors, typography, spacing) for light and dark.
 
 A code export (e.g. React + Tailwind) or a Claude Design link is enough to implement from.
+
+## Third-party skills tab (D73)
+
+Search configured repositories or the public directory; read source, commit, license and plain-text SKILL.md before installing. Installed cards show source/revision and scan/review state. Confirmation requires the acknowledgement; bot selection is separate. Upgrade opens a fresh immutable preview. Supporting files are listed with the native SKILL.md-only limitation. [Contract](third-party-skills.md).

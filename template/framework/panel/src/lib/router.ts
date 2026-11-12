@@ -1,4 +1,4 @@
-// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index>[?tab=…] · #/bots/review · #/apps[?tab=ext]
+// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index>[?tab=…] · #/bots/review · #/apps[?tab=ext|skills]
 import { useEffect, useState } from "react";
 
 export type BotTab = "perfil" | "instrucciones" | "conectores";
@@ -10,7 +10,7 @@ function botTab(query: URLSearchParams): BotTab | undefined {
   return query.get("section") === "connectors" ? "conectores" : undefined;
 }
 
-export type AppsTab = "open" | "ext";
+export type AppsTab = "open" | "ext" | "skills";
 
 export type Route =
   | { name: "setup" }
@@ -29,7 +29,10 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "observability") return { name: "observability" };
   if (parts[0] === "connectors") {const botId=new URLSearchParams(query||" ").get("bot");return { name: "connectors",...(botId?{botId}:{}) };}
   if (parts[0] === "extensions" && parts[1] && parts[2]) return {name:"extension",extensionId:parts[1],pageId:parts[2]};
-  if (parts[0] === "apps") return new URLSearchParams(query || "").get("tab") === "ext" ? { name: "apps", tab: "ext" } : { name: "apps" };
+  if (parts[0] === "apps") {
+    const tab = new URLSearchParams(query || "").get("tab");
+    return tab === "ext" || tab === "skills" ? { name: "apps", tab } : { name: "apps" };
+  }
   if (parts[0] === "bots") {
     if (parts[1] === "review") return { name: "bots", review: true };
     const params = new URLSearchParams(query || "");
@@ -56,7 +59,7 @@ export const href = {
   extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,
   mcp: "#/mcp",
   apps: "#/apps",
-  appsTab: (tab: AppsTab) => (tab === "ext" ? "#/apps?tab=ext" : "#/apps"),
+  appsTab: (tab: AppsTab) => (tab === "open" ? "#/apps" : `#/apps?tab=${tab}`),
   observability: "#/observability",
 };
 
