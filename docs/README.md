@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D73; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D74; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -236,3 +236,5 @@ The owner extension review fixes and focused verification are recorded in [busin
 | 2026-11-12 | **Skills integration acceptance (D73).** Merged current main, regenerated panel assets, removed duplicate native workflow parameters and added PR build/regression checks. Disposable-stack doctor and real authenticated browser installation/scan/confirmation passed. See [evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for final per-agent acceptance and remaining limits. |
 
 | 2026-11-12 | **Native skill scan compatibility (D73).** Combined-stack testing caught the native name/frontmatter equality requirement. Scan now keeps original text/name and binds cleanup to unique source metadata plus hash/state/timestamp; fake protocol checks enforce the same constraint. [Contract](third-party-skills.md#native-name-and-cleanup-contract). |
+
+| 2026-11-12 | **Remote agent and Dagu access (D74).** The existing project token grants Dagu's native tools and `fyso_bot_run`, which uses the native OMB CLI on the project port. Remote transport tests use simulated Dagu and OMB; real remote agent execution remains to be verified. [Contract](agent-surface.md#remote-clients-d63) |
