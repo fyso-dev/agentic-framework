@@ -166,6 +166,12 @@ password: `web-auth:password` says so and `--new` fixes it.
 The stack may keep running: the login service alone is stopped and started around
 the change, and it reads the users fresh from the encrypted file.
 
+Verified (2026-11-11) on a real running project behind an HTTPS provider:
+`web-auth:password` reported the pre-D64 administrator as not stored, `-- --new` set a
+generated password with the stack up, and signing in with it through
+`https://auth.<web_domain>` answered 200 with a `Secure` cookie on the project's own
+domain (401 with a wrong password).
+
 `add` also changes an existing user's password. Changes preserve unrelated
 encrypted secrets and invalidate **all** existing web sessions. The bootstrap
 administrator and last local account cannot be removed through this helper.

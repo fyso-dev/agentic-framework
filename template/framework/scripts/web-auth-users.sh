@@ -54,7 +54,15 @@ node_action=$action; [ "$action" != password ] || node_action=add
 printf '%s\n%s' "$entry" "$password" | node framework/scripts/web-auth-users.cjs "$node_action" "$username"
 if [ "$restart" = true ]; then
   trap - EXIT
-  pc process start web-auth >/dev/null && echo "✓ Login service restarted."
+  pc process start web-auth >/dev/null
+  # Say it is back only when it answers (it starts in a second or two).
+  ready=false
+  for _ in $(seq 1 30); do
+    if framework/scripts/health.sh web-auth 2>/dev/null; then ready=true; break; fi
+    sleep 0.5
+  done
+  if [ "$ready" = true ]; then echo "✓ Login service restarted."
+  else echo "! The login service has not answered yet: check 'mise run status' and 'mise run logs web-auth'." >&2; fi
 fi
 if [ "$generated" = true ]; then
   printf '\n  User      %s\n  Password  %s\n\n' "$username" "$password"
