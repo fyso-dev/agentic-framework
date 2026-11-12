@@ -26,7 +26,7 @@ function pages(wiki) {
     }
   }
   visit(wiki);
-  return found.sort((a, b) => a === b ? 0 : (a < b ? -1 : 1));
+  return found.sort();
 }
 
 // Seconds since epoch of the last commit that touched each page; file time when git has none.
@@ -57,15 +57,21 @@ function links(text) {
   // Code is not prose: links inside fences and inline code are examples.
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
   const found = [];
-  for (const match of prose.matchAll(/\[\[([^\[\]\n]+)\]\]/g)) {
+  for (const match of prose.matchAll(/\[\[([^[\]\n]+)\]\]/g)) {
     const target = match[1].split('|')[0].split('#')[0].split('@')[0].trim();
     if (target && !/^[a-z][a-z0-9+.-]*:/i.test(target)) found.push({kind: 'wiki', target, text: match[0]});
   }
-  for (const match of prose.matchAll(/(?<!!)\[[^\[\]\n]*\]\(([^()\s]+)(?:\s+"[^"\n]*")?\)/g)) {
+  for (const match of prose.matchAll(/(?<!!)\[[^[\]\n]*\]\(([^()\s]+)(?:\s+"[^"\n]*")?\)/g)) {
     const target = match[1].split('#')[0];
     if (target && !/^[a-z][a-z0-9+.-]*:/i.test(target) && !target.startsWith('//')) found.push({kind: 'path', target, text: match[0]});
   }
   return found;
+}
+
+function resolvedLink(link, file) {
+  let target;
+  try { target = decodeURIComponent(link.target); } catch { target = link.target; }
+  return posix(path.normalize(link.kind === 'wiki' || target.startsWith('/') ? target.replace(/^\/+/, '') : path.join(path.dirname(file), target)));
 }
 
 function scan(root, {staleDays = 180, now = Date.now()} = {}) {
@@ -79,9 +85,7 @@ function scan(root, {staleDays = 180, now = Date.now()} = {}) {
     // nobody maintains them, so they are neither old nor unlinked.
     if (/^<!--[^\n]*generated[^\n]*-->/.test(text)) generated.add(file);
     for (const link of links(text)) {
-      let target;
-      try { target = decodeURIComponent(link.target); } catch { target = link.target; }
-      const rel = posix(path.normalize(link.kind === 'wiki' || target.startsWith('/') ? target.replace(/^\/+/, '') : path.join(path.dirname(file), target)));
+      const rel = resolvedLink(link, file);
       if (rel.startsWith('..') || !exists(rel)) broken.push({page: file, link: link.text});
       else linked.add(names.has(rel) ? rel : `${rel}.md`);
     }

@@ -148,14 +148,13 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   if (!Number.isFinite(Date.parse(data.collectedAt)) || now.getTime() - Date.parse(data.collectedAt) > 3600000) out.push(`> ${t.stale}`, '');
   out.push(`## ${t.short}`, '', `- ${t.convs(traces.length)}`, `- ${t.runs(runs.length, failed.length)}`, '');
   out.push(`## ${t.bots}`, '', ...table([t.bot, t.conversations, t.tools, t.errors],
-    [...byBot].sort((a, b) => b[1].conversations - a[1].conversations).map(([name, r]) => [name, r.conversations, r.tools, r.errors])));
-  out.push(`## ${t.workflows}`, '', ...table([t.workflow, t.total, t.ok, t.pending, t.failed, t.other],
+    [...byBot].sort((a, b) => b[1].conversations - a[1].conversations).map(([name, r]) => [name, r.conversations, r.tools, r.errors])),
+    `## ${t.workflows}`, '', ...table([t.workflow, t.total, t.ok, t.pending, t.failed, t.other],
     [...byDag].sort((a, b) => b[1].total - a[1].total).map(([name, r]) => [name, r.total, r.succeeded, r.pending, r.failed, r.other])));
   if (failed.length) out.push(`## ${t.failures}`, '', ...failed.slice(0, 50).map(r => `- \`${cell(r.dag)}\` · ${cell(r.statusLabel)} · ${cell(r.startedAt)} · ${cell(r.id)}`), '');
   out.push(`## ${t.month(caps.month)}`, '', ...table([t.bot, t.turns, t.api, t.est, t.sub],
-    [...monthly].map(([name, r]) => [name, r.turns, usd(sum(r.api)), usd(sum(r.est)), usd(sum(r.sub))])));
-  out.push(`## ${t.caps}`, '');
-  if (caps.configured) out.push(...table([t.bot, t.spent, t.cap, '%', ''], caps.bots.map(r => [r.bot, usd(r.spentUsd), usd(r.capUsd), r.percent ?? '', `${t.state[r.state]}${r.incomplete && r.state === 'exceeded' ? `; ${t.state.unknown}` : ''}`])));
+    [...monthly].map(([name, r]) => [name, r.turns, usd(sum(r.api)), usd(sum(r.est)), usd(sum(r.sub))])), `## ${t.caps}`, '');
+  if (caps.configured) out.push(...table([t.bot, t.spent, t.cap, '%', ''], caps.bots.map(r => [r.bot, usd(r.spentUsd), usd(r.capUsd), r.percent ?? '', `${t.state[r.state]}${r.incomplete && r.state === 'exceeded' ? '; ' + t.state.unknown : ''}`])));
   else out.push(t.noCaps, '');
   const notes = [t.semantics];
   if (caps.incomplete) notes.push(t.state.unknown);
