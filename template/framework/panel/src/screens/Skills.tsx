@@ -1,4 +1,4 @@
-// Third-party skills (D64, docs/third-party-skills.md): find a skill in the project's
+// Third-party skills (D73, docs/third-party-skills.md): find a skill in the project's
 // sources or in the public directory, read its SKILL.md, origin and license, install it
 // pinned to a commit, and confirm it after OpenMausBot's scan. Only a confirmed skill can
 // be switched on, per agent, in the agent's profile. Everything runs through the

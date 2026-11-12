@@ -73,7 +73,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const [soul, setSoul] = useState(initial.soul);
   const [uses, setUses] = useState(initial.uses);
   // Skills shipped by installed extensions (D54) and third-party skills a person confirmed
-  // (D64) are switched per bot; other skills of the team file stay read-only. An extension
+  // (D73) are switched per bot; other skills of the team file stay read-only. An extension
   // skill needs the project's MCP servers, which a bot only loads from the project root.
   const extSkills = useMemo(
     () => [

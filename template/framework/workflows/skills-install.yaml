@@ -1,10 +1,9 @@
-description: Panel skills-install (install, update, scan, confirm or remove one third-party skill, D64)
+description: Panel skills-install (install, update, scan, confirm or remove one third-party skill, D73)
 labels:
   - fyso=system
 type: graph
 max_active_runs: 1
 params:
-  - PLAN_ID: ""
   - PLAN_ID: ""
   - OP: ""
   - NAME: ""

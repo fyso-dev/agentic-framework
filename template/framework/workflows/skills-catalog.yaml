@@ -1,10 +1,9 @@
-description: Panel skills-catalog (search third-party skills, or read one before installing it, D64)
+description: Panel skills-catalog (search third-party skills, or read one before installing it, D73)
 labels:
   - fyso=system
 type: graph
 max_active_runs: 1
 params:
-  - OP: ""
   - OP: ""
   - QUERY: ""
   - NAME: ""

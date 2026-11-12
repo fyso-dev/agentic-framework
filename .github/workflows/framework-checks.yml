@@ -1,0 +1,27 @@
+name: Framework checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  framework:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24.15.0
+          cache: npm
+          cache-dependency-path: template/framework/panel/package-lock.json
+      - run: npm ci --prefix template/framework/panel
+      - run: npm run build --prefix template/framework/panel
+      - name: Run affected framework regressions
+        env:
+          NODE_PATH: ${{ github.workspace }}/template/framework/panel/node_modules
+        run: |
+          export PATH="$PWD/template/framework/panel/node_modules/.bin:$PATH"
+          node --test tests/skills.test.cjs tests/fyso-mcp.test.cjs tests/extensions.test.cjs tests/marketplace.test.cjs tests/bot-form-connectors.test.cjs tests/panel-bot-removal.test.cjs tests/bot-architect.test.cjs tests/team-models.test.cjs tests/bot-roster.test.cjs
+      - run: bash scripts/check-paths.sh
+      - run: git diff --check

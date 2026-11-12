@@ -1,4 +1,4 @@
-// Third-party skills (D64) against throwaway local git repos, a fake public directory
+// Third-party skills (D73) against throwaway local git repos, a fake public directory
 // and a fake OpenMausBot. Nothing here reaches the network or a real service.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');

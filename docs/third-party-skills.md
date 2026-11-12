@@ -2,7 +2,7 @@
 
 Owners can find a skill in Apps → Skills, read its origin, exact commit, license and SKILL.md, install it, review the native scan and explicitly confirm it. Confirmation makes it eligible for each agent's existing Skills toggle; save the agent and use Review and apply. Installation alone never selects a bot.
 
-Evidence and alternatives: [registry spike](adr/spikes/skills-registry.md). D73 is the next free decision in this checkout; renumber it if a concurrent branch reserves it.
+Evidence and alternatives: [registry spike](adr/spikes/skills-registry.md). D73 is reserved for skills; D66–D72 belong to the separate owner-extension delivery.
 
 ## Discovery and ownership
 
@@ -49,7 +49,7 @@ MCP: `fyso_skill_search` discovers or reads untrusted text; `fyso_skill_plan` pr
 
 ## Verification and limits
 
-See [delivery evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for commands and observed results. The pure fixture tests use disposable git repositories and fake directory/OMB servers; they do not establish upstream behavior. The spike's isolated native tests establish the actual scan protocol. Browser smoke uses the built-in mock backend and proves panel transitions only. No claim of live authenticated panel-to-Dagu delivery, provider login, skill execution or production acceptance follows from those checks.
+See [delivery evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for commands and observed results. The pure fixture tests use disposable git repositories and fake directory/OMB servers; they do not establish upstream behavior. The spike's isolated native tests establish the actual scan protocol. Browser smoke uses the built-in mock backend and proves panel transitions only. The later integration acceptance verifies authenticated panel-to-Dagu delivery and native per-agent apply on a full disposable stack with doctor green. No claim of model-level skill execution or production acceptance follows.
 
 ## Change inventory
 

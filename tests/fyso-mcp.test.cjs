@@ -390,7 +390,9 @@ test('the scope server gives a bot Dagu read and execute for its scope only, wit
   const call=(method,params)=>new Promise(r=>{const id=++seq;waiting.set(id,r);child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
   const tool=async(name,args)=>(await call('tools/call',{name,arguments:args})).result;
   try {
-    const init=(await call('initialize',{protocolVersion:'2025-06-18'})).result;
+    const handshake=await call('initialize',{protocolVersion:'2025-06-18'});
+    assert.equal(handshake.error,undefined,JSON.stringify(handshake.error));
+    const init=handshake.result;
     assert.equal(init.serverInfo.name,'fyso-dagu-ventas');
     assert.deepEqual((await call('tools/list')).result.tools.map(t=>t.name),['dagu_read','dagu_execute']);
     assert.equal((await call('tools/call',{name:'fyso_status',arguments:{}})).error.code,-32602);

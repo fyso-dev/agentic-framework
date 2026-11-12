@@ -2,7 +2,7 @@
 
 ## Overview
 
-The git-based lifecycle and pinned OpenMausBot scan were exercised on a disposable generated project. The panel flow was exercised separately with its mock backend. Full-stack doctor failed for fixture prerequisites; this is not a production or authenticated panel-to-Dagu acceptance claim.
+The git-based lifecycle and pinned OpenMausBot scan were exercised on a disposable generated project. The panel flow was exercised separately with its mock backend. The initial standalone fixture lacked prerequisites. The 2026-11-12 integration acceptance below supersedes that limitation: full-stack doctor and the authenticated panel → Dagu → native OMB flow passed. This is local acceptance, not production acceptance.
 
 ## Contents
 
@@ -39,8 +39,8 @@ flowchart TD
 | Remove | Explicit disable first, then folder/provenance removed | ✅ | Native lifecycle and unit tests |
 | Invalid scan attestation | No review allowed; probe cleaned up | ✅ | Focused unit test |
 | Panel review flow | Confirmation disabled until acknowledgement | ✅ | Executable mocked browser and screenshots |
-| Full authenticated panel/Dagu flow | Real workflow enqueue and gateway login | ⚠️ | Not exercised; browser uses mock backend |
-| Full-stack doctor | All checks green | ⚠️ | Failed: incomplete fixture stack/no logged-in engine |
+| Full authenticated panel/Dagu flow | Real workflow enqueue and gateway login | ✅ | [Integration acceptance](#integration-acceptance-2026-11-12) |
+| Full-stack doctor | All checks green | ✅ | [Integration acceptance](#integration-acceptance-2026-11-12) |
 | Actual third-party skill execution | Bot can use its behavior and resources | ⚠️ | No bot turn; OMB imports SKILL.md only |
 
 ## Visual evidence
@@ -111,7 +111,7 @@ The spike also directly posted a clean fixture and a shell-pipe fixture to nativ
 ## Scope and limitations
 
 - Real scan/native team lifecycle and mock browser are separate evidence surfaces.
-- No live gateway login, Dagu workflow execution, remote MCP client approval UI, Linux/Windows or third-party skill behavior was tested.
+- Remote MCP client approval UI, Linux/Windows and actual model interpretation of third-party skill behavior remain untested. Local gateway login and Dagu workflow execution passed in the later integration acceptance.
 - OMB's native scan covers SKILL.md only; supporting-file functionality is not supplied by this feature.
 - The unversioned anonymous directory endpoint can change; git discovery remains usable and errors are shown.
 - Post-upgrade runtime synchronization requires explicit bot apply. Existing native copies persist until then.
@@ -120,3 +120,34 @@ The spike also directly posted a clean fixture and a shell-pipe fixture to nativ
 ## Handoff signals
 
 D73 is provisional pending concurrent-branch decision numbering. No framework commits, pushes, PRs or branch switches were made. The OMB fixture was stopped and every port in 31460–31469 was verified bindable afterward. Test servers and browsers were closed. Temporary fixture/evidence files remain for review; no task-started service remains running.
+
+## Integration acceptance (2026-11-12)
+
+After merging origin/main, a freshly generated disposable project ran the complete process-compose stack on its own ports 32600–32609. `mise run setup`, startup and `mise run doctor` passed using a separately generated age key. The coding-engine status checks used the host's existing native logins; no provider turn was made.
+
+Copier's local absolute source was normalized to the repository HTTPS URL and committed in the fixture before snapshots. Because the encryption key is outside the normal HOME location, fixture workflows explicitly forward `FYSO_COMPOSIO_AGE_KEY_FILE` as `MISE_SOPS_AGE_KEY_FILE`. This fixture-only forwarding is not part of the shipped workflows.
+
+The opt-in executable `tests/skills-live.cjs` uses real Chrome, native Tinyauth login and the gateway. It searches `anthropics/skills`, reads and installs `brand-guidelines` at the displayed immutable commit, waits for the native scan, asserts Confirm is disabled until acknowledgement, confirms, selects the skill on Workflow Architect, saves, reviews and applies. Finally it reads this instance's native skill inventory and asserts `enabled:true`. No mocked responses, provider messages or third-party instructions are executed. Observed Dagu enqueue, run and output requests returned 200; no page errors were observed.
+
+```sh
+FYSO_ACCEPT_DISPOSABLE=1 FYSO_ACCEPT_PROJECT="$DISPOSABLE_PROJECT" \
+  FYSO_ACCEPT_LOG_DIR="$PRIVATE_EVIDENCE_DIR" NODE_PATH="$PLAYWRIGHT_MODULE_DIR" \
+  node tests/skills-live.cjs
+```
+
+Preconditions: an empty skills inventory, a running disposable generated project, the operator's fixture age-key environment, native Chrome and an existing Playwright installation. This test deliberately does not auto-discover or start a project. The operator must stop the stack afterward. Result: login, real install, scan/review gate, per-agent apply and native enabled state **PASS**. Build/typecheck and all 57 affected Node regressions also passed without skips, using Node 24.15.0 and YAML 2.8.1 directly rather than global shims.
+
+<details><summary>Real native scan and acknowledgement</summary>
+
+Authenticated local Chrome after Dagu installation: native scan has no warnings and Confirm is disabled until the person acknowledges reading the source.
+<p align="center"><img src="./live-awaiting-review.png" alt="Real skill awaiting explicit acknowledgement" width="50%"></p>
+</details>
+
+<details><summary>Real confirmation and native apply</summary>
+
+The installed skill becomes Confirmed. A separate per-agent switch and Review and apply then complete the native update; the executable check reads OpenMausBot to verify the selected agent has the skill enabled.
+<p align="center"><img src="./live-confirmed.png" alt="Real installed skill confirmed" width="50%"></p>
+<p align="center"><img src="./live-agent-enabled.png" alt="Real successful application of the selected skill" width="50%"></p>
+</details>
+
+The first browser runs exposed fixture/source-index and selector issues; those were corrected before the clean executable pass. Earlier failed attempts remain diagnostic history, not acceptance. Actual skill execution, supporting-resource loading, cross-platform behavior and provider quality remain outside this validation. A final doctor and complete stack cleanup are recorded by the delivery operator.
