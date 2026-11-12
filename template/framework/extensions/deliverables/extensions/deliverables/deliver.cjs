@@ -98,6 +98,17 @@ const TOOLS = {
 };
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
+function callTool(tool, args) {
+  try {
+    for (const [key, value] of Object.entries(args)) {
+      if (!tool.inputSchema.properties[key]) throw new Error(`unknown argument: ${key}`);
+      if (typeof value !== 'string') throw new Error(`${key} must be a string`);
+    }
+    const result = tool.run(args);
+    return {content: [{type: 'text', text: JSON.stringify(result, null, 2)}], structuredContent: result};
+  } catch (error) { return {isError: true, content: [{type: 'text', text: error.message}]}; }
+}
+
 function handle({id, method, params = {}}) {
   switch (method) {
     case 'initialize':
@@ -110,15 +121,7 @@ function handle({id, method, params = {}}) {
     case 'tools/call': {
       const tool = TOOLS[params.name];
       if (!tool) throw Object.assign(new Error(`unknown tool: ${params.name}`), {code: -32602});
-      try {
-        const args = params.arguments || {};
-        for (const [key, value] of Object.entries(args)) {
-          if (!tool.inputSchema.properties[key]) throw new Error(`unknown argument: ${key}`);
-          if (typeof value !== 'string') throw new Error(`${key} must be a string`);
-        }
-        const result = tool.run(args);
-        return {content: [{type: 'text', text: JSON.stringify(result, null, 2)}], structuredContent: result};
-      } catch (error) { return {isError: true, content: [{type: 'text', text: error.message}]}; }
+      return callTool(tool, params.arguments || {});
     }
     default:
       if (id === undefined) return undefined;

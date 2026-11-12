@@ -8,10 +8,10 @@ sheet_ok='^[A-Za-z0-9][A-Za-z0-9._ -]{0,30}$'
 [[ "${NAME:-}" =~ $name_ok ]] || fail "NAME: letters, digits, spaces, dots, dashes and underscores, without extension"
 [[ "${SHEET:-}" =~ $sheet_ok ]] || fail "SHEET: up to 31 letters, digits, spaces, dots, dashes and underscores"
 source=${SOURCE:-}
-case "$source" in ""|/*|*..*) fail "SOURCE: a path relative to the project, without '..'" ;; esac
+case "$source" in ""|/*|*..*) fail "SOURCE: a path relative to the project, without '..'" ;; *) ;; esac
 case "$source" in *.csv|*.json|*.jsonl) ;; *) fail "SOURCE: a .csv, .json or .jsonl file" ;; esac
 cd "${FYSO_ROOT:?}"
-[ -f "$source" ] && [ ! -L "$source" ] || fail "SOURCE not found: $source"
+[[ -f "$source" && ! -L "$source" ]] || fail "SOURCE not found: $source"
 # Resolve parent symlinks as well as the file itself before Dagu reads the input.
 SOURCE="$source" node -e '
   const fs = require("node:fs"), path = require("node:path");

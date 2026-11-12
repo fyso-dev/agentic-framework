@@ -12,6 +12,6 @@ node -e '
   spend({usage: {groups: []}}, config);
 '
 for name in digest spend-cap; do
-  test -f "project/workflows/ext-ops-assistant-$name.yaml" \
+  [[ -f "project/workflows/ext-ops-assistant-$name.yaml" ]] \
     || { echo "project/workflows/ext-ops-assistant-$name.yaml is missing" >&2; exit 1; }
 done

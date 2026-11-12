@@ -26,7 +26,7 @@ function pages(wiki) {
     }
   }
   visit(wiki);
-  return found.sort();
+  return found.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
 }
 
 // Seconds since epoch of the last commit that touched each page; file time when git has none.
@@ -45,8 +45,12 @@ function changedAt(root, wiki, files) {
       }
     }
   } catch {}
-  for (const file of files) if (!times.has(file)) times.set(file, Math.floor(fs.statSync(path.join(wiki, file)).mtimeMs / 1000));
+  fillMissingTimes(times, wiki, files);
   return times;
+}
+
+function fillMissingTimes(times, wiki, files) {
+  for (const file of files) if (!times.has(file)) times.set(file, Math.floor(fs.statSync(path.join(wiki, file)).mtimeMs / 1000));
 }
 
 function links(text) {
@@ -144,6 +148,20 @@ function report(findings, proposals, lang, date) {
   return out.join('\n');
 }
 
+function writeReport(ctx, findings, proposals, now) {
+  const date = now.toISOString().slice(0, 10), folder = path.join(ctx.wiki, REPORTS[ctx.lang]);
+  fs.mkdirSync(folder, {recursive: true});
+  for (let n = 1; n <= 50; n++) {
+    const name = n === 1 ? `${date}.md` : `${date} (${n}).md`;
+    try {
+      // wx: an existing page is never replaced.
+      fs.writeFileSync(path.join(folder, name), report(findings, proposals, ctx.lang, date), {flag: 'wx'});
+      return `${REPORTS[ctx.lang]}/${name.slice(0, -3)}`;
+    } catch (error) { if (error.code !== 'EEXIST') throw error; }
+  }
+  throw new Error('could not find a free report page name; work is retained');
+}
+
 function publish(env = process.env, now = new Date()) {
   const ctx = context(env);
   if (!ctx.work) throw new Error('publish runs inside the workflow (no run id)');
@@ -156,17 +174,7 @@ function publish(env = process.env, now = new Date()) {
   if (/^No proposals\.?\s*$/i.test(proposals.trim())) proposals = '';
   const result = {pages: findings.pages, broken: findings.broken.length, stale: findings.stale.length, orphans: findings.orphans.length, proposals: !!proposals.trim(), report: null};
   if (result.broken || result.stale || result.orphans || result.proposals) {
-    const date = now.toISOString().slice(0, 10), folder = path.join(ctx.wiki, REPORTS[ctx.lang]);
-    fs.mkdirSync(folder, {recursive: true});
-    for (let n = 1; n <= 50 && !result.report; n++) {
-      const name = n === 1 ? `${date}.md` : `${date} (${n}).md`;
-      try {
-        // wx: an existing page is never replaced.
-        fs.writeFileSync(path.join(folder, name), report(findings, proposals, ctx.lang, date), {flag: 'wx'});
-        result.report = `${REPORTS[ctx.lang]}/${name.slice(0, -3)}`;
-      } catch (error) { if (error.code !== 'EEXIST') throw error; }
-    }
-    if (!result.report) throw new Error('could not find a free report page name; work is retained');
+    result.report = writeReport(ctx, findings, proposals, now);
   }
   fs.rmSync(ctx.work, {recursive: true, force: true});
   return result;

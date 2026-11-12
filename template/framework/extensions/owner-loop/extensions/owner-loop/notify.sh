@@ -3,9 +3,9 @@
 # OpenMausBot's own `send`. MESSAGE and BOT arrive as env vars, never on a shell line.
 set -euo pipefail
 fail() { echo "error: $*" >&2; exit 1; }
-[ -n "${MESSAGE:-}" ] || fail "MESSAGE is empty"
-[ "${#MESSAGE}" -le 2000 ] || fail "MESSAGE is longer than 2000 characters"
-[ -n "${BOT:-}" ] || fail "BOT is empty"
+[[ -n "${MESSAGE:-}" ]] || fail "MESSAGE is empty"
+[[ "${#MESSAGE}" -le 2000 ]] || fail "MESSAGE is longer than 2000 characters"
+[[ -n "${BOT:-}" ]] || fail "BOT is empty"
 [[ "$BOT" != -* && ! "$BOT" =~ [[:cntrl:]] ]] || fail "BOT must be a name or id, without control characters"
 # Always this project's server: without a port the CLI finds the desktop app on 8799.
 [[ "${FYSO_OMB_PORT:-}" =~ ^[0-9]+$ ]] || fail "FYSO_OMB_PORT is not set"

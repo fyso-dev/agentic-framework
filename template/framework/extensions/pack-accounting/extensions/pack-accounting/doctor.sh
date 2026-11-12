@@ -14,4 +14,4 @@ node framework/scripts/render-team.cjs extensions/pack-accounting/team.yaml | no
     }
   });
 '
-test -f extensions/pack-accounting/souls/rules.md || { echo "souls/rules.md is missing" >&2; exit 1; }
+[[ -f extensions/pack-accounting/souls/rules.md ]] || { echo "souls/rules.md is missing" >&2; exit 1; }

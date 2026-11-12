@@ -102,6 +102,20 @@ const TEXT = {
     semantics: 'Amounts are what the tools report, not an invoice. The subscription equivalent is not money charged: it is what the same use would have cost through the API.', alerts: 'Active alerts', source: s => `Source unavailable: ${s}.`},
 };
 
+function summarizeRuns(runs) {
+  const byDag = new Map();
+  for (const run of runs) {
+    const row = byDag.get(run.dag) || {total: 0, succeeded: 0, pending: 0, other: 0, failed: 0};
+    row.total++;
+    if (run.statusLabel === 'succeeded') row.succeeded++;
+    else if (FAILED.has(run.statusLabel)) row.failed++;
+    else if (['running', 'waiting'].includes(run.statusLabel)) row.pending++;
+    else row.other++;
+    byDag.set(run.dag, row);
+  }
+  return byDag;
+}
+
 function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   const t = TEXT[lang], usd = v => num(v) === null ? t.unknown : `$${v.toFixed(2)}`;
   const cell = value => String(value ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ');
@@ -115,16 +129,7 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
     row.conversations++; row.tools += trace.tools || 0; row.errors += trace.errors || 0;
     byBot.set(bot.name, row);
   }
-  const byDag = new Map();
-  for (const run of runs) {
-    const row = byDag.get(run.dag) || {total: 0, succeeded: 0, pending: 0, other: 0, failed: 0};
-    row.total++;
-    if (run.statusLabel === 'succeeded') row.succeeded++;
-    else if (FAILED.has(run.statusLabel)) row.failed++;
-    else if (['running', 'waiting'].includes(run.statusLabel)) row.pending++;
-    else row.other++;
-    byDag.set(run.dag, row);
-  }
+  const byDag = summarizeRuns(runs);
   const caps = spend(data, config, 0.8, now), monthly = new Map();
   for (const group of data.usage?.groups || []) {
     const row = monthly.get(group.bot) || {turns: 0, api: [], est: [], sub: []};

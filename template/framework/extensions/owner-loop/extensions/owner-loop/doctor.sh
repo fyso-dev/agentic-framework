@@ -12,6 +12,6 @@ case "$schema" in
 esac
 cd "${FYSO_ROOT:?}"
 for name in ask notify; do
-  test -f "project/workflows/ext-owner-loop-$name.yaml" \
+  [[ -f "project/workflows/ext-owner-loop-$name.yaml" ]] \
     || { echo "project/workflows/ext-owner-loop-$name.yaml is missing" >&2; exit 1; }
 done

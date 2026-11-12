@@ -4,7 +4,7 @@ set -euo pipefail
 command -v node >/dev/null || { echo "node missing: run mise install" >&2; exit 1; }
 dir="${FYSO_DATA:?}/ext/deliverables/files"
 mkdir -p "$dir"
-test -w "$dir" || { echo "$dir is not writable" >&2; exit 1; }
+[[ -w "$dir" ]] || { echo "$dir is not writable" >&2; exit 1; }
 cd "${FYSO_ROOT:?}"
 node extensions/deliverables/deliver.cjs list >/dev/null
 # When the gateway runs, an unauthenticated request must not get the listing.
