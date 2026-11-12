@@ -260,3 +260,7 @@ Owner choices before adoption: schedules and timezone, whether scheduled wiki AI
 may read business pages, per-bot thresholds/basis, notification destination and
 accountant approval of the sample. These do not block installing the independent
 bundles with their documented defaults.
+
+### Final integration follow-up
+
+The ops doctor validates settings using a complete current synthetic export, matching the shared freshness and integrity checks. A dedicated executable regression verifies success with defaults and rejection of invalid caps. The final generated-stack doctor, authenticated HTTP/human loop and rendered page are recorded in the [integration evidence](../artifacts/delivery-evidence/owner-extensions/README.md); that local acceptance supersedes the earlier browser-rendering limitation. Provider, AI-quality and cross-platform limits remain.

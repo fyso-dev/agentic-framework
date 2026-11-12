@@ -471,3 +471,16 @@ test('file and wiki inputs cannot follow a symlink out of the project', () => pr
     assert.match(check.stderr, /SOURCE resolves outside/);
   } finally {fs.rmSync(outside, {recursive: true, force: true});}
 }, ['knowledge-skills', 'office-docs']));
+
+
+test('ops doctor validates current empty export and rejects invalid cap configuration', () => project(({put, run}) => {
+  put('project/workflows/ext-ops-assistant-digest.yaml', 'steps: []');
+  put('project/workflows/ext-ops-assistant-spend-cap.yaml', 'steps: []');
+  const check = () => run(['bash', 'extensions/ops-assistant/doctor.sh']);
+  const fresh = check();
+  assert.equal(fresh.status, 0, fresh.stderr);
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Support: -1}}));
+  const invalid = check();
+  assert.notEqual(invalid.status, 0);
+  assert.match(invalid.stderr, /botMonthlyUsd must map/);
+}, ['ops-assistant']));
