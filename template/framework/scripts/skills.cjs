@@ -22,11 +22,14 @@ const git = (args, opts = {}) => execFileSync('git', args, {encoding:'utf8', std
   env:{...process.env, GIT_TERMINAL_PROMPT:'0', GIT_CONFIG_COUNT:'2', GIT_CONFIG_KEY_0:'credential.helper', GIT_CONFIG_VALUE_0:'', GIT_CONFIG_KEY_1:'core.hooksPath', GIT_CONFIG_VALUE_1:'/dev/null'}, ...opts});
 const message = e => String(e.stderr || e.message || e).trim().split('\n').pop();
 const sha256 = text => crypto.createHash('sha256').update(text).digest('hex');
-const clean = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁠-⁤﻿]+/g, ' ').trim().slice(0, max);
+const clean = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]+/g, ' ').trim().slice(0, max);
 const slug = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 const validName = name => typeof name === 'string' && name.length <= 64 && NAME.test(name);
-const requireName = name => { if (!validName(name)) throw new Error('expected the name of an installed skill'); return name; };
+const requireName = name => {
+  if (!validName(name)) throw new Error('expected the name of an installed skill');
+  return name;
+};
 
 // ── Sources ────────────────────────────────────────────────────────────────────────
 
