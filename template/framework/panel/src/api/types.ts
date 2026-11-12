@@ -70,11 +70,12 @@ export type MarketplaceEntry = {
   version: string | null;
   update: boolean;
   error?: string;
+  errorCode?: "githubAccess";
 };
 
 export type Marketplace = {
   collectedAt: string;
-  catalogs: { source: string; name: string; error?: string }[];
+  catalogs: { source: string; name: string; error?: string; errorCode?: "githubAccess" }[];
   extensions: MarketplaceEntry[];
 };
 

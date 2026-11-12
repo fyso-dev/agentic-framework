@@ -6,12 +6,20 @@ const os = require('node:os');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {read, glob, validId} = require('./extensions.cjs');
+const {gitEnv} = require('./github-auth.cjs');
 
 const OFFICIAL = 'gh:fyso-dev/fyso-extensions';
 const gitUrl = src => src.replace(/^gh:([^/]+\/[^/@]+?)(\.git)?$/, 'https://github.com/$1.git');
 const git = (args, opts = {}) => execFileSync('git', args, {encoding:'utf8', stdio:['ignore','pipe','pipe'], timeout:60_000,
-  env:{...process.env, GIT_TERMINAL_PROMPT:'0'}, ...opts});
+  env:gitEnv(), ...opts});
 const message = e => String(e.stderr || e.message || e).trim().split('\n').pop();
+function failure(e,src) {
+  if (/^(gh:|https:\/\/github\.com\/|git@github\.com:)/.test(src) && /could not read (Username|Password)|authentication failed|repository not found|terminal prompts disabled|access denied|permission denied|403/i.test(message(e)))
+    return {errorCode:'githubAccess',error:'GitHub repository access is unavailable on this host.'};
+  let error=message(e).replace(/(https?:\/\/)[^/@\s]+@/g,'$1<redacted>@');
+  if(process.env.FYSO_GITHUB_TOKEN)error=error.split(process.env.FYSO_GITHUB_TOKEN).join('<redacted>');
+  return {error};
+}
 
 /** `v1.2.0` → [1,2,0]; null for tags that are not versions. */
 function version(tag) {
@@ -71,14 +79,14 @@ function collect() {
   const local = installed(), seen = new Set(), catalogs = [], extensions = [];
   for (const source of sources()) {
     let catalog;
-    try { catalog = loadCatalog(source); } catch (e) { catalogs.push({source, name:source, error:message(e)}); continue; }
+    try { catalog = loadCatalog(source); } catch (e) { catalogs.push({source, name:source, ...failure(e,source)}); continue; }
     catalogs.push({source, name:catalog.name});
     for (const e of catalog.entries) {
       if (seen.has(e.id)) continue; // the first catalog that lists an id wins
       seen.add(e.id);
       const name = text(e.name || e.id), description = text(e.description);
       let latest = null, error;
-      try { latest = latestTag(e.src); } catch (err) { error = message(err); }
+      try { latest = latestTag(e.src); } catch (err) { error = failure(err,e.src); }
       const current = local[e.id]?.version ?? null;
       extensions.push({id:e.id, src:e.src, catalog:catalog.name,
         name:name.text, ...(name.i18n && {name_i18n:name.i18n}),
@@ -87,7 +95,7 @@ function collect() {
         ...(typeof e.homepage === 'string' && {homepage:e.homepage}),
         latest, installed:!!local[e.id], version:current,
         update:!!(local[e.id] && latest && version(current) && compare(latest, current) > 0),
-        ...(error && {error})});
+        ...(error || {})});
     }
   }
   return {collectedAt:new Date().toISOString(), catalogs, extensions};

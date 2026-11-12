@@ -217,3 +217,7 @@ run = "node framework/scripts/skills.cjs remove"
 [tasks."ext:remove"]
 description = "Remove project extensions"
 run = "framework/scripts/ext.sh remove"
+
+[tasks."github:check"]
+description = "Check noninteractive GitHub read access for this project (optional repository argument)"
+run = "node framework/scripts/github-auth.cjs check"

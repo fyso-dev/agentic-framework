@@ -9,6 +9,9 @@
 # is committed there as one commit and fast-forwarded into the project.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
+# Absolute: both scripts run Copier from a clean worktree of an older commit,
+# which may not contain the GitHub credential helper yet.
+auth="$(cd "$(dirname "$0")" && pwd)/github-auth.cjs"
 ref=${REF:-}; src=${SRC:-}
 [[ -z $ref || $ref =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || fail "REF must be a tag, branch or commit"
 answers=.copier-answers.yml
@@ -43,7 +46,7 @@ if [[ $src != "$origin" ]]; then
   answer _src_path "$answers" "$src"
   git commit -q -m "tmp: template source for this update" -- "$answers" >&2
 fi
-uvx --from copier==9.19.1 copier update --trust --defaults --skip-answered ${ref:+--vcs-ref "$ref"} >&2
+node "$auth" -- uvx --from copier==9.19.1 copier update --trust --defaults --skip-answered ${ref:+--vcs-ref "$ref"} >&2
 if [[ $src != "$origin" ]]; then
   answer _src_path "$answers" "$origin"
 fi

@@ -530,6 +530,8 @@
     "updating": "Actualizando…",
     "installed": "Instalada {{version}}",
     "noTags": "Sin versiones publicadas",
+    "versionsUnavailable": "No se pudieron consultar las versiones",
+    "githubAccess": "El equipo de este proyecto no tiene acceso al repositorio de GitHub. Revisa su cuenta o configura una credencial de lectura con permiso para ese repositorio.",
     "done": "{{id}} {{version}} quedó instalada y guardada en un commit ({{commit}}). Si necesita claves, cárgalas en su tarjeta, en Instaladas.",
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commit, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
