@@ -118,8 +118,25 @@ function pick(skills, wanted, src) {
 
 // ── Record ─────────────────────────────────────────────────────────────────────────
 
+function checkMutationPath(target, directory) {
+    let current = path.resolve('.');
+    for (const segment of target.split(path.sep)) {
+      current = path.join(current, segment);
+      let stat;
+      try { stat = fs.lstatSync(current); } catch (e) { if (e.code === 'ENOENT') break; throw e; }
+      const last = current === path.resolve(target);
+      if (stat.isSymbolicLink() || (!last || directory ? !stat.isDirectory() : !stat.isFile()))
+        throw Error(`unsafe skill mutation path: ${current}`);
+    }
+}
+function mutationPaths(name) {
+  checkMutationPath(DIR, true);
+  if (name) checkMutationPath(path.join(DIR, requireName(name)), true);
+  checkMutationPath(LOCK, false);
+}
 const readLock = () => fs.existsSync(LOCK) ? JSON.parse(fs.readFileSync(LOCK, 'utf8')) : {};
 function writeLock(lock) {
+  mutationPaths();
   fs.mkdirSync(path.dirname(LOCK), {recursive:true});
   fs.writeFileSync(LOCK, JSON.stringify(Object.fromEntries(Object.entries(lock).sort(([a], [b]) => a.localeCompare(b))), null, 2) + '\n');
 }
@@ -340,6 +357,7 @@ async function ombScan(name, description, text) {
 }
 
 async function scan(name, lock = readLock(), {quiet = false} = {}) {
+  mutationPaths(name);
   const entry = lock[requireName(name)];
   if (!entry) throw Error(`${name} is not installed`);
   if (currentHash(name) !== entry.sha256) throw Error(`${name} was changed after it was installed; run mise run skills:update ${name}`);
@@ -413,7 +431,7 @@ function copySkill(from, to, skill) {
     const leaks = spawnSync('gitleaks', ['dir', to, '--no-banner', '--redact'], {encoding:'utf8'});
     if (leaks.error) throw Error('gitleaks is not available (mise install)');
     if (leaks.status) throw Error('the skill contains something that looks like a secret (gitleaks); it was not installed');
-  } catch (e) { fs.rmSync(to, {recursive:true, force:true}); throw e; }
+  } catch (e) { mutationPaths(); checkMutationPath(to, true); fs.rmSync(to, {recursive:true, force:true}); throw e; }
   return files;
 }
 
@@ -430,6 +448,7 @@ const result = (op, name, change, extra = {}) => {
 };
 
 async function add(source, wanted, ref, reviewed) {
+  mutationPaths();
   if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
   // The source is saved in the record, which check-paths scans before every snapshot.
   if (path.isAbsolute(String(source)) || String(source).startsWith('~')) {
@@ -440,6 +459,7 @@ async function add(source, wanted, ref, reviewed) {
   const lock = readLock();
   const skill = resolve(source, wanted, ref, (found, folder) => {
     if (reviewed && reviewed !== found.sha256) throw Error('skill changed since preview; read it again');
+    mutationPaths(found.name);
     if (lock[found.name]) throw Error(`${found.name} is already installed (mise run skills:update ${found.name})`);
     if (fs.existsSync(path.join(DIR, found.name))) throw Error(`${DIR}/${found.name} already exists and is not a third-party skill`);
     return {...found, files:copySkill(folder, path.join(DIR, found.name), found)};
@@ -450,6 +470,7 @@ async function add(source, wanted, ref, reviewed) {
 }
 
 async function update(name, ref, reviewed) {
+  mutationPaths(name);
   if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
   const lock = readLock(), entry = lock[requireName(name)];
   if (!entry) throw Error(`${name} is not installed`);
@@ -464,9 +485,9 @@ async function update(name, ref, reviewed) {
     return {...next, files:copySkill(path.join(dir, found.path), staged, found)};
   });
   if (skill.commit === entry.commit && currentHash(name) === entry.sha256) {
-    fs.rmSync(staged, {recursive:true, force:true});
     return result('update', name, null, {changed:false, from:entry.commit, to:skill.commit});
   }
+  mutationPaths(name);
   fs.rmSync(path.join(DIR, name), {recursive:true, force:true});
   fs.renameSync(staged, path.join(DIR, name));
   lock[name] = record(skill, skill.files, entry);
@@ -474,10 +495,11 @@ async function update(name, ref, reviewed) {
   // New content is new to the scan and to the person; bots keep the confirmed copy until then.
   writeLock(lock[name].scan?.sha256 === skill.sha256 ? lock : await scan(name, lock, {quiet:true}));
   return result('update', name, commit(`skills: update ${name} ${skill.commit.slice(0, 12)}`, name), {changed:true, from:entry.commit, to:skill.commit});
-  } finally { fs.rmSync(temp, {recursive:true, force:true}); }
+  } finally { mutationPaths(); checkMutationPath(temp, true); fs.rmSync(temp, {recursive:true, force:true}); }
 }
 
 function remove(name) {
+  mutationPaths(name);
   const lock = readLock();
   if (!lock[requireName(name)]) throw Error(`${name} is not installed`);
   const bots = teamUses(lock)[name];
@@ -495,6 +517,7 @@ async function rescan(name) {
 
 /** A person read the skill and its scan result, and accepts that exact content. */
 function confirm(name, reviewed) {
+  mutationPaths(name);
   const lock = readLock(), entry = lock[requireName(name)];
   if (!entry) throw Error(`${name} is not installed`);
   if (currentHash(name) !== entry.sha256) throw Error(`${name} was changed after it was installed; update it and review it again`);

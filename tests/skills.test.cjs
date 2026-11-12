@@ -270,3 +270,34 @@ test('failed native import never deletes a concurrent copy',()=>fixture(async({b
   assert.equal(omb.held.size,1);assert.equal(omb.calls.some(c=>c.startsWith('DELETE ')),false);
   assert.equal((await run(['confirm','greeter'])).status,1);
 }));
+
+
+test('mutations reject linked skill parents and preserve target and provenance',()=>fixture(async({base,root,json,run,omb})=>{
+  const {dir}=catalog(base);await json(['add',dir,'greeter']);
+  const parent=path.join(root,'project/bots/skills'), target=path.join(root,'outside-skills');
+  const lockFile=path.join(root,'project/bots/third-party-skills.json');
+  const before=fs.readFileSync(lockFile), original=fs.readFileSync(path.join(parent,'greeter/SKILL.md'));
+  fs.renameSync(parent,target);fs.symlinkSync(target,parent);
+  const calls=omb.calls.length;
+  for(const args of [['add',dir,'pdf-forms'],['update','greeter'],['remove','greeter'],['scan','greeter'],['confirm','greeter']]) {
+    const result=await run(args);assert.equal(result.status,1,args.join(' '));assert.match(result.stderr,/unsafe skill mutation path/);
+  }
+  assert.deepEqual(fs.readFileSync(lockFile),before);
+  assert.deepEqual(fs.readFileSync(path.join(target,'greeter/SKILL.md')),original);
+  assert.deepEqual(fs.readdirSync(target),['greeter']);assert.equal(omb.calls.length,calls);
+}));
+
+test('mutations reject linked installed directories and provenance',()=>fixture(async({base,root,json,run})=>{
+  const {dir}=catalog(base);await json(['add',dir,'greeter']);
+  const folder=path.join(root,'project/bots/skills/greeter'), target=path.join(root,'outside-skill');
+  const lockFile=path.join(root,'project/bots/third-party-skills.json'), before=fs.readFileSync(lockFile);
+  fs.renameSync(folder,target);fs.symlinkSync(target,folder);
+  for(const args of [['update','greeter'],['remove','greeter'],['scan','greeter'],['confirm','greeter']]) {
+    const result=await run(args);assert.equal(result.status,1);assert.match(result.stderr,/unsafe skill mutation path/);
+  }
+  assert.deepEqual(fs.readFileSync(lockFile),before);assert.ok(fs.existsSync(path.join(target,'SKILL.md')));
+  fs.unlinkSync(folder);fs.renameSync(target,folder);
+  const saved=path.join(root,'outside-lock');fs.renameSync(lockFile,saved);fs.symlinkSync(saved,lockFile);
+  const result=await run(['add',dir,'pdf-forms']);assert.equal(result.status,1);assert.match(result.stderr,/unsafe skill mutation path/);
+  assert.deepEqual(fs.readFileSync(saved),before);assert.equal(fs.existsSync(path.join(root,'project/bots/skills/pdf-forms')),false);
+}));
