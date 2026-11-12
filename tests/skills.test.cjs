@@ -179,7 +179,7 @@ test('an update needs a new confirmation; removal deletes the folder and the rec
   assert.equal(git(root,'log','-1','--format=%s'),'skills: remove greeter');
   assert.equal(git(root,'status','--porcelain','--','project/bots/skills','project/bots/third-party-skills.json'),'');
   // The switched-off entry that stays in team.yaml no longer breaks the team.
-  assert.equal(JSON.parse((await exec('render-team.cjs',['project/bots/team.yaml'])).stdout).bots[0].skills,undefined);
+  assert.deepEqual(JSON.parse((await exec('render-team.cjs',['project/bots/team.yaml'])).stdout).bots[0].skills,[]);
 }));
 
 test('unsafe content and unusable sources are refused; a missing scan blocks the confirmation',()=>fixture(async({base,root,run,json,lock})=>{
@@ -300,4 +300,29 @@ test('mutations reject linked installed directories and provenance',()=>fixture(
   const saved=path.join(root,'outside-lock');fs.renameSync(lockFile,saved);fs.symlinkSync(saved,lockFile);
   const result=await run(['add',dir,'pdf-forms']);assert.equal(result.status,1);assert.match(result.stderr,/unsafe skill mutation path/);
   assert.deepEqual(fs.readFileSync(saved),before);assert.equal(fs.existsSync(path.join(root,'project/bots/skills/pdf-forms')),false);
+}));
+
+
+test('removed disabled skills preserve explicit empty selection alongside defaults',()=>fixture(async({root,put,exec})=>{
+  put('default/SKILL.md',skillMd('default'));
+  put('project/bots/team.yaml',`version: 1\ndefaults:\n  skills:\n    - file: ${root}/default/SKILL.md\nbots:\n  - name: Explicit\n    skills:\n      - { file: skills/missing/SKILL.md, enabled: false }\n  - name: Inherited\n`);
+  const result=await exec('render-team.cjs',['project/bots/team.yaml']);assert.equal(result.status,0,result.stderr);
+  const team=JSON.parse(result.stdout);
+  assert.deepEqual(team.bots[0].skills,[]);assert.equal(team.bots[1].skills,undefined);
+  assert.equal((team.bots[0].skills ?? team.defaults.skills).length,0);
+  assert.equal((team.bots[1].skills ?? team.defaults.skills).length,1);
+}));
+
+test('update previews and applies the recorded path among duplicate names',()=>fixture(async({base,root,json,run})=>{
+  const {dir}=catalog(base);await json(['add',dir,'greeter']);
+  const revision=commit(dir,{'skills/greeter/SKILL.md':skillMd('greeter','Recorded update.'),'duplicate/SKILL.md':skillMd('greeter','Other content.')});
+  const ambiguous=await run(['catalog'],{SRC:dir,SKILL:'greeter'});assert.equal(ambiguous.status,1);assert.match(ambiguous.stderr,/has 2 skills/);
+  const preview=await json(['catalog'],{OP:'update',NAME:'greeter'});
+  assert.equal(preview.preview.path,'skills/greeter');assert.match(preview.preview.skillMd,/Recorded update/);assert.equal(preview.preview.commit,revision);
+  const applied=await json(['apply'],{OP:'apply-plan',PLAN_ID:preview.planId});
+  assert.equal(applied.skill.path,'skills/greeter');assert.equal(applied.skill.sha256,preview.preview.sha256);
+  assert.match(fs.readFileSync(path.join(root,'project/bots/skills/greeter/SKILL.md'),'utf8'),/Recorded update/);
+  commit(dir,{'skills/greeter/SKILL.md':skillMd('greeter','CLI update.')});
+  const cli=await json(['update','greeter']);assert.equal(cli.skill.path,'skills/greeter');
+  assert.match(fs.readFileSync(path.join(root,'project/bots/skills/greeter/SKILL.md'),'utf8'),/CLI update/);
 }));

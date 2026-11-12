@@ -273,15 +273,19 @@ async function search(query = '') {
 }
 
 /** Fetch one skill at a commit: what the person reads before installing it. */
-function resolve(source, wanted, ref, use) {
+function selectSkill(all, wanted, source, recordedPath) {
+  return (recordedPath !== undefined && all.find(s => s.path === recordedPath && s.name === wanted)) || pick(all, wanted, source);
+}
+
+function resolve(source, wanted, ref, use, recordedPath) {
   const parsed = parseSource(source);
   return withRepo(parsed.src, ref || parsed.ref, (dir, commit) => {
-    const skill = pick(findSkills(dir, parsed.dir || ''), wanted || parsed.skill, parsed.src);
+    const skill = selectSkill(findSkills(dir, parsed.dir || ''), wanted || parsed.skill, parsed.src, recordedPath);
     return use({...skill, src:parsed.src, commit, sha256:folderHash(path.join(dir, skill.path), skill.sharedLicense)}, path.join(dir, skill.path));
   });
 }
 
-function preview(source, wanted, ref) {
+function preview(source, wanted, ref, recordedPath) {
   return resolve(source, wanted, ref, (skill, folder) => {
     const files = [];
     (function walk(rel) {
@@ -293,7 +297,7 @@ function preview(source, wanted, ref) {
     const held = readLock()[skill.name];
     return {...publicSkill(skill), skillMd:skill.text, licenseText:skill.licenseText, files:files.sort(),
       installed:!!held, ...(held && {installedCommit:held.commit, installedSrc:held.src})};
-  });
+  }, recordedPath);
 }
 
 /** The installed copy of one skill: what the person confirms. */
@@ -376,7 +380,7 @@ function plan(mode, source, wanted, name, ref) {
   if (!['add', 'update'].includes(mode)) throw Error('plan mode must be add or update');
   const lock = readLock(), held = mode === 'update' ? lock[requireName(name)] : null;
   if (mode === 'update' && !held) throw Error('skill is not installed');
-  const detail = preview(held?.src || source, held ? name : wanted, ref);
+  const detail = preview(held?.src || source, held ? name : wanted, ref, held?.path);
   const planId = crypto.randomBytes(16).toString('hex');
   const folder = path.join(process.env.FYSO_DATA || '.data', 'skill-plans');
   fs.mkdirSync(folder, {recursive:true, mode:0o700});
@@ -478,7 +482,7 @@ async function update(name, ref, reviewed) {
   const temp = fs.mkdtempSync(path.join(DIR, `.${name}-`)), staged = path.join(temp, 'skill');
   try {
   const skill = withRepo(entry.src, ref, (dir, at) => {
-    const all = findSkills(dir), found = all.find(s => s.path === entry.path && s.name === name) || pick(all, name, entry.src);
+    const all = findSkills(dir), found = selectSkill(all, name, entry.src, entry.path);
     if (found.name !== name) throw Error(`${entry.src} no longer has a skill named ${name}`);
     const next = {...found, src:entry.src, commit:at, sha256:folderHash(path.join(dir, found.path), found.sharedLicense)};
     if (reviewed && reviewed !== next.sha256) throw Error('skill changed since preview; read it again');

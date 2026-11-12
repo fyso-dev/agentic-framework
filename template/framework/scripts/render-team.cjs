@@ -20,6 +20,5 @@ const {gate}=require('./skills.cjs');
 for(const bot of [team.defaults,...(Array.isArray(team.bots)?team.bots:[])]) {
   if(!Array.isArray(bot?.skills))continue;
   bot.skills=bot.skills.filter(entry=>entry?.enabled !== false || !entry.file || fs.existsSync(entry.file)).map(entry=>gate(entry,bot.name) ? entry : {...entry,enabled:false});
-  if(!bot.skills.length)delete bot.skills;
 }
 process.stdout.write(JSON.stringify(team));

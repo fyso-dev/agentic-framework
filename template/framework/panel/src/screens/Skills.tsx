@@ -32,7 +32,7 @@ function Reader({ reading, onClose }: { reading: Reading; onClose: () => void })
   const [initialReading] = useState(reading);
   // Read once when the reader opens (it is keyed by skill).
   useEffect(() => {
-    void start(initialReading.kind === "local" ? { NAME: initialReading.name } : { SRC: initialReading.hit.src, SKILL: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" });
+    void start(initialReading.kind === "local" ? { NAME: initialReading.name } : initialReading.update ? { OP: "update", NAME: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" } : { SRC: initialReading.hit.src, SKILL: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" });
   }, [start, initialReading]);
   const local = detail.output?.local, preview = detail.output?.preview;
   const shown = reading.kind === "local" ? local : preview;
