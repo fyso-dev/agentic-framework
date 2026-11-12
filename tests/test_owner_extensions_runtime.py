@@ -26,9 +26,12 @@ class OwnerRuntime(unittest.TestCase):
         cls.addClassCleanup(cls.fixture.doClassCleanups)
         cls.project = cls.fixture.project
         cls.env = {**os.environ, 'FYSO_ROOT': str(cls.project),
+                   'MISE_STATE_DIR': str(cls.project / '.data/mise-state'),
+                   'MISE_CACHE_DIR': str(cls.project / '.data/mise-cache'),
+                   'MISE_TRUSTED_CONFIG_PATHS': str(cls.project),
                    'FYSO_DATA': str(cls.project / '.data'),
                    'DAGU_HOME': str(cls.project / '.data/dagu-runtime'),
-                   'DAGU_ENV_PASSTHROUGH_PREFIXES': 'FYSO_',
+                   'DAGU_ENV_PASSTHROUGH_PREFIXES': 'FYSO_,MISE_',
                    'DAGU_DAGS_DIR': str(cls.project / 'project/workflows')}
 
     def run_ok(self, *args, **extra):
