@@ -353,19 +353,22 @@ async function ombScan(name, description, text) {
   const hash = sha256(text);
   for (const bot of (await api('/api/bots?messages=0')).bots || []) {
     const id = encodeURIComponent(bot.id);
-    const probe = `fyso-scan-${crypto.randomBytes(16).toString('hex')}`;
+    const probe = name;
+    const source = `fyso scan ${crypto.randomBytes(16).toString('hex')}`;
     const existing = (await api(`/api/bots/${id}/skills`)).skills || [];
-    if (existing.some(s => s.name === probe)) continue;
+    const held = existing.find(s => s.name === probe);
+    if (held?.sha256 === hash) return warnings(held.warnings);
+    if (held) continue;
     let installed;
     try {
       ({installed} = await api(`/api/bots/${id}/skill-template`, {method:'POST',
-        body:JSON.stringify({name:probe, description, source:'fyso scan', text, enabled:false, warnings:[]})}));
+        body:JSON.stringify({name:probe, description, source, text, enabled:false, warnings:[]})}));
       if (installed?.sha256 !== hash || installed.enabled !== false) throw new Error('OpenMausBot did not attest the disabled content');
       return warnings(installed.warnings);
     } finally {
       if (installed) {
         const held = ((await api(`/api/bots/${id}/skills`)).skills || []).find(s => s.name === probe);
-        if (!held || held.sha256 !== hash || held.enabled !== false ||
+        if (!held || held.source !== source || held.sha256 !== hash || held.enabled !== false ||
             (installed.importedAt && held.importedAt !== installed.importedAt)) throw new Error('OpenMausBot scan probe ownership changed');
         await api(`/api/bots/${id}/skills/${probe}`, {method:'DELETE'});
       }

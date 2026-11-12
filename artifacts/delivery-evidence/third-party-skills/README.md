@@ -151,3 +151,21 @@ The installed skill becomes Confirmed. A separate per-agent switch and Review an
 </details>
 
 The first browser runs exposed fixture/source-index and selector issues; those were corrected before the clean executable pass. Earlier failed attempts remain diagnostic history, not acceptance. Actual skill execution, supporting-resource loading, cross-platform behavior and provider quality remain outside this validation. A final doctor and complete stack cleanup are recorded by the delivery operator.
+
+## Combined release acceptance (2026-11-12)
+
+A new project generated from the combined owner-extension/skills tree installed all six bundles and ran its own complete stack on ports 32800–32819. Initial doctor passed. The first real browser run correctly refused confirmation because native OMB rejected the random probe name: import name must match SKILL.md frontmatter. That was a real adapter defect introduced by the earlier cleanup hardening, not an environment pass.
+
+The corrected adapter keeps the original name and bytes, adds a unique source marker, respects native duplicate refusal and verifies ownership before deleting its confirmed disabled copy. The fake native protocol now parses frontmatter, rejects mismatched names and duplicate imports, and tests changed source ownership. Existing tests reproduced the failure before the fix. All **90 combined Node regressions passed without skips** after the correction.
+
+The unchanged executable `tests/skills-live.cjs` was copied to the disposable runner so captures did not mutate a pipeline-owned checkout. With the corrected adapter deployed, it passed native login, search/read, pinned install via Dagu, native scan, disabled confirmation gate, human acknowledgement, per-agent save/review/apply and the direct native `enabled:true` assertion. The same project passed authenticated deliverables/header/private-slot assertions, native Dagu human wait/answer/resume, real Chrome delivery rendering and final `mise run doctor`. All commands returned zero, no page errors were observed, and `mise run down` stopped the fixture. Fixture-only age-key forwarding followed the earlier acceptance setup.
+
+<details><summary>Combined stack: review and native apply</summary>
+
+Real authenticated Chrome on the combined generated project. Confirmation is initially disabled, becomes available after acknowledgement, and native apply succeeds; the executable then verifies the selected bot's enabled state directly in OpenMausBot.
+<p align="center"><img src="./combined-awaiting-review.png" alt="Combined stack native scan and human review gate" width="50%"></p>
+<p align="center"><img src="./combined-confirmed.png" alt="Combined stack confirmed skill" width="50%"></p>
+<p align="center"><img src="./combined-agent-enabled.png" alt="Combined stack successful native per-agent apply" width="50%"></p>
+</details>
+
+No model turn or fetched third-party instructions were executed. Supporting-resource behavior, real notification/provider delivery, accounting correctness and cross-platform acceptance retain their documented limits. SonarCloud cancellation is a separate explicitly accepted delivery exception; it is not a successful analysis.

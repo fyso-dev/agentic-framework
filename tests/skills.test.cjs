@@ -22,11 +22,17 @@ function fakeOmb() {
       calls.push(`${req.method} ${req.url}`);
       const send=(code,data)=>{res.statusCode=code;res.setHeader('content-type','application/json');res.end(JSON.stringify(data));};
       if(req.url==='/api/bots?messages=0')return send(200,{bots:[{id:'b1',name:'Helper'}]});
-      if(req.url==='/api/bots/b1/skills')return send(200,{skills:[...held.values()]});
+      if(req.url==='/api/bots/b1/skills'){
+        if(behavior.replaceSourceAfterPost)for(const entry of held.values())entry.source='another-operation';
+        return send(200,{skills:[...held.values()]});
+      }
       if(req.url==='/api/bots/b1/skill-template'&&req.method==='POST'){
         const input=JSON.parse(body);
+        const meta=require('../template/framework/panel/node_modules/yaml').parse(/^---\r?\n([\s\S]*?)\r?\n---/.exec(input.text)?.[1] || '');
+        if(meta?.name!==input.name)return send(400,{error:'Skill name does not match its contents'});
         if(behavior.failPost){held.set(input.name,{name:input.name,enabled:false,sha256:sha(input.text)});return send(409,{error:'collision'});}
-        const entry={name:input.name,enabled:input.enabled,sha256:sha(input.text),importedAt:new Date().toISOString(),warnings:/curl[^\n]*\|\s*sh/.test(input.text)?['pipes a download straight into a shell']:[]};
+        if(held.has(input.name))return send(422,{error:'a skill with that name is already imported'});
+        const entry={name:input.name,enabled:input.enabled,sha256:sha(input.text),source:input.source,importedAt:new Date().toISOString(),warnings:/curl[^\n]*\|\s*sh/.test(input.text)?['pipes a download straight into a shell']:[]};
         held.set(input.name,entry);return send(201,{installed:behavior.badScan ? {...entry,sha256:'0'.repeat(64)} : entry});
       }
       const m=/^\/api\/bots\/b1\/skills\/([a-z0-9-]+)$/.exec(req.url);
@@ -113,7 +119,7 @@ test('a skill is read before installing, installed pinned to a commit and kept o
   assert.equal(entry.src,dir);assert.equal(entry.path,'skills/greeter');assert.equal(entry.commit,first);assert.equal(entry.license,'MIT');
   assert.equal(entry.sha256,shown.sha256);assert.equal(entry.review,undefined);
   // The scan imported it switched off into this project's OpenMausBot and removed it again.
-  assert.ok(omb.calls.includes('POST /api/bots/b1/skill-template'));assert.ok(omb.calls.some(c=>/^DELETE \/api\/bots\/b1\/skills\/fyso-scan-[a-f0-9]{32}$/.test(c)));assert.equal(omb.held.size,0);
+  assert.ok(omb.calls.includes('POST /api/bots/b1/skill-template'));assert.ok(omb.calls.includes('DELETE /api/bots/b1/skills/greeter'));assert.equal(omb.held.size,0);
   assert.equal(git(root,'log','-1','--format=%s'),`skills: add greeter ${first.slice(0,12)}`);
   assert.deepEqual(git(root,'show','--name-only','--format=','HEAD').split('\n').sort(),
     ['project/bots/skills/greeter/LICENSE','project/bots/skills/greeter/SKILL.md','project/bots/skills/greeter/notes/style.md','project/bots/third-party-skills.json']);
@@ -342,4 +348,13 @@ test('MCP add plan applies the exact tree path with duplicate names',()=>fixture
   const installed=await json(['apply'],{...env,OP:'apply-plan',PLAN_ID:plan.planId,SKILLS_APPLY:'1'});
   assert.equal(installed.skill.path,'two');assert.equal(installed.skill.commit,revision);assert.equal(installed.skill.sha256,plan.preview.sha256);
   assert.match(fs.readFileSync(path.join(root,'project/bots/skills/duplicate/SKILL.md'),'utf8'),/Reviewed copy/);
+}));
+
+
+test('native scan preserves a copy whose source ownership changed before cleanup',()=>fixture(async({base,omb,json,run})=>{
+  const {dir}=catalog(base);omb.behavior.replaceSourceAfterPost=true;
+  const added=await json(['add',dir,'greeter']);assert.equal(added.skill.state,'scan');
+  assert.equal(omb.held.get('greeter').source,'another-operation');
+  assert.equal(omb.calls.some(c=>c.startsWith('DELETE ')),false);
+  assert.equal((await run(['confirm','greeter'])).status,1);
 }));
