@@ -29,7 +29,7 @@ function pages(wiki) {
   return found.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
 }
 
-// Seconds since epoch of the last commit that touched each page; file time when git has none.
+// Clean tracked pages use commit time; modified and untracked pages use file time.
 function changedAt(root, wiki, files) {
   const times = new Map();
   try {

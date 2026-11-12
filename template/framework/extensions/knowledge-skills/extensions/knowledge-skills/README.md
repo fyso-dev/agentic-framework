@@ -21,8 +21,9 @@ written when it finds nothing.
 - `PROVIDER`: `claude` or `codex` lets the project's coding engine read a private copy
   of the wiki and propose fixes for contradictions (uses AI on every run); `none`
   checks links and dates only.
-- `STALE_DAYS`: a page unchanged for this many days is listed (default 180; the date
-  is the page's last commit, or the file time when it was never committed).
+- `STALE_DAYS`: a page unchanged for this many days is listed (default 180). Clean
+  tracked pages use their last commit date; modified or untracked pages use their
+  file modification time.
 - `mise run knowledge-skills:check` prints the same findings without AI or writing.
 
 For a bundled local installation, review local edits before reapplying to change

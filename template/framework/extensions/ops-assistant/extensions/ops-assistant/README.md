@@ -43,6 +43,8 @@ already uses) and commit:
   daily 09:00). The first time a bot goes over its cap in a month **the run fails**,
   so it shows red in Dagu and in the panel's Observability alerts. The weekly digest
   lists every bot's state, including those above 80%.
+- The scheduled check also fails when spend data is incomplete and no exceedance is
+  known, because it cannot verify the caps.
 - `mise run ops-assistant:spend` shows the figures now.
 
 **It alerts; it does not pause anything.** OpenMausBot's own limit is one amount for

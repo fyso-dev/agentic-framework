@@ -133,7 +133,6 @@ spend stays unknown; warnings/exceedances based on known amounts are lower bound
 Stale exports and exports for the wrong UTC month fail evaluation. For a current
 export, incomplete sources, invalid rows or unknown costs leave below-cap spend
 unverified; known eligible spend at or above the cap still establishes an exceedance.
-The scheduled check fails verification when data is incomplete and no exceedance is known.
 The first new
 exceedance per bot/month fails the workflow, making an advisory Dagu failure; a mark
 in ignored runtime data suppresses duplicate alerts. Later runs still report the
