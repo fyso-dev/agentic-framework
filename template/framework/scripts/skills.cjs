@@ -368,8 +368,9 @@ async function ombScan(name, description, text) {
     } finally {
       if (installed) {
         const held = ((await api(`/api/bots/${id}/skills`)).skills || []).find(s => s.name === probe);
-        if (!held || held.source !== source || held.sha256 !== hash || held.enabled !== false ||
-            (installed.importedAt && held.importedAt !== installed.importedAt)) throw new Error('OpenMausBot scan probe ownership changed');
+        if (typeof installed.importedAt !== 'string' || !installed.importedAt.trim() || !Number.isFinite(Date.parse(installed.importedAt)) ||
+            !held || held.source !== source || held.sha256 !== hash || held.enabled !== false ||
+            held.importedAt !== installed.importedAt) throw new Error('OpenMausBot scan probe ownership changed');
         await api(`/api/bots/${id}/skills/${probe}`, {method:'DELETE'});
       }
     }

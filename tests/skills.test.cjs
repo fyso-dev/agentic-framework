@@ -24,6 +24,7 @@ function fakeOmb() {
       if(req.url==='/api/bots?messages=0')return send(200,{bots:[{id:'b1',name:'Helper'}]});
       if(req.url==='/api/bots/b1/skills'){
         if(behavior.replaceSourceAfterPost)for(const entry of held.values())entry.source='another-operation';
+        if(behavior.changeTimestampAfterPost)for(const entry of held.values())entry.importedAt='2020-01-01T00:00:00.000Z';
         return send(200,{skills:[...held.values()]});
       }
       if(req.url==='/api/bots/b1/skill-template'&&req.method==='POST'){
@@ -33,7 +34,12 @@ function fakeOmb() {
         if(behavior.failPost){held.set(input.name,{name:input.name,enabled:false,sha256:sha(input.text)});return send(409,{error:'collision'});}
         if(held.has(input.name))return send(422,{error:'a skill with that name is already imported'});
         const entry={name:input.name,enabled:input.enabled,sha256:sha(input.text),source:input.source,importedAt:new Date().toISOString(),warnings:/curl[^\n]*\|\s*sh/.test(input.text)?['pipes a download straight into a shell']:[]};
-        held.set(input.name,entry);return send(201,{installed:behavior.badScan ? {...entry,sha256:'0'.repeat(64)} : entry});
+        held.set(input.name,entry);
+        const installed={...entry};
+        if(behavior.badScan)installed.sha256='0'.repeat(64);
+        if(behavior.postTimestamp!==undefined)installed.importedAt=behavior.postTimestamp;
+        if(behavior.omitTimestamp)delete installed.importedAt;
+        return send(201,{installed});
       }
       const m=/^\/api\/bots\/b1\/skills\/([a-z0-9-]+)$/.exec(req.url);
       if(m&&req.method==='DELETE'){held.delete(m[1]);return send(200,{ok:true});}
@@ -356,5 +362,19 @@ test('native scan preserves a copy whose source ownership changed before cleanup
   const added=await json(['add',dir,'greeter']);assert.equal(added.skill.state,'scan');
   assert.equal(omb.held.get('greeter').source,'another-operation');
   assert.equal(omb.calls.some(c=>c.startsWith('DELETE ')),false);
+  assert.equal((await run(['confirm','greeter'])).status,1);
+}));
+
+for(const [label,behavior] of [
+  ['missing', {omitTimestamp:true}],
+  ['empty', {postTimestamp:''}],
+  ['malformed', {postTimestamp:'not-a-date'}],
+  ['changed', {changeTimestampAfterPost:true}],
+]) test(`native scan preserves a copy with ${label} import timestamp`,()=>fixture(async({base,omb,json,run,lock})=>{
+  const {dir}=catalog(base);Object.assign(omb.behavior,behavior);
+  const added=await json(['add',dir,'greeter']);assert.equal(added.skill.state,'scan');
+  assert.equal(omb.held.has('greeter'),true);
+  assert.equal(omb.calls.some(c=>c.startsWith('DELETE ')),false);
+  assert.equal(lock().greeter.scan,undefined);
   assert.equal((await run(['confirm','greeter'])).status,1);
 }));
