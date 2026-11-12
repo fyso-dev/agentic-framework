@@ -1,0 +1,10 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-pack-accounting.yml
+_templates_suffix: .slotjinja
+# The bots use the engine the project chose at generation (PLAN D32).
+_external_data:
+  project: .copier-answers.yml
+_exclude:
+  - copier.yml
+  - /README.md
+  - .git
