@@ -135,6 +135,33 @@ test('wiki gardener finds broken links, old and unlinked pages, and ignores code
   assert.deepEqual(links('[[A|b]] ![x](y.png) [t](z.md "title")').map(l => l.target), ['A', 'z.md']);
 }, ['knowledge-skills']));
 
+test('wiki gardener distinguishes an empty wiki from traversal failures', () => project(({root, put, run}) => {
+  const wiki = path.join(root, 'project/wiki');
+  fs.mkdirSync(wiki, {recursive: true});
+  const check = () => run(['node', 'extensions/knowledge-skills/garden.cjs', 'check']);
+  const empty = check();
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.equal(JSON.parse(empty.stdout).pages, 0);
+  fs.rmdirSync(wiki);
+  put('project/wiki', 'not a directory');
+  const invalid = check();
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /ENOTDIR/);
+  fs.rmSync(wiki);
+  put('project/wiki/nested/page.md', 'text');
+  const injected = run(['node', '-e', `
+    const fs = require('node:fs');
+    const original = fs.readdirSync;
+    fs.readdirSync = function(dir, options) {
+      if (String(dir).endsWith('/nested')) { const e = new Error('permission denied'); e.code = 'EACCES'; throw e; }
+      return original.call(this, dir, options);
+    };
+    require('./extensions/knowledge-skills/garden.cjs').scan(process.env.FYSO_ROOT);
+  `]);
+  assert.notEqual(injected.status, 0);
+  assert.match(injected.stderr, /permission denied/);
+}, ['knowledge-skills']));
+
 test('wiki gardener publishes one new report page, never edits or replaces a page, and cleans up', () => project(({root, put, run}) => {
   put('project/wiki/index.md', '# Inicio\n[[Falta]]\n');
   const before = fs.readFileSync(path.join(root, 'project/wiki/index.md'), 'utf8');
@@ -316,6 +343,20 @@ test('notify hands the message to this project\'s OpenMausBot only, with an expl
   }
 }, ['owner-loop']));
 
+
+test('digest and spend reject incomplete ledger exports', () => project(({put, run}) => {
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 100}}));
+  const data = {...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01'};
+  for (const change of [{invalidRows: 1}, {warnings: ['invalidLedgerRows']}, {sources: {ledger: 'unavailable'}}]) {
+    put('.data/panel/observability.json', JSON.stringify({...data, ...change}));
+    for (const action of ['digest', 'spend']) {
+      const result = run(['node', 'extensions/ops-assistant/digest.cjs', action]);
+      assert.equal(result.status, 1, action);
+      assert.match(result.stderr, /ledger.*unverified/);
+      assert.equal(result.stdout, '');
+    }
+  }
+}, ['ops-assistant']));
 
 test('spend checks refuse stale data, unavailable ledgers and old months', () => project(({put, run}) => {
   for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}, {sources: {ledger: 'unavailable'}}, {invalidRows: 1}, {warnings: ['invalidLedgerRows']}] ) {

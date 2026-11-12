@@ -34,6 +34,8 @@ function settings(ctx) {
 // equivalent and unclassified cost. Unknown amounts are never counted as zero spend:
 // they are reported as missing.
 function spend(data, config, warnAt = 0.8) {
+  if (data.sources?.ledger !== 'ok' || data.invalidRows > 0 || data.warnings?.includes('invalidLedgerRows'))
+    throw new Error('observability ledger is unavailable or contains invalid rows; spend is unverified');
   const caps = config.botMonthlyUsd;
   if (config.botMonthlyUsdBasis !== undefined && !['api', 'all'].includes(config.botMonthlyUsdBasis))
     throw new Error('botMonthlyUsdBasis must be api or all');
@@ -63,8 +65,6 @@ function spendCheck(env = process.env) {
   if (!Number.isFinite(collected) || now - collected > 3600000 || collected > now + 60000 ||
       (data.from || '').slice(0, 7) !== new Date(now).toISOString().slice(0, 7))
     throw new Error('observability export is stale or belongs to another month; refresh fyso-observability');
-  if (data.sources?.ledger !== 'ok' || data.invalidRows > 0 || data.warnings?.includes('invalidLedgerRows'))
-    throw new Error('observability ledger is unavailable or contains invalid rows; spend is unverified');
   const state = spend(data, settings(ctx));
   const file = path.join(ctx.data, 'ext', 'ops-assistant', 'spend-alerts.json');
   let marks = {};

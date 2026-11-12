@@ -16,12 +16,17 @@ const LIMIT = 200, MAX_COPY_BYTES = 4 * 1024 * 1024, MAX_COPY_FILES = 500, MAX_P
 const posix = file => file.split(path.sep).join('/');
 
 function pages(wiki) {
-  let found = [];
-  try { found = [...fs.globSync('**/*.md', {cwd: wiki})]; } catch {}
-  return found.filter(file => {
-    const full = path.join(wiki, file), real = fs.realpathSync(full);
-    return fs.lstatSync(full).isFile() && !path.relative(fs.realpathSync(wiki), real).startsWith('..');
-  }).map(posix).filter(file => !OWN.has(file.split('/')[0]) && !file.split('/').some(part => part.startsWith('.'))).sort();
+  const found = [];
+  function visit(dir, prefix = '') {
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+      if (entry.name.startsWith('.') || (!prefix && OWN.has(entry.name))) continue;
+      const relative = path.join(prefix, entry.name);
+      if (entry.isDirectory()) visit(path.join(dir, entry.name), relative);
+      else if (entry.isFile() && entry.name.endsWith('.md')) found.push(posix(relative));
+    }
+  }
+  visit(wiki);
+  return found.sort();
 }
 
 // Seconds since epoch of the last commit that touched each page; file time when git has none.
