@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "deliverables": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["extensions/deliverables/mcp.sh"]
+    }
+  }
+}

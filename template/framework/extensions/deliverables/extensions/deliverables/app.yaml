@@ -1,0 +1,5 @@
+id: deliverables
+name: {es: Entregables, en: Deliverables}
+description: {es: Archivos que prepararon los bots, en: Files your bots prepared}
+icon: truck
+url: http://files.${FYSO_WEB_DOMAIN}:${FYSO_HTTP_PORT}/.ui/index.html
