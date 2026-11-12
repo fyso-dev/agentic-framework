@@ -151,6 +151,15 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 		}
 	}
 	# Dedicated SOPS/native-activation glue; never send project keys through Dagu.
+	# Remote MCP connection commands (D65): same private glue, never through Dagu.
+	handle /api/agent/remote {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	handle /api/agent/* {
+		respond 404
+	}
 	handle /api/composio/setup {
 		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
 			header_up Authorization "{$FYSO_DAGU_AUTH}"

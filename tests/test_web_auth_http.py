@@ -196,6 +196,13 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertTrue(json.loads(body)['daguCredential'])
         self.assertFalse(json.loads(body)['webCookieLeaked'])
         self.assertEqual(self.request('panel', '/api/connectors/mcp', 'POST', {})[0], 401)
+        # D65: the remote MCP commands (token included) need the web session and the same private glue.
+        self.assertEqual(self.request('panel', '/api/agent/remote', 'POST', {})[0], 401)
+        status, _, body = self.request('panel', '/api/agent/remote', 'POST', {}, Cookie=cookie, Origin=origin)
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)['daguCredential']); self.assertFalse(json.loads(body)['webCookieLeaked'])
+        self.assertEqual(self.request('panel', '/api/agent/remote', 'POST', {}, Cookie=cookie, Origin='https://foreign.invalid')[0], 403)
+        self.assertEqual(self.request('panel', '/api/agent/other', 'POST', {}, Cookie=cookie, Origin=origin)[0], 404)
 
     def test_00_remote_mcp_route_skips_the_login_and_only_exists_on_the_panel(self):
         # D63: the endpoint authenticates its own bearer token; the gateway must hand it over untouched.

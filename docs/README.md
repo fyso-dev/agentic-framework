@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D64; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D65; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -222,3 +222,5 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | **D62 + D63 on a real project.** A project updated to `v0.1.0-rc.3` with `fyso-ext-netbird` `v0.4.0` (`access=https`) serves six addresses over HTTPS through a self-hosted NetBird reverse proxy, passes `mise run doctor`, and Claude Code on another machine connects to its `/mcp` with the token from `mise run agent:remote`. Findings: (1) a host reached over SSH cannot read a private template over `https://` (the macOS keychain is locked there); `SRC=git@github.com:…` for `update.sh`, or a `url.insteadOf` for one Copier command, works with a forwarded agent. (2) Copier treats an untracked folder as a dirty tree, so `copier update -d web_domain=…` and the terminal `ext:update -- -d …` need a clean worktree; `update.sh` and the panel's extension upgrade already use one, but neither passes answers. (3) Project apps that wrote their address literally in `app.yaml` keep the old domain after `web_domain` changes. |
 
 | 2026-11-11 | **Recoverable web passwords (D64).** `mise run web-auth:password` shows a user's password and `-- --new` sets a readable generated one, with the project running and without a terminal prompt. Passwords are kept encrypted next to their hashes. Verified with real sops, age and Caddy bcrypt (`tests/web-auth-password.test.cjs`). [Contract](web-auth.md#configuration-and-ownership) |
+
+| 2026-11-11 | **Run the remote MCP setup from the panel (D65).** `#/mcp` over HTTPS gets a *Run* button: Dagu makes sure the token exists (`fyso-agent-connect`, `MODE=remote`) and the private setup adapter returns the command for Claude Code, Codex, OpenCode, Gemini CLI and a generic JSON entry. The token never passes through Dagu. First recorded exception to "the panel never shows secret values". [Agent surface](agent-surface.md#remote-clients-d63) |
