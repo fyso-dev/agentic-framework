@@ -10,6 +10,9 @@ function fixture(fn) {
   fs.cpSync(path.join(source,'framework/mcp.json'),path.join(root,'framework/mcp.json'));
   fs.mkdirSync(path.join(root,'bin'));
   fs.symlinkSync(path.join(source,'framework/panel/node_modules/yaml/bin.mjs'),path.join(root,'bin/yaml'));
+  // The fixture already supplies the environment that mise loads in a project.
+  put('bin/mise','#!/bin/sh\n[ "$1" = exec ] && [ "$2" = -- ] || exit 2\nshift 2\nexec "$@"\n');
+  fs.chmodSync(path.join(root,'bin/mise'),0o755);
   const ambient=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('FYSO_')));
   const env={...ambient,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,FYSO_ROOT:root,FYSO_DATA:path.join(root,'.data'),FYSO_HTTP_PORT:'19400'};
   // Run node directly: a mise shim would parse the fixture's untrusted conf.d files.
