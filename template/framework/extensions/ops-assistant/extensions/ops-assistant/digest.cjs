@@ -63,7 +63,8 @@ function spendCheck(env = process.env) {
   if (!Number.isFinite(collected) || now - collected > 3600000 || collected > now + 60000 ||
       (data.from || '').slice(0, 7) !== new Date(now).toISOString().slice(0, 7))
     throw new Error('observability export is stale or belongs to another month; refresh fyso-observability');
-  if (data.sources?.ledger !== 'ok') throw new Error('observability ledger is unavailable; spend is unverified');
+  if (data.sources?.ledger !== 'ok' || data.invalidRows > 0 || data.warnings?.includes('invalidLedgerRows'))
+    throw new Error('observability ledger is unavailable or contains invalid rows; spend is unverified');
   const state = spend(data, settings(ctx));
   const file = path.join(ctx.data, 'ext', 'ops-assistant', 'spend-alerts.json');
   let marks = {};
@@ -82,7 +83,7 @@ const TEXT = {
   es: {title: 'Resumen semanal', period: (a, b) => `Del ${a} al ${b}.`, collected: at => `Datos recogidos: ${at}.`, stale: 'Los datos tienen más de una hora: el proyecto estuvo detenido o la recolección falló.',
     short: 'En pocas palabras', convs: n => `${n} conversaciones con bots`, runs: (n, f) => `${n} ejecuciones de workflows, ${f} con fallas`, weekCost: 'Costo conocido de las conversaciones de la semana',
     bots: 'Qué hicieron los bots', bot: 'Bot', conversations: 'Conversaciones', tools: 'Usos de herramientas', errors: 'Errores', none: 'Sin actividad registrada.',
-    workflows: 'Workflows', workflow: 'Workflow', total: 'Ejecuciones', ok: 'Correctas', failed: 'Con fallas', failures: 'Qué falló', when: 'cuándo',
+    workflows: 'Workflows', workflow: 'Workflow', total: 'Ejecuciones', ok: 'Correctas', pending: 'Pendientes', other: 'Otros estados', failed: 'Con fallas', failures: 'Qué falló', when: 'cuándo',
     month: m => `Costo del mes (${m}, hasta la fecha)`, api: 'API informado', est: 'API estimado', sub: 'Equivalente de suscripción', unknown: 'sin dato', turns: 'Turnos',
     caps: 'Topes de gasto', cap: 'Tope', spent: 'Gastado', state: {ok: 'dentro del tope', warn: 'cerca del tope', exceeded: 'superó el tope', none: 'sin tope', unknown: 'datos incompletos'}, noCaps: 'No hay topes configurados (`botMonthlyUsd` en `project/observability.json`).',
     notes: 'Notas', missing: n => `${n} turnos sin costo informado: los totales pueden ser menores que el gasto real.`, truncated: 'Hay más actividad que la que guarda el resumen: las cifras de la semana pueden estar incompletas.',
@@ -90,7 +91,7 @@ const TEXT = {
   en: {title: 'Weekly digest', period: (a, b) => `From ${a} to ${b}.`, collected: at => `Data collected: ${at}.`, stale: 'The data is more than an hour old: the project was stopped or collection failed.',
     short: 'In short', convs: n => `${n} conversations with bots`, runs: (n, f) => `${n} workflow runs, ${f} with failures`, weekCost: 'Known cost of this week\'s conversations',
     bots: 'What the bots did', bot: 'Bot', conversations: 'Conversations', tools: 'Tool uses', errors: 'Errors', none: 'No recorded activity.',
-    workflows: 'Workflows', workflow: 'Workflow', total: 'Runs', ok: 'Succeeded', failed: 'With failures', failures: 'What failed', when: 'when',
+    workflows: 'Workflows', workflow: 'Workflow', total: 'Runs', ok: 'Succeeded', pending: 'Pending', other: 'Other states', failed: 'With failures', failures: 'What failed', when: 'when',
     month: m => `Cost this month (${m}, to date)`, api: 'API reported', est: 'API estimated', sub: 'Subscription equivalent', unknown: 'unknown', turns: 'Turns',
     caps: 'Spend caps', cap: 'Cap', spent: 'Spent', state: {ok: 'within the cap', warn: 'close to the cap', exceeded: 'over the cap', none: 'no cap', unknown: 'incomplete data'}, noCaps: 'No caps are configured (`botMonthlyUsd` in `project/observability.json`).',
     notes: 'Notes', missing: n => `${n} turns reported no cost: totals may be lower than the real spend.`, truncated: 'There is more activity than the summary keeps: this week\'s figures may be incomplete.',
@@ -112,8 +113,12 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   }
   const byDag = new Map();
   for (const run of runs) {
-    const row = byDag.get(run.dag) || {total: 0, failed: 0};
-    row.total++; if (FAILED.has(run.statusLabel)) row.failed++;
+    const row = byDag.get(run.dag) || {total: 0, succeeded: 0, pending: 0, other: 0, failed: 0};
+    row.total++;
+    if (run.statusLabel === 'succeeded') row.succeeded++;
+    else if (FAILED.has(run.statusLabel)) row.failed++;
+    else if (['running', 'waiting'].includes(run.statusLabel)) row.pending++;
+    else row.other++;
     byDag.set(run.dag, row);
   }
   const caps = spend(data, config), monthly = new Map();
@@ -128,8 +133,8 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   out.push(`## ${t.short}`, '', `- ${t.convs(traces.length)}`, `- ${t.runs(runs.length, failed.length)}`, '');
   out.push(`## ${t.bots}`, '', ...table([t.bot, t.conversations, t.tools, t.errors],
     [...byBot].sort((a, b) => b[1].conversations - a[1].conversations).map(([name, r]) => [name, r.conversations, r.tools, r.errors])));
-  out.push(`## ${t.workflows}`, '', ...table([t.workflow, t.total, t.ok, t.failed],
-    [...byDag].sort((a, b) => b[1].total - a[1].total).map(([name, r]) => [name, r.total, r.total - r.failed, r.failed])));
+  out.push(`## ${t.workflows}`, '', ...table([t.workflow, t.total, t.ok, t.pending, t.failed, t.other],
+    [...byDag].sort((a, b) => b[1].total - a[1].total).map(([name, r]) => [name, r.total, r.succeeded, r.pending, r.failed, r.other])));
   if (failed.length) out.push(`## ${t.failures}`, '', ...failed.slice(0, 50).map(r => `- \`${cell(r.dag)}\` · ${cell(r.statusLabel)} · ${cell(r.startedAt)} · ${cell(r.id)}`), '');
   out.push(`## ${t.month(caps.month)}`, '', ...table([t.bot, t.turns, t.api, t.est, t.sub],
     [...monthly].map(([name, r]) => [name, r.turns, usd(sum(r.api)), usd(sum(r.est)), usd(sum(r.sub))])));
@@ -155,12 +160,10 @@ function writeDigest(env = process.env, now = new Date()) {
   fs.mkdirSync(folder, {recursive: true});
   for (let n = 1; n <= 50; n++) {
     const name = n === 1 ? `${summary.to}.md` : `${summary.to} (${n}).md`, file = path.join(folder, name);
-    let current = null;
-    try { current = fs.readFileSync(file, 'utf8'); } catch {}
-    // Replace only a page this script wrote; a page a person made or edited is kept.
-    if (current !== null && !current.startsWith(MARK)) continue;
-    fs.writeFileSync(file, text);
-    return {...summary, page: `${FOLDER[ctx.lang]}/${name.slice(0, -3)}`};
+    try {
+      fs.writeFileSync(file, text, {flag: 'wx'});
+      return {...summary, page: `${FOLDER[ctx.lang]}/${name.slice(0, -3)}`};
+    } catch (error) { if (error.code !== 'EEXIST') throw error; }
   }
   throw new Error('could not find a free page name');
 }

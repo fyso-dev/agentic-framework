@@ -1,6 +1,6 @@
 # Weekly digest: what the bots did, what failed and what it cost, as one wiki page
 # (Resumen semanal/<date>, or Weekly digest/<date>). Read-only over the framework's
-# observability export; no AI. A rerun on the same day replaces its own page only.
+# observability export; no AI. Each run creates a new page.
 description: Write the weekly digest of bot activity, failures and cost as a wiki page
 type: graph
 {% if digest_schedule %}schedule: "{{ digest_schedule }}"

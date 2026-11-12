@@ -171,6 +171,23 @@ test('wiki gardener publishes one new report page, never edits or replaces a pag
   assert.equal(JSON.parse(check.stdout).pages, 1);
 }, ['knowledge-skills']));
 
+test('wiki gardener retains work when all report names are occupied', () => project(({root, put, run}) => {
+  put('project/wiki/index.md', '[[Missing]]');
+  const env = {DAG_RUN_ID: 'occupied', LANG_UI: 'en'};
+  const garden = action => run(['node', 'extensions/knowledge-skills/garden.cjs', action], env);
+  assert.equal(garden('prepare').status, 0);
+  const work = path.join(root, '.data/ext/knowledge-skills/garden/occupied');
+  fs.writeFileSync(path.join(work, 'proposals.md'), 'Keep this proposal');
+  const today = new Date().toISOString().slice(0, 10);
+  for (let n = 1; n <= 50; n++) put(`project/wiki/Maintenance/${today}${n === 1 ? '' : ` (${n})`}.md`, 'existing');
+  const result = garden('publish');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /free report page/);
+  assert.equal(fs.readFileSync(path.join(work, 'proposals.md'), 'utf8'), 'Keep this proposal');
+  assert.ok(fs.existsSync(path.join(work, 'findings.json')));
+  assert.equal(fs.readFileSync(path.join(root, `project/wiki/Maintenance/${today}.md`), 'utf8'), 'existing');
+}, ['knowledge-skills']));
+
 const now = new Date('2026-11-11T12:00:00Z');
 const observability = () => ({
   version: 1, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'unavailable'},
@@ -198,7 +215,10 @@ test('weekly digest reports the week from the observability export without inven
   assert.match(text, /- 2 conversaciones con bots\n- 2 ejecuciones de workflows, 1 con fallas/);
   assert.match(text, /\| Soporte \| 2 \| 4 \| 1 \|/);
   assert.match(text, /\| Ventas \\\| Norte \| 1 \| 1 \| 0 \|/, 'table cells are escaped');
-  assert.match(text, /\| facturas \| 2 \| 1 \| 1 \|/);
+  assert.match(text, /\| facturas \| 2 \| 1 \| 0 \| 1 \| 0 \|/);
+  const active = observability();
+  active.runs.push(...['running', 'waiting', 'queued'].map((statusLabel, i) => ({id: `active-${i}`, dag: 'facturas', statusLabel, startedAt: '2026-11-11T09:00:00Z'})));
+  assert.match(digest(active, {}, {lang: 'en', now}).text, /\| facturas \| 5 \| 1 \| 2 \| 1 \| 1 \|/);
   assert.match(text, /## Qué falló\n\n- `facturas` · failed · 2026-11-11T08:00:00Z · r2/);
   assert.doesNotMatch(text, /r0|\$99|\$2\.25/, 'activity outside the window is left out');
   // Unknown is never shown as zero; subscription use is labeled as an equivalent.
@@ -232,7 +252,7 @@ test('spend caps compare month-to-date cost per bot, by the chosen basis, and re
     assert.throws(() => spend(observability(), bad), /botMonthlyUsd/);
 }, ['ops-assistant']));
 
-test('spend-cap run fails once per bot and month, and the digest replaces only its own page', () => project(({root, put, run}) => {
+test('spend-cap run fails once per bot and month, and the digest preserves existing pages', () => project(({root, put, run}) => {
   put('.data/panel/observability.json', JSON.stringify({...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01'}));
   put('project/observability.json', JSON.stringify({monthlyApiUsd: null, botMonthlyUsd: {Soporte: 18}}));
   const spend = () => run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
@@ -248,10 +268,11 @@ test('spend-cap run fails once per bot and month, and the digest replaces only i
   const written = JSON.parse(digest().stdout);
   const page = path.join(root, 'project/wiki', `${written.page}.md`);
   assert.match(written.page, /^Resumen semanal\/\d{4}-\d{2}-\d{2}$/);
-  assert.equal(JSON.parse(digest().stdout).page, written.page, 'a rerun replaces its own page');
-  fs.writeFileSync(page, '# Mis notas\n');
-  assert.equal(JSON.parse(digest().stdout).page, `${written.page} (2)`, 'a page a person wrote is kept');
-  assert.equal(fs.readFileSync(page, 'utf8'), '# Mis notas\n');
+  const edited = fs.readFileSync(page, 'utf8') + '\nMy notes\n';
+  fs.writeFileSync(page, edited);
+  assert.equal(JSON.parse(digest().stdout).page, `${written.page} (2)`);
+  assert.equal(fs.readFileSync(page, 'utf8'), edited);
+  assert.equal(JSON.parse(digest().stdout).page, `${written.page} (3)`);
   assert.match(JSON.parse(digest({LANG_UI: 'en'}).stdout).page, /^Weekly digest\//);
   assert.equal(digest({DAYS: '400'}).status, 1);
   fs.rmSync(path.join(root, '.data/panel/observability.json'));
@@ -297,11 +318,11 @@ test('notify hands the message to this project\'s OpenMausBot only, with an expl
 
 
 test('spend checks refuse stale data, unavailable ledgers and old months', () => project(({put, run}) => {
-  for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}, {sources: {ledger: 'unavailable'}}]) {
+  for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}, {sources: {ledger: 'unavailable'}}, {invalidRows: 1}, {warnings: ['invalidLedgerRows']}] ) {
     put('.data/panel/observability.json', JSON.stringify({...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01', ...change}));
     const result = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /stale|unavailable/);
+    assert.match(result.stderr, /stale|unavailable|invalid rows/);
   }
 }, ['ops-assistant']));
 

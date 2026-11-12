@@ -161,6 +161,7 @@ function publish(env = process.env, now = new Date()) {
         result.report = `${REPORTS[ctx.lang]}/${name.slice(0, -3)}`;
       } catch (error) { if (error.code !== 'EEXIST') throw error; }
     }
+    if (!result.report) throw new Error('could not find a free report page name; work is retained');
   }
   fs.rmSync(ctx.work, {recursive: true, force: true});
   return result;

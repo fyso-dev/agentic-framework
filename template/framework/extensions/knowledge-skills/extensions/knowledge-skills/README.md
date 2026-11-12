@@ -47,4 +47,5 @@ Knowledge page (SilverBullet) or in Dagu's wiki.
   not to fill gaps.
 - Contradiction proposals are AI-generated from the pages: review before approving.
   Large wikis are read in part (500 pages, 4 MB) and the report says so.
+- Failed runs retain their private work directory for recovery; remove it after review.
 - Link checks cover `[[wiki links]]` and relative Markdown links, not web addresses.

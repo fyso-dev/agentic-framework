@@ -112,7 +112,11 @@ Only an additive report page is published. The AI sees a bounded private copy
 (500 pages/4 MB) and its proposals are untrusted. Existing pages are not automatically
 repaired. A coding harness is not an OS-level read boundary; its safety flags and
 provider sandbox have the same limitations as the reference SilverBullet import.
+Failed runs retain the private work directory for recovery; remove it after review.
 Provider execution and usefulness of contradiction findings need separate acceptance.
+
+The focused `node --test tests/owner-extensions.test.cjs` check passed 13 tests,
+including retained work when report names are exhausted.
 
 ## ops-assistant
 
@@ -126,17 +130,20 @@ Caps live in project-owned `project/observability.json`, under `botMonthlyUsd`
 (bot names or `*`) and `botMonthlyUsdBasis` (`api` default or `all`). API cost,
 estimated API cost and subscription equivalents remain distinguishable. Unknown
 spend stays unknown; warnings/exceedances based on known amounts are lower bounds.
-Stale exports, the wrong UTC month or unavailable ledgers fail checks. The first new
+Stale exports, the wrong UTC month, unavailable ledgers or invalid ledger rows fail checks. The first new
 exceedance per bot/month fails the workflow, making an advisory Dagu failure; a mark
 in ignored runtime data suppresses duplicate alerts. Later runs still report the
 exceeded state. No proactive phone/email notification is implied by a red run.
+
+The same focused check passed 13 tests, including edited report preservation,
+invalid ledger rejection and workflow status counts.
 
 This does not pause bots. The inspected OMB 0.1.141 package exposes workspace-wide
 `budgets.monthlyUsd`, behind its `budgets` license feature, not a native per-bot pause.
 The export provides monthly usage groups, not weekly trace costs; the digest reports
 month-to-date cost per bot. Weekly activity reports are limited by export retention and show partial-source warnings;
-month-crossing periods are explicitly incomplete. Generated digest pages retain a
-marker; remove that marker before making personal edits you want reruns to preserve.
+month-crossing periods are explicitly incomplete. Every digest run creates a new page,
+so existing pages and personal edits remain intact.
 
 `automate-this` reads Dagu's authoring reference and the existing authoring skill,
 uses `dagu_change` preview/apply and creates project workflows only. An approved

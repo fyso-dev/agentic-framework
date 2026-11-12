@@ -7,7 +7,7 @@ alert when a bot spends more than you decided.
 
 `ext-ops-assistant-digest` writes one wiki page, `Resumen semanal/<date>`
 (`Weekly digest/<date>`), on the schedule chosen at install (default: Mondays 08:00,
-server time): conversations per bot, workflow runs and failures, the month's cost per
+server time; each run creates a new page): conversations per bot, workflow runs and failures, the month's cost per
 bot and the state of the spend caps. It reads the same data as the panel's
 Observability page and uses no AI. Run it now with `mise run ops-assistant:digest`, or
 ask a bot with Dagu access to run the workflow and read you the page.
@@ -55,5 +55,5 @@ to turn. To stop a bot, change or remove it in the panel.
   100 workflow runs). A week that crosses a month boundary is partial, and the page
   says when figures may be incomplete.
 - The export has monthly usage groups, not weekly trace costs. Costs are month-to-date
-  per bot; no weekly amount is inferred from conversation traces. Missing, stale or
+  per bot; no weekly amount is inferred from conversation traces. Missing, stale, invalid or
   unavailable spend data stays unverified, never within cap.

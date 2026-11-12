@@ -89,6 +89,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |

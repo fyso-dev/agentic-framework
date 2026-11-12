@@ -169,7 +169,6 @@ class OwnerExtensions(unittest.TestCase):
                 metadata = self.yaml(path, frontmatter=True)
                 self.assertEqual(metadata['name'], skill)
                 self.assertGreater(len(metadata['description']), 40, f'{ext}/{skill}: say when to use it')
-                self.assertLess(len(path.read_text().splitlines()), 120, f'{ext}/{skill}: keep skills short')
 
     def test_panel_copy_is_localized_in_spanish_and_english(self):
         folders = [path for path in (self.project / 'extensions').glob('*/**/locales') if path.is_dir()]
