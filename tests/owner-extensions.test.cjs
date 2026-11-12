@@ -407,6 +407,30 @@ test('unclassified spend is unknown for API caps in both commands', () => projec
   assert.doesNotMatch(report, /within the cap/);
 }, ['ops-assistant']));
 
+test('known spend exceeding a cap alerts while retaining incomplete coverage', () => project(({root, put, run}) => {
+  const current = new Date();
+  const data = {...observability(), collectedAt: current.toISOString(), from: current.toISOString().slice(0, 7) + '-01'};
+  data.usage.totals.missingCost = 1;
+  data.usage.groups = [
+    {bot: 'Soporte', turns: 2, apiReportedUsd: 20, estimatedApiUsd: null, subscriptionEquivalentUsd: null, unclassifiedUsd: null, missingCost: 1},
+    {bot: 'Ventas', turns: 1, apiReportedUsd: 1, estimatedApiUsd: null, subscriptionEquivalentUsd: null, unclassifiedUsd: null, missingCost: 0},
+  ];
+  put('.data/panel/observability.json', JSON.stringify(data));
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {'*': 10}}));
+  const result = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
+  assert.equal(result.status, 2, result.stderr);
+  const state = JSON.parse(result.stdout);
+  assert.deepEqual(state.newlyExceeded, ['Soporte']);
+  assert.equal(state.bots.find(bot => bot.bot === 'Soporte').state, 'exceeded');
+  assert.equal(state.bots.find(bot => bot.bot === 'Soporte').incomplete, true);
+  assert.equal(state.bots.find(bot => bot.bot === 'Ventas').state, 'unknown');
+  const digest = run(['node', 'extensions/ops-assistant/digest.cjs', 'digest'], {LANG_UI: 'en'});
+  assert.equal(digest.status, 0, digest.stderr);
+  const report = fs.readFileSync(path.join(root, 'project/wiki', `${JSON.parse(digest.stdout).page}.md`), 'utf8');
+  assert.match(report, /over the cap; incomplete data/);
+  assert.doesNotMatch(report, /within the cap/);
+}, ['ops-assistant']));
+
 test('spend checks refuse stale data, unavailable ledgers and old months', () => project(({put, run}) => {
   for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}, {sources: {ledger: 'unavailable'}}, {invalidRows: 1}, {warnings: ['invalidLedgerRows']}] ) {
     put('.data/panel/observability.json', JSON.stringify({...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01', ...change}));

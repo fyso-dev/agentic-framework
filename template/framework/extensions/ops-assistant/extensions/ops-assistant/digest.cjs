@@ -60,8 +60,9 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
   }
   const rows = [...bots.values()].map(row => {
     const spentUsd = sum(row.parts), capUsd = caps ? num(caps[row.bot]) ?? num(caps['*']) : null;
-    const state = capUsd === null ? 'none' : incomplete || spentUsd === null || row.missingCost || row.unclassified ? 'unknown' : spentUsd >= capUsd ? 'exceeded' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
-    return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, turns: row.turns, missingCost: row.missingCost};
+    const partial = Boolean(incomplete || spentUsd === null || row.missingCost || row.unclassified);
+    const state = capUsd === null ? 'none' : spentUsd !== null && spentUsd >= capUsd ? 'exceeded' : partial ? 'unknown' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
+    return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, incomplete: partial, turns: row.turns, missingCost: row.missingCost};
   }).sort((a, b) => (b.spentUsd ?? 0) - (a.spentUsd ?? 0));
   return {month: (data.from || '').slice(0, 7), basis, configured: !!caps && Object.keys(caps).length > 0, bots: rows,
     exceeded: rows.filter(r => r.state === 'exceeded').map(r => r.bot), warn: rows.filter(r => r.state === 'warn').map(r => r.bot)};
@@ -144,7 +145,7 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   out.push(`## ${t.month(caps.month)}`, '', ...table([t.bot, t.turns, t.api, t.est, t.sub],
     [...monthly].map(([name, r]) => [name, r.turns, usd(sum(r.api)), usd(sum(r.est)), usd(sum(r.sub))])));
   out.push(`## ${t.caps}`, '');
-  if (caps.configured) out.push(...table([t.bot, t.spent, t.cap, '%', ''], caps.bots.map(r => [r.bot, usd(r.spentUsd), usd(r.capUsd), r.percent ?? '', t.state[r.state]])));
+  if (caps.configured) out.push(...table([t.bot, t.spent, t.cap, '%', ''], caps.bots.map(r => [r.bot, usd(r.spentUsd), usd(r.capUsd), r.percent ?? '', `${t.state[r.state]}${r.incomplete && r.state === 'exceeded' ? `; ${t.state.unknown}` : ''}`])));
   else out.push(t.noCaps, '');
   const notes = [t.semantics];
   const missing = data.usage?.totals?.missingCost || 0;
