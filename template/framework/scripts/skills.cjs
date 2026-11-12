@@ -277,15 +277,17 @@ function selectSkill(all, wanted, source, recordedPath) {
   return (recordedPath !== undefined && all.find(s => s.path === recordedPath && s.name === wanted)) || pick(all, wanted, source);
 }
 
-function resolve(source, wanted, ref, use, recordedPath) {
+function resolve(source, wanted, ref, use, recordedPath, exactPath = false) {
   const parsed = parseSource(source);
   return withRepo(parsed.src, ref || parsed.ref, (dir, commit) => {
-    const skill = selectSkill(findSkills(dir, parsed.dir || ''), wanted || parsed.skill, parsed.src, recordedPath);
+    const all = findSkills(dir, parsed.dir || '');
+    const skill = exactPath ? all.find(s => s.path === recordedPath && s.name === wanted) : selectSkill(all, wanted || parsed.skill, parsed.src, recordedPath);
+    if (!skill) throw Error('reviewed skill path no longer matches; preview again');
     return use({...skill, src:parsed.src, commit, sha256:folderHash(path.join(dir, skill.path), skill.sharedLicense)}, path.join(dir, skill.path));
   });
 }
 
-function preview(source, wanted, ref, recordedPath) {
+function preview(source, wanted, ref, recordedPath, exactPath = false) {
   return resolve(source, wanted, ref, (skill, folder) => {
     const files = [];
     (function walk(rel) {
@@ -297,7 +299,7 @@ function preview(source, wanted, ref, recordedPath) {
     const held = readLock()[skill.name];
     return {...publicSkill(skill), skillMd:skill.text, licenseText:skill.licenseText, files:files.sort(),
       installed:!!held, ...(held && {installedCommit:held.commit, installedSrc:held.src})};
-  }, recordedPath);
+  }, recordedPath, exactPath);
 }
 
 /** The installed copy of one skill: what the person confirms. */
@@ -376,11 +378,11 @@ async function scan(name, lock = readLock(), {quiet = false} = {}) {
 }
 
 // Immutable preview/apply plans for platform MCP clients. Human confirmation is separate.
-function plan(mode, source, wanted, name, ref) {
+function plan(mode, source, wanted, name, ref, selectedPath) {
   if (!['add', 'update'].includes(mode)) throw Error('plan mode must be add or update');
   const lock = readLock(), held = mode === 'update' ? lock[requireName(name)] : null;
   if (mode === 'update' && !held) throw Error('skill is not installed');
-  const detail = preview(held?.src || source, held ? name : wanted, ref, held?.path);
+  const detail = preview(held?.src || source, held ? name : wanted, ref, held?.path ?? selectedPath, !held && selectedPath !== undefined);
   const planId = crypto.randomBytes(16).toString('hex');
   const folder = path.join(process.env.FYSO_DATA || '.data', 'skill-plans');
   fs.mkdirSync(folder, {recursive:true, mode:0o700});
@@ -394,7 +396,7 @@ async function applyPlan(planId) {
   const planned = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (planned.expires < Date.now() || planned.base !== JSON.stringify(readLock())) throw Error('skill plan is stale; preview again');
   const d = planned.detail;
-  const output = planned.mode === 'add' ? await add(d.src, d.name, d.commit, d.sha256) : await update(planned.name, d.commit, d.sha256);
+  const output = planned.mode === 'add' ? await add(d.src, d.name, d.commit, d.sha256, d.path) : await update(planned.name, d.commit, d.sha256, d.path);
   fs.rmSync(file);
   return output;
 }
@@ -451,7 +453,7 @@ const result = (op, name, change, extra = {}) => {
   return {op, name, commit:change, skill:inventory().find(s => s.name === name) || null, ...extra};
 };
 
-async function add(source, wanted, ref, reviewed) {
+async function add(source, wanted, ref, reviewed, reviewedPath) {
   mutationPaths();
   if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
   // The source is saved in the record, which check-paths scans before every snapshot.
@@ -467,13 +469,13 @@ async function add(source, wanted, ref, reviewed) {
     if (lock[found.name]) throw Error(`${found.name} is already installed (mise run skills:update ${found.name})`);
     if (fs.existsSync(path.join(DIR, found.name))) throw Error(`${DIR}/${found.name} already exists and is not a third-party skill`);
     return {...found, files:copySkill(folder, path.join(DIR, found.name), found)};
-  });
+  }, reviewedPath, reviewedPath !== undefined);
   lock[skill.name] = record(skill, skill.files);
   writeLock(await scan(skill.name, lock, {quiet:true}));
   return result('add', skill.name, commit(`skills: add ${skill.name} ${skill.commit.slice(0, 12)}`, skill.name));
 }
 
-async function update(name, ref, reviewed) {
+async function update(name, ref, reviewed, reviewedPath) {
   mutationPaths(name);
   if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
   const lock = readLock(), entry = lock[requireName(name)];
@@ -482,8 +484,8 @@ async function update(name, ref, reviewed) {
   const temp = fs.mkdtempSync(path.join(DIR, `.${name}-`)), staged = path.join(temp, 'skill');
   try {
   const skill = withRepo(entry.src, ref, (dir, at) => {
-    const all = findSkills(dir), found = selectSkill(all, name, entry.src, entry.path);
-    if (found.name !== name) throw Error(`${entry.src} no longer has a skill named ${name}`);
+    const all = findSkills(dir), found = reviewedPath !== undefined ? all.find(s => s.path === reviewedPath && s.name === name) : selectSkill(all, name, entry.src, entry.path);
+    if (!found || found.name !== name) throw Error(`${entry.src} no longer has a skill named ${name}`);
     const next = {...found, src:entry.src, commit:at, sha256:folderHash(path.join(dir, found.path), found.sharedLicense)};
     if (reviewed && reviewed !== next.sha256) throw Error('skill changed since preview; read it again');
     return {...next, files:copySkill(path.join(dir, found.path), staged, found)};
@@ -539,7 +541,7 @@ if (require.main === module) (async () => {
     // Workflows (fyso-skills-catalog, fyso-skills-install): parameters arrive as env vars.
     case 'catalog': {
       const collectedAt = new Date().toISOString();
-      if (env.OP) return out(plan(env.OP, env.SRC, env.SKILL, env.NAME, env.COMMIT));
+      if (env.OP) return out(plan(env.OP, env.SRC, env.SKILL, env.NAME, env.COMMIT, env.SKILL_PATH || undefined));
       if (env.NAME) return out({collectedAt, local:local(env.NAME)});
       return out(env.SRC ? {collectedAt, preview:preview(env.SRC, env.SKILL, env.COMMIT)} : await search(env.QUERY));
     }

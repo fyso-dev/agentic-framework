@@ -414,7 +414,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
         }
         case DAGS.skillsCatalog: {
           const held = params?.NAME ? skills.get(params.NAME) : undefined;
-          const output: SkillCatalog = held
+          const output: SkillCatalog = params?.OP ? { collectedAt: new Date().toISOString(), planId: `mock-${params.OP}-${params.NAME || params.SKILL}`, preview: { ...mockSkill(params.NAME || params.SKILL || "pdf-forms", "review"), skillMd: SKILL_MD, licenseText: "Apache License", files: ["SKILL.md"], installed: !!held } } : held
             ? { collectedAt: new Date().toISOString(), local: { ...held, skillMd: SKILL_MD.replaceAll("brand-guidelines", held?.name || params?.SKILL || "pdf-forms"), files: ["LICENSE.txt", "SKILL.md"] } }
             : params?.SRC
               ? { collectedAt: new Date().toISOString(), preview: { ...mockSkill(params.SKILL || "pdf-forms", "review"), skillMd: SKILL_MD.replaceAll("brand-guidelines", params?.SKILL || "pdf-forms"), licenseText: "Apache License\nVersion 2.0, January 2004", files: ["LICENSE.txt", "SKILL.md"], installed: skills.has(params.SKILL || "pdf-forms") } }
@@ -425,8 +425,9 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
           break;
         }
         case DAGS.skillsInstall: {
-          const name = params?.NAME || params?.SKILL || "";
-          const op = params?.OP ?? "";
+          const parts = (params?.PLAN_ID || "").split("-");
+          const name = params?.NAME || params?.SKILL || parts.slice(2).join("-") || "";
+          const op = params?.OP === "apply-plan" ? parts[1] : params?.OP ?? "";
           add({
             dag, id, createdAt, duration: 2400, outcome: "succeeded",
             outputs: () => ({ result: JSON.stringify({ op, name, commit: "7ad31c2", skill: skills.get(name) ?? null, ...(op === "update" && { changed: false }) }) }),

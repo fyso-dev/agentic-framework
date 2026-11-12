@@ -326,3 +326,20 @@ test('update previews and applies the recorded path among duplicate names',()=>f
   const cli=await json(['update','greeter']);assert.equal(cli.skill.path,'skills/greeter');
   assert.match(fs.readFileSync(path.join(root,'project/bots/skills/greeter/SKILL.md'),'utf8'),/CLI update/);
 }));
+
+
+test('MCP add plan applies the exact tree path with duplicate names',()=>fixture(async({base,root,run,json})=>{
+  const dir=path.join(base,'duplicates');
+  const revision=repo(dir,{'one/SKILL.md':skillMd('duplicate','First copy.'),'two/SKILL.md':skillMd('duplicate','Reviewed copy.')});
+  const wrapper=path.join(root,'bin/git');
+  fs.writeFileSync(wrapper,`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');const args=process.argv.slice(2).map(a=>a==='https://github.com/fixture/skills.git'?process.env.FIXTURE_REPO:a);const r=spawnSync('/usr/bin/git',args,{stdio:'inherit',env:process.env});process.exit(r.status ?? 1);\n`);
+  fs.chmodSync(wrapper,0o755);
+  const env={FIXTURE_REPO:dir};
+  const ambiguous=await run(['catalog'],{...env,OP:'add',SRC:'gh:fixture/skills',SKILL:'duplicate'});
+  assert.equal(ambiguous.status,1);assert.match(ambiguous.stderr,/has 2 skills/);
+  const plan=await json(['catalog'],{...env,OP:'add',SRC:`https://github.com/fixture/skills/tree/${revision}/two`,SKILL:'duplicate'});
+  assert.equal(plan.preview.path,'two');assert.equal(plan.preview.commit,revision);assert.match(plan.preview.skillMd,/Reviewed copy/);
+  const installed=await json(['apply'],{...env,OP:'apply-plan',PLAN_ID:plan.planId,SKILLS_APPLY:'1'});
+  assert.equal(installed.skill.path,'two');assert.equal(installed.skill.commit,revision);assert.equal(installed.skill.sha256,plan.preview.sha256);
+  assert.match(fs.readFileSync(path.join(root,'project/bots/skills/duplicate/SKILL.md'),'utf8'),/Reviewed copy/);
+}));

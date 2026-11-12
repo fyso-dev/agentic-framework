@@ -136,6 +136,7 @@ export type SkillDetail = Omit<SkillHit, "origin" | "installed"> & {
 /** Output `catalog` of `fyso-skills-catalog`: a search, one skill of a source, or one installed skill. */
 export type SkillCatalog = {
   collectedAt: string;
+  planId?: string;
   query?: string;
   sources?: { source: string; count?: number; error?: string; skipped?: boolean }[];
   skills?: SkillHit[];

@@ -9,6 +9,7 @@ params:
   - NAME: ""
   - SRC: ""
   - SKILL: ""
+  - SKILL_PATH: ""
   - COMMIT: ""
 env:
   - ROOT: ${FYSO_ROOT}

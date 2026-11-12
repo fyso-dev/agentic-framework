@@ -32,7 +32,7 @@ function Reader({ reading, onClose }: { reading: Reading; onClose: () => void })
   const [initialReading] = useState(reading);
   // Read once when the reader opens (it is keyed by skill).
   useEffect(() => {
-    void start(initialReading.kind === "local" ? { NAME: initialReading.name } : initialReading.update ? { OP: "update", NAME: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" } : { SRC: initialReading.hit.src, SKILL: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" });
+    void start(initialReading.kind === "local" ? { NAME: initialReading.name } : initialReading.update ? { OP: "update", NAME: initialReading.hit.name, COMMIT: initialReading.hit.commit ?? "" } : { OP: "add", SRC: initialReading.hit.src, SKILL: initialReading.hit.name, SKILL_PATH: initialReading.hit.path ?? "", COMMIT: initialReading.hit.commit ?? "" });
   }, [start, initialReading]);
   const local = detail.output?.local, preview = detail.output?.preview;
   const shown = reading.kind === "local" ? local : preview;
@@ -101,7 +101,7 @@ function Reader({ reading, onClose }: { reading: Reading; onClose: () => void })
           <span className="ap-tag ok"><IconCheck size={13} />{t("skills.installed")}</span>
         ) : (
           <button type="button" className="btn btn-pri" disabled={busy}
-            onClick={() => void run({ OP: reading.update ? "update" : "add", NAME: preview.name, SRC: preview.src, SKILL: preview.name, COMMIT: preview.commit ?? "", SHA256: preview.sha256 })}>
+            onClick={() => void run({ OP: "apply-plan", PLAN_ID: detail.output?.planId ?? "" })}>
             {busy ? <Spinner size={14} /> : <IconDownload size={16} />}{t(reading.update ? "skills.applyUpdate" : "skills.install")}
           </button>
         ))}
