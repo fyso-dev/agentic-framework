@@ -38,15 +38,13 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
   if (!Number.isFinite(collected) || current - collected > 3600000 || collected > current + 60000 ||
       data.from !== `${now.toISOString().slice(0, 7)}-01`)
     throw new Error('observability export is stale or belongs to another month; refresh fyso-observability');
-  if (data.sources?.ledger !== 'ok' || data.invalidRows > 0 || data.warnings?.includes('invalidLedgerRows'))
-    throw new Error('observability ledger is unavailable or contains invalid rows; spend is unverified');
   const caps = config.botMonthlyUsd;
   if (config.botMonthlyUsdBasis !== undefined && !['api', 'all'].includes(config.botMonthlyUsdBasis))
     throw new Error('botMonthlyUsdBasis must be api or all');
   const basis = config.botMonthlyUsdBasis === 'all' ? 'all' : 'api';
   if (caps !== undefined && (typeof caps !== 'object' || caps === null || Array.isArray(caps) || Object.values(caps).some(v => num(v) === null)))
     throw new Error('project/observability.json: botMonthlyUsd must map bot names (or "*") to amounts in USD');
-  const incomplete = !data.coverage || data.coverage.tracesTruncated !== false || data.coverage.runsTruncated !== false ||
+  const incomplete = num(data.invalidRows) !== 0 || !data.coverage || data.coverage.tracesTruncated !== false || data.coverage.runsTruncated !== false ||
     ['ledger', 'traces', 'runs', 'harness'].some(source => data.sources?.[source] !== 'ok') ||
     !Array.isArray(data.warnings) || data.warnings.length > 0 || !Array.isArray(data.usage?.groups) ||
     num(data.usage?.totals?.missingCost) !== 0;
@@ -64,7 +62,7 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
     const state = capUsd === null ? 'none' : spentUsd !== null && spentUsd >= capUsd ? 'exceeded' : partial ? 'unknown' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
     return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, incomplete: partial, turns: row.turns, missingCost: row.missingCost};
   }).sort((a, b) => (b.spentUsd ?? 0) - (a.spentUsd ?? 0));
-  return {month: (data.from || '').slice(0, 7), basis, configured: !!caps && Object.keys(caps).length > 0, bots: rows,
+  return {month: (data.from || '').slice(0, 7), basis, incomplete, warnings: Array.isArray(data.warnings) ? data.warnings : [], configured: !!caps && Object.keys(caps).length > 0, bots: rows,
     exceeded: rows.filter(r => r.state === 'exceeded').map(r => r.bot), warn: rows.filter(r => r.state === 'warn').map(r => r.bot)};
 }
 
@@ -148,6 +146,7 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   if (caps.configured) out.push(...table([t.bot, t.spent, t.cap, '%', ''], caps.bots.map(r => [r.bot, usd(r.spentUsd), usd(r.capUsd), r.percent ?? '', `${t.state[r.state]}${r.incomplete && r.state === 'exceeded' ? `; ${t.state.unknown}` : ''}`])));
   else out.push(t.noCaps, '');
   const notes = [t.semantics];
+  if (caps.incomplete) notes.push(t.state.unknown);
   const missing = data.usage?.totals?.missingCost || 0;
   if (missing) notes.push(t.missing(missing));
   if (data.coverage?.tracesTruncated || data.coverage?.runsTruncated || Date.parse(data.from) > since) notes.push(t.truncated);

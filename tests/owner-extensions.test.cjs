@@ -217,7 +217,7 @@ test('wiki gardener retains work when all report names are occupied', () => proj
 
 const now = new Date('2026-11-11T12:00:00Z');
 const observability = () => ({
-  version: 1, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'ok'},
+  version: 1, invalidRows: 0, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'ok'},
   warnings: [], coverage: {tracesTruncated: false, runsTruncated: false}, alerts: [{kind: 'failures', value: 1, limit: 1}],
   usage: {totals: {turns: 12, missingCost: 0}, groups: [
     {bot: 'Soporte', model: 'claude-api', billingKind: 'api', source: 'omb', turns: 6, apiReportedUsd: 18.5, estimatedApiUsd: null, subscriptionEquivalentUsd: null, unclassifiedUsd: null, missingCost: 0},
@@ -341,18 +341,24 @@ test('notify hands the message to this project\'s OpenMausBot only, with an expl
 }, ['owner-loop']));
 
 
-test('digest and spend reject incomplete ledger exports', () => project(({put, run}) => {
-  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 100}}));
-  const data = {...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01'};
-  for (const change of [{invalidRows: 1}, {warnings: ['invalidLedgerRows']}, {sources: {ledger: 'unavailable'}}]) {
-    put('.data/panel/observability.json', JSON.stringify({...data, ...change}));
-    for (const action of ['digest', 'spend']) {
-      const result = run(['node', 'extensions/ops-assistant/digest.cjs', action]);
-      assert.equal(result.status, 1, action);
-      assert.match(result.stderr, /ledger.*unverified/);
-      assert.equal(result.stdout, '');
-    }
-  }
+test('invalid ledger rows preserve known over-cap alerts and incomplete status', () => project(({root, put, run}) => {
+  const current = new Date();
+  const data = {...observability(), invalidRows: 1, warnings: ['invalidLedgerRows'], collectedAt: current.toISOString(), from: current.toISOString().slice(0, 7) + '-01'};
+  put('.data/panel/observability.json', JSON.stringify(data));
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 10, '*': 100}}));
+  const alert = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
+  assert.equal(alert.status, 2, alert.stderr);
+  const result = JSON.parse(alert.stdout);
+  assert.deepEqual(result.newlyExceeded, ['Soporte']);
+  assert.equal(result.incomplete, true);
+  assert.deepEqual(result.warnings, ['invalidLedgerRows']);
+  assert.equal(result.bots.find(bot => bot.bot === 'Soporte').incomplete, true);
+  assert.equal(result.bots.find(bot => bot.bot === 'Ventas | Norte').state, 'unknown');
+  const digest = run(['node', 'extensions/ops-assistant/digest.cjs', 'digest'], {LANG_UI: 'en'});
+  assert.equal(digest.status, 0, digest.stderr);
+  const report = fs.readFileSync(path.join(root, 'project/wiki', `${JSON.parse(digest.stdout).page}.md`), 'utf8');
+  assert.match(report, /over the cap; incomplete data/);
+  assert.doesNotMatch(report, /within the cap/);
 }, ['ops-assistant']));
 
 test('digest and spend reject stale and wrong-month exports', () => project(({put, run}) => {
@@ -375,7 +381,9 @@ test('incomplete coverage and unknown costs cannot produce within-cap states', (
   const {spend, digest} = require(path.join(root, 'extensions/ops-assistant/digest.cjs'));
   for (const change of [
     {coverage: {tracesTruncated: true, runsTruncated: false}},
-    ...['traces', 'runs', 'harness'].map(source => ({sources: {...observability().sources, [source]: 'unavailable'}})),
+    {invalidRows: 1},
+    {warnings: ['invalidLedgerRows']},
+    ...['ledger', 'traces', 'runs', 'harness'].map(source => ({sources: {...observability().sources, [source]: 'unavailable'}})),
     ...['invalidArtifacts', 'runDetailsUnavailable', 'invalidSettings'].map(warning => ({warnings: [warning]})),
     {usage: {...observability().usage, totals: {turns: 12, missingCost: 1}}},
   ]) {
@@ -432,7 +440,7 @@ test('known spend exceeding a cap alerts while retaining incomplete coverage', (
 }, ['ops-assistant']));
 
 test('spend checks refuse stale data, unavailable ledgers and old months', () => project(({put, run}) => {
-  for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}, {sources: {ledger: 'unavailable'}}, {invalidRows: 1}, {warnings: ['invalidLedgerRows']}] ) {
+  for (const change of [{collectedAt: '2000-01-01'}, {from: '2000-01-01'}] ) {
     put('.data/panel/observability.json', JSON.stringify({...observability(), collectedAt: new Date().toISOString(), from: new Date().toISOString().slice(0, 7) + '-01', ...change}));
     const result = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
     assert.equal(result.status, 1);
