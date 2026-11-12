@@ -47,18 +47,20 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
   if (caps !== undefined && (typeof caps !== 'object' || caps === null || Array.isArray(caps) || Object.values(caps).some(v => num(v) === null)))
     throw new Error('project/observability.json: botMonthlyUsd must map bot names (or "*") to amounts in USD');
   const incomplete = !data.coverage || data.coverage.tracesTruncated !== false || data.coverage.runsTruncated !== false ||
-    data.sources?.harness !== 'ok' || !Array.isArray(data.usage?.groups) ||
-    typeof data.usage?.totals?.missingCost !== 'number' || data.usage.totals.missingCost > 0;
+    ['ledger', 'traces', 'runs', 'harness'].some(source => data.sources?.[source] !== 'ok') ||
+    !Array.isArray(data.warnings) || data.warnings.length > 0 || !Array.isArray(data.usage?.groups) ||
+    num(data.usage?.totals?.missingCost) !== 0;
   const bots = new Map();
   for (const group of data.usage?.groups || []) {
-    const row = bots.get(group.bot) || {bot: group.bot, parts: [], missingCost: 0, turns: 0};
+    const row = bots.get(group.bot) || {bot: group.bot, parts: [], missingCost: 0, turns: 0, unclassified: false};
     row.parts.push(group.apiReportedUsd, group.estimatedApiUsd, ...(basis === 'all' ? [group.subscriptionEquivalentUsd, group.unclassifiedUsd] : []));
-    row.missingCost += group.missingCost || 0; row.turns += group.turns || 0;
+    row.missingCost += num(group.missingCost) ?? 1; row.turns += group.turns || 0;
+    if (basis === 'api' && (num(group.unclassifiedUsd) ?? 0) > 0) row.unclassified = true;
     bots.set(group.bot, row);
   }
   const rows = [...bots.values()].map(row => {
     const spentUsd = sum(row.parts), capUsd = caps ? num(caps[row.bot]) ?? num(caps['*']) : null;
-    const state = capUsd === null ? 'none' : incomplete || spentUsd === null || row.missingCost ? 'unknown' : spentUsd >= capUsd ? 'exceeded' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
+    const state = capUsd === null ? 'none' : incomplete || spentUsd === null || row.missingCost || row.unclassified ? 'unknown' : spentUsd >= capUsd ? 'exceeded' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
     return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, turns: row.turns, missingCost: row.missingCost};
   }).sort((a, b) => (b.spentUsd ?? 0) - (a.spentUsd ?? 0));
   return {month: (data.from || '').slice(0, 7), basis, configured: !!caps && Object.keys(caps).length > 0, bots: rows,

@@ -218,7 +218,7 @@ test('wiki gardener retains work when all report names are occupied', () => proj
 const now = new Date('2026-11-11T12:00:00Z');
 const observability = () => ({
   version: 1, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'ok'},
-  coverage: {tracesTruncated: false, runsTruncated: false}, alerts: [{kind: 'failures', value: 1, limit: 1}],
+  warnings: [], coverage: {tracesTruncated: false, runsTruncated: false}, alerts: [{kind: 'failures', value: 1, limit: 1}],
   usage: {totals: {turns: 12, missingCost: 0}, groups: [
     {bot: 'Soporte', model: 'claude-api', billingKind: 'api', source: 'omb', turns: 6, apiReportedUsd: 18.5, estimatedApiUsd: null, subscriptionEquivalentUsd: null, unclassifiedUsd: null, missingCost: 0},
     {bot: 'Soporte', model: 'haiku', billingKind: 'subscription', source: 'omb', turns: 2, apiReportedUsd: null, estimatedApiUsd: null, subscriptionEquivalentUsd: 4, unclassifiedUsd: null, missingCost: 0},
@@ -375,7 +375,8 @@ test('incomplete coverage and unknown costs cannot produce within-cap states', (
   const {spend, digest} = require(path.join(root, 'extensions/ops-assistant/digest.cjs'));
   for (const change of [
     {coverage: {tracesTruncated: true, runsTruncated: false}},
-    {sources: {...observability().sources, harness: 'unavailable'}},
+    ...['traces', 'runs', 'harness'].map(source => ({sources: {...observability().sources, [source]: 'unavailable'}})),
+    ...['invalidArtifacts', 'runDetailsUnavailable', 'invalidSettings'].map(warning => ({warnings: [warning]})),
     {usage: {...observability().usage, totals: {turns: 12, missingCost: 1}}},
   ]) {
     const data = {...observability(), ...change};
@@ -384,6 +385,26 @@ test('incomplete coverage and unknown costs cannot produce within-cap states', (
     assert.match(digest(data, {botMonthlyUsd: {Soporte: 100}}, {lang: 'en', now}).text, /incomplete data/);
     assert.doesNotMatch(digest(data, {botMonthlyUsd: {Soporte: 100}}, {lang: 'en', now}).text, /within the cap/);
   }
+}, ['ops-assistant']));
+
+test('unclassified spend is unknown for API caps in both commands', () => project(({root, put, run}) => {
+  const current = new Date();
+  const data = {...observability(), collectedAt: current.toISOString(), from: current.toISOString().slice(0, 7) + '-01'};
+  data.usage.groups = [{bot: 'Soporte', turns: 2, apiReportedUsd: 1, estimatedApiUsd: null,
+    subscriptionEquivalentUsd: null, unclassifiedUsd: 100, missingCost: 0}];
+  put('.data/panel/observability.json', JSON.stringify(data));
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 10}}));
+  const spendResult = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
+  assert.equal(spendResult.status, 0, spendResult.stderr);
+  const bot = JSON.parse(spendResult.stdout).bots[0];
+  assert.equal(bot.spentUsd, 1);
+  assert.equal(bot.state, 'unknown');
+  const digestResult = run(['node', 'extensions/ops-assistant/digest.cjs', 'digest'], {LANG_UI: 'en'});
+  assert.equal(digestResult.status, 0, digestResult.stderr);
+  const page = JSON.parse(digestResult.stdout).page;
+  const report = fs.readFileSync(path.join(root, 'project/wiki', `${page}.md`), 'utf8');
+  assert.match(report, /incomplete data/);
+  assert.doesNotMatch(report, /within the cap/);
 }, ['ops-assistant']));
 
 test('spend checks refuse stale data, unavailable ledgers and old months', () => project(({put, run}) => {
