@@ -1,4 +1,4 @@
-// Apps, in two tabs. "Open" is a tile launcher: framework apps (Dagu, OpenMausBot), the
+// Apps, in three tabs (the third, third-party skills, lives in Skills.tsx). "Open" is a tile launcher: framework apps (Dagu, OpenMausBot), the
 // project's own apps and the apps added by extensions, each with its health. "Extensions"
 // lists the installed extensions (docs/extensions-contract.md §5) and the marketplace (§8),
 // which installs and upgrades through the fyso-ext-catalog and fyso-ext-install workflows.
@@ -16,6 +16,7 @@ import {
 import { ExtensionSetup } from "../components/ExtensionSetup";
 import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
 import { CopyLine } from "../components/ui";
+import { SkillsTab } from "./Skills";
 import { localized } from "../lib/i18n";
 import { go, href, type AppsTab } from "../lib/router";
 import { useDaguAction, type Action } from "../lib/useDaguAction";
@@ -474,7 +475,10 @@ export function Apps({ tab }: { tab: AppsTab }) {
   const tabs: { id: AppsTab; label: string; Icon: typeof IconPuzzle }[] = [
     { id: "open", label: t("apps.tabOpen"), Icon: IconArrowUpRight },
     { id: "ext", label: t("apps.tabExt"), Icon: IconPuzzle },
+    { id: "skills", label: t("apps.tabSkills"), Icon: IconLayers },
   ];
+  const s = useStore();
+  const toReview = (s.skills.data ?? []).filter((k) => k.state !== "ready").length;
   return (
     <main className="page page-wide ap-page">
       <div className="ap-head">
@@ -488,11 +492,14 @@ export function Apps({ tab }: { tab: AppsTab }) {
               {id === "ext" && updates > 0 && (
                 <span className="ap-count" data-tip={t("apps.updates", { count: updates })}>{updates}<span className="sr-only"> {t("apps.updates", { count: updates })}</span></span>
               )}
+              {id === "skills" && toReview > 0 && (
+                <span className="ap-count" data-tip={t("skills.toReview", { count: toReview })}>{toReview}<span className="sr-only"> {t("skills.toReview", { count: toReview })}</span></span>
+              )}
             </button>
           ))}
         </div>
       </div>
-      {tab === "open" ? <OpenTab /> : <ExtensionsTab market={market} />}
+      {tab === "open" ? <OpenTab /> : tab === "skills" ? <SkillsTab /> : <ExtensionsTab market={market} />}
     </main>
   );
 }

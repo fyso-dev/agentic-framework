@@ -86,7 +86,7 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 		}
 		respond 405
 	}
-	@config path /config/project.json /config/apps.json /config/extensions.json /config/observability.json /config/bot-versioning.json
+	@config path /config/project.json /config/apps.json /config/extensions.json /config/skills.json /config/observability.json /config/bot-versioning.json
 	handle @config {
 		@read method GET HEAD
 		handle @read {

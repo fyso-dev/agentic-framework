@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck } from "./types";
+import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -121,6 +121,15 @@ function extensions(scenario: Scenario): Extension[] {
     },
   ];
 }
+
+// Third-party skills (D64): one confirmed, one waiting for review; installs land in "review".
+const SKILL_MD = "---\nname: brand-guidelines\ndescription: Demonstration skill for panel review.\nlicense: Apache-2.0\n---\n\n# Demo skill\n\nThis is fictional content used to test the panel review flow.\n";
+const mockSkill = (name: string, state: ThirdPartySkill["state"], warnings: string[] = []): ThirdPartySkill => ({
+  name, description: name === "pdf-forms" ? "Fills PDF forms." : "Applies the brand colors and typography.", src: "gh:anthropics/skills",
+  path: `skills/${name}`, commit: "2c5958ecac7cee2b583967a2c4981d0f4a75c579", license: "Apache-2.0", licenseFile: "LICENSE.txt", licenseTitle: "Apache License",
+  sha256: "10067cdd9be9cd5d97c741fc6e25830135afa0e11cc71e567b75763e26d08799", files: 2, installedAt: "2026-11-11T12:00:00.000Z",
+  scan: { at: "2026-11-11T12:00:01.000Z", warnings }, review: state === "ready" ? { at: "2026-11-11T12:05:00.000Z" } : null, state, bots: [],
+});
 
 function marketplace(installed: Set<string>, versions: Map<string, string>): Marketplace {
   const entries: Omit<MarketplaceEntry, "installed" | "version" | "update">[] = [
@@ -242,6 +251,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   const latest = new Map<string, MockRun>();
   let seq = 0;
   const installed = new Set(scenario === "empty" ? [] : ["sample"]);
+  const skills = new Map<string, ThirdPartySkill>(scenario === "empty" ? [] : [["brand-guidelines", mockSkill("brand-guidelines", "ready")]]);
   const agentsOn = new Set(scenario === "empty" ? [] : ["claude-desktop"]);
   const versions = new Map(scenario === "empty" ? [] : [["sample", "v1.2.0"]]);
 
@@ -337,6 +347,11 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       return [...base.map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
     },
 
+    async getSkills() {
+      await sleep(200);
+      return [...skills.values()];
+    },
+
     async enqueue(dag, params) {
       await sleep(200);
       const id = `mock-${++seq}`;
@@ -388,6 +403,32 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
             onDone: () => {
               installed.add(ext);
               if (latest) versions.set(ext, latest);
+            },
+          });
+          break;
+        }
+        case DAGS.skillsCatalog: {
+          const held = params?.NAME ? skills.get(params.NAME) : undefined;
+          const output: SkillCatalog = held
+            ? { collectedAt: new Date().toISOString(), local: { ...held, skillMd: SKILL_MD.replaceAll("brand-guidelines", held?.name || params?.SKILL || "pdf-forms"), files: ["LICENSE.txt", "SKILL.md"] } }
+            : params?.SRC
+              ? { collectedAt: new Date().toISOString(), preview: { ...mockSkill(params.SKILL || "pdf-forms", "review"), skillMd: SKILL_MD.replaceAll("brand-guidelines", params?.SKILL || "pdf-forms"), licenseText: "Apache License\nVersion 2.0, January 2004", files: ["LICENSE.txt", "SKILL.md"], installed: skills.has(params.SKILL || "pdf-forms") } }
+              : { collectedAt: new Date().toISOString(), query: params?.QUERY ?? "", sources: [{ source: "gh:anthropics/skills", count: 1 }, { source: "skills.sh", count: 1 }], installed: [...skills.values()],
+                  skills: [{ ...mockSkill("pdf-forms", "review"), origin: "source", installed: skills.has("pdf-forms") },
+                    { name: "report-writer", src: "gh:acme/agent-skills", origin: "directory", installs: 1280, url: "https://skills.sh/acme/agent-skills/report-writer", installed: false }] };
+          add({ dag, id, createdAt, duration: 1500, outcome: "succeeded", outputs: () => ({ catalog: JSON.stringify(output) }) });
+          break;
+        }
+        case DAGS.skillsInstall: {
+          const name = params?.NAME || params?.SKILL || "";
+          const op = params?.OP ?? "";
+          add({
+            dag, id, createdAt, duration: 2400, outcome: "succeeded",
+            outputs: () => ({ result: JSON.stringify({ op, name, commit: "7ad31c2", skill: skills.get(name) ?? null, ...(op === "update" && { changed: false }) }) }),
+            onDone: () => {
+              if (op === "add") skills.set(name, mockSkill(name, "review"));
+              else if (op === "confirm") skills.set(name, mockSkill(name, "ready"));
+              else if (op === "remove") skills.delete(name);
             },
           });
           break;

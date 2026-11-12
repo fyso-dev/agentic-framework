@@ -1,0 +1,24 @@
+description: Panel skills-install (install, update, scan, confirm or remove one third-party skill, D64)
+labels:
+  - fyso=system
+type: graph
+max_active_runs: 1
+params:
+  - PLAN_ID: ""
+  - PLAN_ID: ""
+  - OP: ""
+  - NAME: ""
+  - SRC: ""
+  - SKILL: ""
+  - COMMIT: ""
+  - SHA256: ""
+env:
+  - ROOT: ${FYSO_ROOT}
+  - SKILLS_APPLY: "1"
+working_dir: ${ROOT}
+steps:
+  # mise exec: Dagu steps start from a cleared environment (ports, tools).
+  # Parameters reach the script as env vars, never through the shell command line.
+  - id: apply
+    command: mise exec -- node framework/scripts/skills.cjs apply
+    output: RESULT

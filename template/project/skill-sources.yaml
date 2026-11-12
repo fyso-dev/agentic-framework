@@ -1,0 +1,6 @@
+# Where this project looks for third-party Agent Skills (D64).
+# Each line is a git repository that holds SKILL.md folders. `skills.sh` adds keyword
+# search in that public directory: it only names repositories, the files always come
+# from git, pinned to a commit. Remove a line to stop using that source.
+- gh:anthropics/skills
+- skills.sh

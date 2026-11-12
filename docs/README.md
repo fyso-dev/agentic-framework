@@ -20,7 +20,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D63; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D73; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -55,6 +55,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
+| Third-party skills: catalog discovery, pinned git copies, native scan and human review (D73) | [third-party-skills.md](third-party-skills.md) · [spike](adr/spikes/skills-registry.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: published [v0.1.0](https://github.com/fyso-dev/fyso-ext-silverbullet/releases/tag/v0.1.0), official marketplace, shared wiki files, panel-aligned theme, official filesystem MCP, per-bot skill, panel Knowledge page, AI import of a folder or zip, install and verification (D53, D54, D58, D59) | [silverbullet-extension.md](silverbullet-extension.md) |
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
@@ -91,6 +92,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
+| 2026-11-12 | **Third-party skills (D73).** skills.sh anonymous CLI endpoint verified; documented v1 requires Vercel identity. Native OMB 0.1.141 disabled import scans SKILL.md and omits supporting files. Git copies retain full provenance/license and require human confirmation; panel/MCP apply immutable previews. [Spike](adr/spikes/skills-registry.md) · [contract and verification](third-party-skills.md). |
 | 2026-11-10 | **Longer default local web sessions.** New projects use 30 days for native Tinyauth session expiry and maximum lifetime to avoid hourly logins. Existing project-owned authentication settings are preserved; adoption and memorable passphrases are documented in [web authentication](web-auth.md). |
 |---|---|
 | 2026-11-10 | **Panel roster refresh and exact bot removal.** The panel refreshes the declaration alongside the native roster, retains stale drafts without applying them and shows native avatars when available. Bot deletion previews identify exact runtime IDs and warn about conversation history loss. [Contract](panel-contract.md#3-action-workflows) |
