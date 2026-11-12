@@ -1,6 +1,6 @@
 # Bundled extensions for business owners
 
-D66–D72 (provisional numbers: another branch may require renumbering at merge).
+D66–D72.
 These are opt-in sources under `framework/extensions/` in a generated project.
 They do not enable skills, install bots, grant tools or publish marketplace entries.
 
@@ -130,13 +130,16 @@ Caps live in project-owned `project/observability.json`, under `botMonthlyUsd`
 (bot names or `*`) and `botMonthlyUsdBasis` (`api` default or `all`). API cost,
 estimated API cost and subscription equivalents remain distinguishable. Unknown
 spend stays unknown; warnings/exceedances based on known amounts are lower bounds.
-Stale exports, the wrong UTC month, unavailable ledgers or invalid ledger rows fail checks. The first new
+Stale exports and exports for the wrong UTC month fail evaluation. For a current
+export, incomplete sources, invalid rows or unknown costs leave below-cap spend
+unverified; known eligible spend at or above the cap still establishes an exceedance.
+The first new
 exceedance per bot/month fails the workflow, making an advisory Dagu failure; a mark
 in ignored runtime data suppresses duplicate alerts. Later runs still report the
 exceeded state. No proactive phone/email notification is implied by a red run.
 
-The same focused check passed 13 tests, including edited report preservation,
-invalid ledger rejection and workflow status counts.
+The focused checks cover edited report preservation, incomplete ledger handling and
+workflow status counts.
 
 This does not pause bots. The inspected OMB 0.1.141 package exposes workspace-wide
 `budgets.monthlyUsd`, behind its `budgets` license feature, not a native per-bot pause.
@@ -246,7 +249,7 @@ configuration instead of enumerating two names.
   the fixture now supplies both native process names. Only the hook test needed a
   rerun after that correction and passed (1/1); core activation behavior was unchanged.
 - `bash scripts/check-paths.sh`, a separate equivalent scan of all untracked files,
-  and `git diff --check` passed. Worktree changes remain uncommitted; no push or publication was performed.
+  and `git diff --check` passed at the time of this acceptance run.
 
 Not verified: browser rendering/layout, AI interviews or contradiction quality,
 real bot notification/device delivery, real credential-card/provider interaction,

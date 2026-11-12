@@ -95,4 +95,3 @@ steps:
     depends: [agent_claude, agent_codex]
     run: node extensions/knowledge-skills/garden.cjs publish
     output: RESULT
-
