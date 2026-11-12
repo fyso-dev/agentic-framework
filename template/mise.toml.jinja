@@ -96,8 +96,14 @@ description = "Build the pinned, unmodified native login service"
 run = "framework/scripts/install-web-auth.sh"
 
 [tasks."web-auth:users"]
-description = "Manage local web users while the stack is stopped: init, add <username>, remove <username>"
+description = "Manage local web users: add <username>, remove <username>; signs everyone out"
+raw = true   # a generated password is printed on purpose
 run = "framework/scripts/web-auth-users.sh"
+
+[tasks."web-auth:password"]
+description = "Show the web login password (default: the administrator's); --new sets a new readable one"
+raw = true   # the password is printed on purpose; mise would redact it otherwise
+run = "framework/scripts/web-auth-users.sh password"
 
 [tasks.snapshot]
 description = "Save bots, memory and workflows to git now (also runs hourly in Dagu)"
