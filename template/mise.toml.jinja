@@ -119,7 +119,7 @@ run = "framework/scripts/tray-install.sh"
 
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
-run = "sops edit secrets.enc.yaml"
+run = 'SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}" sops edit secrets.enc.yaml'
 
 [tasks."bots:architect"]
 description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
