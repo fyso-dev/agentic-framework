@@ -33,7 +33,7 @@ function render() {
   const body = $('list').tBodies[0];
   body.replaceChildren(...shown.map(file => {
     const row = document.createElement('tr');
-    const cell = (text, className) => { const td = document.createElement('td'); td.textContent = text; if (className) td.className = className; row.append(td); return td; };
+    const cell = (text, className) => { const td = document.createElement('td'); td.textContent = text; if (className) { td.className = className; } row.append(td); return td; };
     cell(file.name, 'name');
     cell(when.format(new Date(file.mod_time)), 'date');
     cell(size(file.size), 'num');
@@ -45,7 +45,10 @@ function render() {
     return row;
   }));
   $('list').hidden = !shown.length;
-  $('state').textContent = !files.length ? t.empty : !shown.length ? t.noMatch : '';
+  let state = '';
+  if (!files.length) state = t.empty;
+  else if (!shown.length) state = t.noMatch;
+  $('state').textContent = state;
 }
 
 async function load() {
@@ -64,4 +67,4 @@ async function load() {
 }
 $('filter').addEventListener('input', render);
 $('refresh').addEventListener('click', load);
-load();
+await load();

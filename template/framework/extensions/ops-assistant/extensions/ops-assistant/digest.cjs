@@ -25,7 +25,10 @@ function readExport(ctx) {
 }
 function settings(ctx) {
   try { return JSON.parse(fs.readFileSync(path.join(ctx.root, 'project', 'observability.json'), 'utf8')) || {}; }
-  catch (error) { if (error.code === 'ENOENT') return {}; throw new Error('project/observability.json is not valid JSON'); }
+  catch (error) {
+    if (error.code === 'ENOENT') return {};
+    throw new Error('project/observability.json is not valid JSON');
+  }
 }
 
 // Month-to-date cost per bot against `botMonthlyUsd` of project/observability.json:
@@ -44,7 +47,7 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
   const basis = config.botMonthlyUsdBasis === 'all' ? 'all' : 'api';
   if (caps !== undefined && (typeof caps !== 'object' || caps === null || Array.isArray(caps) || Object.values(caps).some(v => num(v) === null)))
     throw new Error('project/observability.json: botMonthlyUsd must map bot names (or "*") to amounts in USD');
-  const incomplete = num(data.invalidRows) !== 0 || !data.coverage || data.coverage.tracesTruncated !== false || data.coverage.runsTruncated !== false ||
+  const incomplete = num(data.invalidRows) !== 0 || data.coverage?.tracesTruncated !== false || data.coverage?.runsTruncated !== false ||
     ['ledger', 'traces', 'runs', 'harness'].some(source => data.sources?.[source] !== 'ok') ||
     !Array.isArray(data.warnings) || data.warnings.length > 0 || !Array.isArray(data.usage?.groups) ||
     num(data.usage?.totals?.missingCost) !== 0;
@@ -59,7 +62,11 @@ function spend(data, config, warnAt = 0.8, now = new Date()) {
   const rows = [...bots.values()].map(row => {
     const spentUsd = sum(row.parts), capUsd = caps ? num(caps[row.bot]) ?? num(caps['*']) : null;
     const partial = Boolean(incomplete || spentUsd === null || row.missingCost || row.unclassified);
-    const state = capUsd === null ? 'none' : spentUsd !== null && spentUsd >= capUsd ? 'exceeded' : partial ? 'unknown' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
+    let state = 'ok';
+    if (capUsd === null) state = 'none';
+    else if (spentUsd !== null && spentUsd >= capUsd) state = 'exceeded';
+    else if (partial) state = 'unknown';
+    else if (spentUsd >= capUsd * warnAt) state = 'warn';
     return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, incomplete: partial, turns: row.turns, missingCost: row.missingCost};
   }).sort((a, b) => (b.spentUsd ?? 0) - (a.spentUsd ?? 0));
   return {month: (data.from || '').slice(0, 7), basis, incomplete, warnings: Array.isArray(data.warnings) ? data.warnings : [], configured: !!caps && Object.keys(caps).length > 0, bots: rows,
@@ -118,7 +125,7 @@ function summarizeRuns(runs) {
 
 function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
   const t = TEXT[lang], usd = v => num(v) === null ? t.unknown : `$${v.toFixed(2)}`;
-  const cell = value => String(value ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ');
+  const cell = value => String(value ?? '').replaceAll('|', String.raw`\|`).replace(/\s+/g, ' ');
   const since = now.getTime() - days * 86400000, inWindow = at => Number.isFinite(Date.parse(at)) && Date.parse(at) >= since && Date.parse(at) <= now.getTime();
   const day = d => new Date(d).toISOString().slice(0, 10);
   const traces = (data.traces || []).filter(tr => inWindow(tr.startedAt)), runs = (data.runs || []).filter(r => inWindow(r.startedAt));

@@ -26,7 +26,7 @@ function pages(wiki) {
     }
   }
   visit(wiki);
-  return found.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  return found.sort((a, b) => a === b ? 0 : (a < b ? -1 : 1));
 }
 
 // Seconds since epoch of the last commit that touched each page; file time when git has none.
@@ -37,7 +37,7 @@ function changedAt(root, wiki, files) {
       {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024});
     const prefix = posix(path.relative(root, wiki));
     let at = 0;
-    for (const token of log.split(/\0|\n/)) {
+    for (const token of log.split(/[\0\n]/)) {
       if (token.startsWith('@')) at = Number(token.slice(1));
       else if (token && at) {
         const rel = prefix && token.startsWith(prefix + '/') ? token.slice(prefix.length + 1) : token;
@@ -57,11 +57,11 @@ function links(text) {
   // Code is not prose: links inside fences and inline code are examples.
   const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
   const found = [];
-  for (const match of prose.matchAll(/\[\[([^\]\n]+)\]\]/g)) {
+  for (const match of prose.matchAll(/\[\[([^\[\]\n]+)\]\]/g)) {
     const target = match[1].split('|')[0].split('#')[0].split('@')[0].trim();
     if (target && !/^[a-z][a-z0-9+.-]*:/i.test(target)) found.push({kind: 'wiki', target, text: match[0]});
   }
-  for (const match of prose.matchAll(/(?<!!)\[[^\]\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+  for (const match of prose.matchAll(/(?<!!)\[[^\[\]\n]*\]\(([^()\s]+)(?:\s+"[^"\n]*")?\)/g)) {
     const target = match[1].split('#')[0];
     if (target && !/^[a-z][a-z0-9+.-]*:/i.test(target) && !target.startsWith('//')) found.push({kind: 'path', target, text: match[0]});
   }
@@ -139,7 +139,7 @@ const pageLink = file => `[[${file.replace(/\.md$/, '')}]]`;
 
 function report(findings, proposals, lang, date) {
   const t = TEXT[lang], out = [`# ${t.title} ${date}`, '', t.intro(findings.pages, date), ''];
-  if (findings.broken.length) out.push(`## ${t.broken}`, '', ...findings.broken.map(b => `- ${pageLink(b.page)}: \`${b.link.replace(/`/g, "'")}\``), '');
+  if (findings.broken.length) out.push(`## ${t.broken}`, '', ...findings.broken.map(b => `- ${pageLink(b.page)}: \`${b.link.replaceAll('`', "'")}\``), '');
   if (findings.stale.length) out.push(`## ${t.stale(findings.staleDays)}`, '', ...findings.stale.map(s => `- ${pageLink(s.page)} (${s.days} ${t.days})`), '');
   if (findings.orphans.length) out.push(`## ${t.orphans}`, '', ...findings.orphans.map(o => `- ${pageLink(o)}`), '');
   if (findings.truncated) out.push(t.more, '');
