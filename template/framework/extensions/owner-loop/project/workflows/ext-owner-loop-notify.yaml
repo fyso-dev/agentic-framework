@@ -1,0 +1,14 @@
+# Tell the owner something from a workflow, through a bot of this project: the message
+# is sent to the bot with OpenMausBot's own `send`, and the bot passes it on in its
+# conversation (OpenMausBot notifies the person's paired devices). One short bot turn.
+# Start it as the last step of another workflow with dag.enqueue, or by hand.
+description: Pass a message to the owner through a bot's conversation
+type: graph
+params:
+  - MESSAGE: ""        # complete on its own; no secrets
+  - BOT: MausBot       # the bot that passes it on (name or id)
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: send
+    run: bash extensions/owner-loop/notify.sh
+    output: RESULT

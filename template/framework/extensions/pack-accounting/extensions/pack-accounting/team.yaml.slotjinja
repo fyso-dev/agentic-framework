@@ -1,0 +1,48 @@
+# Sample bot pack for an accounting firm, in OpenMausBot's native team file format
+# (the format of project/bots/team.yaml). It is a STARTING POINT that needs review by
+# a qualified accountant of the firm: it holds no tax, legal or regulatory facts, and
+# the bots are told to take those from the firm's own wiki pages and people.
+#
+# Nothing here is applied by installing. Preview it, then copy the bots you want into
+# project/bots/team.yaml and review and apply them in the panel (see README.md).
+{%- if _external_data.project.engine | default('claude') == 'codex' %}
+{%- set strong = 'codex/gpt-6.1-sol' %}
+{%- set fast = 'codex/gpt-6-luna' %}
+{%- else %}
+{%- set strong = 'claude/claude-sonnet-5' %}
+{%- set fast = 'claude/claude-haiku-4-5' %}
+{%- endif %}
+version: 1
+
+defaults:
+  computer: "off"
+  cwd: ${FYSO_ROOT}
+
+bots:
+  - name: Client Intake
+    title: Collects what the firm needs from each client and keeps the checklist
+    model: {{ fast }}
+    approval: ask
+    tools: { allow: ["native:*"] }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/client-intake.md' }
+
+  - name: Bookkeeping Assistant
+    title: Prepares working papers and reconciliation drafts for an accountant to review
+    model: {{ strong }}
+    approval: ask
+    tools: { allow: ["native:*"] }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/bookkeeping-assistant.md' }
+
+  - name: Deadline Keeper
+    title: Tracks the firm's own calendar of obligations and reminds in time
+    model: {{ fast }}
+    approval: ask
+    tools: { allow: ["native:*"] }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/deadline-keeper.md' }
+
+  - name: Client Writer
+    title: Drafts messages and letters to clients for a person to send
+    model: {{ fast }}
+    approval: ask
+    tools: { allow: ["native:*"] }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/client-writer.md' }

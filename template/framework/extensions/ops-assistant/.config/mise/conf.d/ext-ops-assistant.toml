@@ -1,0 +1,8 @@
+# No extra tool: two workflows and one script on the project's Node.
+[tasks."ops-assistant:digest"]
+description = "Write the weekly digest page now"
+run = "framework/scripts/run-ext.sh ops-assistant -- node extensions/ops-assistant/digest.cjs digest"
+
+[tasks."ops-assistant:spend"]
+description = "Show each bot's month-to-date cost against its cap"
+run = "framework/scripts/run-ext.sh ops-assistant -- node extensions/ops-assistant/digest.cjs spend"

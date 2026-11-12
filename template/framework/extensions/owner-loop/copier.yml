@@ -1,0 +1,8 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-owner-loop.yml
+_templates_suffix: .slotjinja
+# No port, process or secret: Dagu and OpenMausBot already do the work. Nothing to ask.
+_exclude:
+  - copier.yml
+  - /README.md
+  - .git

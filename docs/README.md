@@ -58,6 +58,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Third-party skills: catalog discovery, pinned git copies, native scan and human review (D73) | [third-party-skills.md](third-party-skills.md) · [spike](adr/spikes/skills-registry.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: published [v0.1.0](https://github.com/fyso-dev/fyso-ext-silverbullet/releases/tag/v0.1.0), official marketplace, shared wiki files, panel-aligned theme, official filesystem MCP, per-bot skill, panel Knowledge page, AI import of a folder or zip, install and verification (D53, D54, D58, D59) | [silverbullet-extension.md](silverbullet-extension.md) |
+| Business-owner opt-in extensions: office documents, deliverables, knowledge skills, operations, owner loop and accounting sample (D66–D72) | [owner-extensions.md](owner-extensions.md) |
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
@@ -89,6 +90,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
 
 | Date | Entry |
@@ -226,5 +229,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | **Recoverable web passwords (D64).** `mise run web-auth:password` shows a user's password and `-- --new` sets a readable generated one, with the project running and without a terminal prompt. Passwords are kept encrypted next to their hashes. Verified with real sops, age and Caddy bcrypt (`tests/web-auth-password.test.cjs`). [Contract](web-auth.md#configuration-and-ownership) |
 
 | 2026-11-11 | **Run the remote MCP setup from the panel (D65).** `#/mcp` over HTTPS gets a *Run* button: Dagu makes sure the token exists (`fyso-agent-connect`, `MODE=remote`) and the private setup adapter returns the command for Claude Code, Codex, OpenCode, Gemini CLI and a generic JSON entry. The token never passes through Dagu. First recorded exception to "the panel never shows secret values". [Agent surface](agent-surface.md#remote-clients-d63) |
+| 2026-11-11 | **Owner extensions handoff review (D66–D72).** Six independent bundles use native slots and per-bot opt-in. Corrected PPTX verification guidance, Typst font selection, attachment headers for directory-index cases, resolved symlink inputs, and stale/missing spend checks. Native document/XLSX/gardener tests, generated-stack doctor, authenticated file HTTP checks and Dagu human wait/resume passed; AI and browser acceptance remain separate. Upstream document licenses allow redistribution; thin original skills avoid their extra dependencies. See [sources, verification and open spikes](owner-extensions.md). |
+
+| 2026-11-12 | **Owner extensions final integration acceptance.** Corrected the ops doctor synthetic freshness contract and added its executable regression. Reverified complete-stack doctor, authenticated downloads and private slots, Dagu human wait/resume and real rendered deliverables. [Evidence](../artifacts/delivery-evidence/owner-extensions/README.md). |
 
 | 2026-11-12 | **Skills integration acceptance (D73).** Merged current main, regenerated panel assets, removed duplicate native workflow parameters and added PR build/regression checks. Disposable-stack doctor and real authenticated browser installation/scan/confirmation passed. See [evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for final per-agent acceptance and remaining limits. |

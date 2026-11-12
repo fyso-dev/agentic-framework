@@ -1,0 +1,8 @@
+# No extra tool: Caddy serves the folder and the deliver tool runs on the project's Node.
+[tasks."deliverables:list"]
+description = "List delivered files with their links"
+run = "framework/scripts/run-ext.sh deliverables -- node extensions/deliverables/deliver.cjs list"
+
+[tasks."deliverables:doctor"]
+description = "Check the deliverables folder and its login protection"
+run = "framework/scripts/run-ext.sh deliverables -- bash extensions/deliverables/doctor.sh"
