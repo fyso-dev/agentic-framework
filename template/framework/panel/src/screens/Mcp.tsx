@@ -3,12 +3,15 @@
 // MODE=status says which agents are installed and connected; connect, disconnect and open act
 // on one. Those apps live on the Dagu host, so when the panel is opened from another machine the
 // actions are hidden. Over HTTPS (an HTTPS provider extension, D62) the page points to the remote
-// MCP endpoint and the terminal task that prints its token (D63); over plain HTTP it says what is missing.
+// MCP endpoint (D63): a Run button makes sure the token exists through the same workflow (MODE=remote)
+// and then shows the command for each client, fetched from the private setup adapter (D65); the
+// terminal task stays as the copyable alternative. Over plain HTTP it says what is missing.
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { agentRemote, RemoteError, type RemoteCommands } from "../api/agentRemote";
 import { DAGS } from "../api/types";
 import { ActionError } from "../components/Action";
-import { IconChat, IconCheck, IconCode, IconInfo, IconPlug, IconSparkle, IconTerminal, Spinner } from "../components/Icons";
+import { IconChat, IconCheck, IconCode, IconInfo, IconPlay, IconPlug, IconSparkle, IconTerminal, Spinner } from "../components/Icons";
 import { CopyLine } from "../components/ui";
 import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { useStore } from "../store";
@@ -161,6 +164,60 @@ function LocalAgents({ server }: { server: (name: string) => void }) {
   );
 }
 
+/** Remote view over HTTPS: run the task through Dagu, then show each client's command. */
+function RemoteConnect() {
+  const { t } = useTranslation();
+  const { backend, mock } = useStore();
+  const ensure = useDaguAction<{ mode: "remote"; server: string; url: string; created: boolean }>(backend, DAGS.agentConnect, "result");
+  const [busy, setBusy] = useState(false);
+  const [commands, setCommands] = useState<RemoteCommands | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    if (busy) return;
+    setBusy(true); setError(null); setCommands(null);
+    const ensured = await ensure.start({ MODE: "remote" });
+    if (ensured) {
+      try { setCommands(await agentRemote(mock)); }
+      catch (e) { setError(e instanceof RemoteError ? e.code : "failed"); }
+    }
+    setBusy(false);
+  };
+  const known = ["httpsRequired", "noToken", "origin", "unauthorized"];
+  return (
+    <div className="grow as-remote-run">
+      <h2 id="as-remote-t">{t("mcp.remoteReadyTitle")}</h2>
+      <p className="mute">{t("mcp.remoteReadyBody")}</p>
+      <div className="as-run">
+        <CopyLine text="mise run agent:remote" />
+        <button type="button" className="btn btn-pri ap-btn" disabled={busy} onClick={() => void run()}>
+          {busy ? <Spinner /> : <IconPlay size={16} />}{busy ? t("mcp.remoteRunning") : t("mcp.remoteRun")}
+        </button>
+      </div>
+      {!busy && <ActionError action={ensure as Action<unknown>} />}
+      {error && <p role="alert" className="action-error"><strong>{t(`mcp.remoteError.${known.includes(error) ? error : "failed"}`)}</strong></p>}
+      {commands ? (
+        <>
+          <p className="as-hint"><IconInfo size={14} />{t("mcp.remoteSecret")}</p>
+          <ul className="as-clients">
+            {commands.clients.map((client) => (
+              <li key={client.id}>
+                <h3>{client.id === "other" ? t("mcp.remoteOther") : client.label}</h3>
+                {client.note && <p className="sub">{t(`mcp.remoteNote.${client.note}`)}</p>}
+                {client.commands.map((command) => <CopyLine key={command} text={command} />)}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <p className="mute">{t("mcp.remoteAddress")}</p>
+          <CopyLine text={`${location.origin}/mcp`} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Mcp() {
   const { t } = useTranslation();
   const { project, mock } = useStore();
@@ -183,15 +240,7 @@ export function Mcp() {
       {local ? <LocalAgents server={setServer} /> : (
         <section className="as-remote" aria-labelledby="as-remote-t">
           <span aria-hidden="true" className="as-logo"><IconHost /></span>
-          {location.protocol === "https:" ? (
-            <div className="grow">
-              <h2 id="as-remote-t">{t("mcp.remoteReadyTitle")}</h2>
-              <p className="mute">{t("mcp.remoteReadyBody")}</p>
-              <CopyLine text="mise run agent:remote" />
-              <p className="mute">{t("mcp.remoteAddress")}</p>
-              <CopyLine text={`${location.origin}/mcp`} />
-            </div>
-          ) : (
+          {location.protocol === "https:" ? <RemoteConnect /> : (
             <div className="grow">
               <h2 id="as-remote-t">{t("mcp.remoteTitle")}</h2>
               <p className="mute">{t("mcp.remoteBody")}</p>
