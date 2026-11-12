@@ -207,6 +207,7 @@ function InstallControl({ entry, market, where }: { entry: MarketplaceEntry; mar
   if (market.target?.id === entry.id && busy) {
     return <span className="ap-tag acc" role="status"><Spinner />{entry.installed ? t("market.updating") : t("market.installing")}</span>;
   }
+  if (entry.error) return <span className="ap-tag">{t("market.versionsUnavailable")}</span>;
   if (!entry.latest) return <span className="ap-tag">{t("market.noTags")}</span>;
   if (entry.installed && !entry.update) {
     return <span className="ap-tag ok"><IconCheck size={13} />{t("market.installedShort")}</span>;
@@ -318,7 +319,7 @@ function MarketCard({ entry, market }: { entry: MarketplaceEntry; market: Market
           {entry.tags.map((tag) => <li key={tag} className="ap-tag">{tag}</li>)}
         </ul>
       )}
-      {entry.error && <p className="app-note is-down">{entry.error}</p>}
+      {entry.error && <p className="app-note is-down">{entry.errorCode === "githubAccess" ? t("market.githubAccess") : entry.error}</p>}
       <div className="ap-foot">
         {version && (
           <span className="ap-tag" data-tip={entry.installed && entry.version ? t("market.installedTip", { version: entry.version }) : t("market.latestTip")}>{version}</span>
@@ -436,7 +437,7 @@ function ExtensionsTab({ market }: { market: Market }) {
         <ActionError action={market.catalog as Action<unknown>} />
         {data?.catalogs.filter((c) => c.error).map((c) => (
           <div key={c.source} role="alert" className="banner banner-down">
-            <p className="grow">{t("market.catalogError", { name: c.name, error: c.error })}</p>
+            <p className="grow">{t("market.catalogError", { name: c.name, error: c.errorCode === "githubAccess" ? t("market.githubAccess") : c.error })}</p>
           </div>
         ))}
         {!data ? (

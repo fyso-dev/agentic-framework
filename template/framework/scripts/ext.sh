@@ -2,8 +2,11 @@
 # Lifecycle stays with Copier; only removal, catalog lookup and panel installs need glue.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
+# Absolute: both scripts run Copier from a clean worktree of an older commit,
+# which may not contain the GitHub credential helper yet.
+auth="$(cd "$(dirname "$0")" && pwd)/github-auth.cjs"
 action=${1:-}; shift || true
-copier() { uvx --from copier==9.19.1 copier "$@"; }
+copier() { node "$auth" -- uvx --from copier==9.19.1 copier "$@"; }
 refresh() {
   local file
   for file in .config/mise/conf.d/ext-*.toml; do
