@@ -193,6 +193,9 @@ if (require.main === module) {
       const result = spendCheck();
       console.log(JSON.stringify(result));
       if (result.newlyExceeded.length) { console.error(`over the monthly cap: ${result.newlyExceeded.join(', ')}`); process.exitCode = 2; }
+      else if (!result.exceeded.length && (result.incomplete || result.bots.some(bot => bot.state === 'unknown'))) {
+        console.error('error: spend verification incomplete'); process.exitCode = 1;
+      }
     } else throw new Error('Usage: digest.cjs <digest|spend>');
   } catch (error) { console.error(`error: ${error.message}`); process.exitCode = 1; }
 }

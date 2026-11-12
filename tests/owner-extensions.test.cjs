@@ -360,6 +360,9 @@ test('invalid ledger rows preserve known over-cap alerts and incomplete status',
   assert.deepEqual(result.warnings, ['invalidLedgerRows']);
   assert.equal(result.bots.find(bot => bot.bot === 'Soporte').incomplete, true);
   assert.equal(result.bots.find(bot => bot.bot === 'Ventas | Norte').state, 'unknown');
+  const repeat = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
+  assert.equal(repeat.status, 0, repeat.stderr);
+  assert.deepEqual(JSON.parse(repeat.stdout).newlyExceeded, []);
   const digest = run(['node', 'extensions/ops-assistant/digest.cjs', 'digest'], {LANG_UI: 'en'});
   assert.equal(digest.status, 0, digest.stderr);
   const report = fs.readFileSync(path.join(root, 'project/wiki', `${JSON.parse(digest.stdout).page}.md`), 'utf8');
@@ -409,7 +412,7 @@ test('unclassified spend is unknown for API caps in both commands', () => projec
   put('.data/panel/observability.json', JSON.stringify(data));
   put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 10}}));
   const spendResult = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
-  assert.equal(spendResult.status, 0, spendResult.stderr);
+  assert.equal(spendResult.status, 1, spendResult.stderr);
   const bot = JSON.parse(spendResult.stdout).bots[0];
   assert.equal(bot.spentUsd, 1);
   assert.equal(bot.state, 'unknown');
@@ -419,6 +422,31 @@ test('unclassified spend is unknown for API caps in both commands', () => projec
   const report = fs.readFileSync(path.join(root, 'project/wiki', `${page}.md`), 'utf8');
   assert.match(report, /incomplete data/);
   assert.doesNotMatch(report, /within the cap/);
+}, ['ops-assistant']));
+
+test('spend command fails incomplete verification and accepts complete below-cap data', () => project(({put, run}) => {
+  const current = new Date();
+  const fresh = {...observability(), collectedAt: current.toISOString(), from: current.toISOString().slice(0, 7) + '-01'};
+  fresh.usage.groups = [fresh.usage.groups[0]];
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 100}}));
+  for (const [change, status] of [
+    [{sources: {...fresh.sources, ledger: 'unavailable'}, usage: {...fresh.usage, groups: []}}, 1],
+    [{invalidRows: 1, warnings: ['invalidLedgerRows']}, 1],
+    [{}, 0],
+  ]) {
+    put('.data/panel/observability.json', JSON.stringify({...fresh, ...change}));
+    const result = run(['node', 'extensions/ops-assistant/digest.cjs', 'spend']);
+    assert.equal(result.status, status, result.stderr);
+    const state = JSON.parse(result.stdout);
+    assert.equal(state.incomplete, status === 1);
+    assert.deepEqual(state.newlyExceeded, []);
+    if (status === 1) assert.match(result.stderr, /verification incomplete/);
+    if (change.invalidRows) {
+      assert.deepEqual(state.warnings, ['invalidLedgerRows']);
+      assert.equal(state.bots[0].state, 'unknown');
+    }
+    if (status === 0) assert.equal(state.bots[0].state, 'ok');
+  }
 }, ['ops-assistant']));
 
 test('known spend exceeding a cap alerts while retaining incomplete coverage', () => project(({root, put, run}) => {
