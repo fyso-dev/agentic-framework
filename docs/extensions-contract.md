@@ -242,3 +242,27 @@ The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks
 This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.
 
 The SDK version is also declared in `framework/panel/extension-api.json` (the source of `PANEL_API_VERSION`). Copier extensions may use native `_external_data` to validate this capability before writing files. This makes compatibility explicit without coupling an extension to a framework repository layout or branch.
+
+## 10. HTTPS provider (D62)
+
+An extension that terminates TLS for the project declares it in its conf.d file
+(`.config/mise/conf.d/ext-<ext>.toml`):
+
+```toml
+[env]
+FYSO_WEB_SCHEME = "https"
+```
+
+The core then treats `https://<app>.<web_domain>` as the project's addresses
+([web-auth.md](web-auth.md#https-through-a-provider-extension-d62)). The provider:
+
+- delivers every `<app>.<web_domain>` name to `127.0.0.1:$FYSO_HTTP_PORT` (directly or
+  through its own relay) and keeps the `Host` header;
+- serves a certificate browsers and CLI clients trust without configuration;
+- tells the person which `web_domain` to set (`copier update -d web_domain=…`), because
+  that answer belongs to the project;
+- states in its README and its doctor who can reach the addresses (public, peers only,
+  groups). That is the provider administrator's decision, not the project's;
+- is the only provider of the project. Nothing detects a second one yet.
+
+Features that need HTTPS check the scheme, not a particular extension.

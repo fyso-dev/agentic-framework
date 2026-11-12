@@ -22,12 +22,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(os.environ.get('FYSO_TEST_TINYAUTH') and os.environ.get('FYSO_TEST_CADDY'), 'requires explicit native test binaries')
 class WebAuthHTTP(unittest.TestCase):
+    # People reach the gateway on its listening address; a subclass puts it behind
+    # an HTTPS provider (D62), which changes the public scheme and drops the port.
+    scheme = 'http'
+    port_offset = 0
+    web_domain = None
+
+    @classmethod
+    def origin(cls, app):
+        return f'{cls.scheme}://{cls.host(app)}'
+
+    @classmethod
+    def host(cls, app):
+        return f'{app}.{cls.domain}' + ('' if cls.scheme == 'https' else f':{cls.port}')
+
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix='fyso-web-auth-')
         cls.root = Path(cls.tmp.name)
-        cls.port = int(os.environ.get('FYSO_TEST_AUTH_PORT_BASE', '19800'))
-        cls.domain = f'security-{cls.port}.localhost'
+        cls.port = int(os.environ.get('FYSO_TEST_AUTH_PORT_BASE', '19800')) + cls.port_offset
+        cls.domain = cls.web_domain or f'security-{cls.port}.localhost'
         cls.processes = []
         cls.servers = []
         cls.logs = []
@@ -61,6 +75,7 @@ class WebAuthHTTP(unittest.TestCase):
             def do_GET(self):
                 body = json.dumps({
                     'path': self.path,
+                    'bearer': self.headers.get('Authorization') == 'Bearer fixture-mcp-token',
                     'daguCredential': self.headers.get('Authorization') == cls.dagu_auth,
                     'ombCredential': self.headers.get('Authorization') == 'Bearer fixture-omb-token',
                     'user': self.headers.get('Remote-User'),
@@ -79,15 +94,20 @@ class WebAuthHTTP(unittest.TestCase):
             cls.servers.append(server)
             threading.Thread(target=server.serve_forever, daemon=True).start()
         cls.setup_socket = Path('/tmp') / f'fyso-auth-setup-{cls.port}.sock'
-        server = ThreadingUnixStreamServer(str(cls.setup_socket), Echo)
-        cls.servers.append(server)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.mcp_socket = Path('/tmp') / f'fyso-auth-mcp-{cls.port}.sock'
+        for socket_path in [cls.setup_socket, cls.mcp_socket]:
+            socket_path.unlink(missing_ok=True)
+            server = ThreadingUnixStreamServer(str(socket_path), Echo)
+            cls.servers.append(server)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+        cls.addClassCleanup(lambda: cls.mcp_socket.unlink(missing_ok=True))
         cls.addClassCleanup(lambda: cls.setup_socket.unlink(missing_ok=True))
         binary_dir = cls.root / 'bin'; binary_dir.mkdir()
         (binary_dir / 'yaml').symlink_to(ROOT / 'template/framework/panel/node_modules/yaml/bin.mjs')
         config_env = {**os.environ, 'PATH': str(binary_dir) + os.pathsep + os.environ['PATH'],
             'FYSO_ROOT':str(cls.root), 'FYSO_DATA':str(cls.root), 'FYSO_WEB_DOMAIN':cls.domain,
-            'FYSO_HTTP_PORT':str(cls.port), 'FYSO_AUTH_PORT':str(cls.port + 9), 'FYSO_AUTH_USERS':cls.users}
+            'FYSO_HTTP_PORT':str(cls.port), 'FYSO_AUTH_PORT':str(cls.port + 9), 'FYSO_AUTH_USERS':cls.users,
+            'FYSO_WEB_SCHEME':cls.scheme}
         subprocess.run(['node', str(ROOT / 'template/framework/scripts/web-auth-config.cjs')], env=config_env, check=True)
         cls.auth_env = {**os.environ, 'TINYAUTH_CONFIGFILE':str(cls.root / 'web-auth/runtime/config.yaml')}
         cls.start_auth()
@@ -95,9 +115,10 @@ class WebAuthHTTP(unittest.TestCase):
             'XDG_CONFIG_HOME':str(cls.root / 'caddy-config'), 'XDG_DATA_HOME':str(cls.root / 'caddy-data'),
             'FYSO_PANEL_ROOT': str(cls.root / 'panel'), 'FYSO_HTTP_PORT': str(cls.port),
             'FYSO_WEB_DOMAIN': cls.domain, 'FYSO_AUTH_UPSTREAM': f'127.0.0.1:{cls.port + 9}',
+            'FYSO_WEB_SCHEME': cls.scheme, 'FYSO_WEB_PORT_SUFFIX': '' if cls.scheme == 'https' else f':{cls.port}',
             'FYSO_DAGU_PORT': str(cls.port + 1), 'FYSO_OMB_PORT': str(cls.port + 4),
             'FYSO_CADDY_ADMIN_PORT': str(cls.port + 8), 'FYSO_BIND': '127.0.0.1',
-            'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
+            'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_MCP_SOCKET': str(cls.mcp_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
         cls.start([os.environ['FYSO_TEST_CADDY'], 'run', '--config', str(cls.root / 'Caddyfile')], env)
         cls.wait_port(cls.port)
 
@@ -140,7 +161,7 @@ class WebAuthHTTP(unittest.TestCase):
     @classmethod
     def request(cls, app, path='/', method='GET', body=None, cookie=None, **headers):
         connection = http.client.HTTPConnection('127.0.0.1', cls.port, timeout=10)
-        headers['Host'] = f'{app}.{cls.domain}:{cls.port}'
+        headers['Host'] = cls.host(app)
         if cookie: headers['Cookie'] = cookie
         if body is not None: body = json.dumps(body); headers['Content-Type'] = 'application/json'
         connection.request(method, path, body, headers)
@@ -150,18 +171,19 @@ class WebAuthHTTP(unittest.TestCase):
         return result
 
     def login(self, username='admin'):
-        status, headers, _ = self.request('auth', '/api/user/login', 'POST', {'username':username, 'password':self.password}, Origin=f'http://auth.{self.domain}:{self.port}')
+        status, headers, _ = self.request('auth', '/api/user/login', 'POST', {'username':username, 'password':self.password}, Origin=self.origin('auth'))
         self.assertEqual(status, 200)
         cookie = headers.get('Set-Cookie', '')
         self.assertIn(f'Domain={self.domain}', cookie)
         self.assertIn('HttpOnly', cookie); self.assertIn('SameSite=Lax', cookie)
+        self.assertEqual('Secure' in cookie, self.scheme == 'https')
         return cookie.split(';')[0]
 
     def test_connector_setup_uses_web_session_and_private_technical_upstream(self):
         route = '/api/composio/setup'
         self.assertEqual(self.request('panel', route, 'POST', {'apiKey':'fixture-key'})[0], 401)
         cookie = self.login()
-        origin = f'http://panel.{self.domain}:{self.port}'
+        origin = self.origin('panel')
         status, _, body = self.request('panel', route, 'POST', {'apiKey':'fixture-key'}, Cookie=cookie, Origin=origin, Authorization='Bearer forged')
         self.assertEqual(status, 200)
         echo = json.loads(body)
@@ -175,10 +197,22 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertFalse(json.loads(body)['webCookieLeaked'])
         self.assertEqual(self.request('panel', '/api/connectors/mcp', 'POST', {})[0], 401)
 
+    def test_00_remote_mcp_route_skips_the_login_and_only_exists_on_the_panel(self):
+        # D63: the endpoint authenticates its own bearer token; the gateway must hand it over untouched.
+        status, _, body = self.request('panel', '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')
+        self.assertEqual(status, 200); seen = json.loads(body)
+        self.assertEqual(seen['path'], '/mcp'); self.assertTrue(seen['bearer'])
+        status, _, body = self.request('panel', '/mcp', 'POST', {}, **{'Remote-User': 'admin'})
+        self.assertEqual(status, 200); self.assertFalse(json.loads(body)['bearer'])
+        for path in ['/mcp/', '/mcp/x', '/mcpx']:
+            self.assertEqual(self.request('panel', path, 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, path)
+        for app in ['dagu', 'omb']:
+            self.assertEqual(self.request(app, '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, app)
+
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:
             status, headers, _ = self.request(app, **{'User-Agent':'Mozilla/5.0 Chrome/130.0.0.0'})
-            self.assertEqual(status, 302); self.assertIn(f'auth.{self.domain}', headers['Location'])
+            self.assertEqual(status, 302); self.assertTrue(headers['Location'].startswith(self.origin('auth') + '/'), headers['Location'])
             self.assertNotIn('Www-Authenticate', headers)
             status, headers, _ = self.request(app, '/api/probe', **{'User-Agent':'Mozilla/5.0 Chrome/130.0.0.0'})
             self.assertEqual(status, 401); self.assertNotIn('Www-Authenticate', headers)
@@ -191,7 +225,7 @@ class WebAuthHTTP(unittest.TestCase):
             self.assertEqual(self.request('panel', path, cookie=cookie)[0], 200)
         self.assertEqual(self.request('panel', '/extensions/example-pages/secrets.yaml', cookie=cookie)[0], 404)
         self.assertEqual(self.request('panel', page, 'POST', {}, cookie=cookie,
-            Origin=f'http://panel.{self.domain}:{self.port}')[0], 405)
+            Origin=self.origin('panel'))[0], 405)
         self.assertEqual(self.request('panel', page, cookie=self.login('viewer'))[0], 403)
 
     def test_02_basic_auth_and_forged_identity_do_not_bypass_sessions(self):
@@ -216,7 +250,7 @@ class WebAuthHTTP(unittest.TestCase):
                     with self.subTest(app=app, path=resource, method=method):
                         status, _, body = self.request(app, resource, method,
                             {} if method == 'POST' else None, cookie=cookie,
-                            Origin=f'http://{app}.{self.domain}:{self.port}')
+                            Origin=self.origin(app))
                         self.assertEqual(status, 200)
                         data = json.loads(body)
                         self.assertFalse(data['webCookieLeaked'])
@@ -227,7 +261,7 @@ class WebAuthHTTP(unittest.TestCase):
         cookie = self.login()
         status, _, body = self.request('panel', '/api/session', cookie=cookie)
         self.assertEqual(status, 200); self.assertEqual(json.loads(body)['auth']['username'], 'admin')
-        self.assertEqual(self.request('panel', '/api/session/logout', 'POST', {}, cookie=cookie, Origin=f'http://panel.{self.domain}:{self.port}')[0], 200)
+        self.assertEqual(self.request('panel', '/api/session/logout', 'POST', {}, cookie=cookie, Origin=self.origin('panel'))[0], 200)
         for app in ['panel','dagu','omb']:
             self.assertEqual(self.request(app, '/api/probe', cookie=cookie)[0], 401)
 
@@ -237,7 +271,7 @@ class WebAuthHTTP(unittest.TestCase):
             for headers in [{'Origin':'https://foreign.invalid'}, {'Sec-Fetch-Site':'cross-site'}]:
                 self.assertEqual(self.request(app, '/api/probe', 'POST', {}, cookie=cookie, **headers)[0], 403)
         # Sibling apps are same-site, but must not be able to forge each other's writes.
-        self.assertEqual(self.request('dagu', '/api/probe', 'POST', {}, cookie=cookie, Origin=f'http://omb.{self.domain}:{self.port}')[0], 403)
+        self.assertEqual(self.request('dagu', '/api/probe', 'POST', {}, cookie=cookie, Origin=self.origin('omb'))[0], 403)
 
     def test_06_per_application_permissions_and_unconfigured_apps_deny(self):
         cookie = self.login('viewer')
@@ -275,6 +309,18 @@ class WebAuthHTTP(unittest.TestCase):
             for app in ['panel','dagu','omb']:
                 self.assertIn(self.request(app, '/api/probe', cookie=cookie)[0], [502,503])
         finally: self.start_auth()
+
+
+class WebAuthBehindHTTPS(WebAuthHTTP):
+    """The same boundaries when an HTTPS provider fronts the loopback gateway (D62)."""
+    scheme = 'https'
+    port_offset = 20
+    web_domain = 'host1.proxy.example.test'
+
+    def test_05b_the_listening_address_is_not_an_accepted_origin(self):
+        cookie = self.login()
+        listening = f'http://panel.{self.domain}:{self.port}'
+        self.assertEqual(self.request('panel', '/api/session/logout', 'POST', {}, cookie=cookie, Origin=listening)[0], 403)
 
 
 if __name__ == '__main__':

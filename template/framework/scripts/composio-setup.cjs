@@ -51,7 +51,7 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
 }
 function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args)) {
   const expected=Buffer.from('Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
-  const origin=`http://panel.${env.FYSO_WEB_DOMAIN||'localhost'}:${env.FYSO_HTTP_PORT}`;
+  const origin=require('./web-origin.cjs').origin('panel',env,env.FYSO_WEB_DOMAIN||'localhost');
   return http.createServer(async(req,res)=>{
     const reply=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));};
     if(req.url==='/health'&&req.method==='GET')return reply(200,{ok:true});

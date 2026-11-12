@@ -3,6 +3,7 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ADMIN_PASSWORD FYSO_DATA FYSO_WEB_DOMAIN
+web_scheme >/dev/null
 shared_login || require_env FYSO_AUTH_USERS
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "HTTP web login is local-only. Remote HTTPS deployment is not configured."
 
@@ -52,9 +53,9 @@ for _ in $(seq 1 120); do
       -d '{}' "http://127.0.0.1:$FYSO_DAGU_PORT/api/v1/dags/fyso-observability/enqueue" || true
     login="local web login"; ! shared_login || login="shared web login"
     cat <<MSG
-  Panel        http://panel.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT     ($login)
-  Dagu         http://dagu.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT
-  OpenMausBot  http://omb.$FYSO_WEB_DOMAIN:$FYSO_HTTP_PORT         (same web session)
+  Panel        $(web_origin panel)     ($login)
+  Dagu         $(web_origin dagu)
+  OpenMausBot  $(web_origin omb)         (same web session)
 
   mise run status · mise run logs <dagu|omb|caddy> · mise run doctor · mise run down
 MSG

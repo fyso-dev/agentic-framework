@@ -5,14 +5,15 @@
 	auto_https off
 	# Authentication routes must execute before handle/handle_path application routes.
 	order route before handle
-	# HTTP web login is loopback-only; remote HTTPS deployment is a separate contract.
+	# The gateway is loopback HTTP in every mode. An HTTPS provider extension (D62)
+	# terminates TLS in front of it and sets the public scheme.
 	default_bind {$FYSO_BIND:127.0.0.1}
 	storage file_system {$FYSO_DATA}/caddy
 }
 
 # Native session authentication; the snippet is the stable extension boundary.
 (fyso_browser_guard) {
-	@foreignOrigin expression `{http.request.header.Origin} != "" && {http.request.header.Origin} != {http.request.scheme} + "://" + {http.request.hostport}`
+	@foreignOrigin expression `{http.request.header.Origin} != "" && {http.request.header.Origin} != "{$FYSO_WEB_SCHEME:http}://" + {http.request.hostport}`
 	respond @foreignOrigin 403
 	@crossSiteApi {
 		path /api/*
@@ -44,6 +45,8 @@
 			uri /api/auth/caddy
 			copy_headers Remote-User Remote-Name Remote-Email Remote-Groups
 			header_up User-Agent {fyso_auth_ua}
+			# The login builds its redirects from the public scheme (D62).
+			header_up X-Forwarded-Proto {$FYSO_WEB_SCHEME:http}
 		}
 		# Only the panel's authority-backed handlers may retain the web session.
 		@upstream {
@@ -65,6 +68,11 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 
 # Panel files and same-origin Dagu API.
 http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	# Remote MCP clients (D63) carry a bearer token instead of a web session: this
+	# route runs before the login and the endpoint checks the token itself.
+	route /mcp {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
 	import fyso_login
 	handle /api/session {
 		rewrite * /api/context/user
@@ -104,7 +112,7 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	@panelForeignOrigin {
 		path /api/omb/*
 		header Origin *
-		not header Origin http://panel.{$FYSO_WEB_DOMAIN:localhost}:{$FYSO_HTTP_PORT}
+		not header Origin {$FYSO_WEB_SCHEME:http}://panel.{$FYSO_WEB_DOMAIN:localhost}{$FYSO_WEB_PORT_SUFFIX}
 	}
 	@panelCrossSite {
 		path /api/omb/*
@@ -218,11 +226,11 @@ import {$FYSO_ROOT}/extensions/*/Caddyfile
 
 # Bookmarks from earlier templates keep working; redirects preserve no credentials.
 http://panel.localhost:{$FYSO_HTTP_PORT} {
-	redir http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT}{uri} 308
+	redir {$FYSO_WEB_SCHEME:http}://panel.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
 }
 http://dagu.localhost:{$FYSO_HTTP_PORT} {
-	redir http://dagu.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT}{uri} 308
+	redir {$FYSO_WEB_SCHEME:http}://dagu.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
 }
 http://omb.localhost:{$FYSO_HTTP_PORT} {
-	redir http://omb.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT}{uri} 308
+	redir {$FYSO_WEB_SCHEME:http}://omb.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
 }

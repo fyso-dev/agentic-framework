@@ -6,11 +6,12 @@ source "$(dirname "$0")/lib.sh"
 # dependencies and readiness (health.sh asks the shared service) need no second shape.
 if shared_login; then exec tail -f /dev/null; fi
 require_env FYSO_DATA FYSO_ROOT FYSO_WEB_DOMAIN FYSO_HTTP_PORT FYSO_AUTH_PORT FYSO_AUTH_USERS
-[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "HTTP web login is local-only. Remote HTTPS deployment is not configured."
+web_scheme >/dev/null
+[ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "The gateway listens on loopback only. Remote access goes through a private forwarder or an HTTPS provider extension."
 [ -x "$FYSO_DATA/web-auth/bin/tinyauth" ] || fail "run 'mise run web-auth:install' first"
 umask 077
 mkdir -p "$FYSO_DATA/web-auth/runtime"
-node "$FYSO_ROOT/framework/scripts/web-auth-config.cjs"
+FYSO_WEB_SCHEME="$(web_scheme)" node "$FYSO_ROOT/framework/scripts/web-auth-config.cjs"
 cd "$FYSO_DATA/web-auth/runtime"
 clean_exec \
   TINYAUTH_CONFIGFILE="$FYSO_DATA/web-auth/runtime/config.yaml" \

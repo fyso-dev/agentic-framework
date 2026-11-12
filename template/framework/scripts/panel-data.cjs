@@ -9,7 +9,8 @@ const readTeam = () => yaml.parse(fs.readFileSync('project/bots/team.yaml', 'utf
 // Engines the declared bots run on: the provider prefix of each model.
 const usedEngines = team => team.bots.map(b => String(b.model || team.defaults?.model || '').split('/')[0]).filter(Boolean);
 const domain = env.FYSO_WEB_DOMAIN || `${env.FYSO_PROJECT}-${env.FYSO_HTTP_PORT}.localhost`;
-const urls = {panel:`http://panel.${domain}:${env.FYSO_HTTP_PORT}`, auth:`http://auth.${domain}:${env.FYSO_HTTP_PORT}`, dagu:`http://dagu.${domain}:${env.FYSO_HTTP_PORT}`, omb:`http://omb.${domain}:${env.FYSO_HTTP_PORT}`};
+const web = require('./web-origin.cjs');
+const urls = Object.fromEntries(['panel','auth','dagu','omb'].map(app => [app, web.origin(app, env, domain)]));
 if (process.argv[2] === 'config') {
   require('./bot-versioning.cjs').write();
   const extensions = require('./extensions.cjs');
@@ -20,6 +21,7 @@ if (process.argv[2] === 'config') {
     const app = file.startsWith('extensions/') ? substitute(read(file)) : read(file);
     app.group = file.startsWith('framework/') ? 'framework' : file.startsWith('extensions/') ? 'extension' : 'project';
     if (app.group === 'framework') app.url = urls[app.id];
+    else app.url = web.publicUrl(app.url, env, domain);
     for (const key of ['name','description','accessNote']) {
       if (app[key] && typeof app[key] === 'object') {
         app[`${key}_i18n`] = app[key]; app[key] = app[key].es || app[key].en || Object.values(app[key])[0];

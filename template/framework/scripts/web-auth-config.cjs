@@ -38,11 +38,12 @@ if (require.main === module) {
     const config = withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT);
     const runtime = path.join(env.FYSO_DATA, 'web-auth/runtime');
     fs.mkdirSync(runtime, {recursive:true, mode:0o700});
-    config.appUrl = `http://auth.${env.FYSO_WEB_DOMAIN}:${env.FYSO_HTTP_PORT}`;
+    const web = require('./web-origin.cjs');
+    config.appUrl = web.origin('auth', env);
     config.server = {address:'127.0.0.1', port:Number(env.FYSO_AUTH_PORT)};
     config.database = {driver:'sqlite', path:path.join(runtime,'sessions.db')};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
-    config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:false, subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
+    config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
     fs.writeFileSync(path.join(runtime,'config.yaml'), yaml.stringify(config), {mode:0o600});
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

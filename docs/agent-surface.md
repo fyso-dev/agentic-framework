@@ -140,7 +140,51 @@ node framework/scripts/agent-connect.cjs status   # JSON: installed and connecte
 
 The entry is named **`fyso-<slug>`**, one per project: a plain `fyso` may already exist (e.g. the Fyso cloud server). It runs `mise -C <project> exec -- node framework/scripts/fyso-mcp.cjs`, an absolute launcher, because desktop apps start servers with a minimal `PATH` and no project folder. Verified: started that way from `/` with only the system `PATH`, the server answers and `fyso_status` reports the project. Tests: `tests/agent-connect.test.cjs` (fake HOME and CLIs).
 
-**From the panel (D52).** *Maneja el proyecto desde tu IA* (`#/mcp`, linked from Setup) runs the same script through the `fyso-agent-connect` workflow: `MODE=status` returns `{server, agents: [{id, label, desktop, found, connected}]}` (connected = `fyso-<slug>` in the Claude Desktop JSON, a `[mcp_servers.<name>]` table in `$CODEX_HOME/config.toml`, or the user-scope `mcpServers` of `~/.claude.json`); `connect`, `disconnect` and `open` (Codex, Claude Desktop) act on one agent. The actions change the Dagu host's apps, so the page shows them only when it is opened through a loopback name; remote access is the planned HTTP MCP with a token (D52).
+**From the panel (D52).** *Maneja el proyecto desde tu IA* (`#/mcp`, linked from Setup) runs the same script through the `fyso-agent-connect` workflow: `MODE=status` returns `{server, agents: [{id, label, desktop, found, connected}]}` (connected = `fyso-<slug>` in the Claude Desktop JSON, a `[mcp_servers.<name>]` table in `$CODEX_HOME/config.toml`, or the user-scope `mcpServers` of `~/.claude.json`); `connect`, `disconnect` and `open` (Codex, Claude Desktop) act on one agent. The actions change the Dagu host's apps, so the page shows them only when it is opened through a loopback name; from another machine it points to the remote MCP (D63, below) when the address is HTTPS, and says an HTTPS provider is missing otherwise.
+
+### Remote clients (D63)
+
+An agent on another machine connects over HTTPS, so the project needs an HTTPS provider
+extension first (D62, for example `fyso-ext-netbird` with `access=https`).
+
+```sh
+mise run agent:remote              # on the project's machine: address, token and commands
+mise run agent:remote -- --rotate  # new token; old connections stop working
+```
+
+It prints, with the real token:
+
+```sh
+claude mcp add --transport http --scope user fyso-<slug> https://panel.<web_domain>/mcp --header "Authorization: Bearer <token>"
+export FYSO_<SLUG>_MCP_TOKEN=<token>
+codex mcp add fyso-<slug> --url https://panel.<web_domain>/mcp --bearer-token-env-var FYSO_<SLUG>_MCP_TOKEN
+```
+
+| Piece | What |
+|---|---|
+| Endpoint | `POST https://panel.<web_domain>/mcp`, MCP Streamable HTTP, one JSON answer per request (no sessions, no SSE); JSON-RPC batches accepted; notifications answer 202 |
+| Server | `fyso-mcp.cjs --http /tmp/fyso-mcp-<port>.sock`, process `mcp-remote` (`run-mcp-remote.sh`), started through `mise exec` so it reads the token and the scheme fresh |
+| Gateway | `route /mcp` on the panel site, before the web login; every other host and path keeps the login |
+| Credential | `FYSO_MCP_TOKEN` (random, 32 bytes) in `secrets.enc.yaml`; compared in constant time by the endpoint; printed only by the terminal task (`raw = true`, because mise redacts secrets in task output) |
+| Refused | no or wrong token (401), any request with `Origin` (403), methods other than POST (405), bodies over 1 MB (413) |
+| Off (404 with the reason) | public scheme is not `https`, or the token is missing |
+| Tools | the platform tools; never Dagu's forwarded tools (D57) |
+
+One token per project: whoever holds it has the project's platform tools, so it is a
+password. The panel page `#/mcp`, opened from another machine over HTTPS, shows the
+address and the task to run, not the token.
+
+Verified (2026-11-11): `tests/mcp-remote.test.cjs` (initialize, tools without `dagu_*`,
+token, Origin, method, size and "off" cases against the real server on a socket) and
+`tests/test_web_auth_http.py` (real Caddy: `/mcp` skips the login on the panel host only,
+in both schemes). `agent:remote` was run by hand in a throwaway folder with real sops
+3.13.3 and an age key: it stored a 43-character token encrypted, kept the existing
+secret and printed the commands. End to end on a real project behind the NetBird
+reverse proxy: `mise run agent:remote` created the token and restarted `mcp-remote`;
+over the public address the endpoint answered 401 without or with a wrong token, 403
+with `Origin`, and `initialize` plus `tools/list` (26 tools, none `dagu_*`) with the
+right one; `claude mcp add --transport http …` then showed the server as connected.
+Not verified: a Codex client, and tool calls that change the project through this path.
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment. Desktop agents reach its tools through `fyso-<slug>` instead (forwarded, D57).
 
