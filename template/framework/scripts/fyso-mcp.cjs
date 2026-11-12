@@ -9,11 +9,11 @@
 // Transport: MCP stdio (newline-delimited JSON-RPC 2.0). No dependencies.
 // With `--http <unix socket>` it serves the same tools over MCP Streamable HTTP for remote
 // clients (D63): stateless JSON answers behind the gateway's /mcp route, a bearer token,
-// only when the project has an HTTPS provider, and never Dagu's forwarded tools (D57).
+// only when the project has an HTTPS provider. The project token grants Dagu access too.
 // Started by the project's .mcp.json: `mise exec -- node framework/scripts/fyso-mcp.cjs --no-dagu`.
 const fs = require('node:fs');
 const path = require('node:path');
-const {execFileSync} = require('node:child_process');
+const {execFileSync, spawn} = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const VERSION = '1';
@@ -25,7 +25,7 @@ const option = name => { const at = process.argv.indexOf(name); return at < 0 ? 
 const SCOPE = option('--scope');
 const scopeGuard = SCOPE === null ? null : require('./dagu-scope.cjs').guard(ROOT, SCOPE, (option('--system') || '').split(',').filter(Boolean));
 const HTTP_SOCKET = option('--http');
-const FORWARD_DAGU = HTTP_SOCKET === null && (!!scopeGuard || !process.argv.includes('--no-dagu'));
+const FORWARD_DAGU = !!scopeGuard || !process.argv.includes('--no-dagu');
 const scopes = require('./workflow-scopes.cjs');
 let forwarder;
 const daguMcp = () => forwarder ||= require('./dagu-mcp.cjs').forwarder();
@@ -106,6 +106,35 @@ const TOOLS = {
     inputSchema: obj(),
     annotations: {readOnlyHint: true},
     run: () => architect({OP: 'list'}),
+  },
+  fyso_bot_run: {
+    description: 'Send a message to a project OpenMausBot agent and wait for its reply and delegated work. Get the exact bot_id from fyso_bots_list. A new conversation is created by default; pass task to continue an existing conversation. The agent can use its configured tools and permissions. A timeout can leave work running; do not blindly retry.',
+    inputSchema: obj({bot_id: str('Exact native bot id'), message: str('Message for the agent'), task: str('Optional conversation id, or current')}, ['bot_id', 'message']),
+    annotations: {destructiveHint: true, openWorldHint: true},
+    run: ({bot_id, message, task}) => new Promise((resolve, reject) => {
+      const port = process.env.FYSO_OMB_PORT || '';
+      if (!/^\d+$/.test(port) || +port < 1 || +port > 65535) return reject(new Error('explicit project FYSO_OMB_PORT required'));
+      if (bot_id.startsWith('-') || /[\x00-\x1f]/.test(bot_id) || (task && (task.startsWith('-') || /[\x00-\x1f]/.test(task)))) return reject(new Error('invalid bot or task id'));
+      const args = ['run', '--bot', bot_id, '-', '--port', port, '--json', '--timeout', '30m', '--on-input', 'exit', '--on-timeout', 'leave', ...(task ? ['--task', task] : [])];
+      const child = spawn('openmausbot', args, {stdio: ['pipe', 'pipe', 'pipe']});
+      let stdout = '', stderr = '', overflow = false;
+      const collect = (which, chunk) => {
+        if (stdout.length + stderr.length + chunk.length > 4 * 1024 * 1024) { overflow = true; child.kill(); return; }
+        if (which === 'out') stdout += chunk; else stderr += chunk;
+      };
+      child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+      child.stdout.on('data', chunk => collect('out', chunk)); child.stderr.on('data', chunk => collect('err', chunk));
+      child.on('error', reject);
+      child.on('close', (code, signal) => {
+        if (overflow) return reject(new Error('OpenMausBot output exceeded the limit; the job may still be running'));
+        let result;
+        try { result = JSON.parse(stdout); } catch { return reject(new Error(`OpenMausBot returned an invalid result (${signal || `exit ${code}`}); work may still be running. ${stderr.slice(-4000)}`)); }
+        if (code !== 0 || result.ok !== true) return reject(new Error(`OpenMausBot run ended with ${signal || `exit ${code}`}; work may still be running. ${JSON.stringify(result)}`));
+        resolve(result);
+      });
+      child.stdin.on('error', () => {});
+      child.stdin.end(message);
+    }),
   },
   fyso_bot_read: {
     description: 'Read one bot\'s native profile by its exact id (from fyso_bots_list), plus the revision a later plan is based on.',

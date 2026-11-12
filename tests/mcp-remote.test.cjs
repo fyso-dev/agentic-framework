@@ -21,17 +21,34 @@ function start(t,env) {
 }
 const init={jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'t',version:'0'}}};
 
-test('with an HTTPS provider and the token, a client initializes and lists the platform tools without Dagu\'s',async t=>{
-  const s=await start(t,{FYSO_WEB_SCHEME:'https',FYSO_MCP_TOKEN:TOKEN});
+test('the project token grants remote Dagu tools and an OpenMausBot conversation',async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-remote-fixture-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const cli=path.join(dir,'openmausbot');
+  fs.writeFileSync(cli,`#!/usr/bin/env node\nlet input='';process.stdin.on('data',c=>input+=c);process.stdin.on('end',()=>console.log(JSON.stringify({ok:true,threadId:'thread-1',args:process.argv.slice(2),input})));\n`,{mode:0o755});
+  const dagu=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c);req.on('end',()=>{
+    const m=JSON.parse(body); res.setHeader('Content-Type','application/json');
+    if(m.method==='initialize')res.setHeader('Mcp-Session-Id','test');
+    if(m.id===undefined){res.statusCode=202;return res.end();}
+    const result=m.method==='initialize'?{}:m.method==='tools/list'?{tools:[{name:'dagu_read',inputSchema:{type:'object'}},{name:'dagu_execute',inputSchema:{type:'object'}},{name:'dagu_change',inputSchema:{type:'object'}}]}:{content:[{type:'text',text:JSON.stringify(m.params)}]};
+    res.end(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
+  });});
+  await new Promise(resolve=>dagu.listen(0,'127.0.0.1',resolve));t.after(()=>dagu.close());
+  const s=await start(t,{FYSO_WEB_SCHEME:'https',FYSO_MCP_TOKEN:TOKEN,FYSO_DAGU_PORT:String(dagu.address().port),DAGU_MCP_AUTH:'Basic fixture',FYSO_OMB_PORT:'19444',FYSO_DATA:dir,PATH:`${dir}:${process.env.PATH}`});
   assert.equal((fs.statSync(s.socket).mode&0o077),0);
   const hello=await s.call('POST','/mcp',s.auth,init);
   assert.equal(hello.status,200);assert.equal(hello.body.result.serverInfo.name,'fyso');assert.equal(hello.body.result.protocolVersion,'2025-06-18');
   assert.equal((await s.call('POST','/mcp',s.auth,{jsonrpc:'2.0',method:'notifications/initialized'})).status,202);
   const list=await s.call('POST','/mcp',s.auth,{jsonrpc:'2.0',id:2,method:'tools/list'});
   const names=list.body.result.tools.map(tool=>tool.name);
-  assert.ok(names.includes('fyso_status'));assert.ok(!names.some(name=>name.startsWith('dagu_')));
-  const forwarded=await s.call('POST','/mcp',s.auth,{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'dagu_read',arguments:{}}});
-  assert.equal(forwarded.body.error.code,-32602);
+  for(const name of ['fyso_status','fyso_bot_run','dagu_read','dagu_execute','dagu_change'])assert.ok(names.includes(name),name);
+  const forwarded=await s.call('POST','/mcp',s.auth,{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'dagu_execute',arguments:{action:'start',name:'example'}}});
+  assert.deepEqual(JSON.parse(forwarded.body.result.content[0].text),{name:'dagu_execute',arguments:{action:'start',name:'example'}});
+  const bot=await s.call('POST','/mcp',s.auth,{jsonrpc:'2.0',id:5,method:'tools/call',params:{name:'fyso_bot_run',arguments:{bot_id:'bot-1',message:'hello',task:'conversation-1'}}});
+  const result=bot.body.result.structuredContent;
+  assert.equal(result.threadId,'thread-1');
+  assert.deepEqual(result.args,['run','--bot','bot-1','-','--port','19444','--json','--timeout','30m','--on-input','exit','--on-timeout','leave','--task','conversation-1']);
+  assert.equal(result.input,'hello');
   const batch=await s.call('POST','/mcp',s.auth,[{jsonrpc:'2.0',id:4,method:'ping'},{jsonrpc:'2.0',method:'notifications/initialized'}]);
   assert.deepEqual(batch.body,[{jsonrpc:'2.0',id:4,result:{}}]);
 });
