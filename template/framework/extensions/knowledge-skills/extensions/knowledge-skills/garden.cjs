@@ -26,7 +26,7 @@ function pages(wiki) {
     }
   }
   visit(wiki);
-  return found.sort();
+  return found.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
 }
 
 // Seconds since epoch of the last commit that touched each page; file time when git has none.

@@ -162,6 +162,12 @@ test('wiki gardener distinguishes an empty wiki from traversal failures', () => 
   assert.match(injected.stderr, /permission denied/);
 }, ['knowledge-skills']));
 
+test('wiki gardener reports orphan pages in deterministic code-unit order', () => project(({root, put}) => {
+  const {scan} = require(path.join(root, 'extensions/knowledge-skills/garden.cjs'));
+  for (const name of ['zeta', 'Alpha', 'beta', '10', '2']) put(`project/wiki/${name}.md`);
+  assert.deepEqual(scan(root).orphans, ['10.md', '2.md', 'Alpha.md', 'beta.md', 'zeta.md']);
+}, ['knowledge-skills']));
+
 test('wiki gardener publishes one new report page, never edits or replaces a page, and cleans up', () => project(({root, put, run}) => {
   put('project/wiki/index.md', '# Inicio\n[[Falta]]\n');
   const before = fs.readFileSync(path.join(root, 'project/wiki/index.md'), 'utf8');
