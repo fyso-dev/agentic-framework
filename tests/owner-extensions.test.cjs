@@ -217,12 +217,12 @@ test('wiki gardener retains work when all report names are occupied', () => proj
 
 const now = new Date('2026-11-11T12:00:00Z');
 const observability = () => ({
-  version: 1, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'unavailable'},
+  version: 1, collectedAt: '2026-11-11T11:58:00.000Z', from: '2026-11-01', to: '2026-11-11', sources: {ledger: 'ok', traces: 'ok', runs: 'ok', harness: 'ok'},
   coverage: {tracesTruncated: false, runsTruncated: false}, alerts: [{kind: 'failures', value: 1, limit: 1}],
-  usage: {totals: {turns: 12, missingCost: 2}, groups: [
+  usage: {totals: {turns: 12, missingCost: 0}, groups: [
     {bot: 'Soporte', model: 'claude-api', billingKind: 'api', source: 'omb', turns: 6, apiReportedUsd: 18.5, estimatedApiUsd: null, subscriptionEquivalentUsd: null, unclassifiedUsd: null, missingCost: 0},
-    {bot: 'Soporte', model: 'haiku', billingKind: 'subscription', source: 'omb', turns: 2, apiReportedUsd: null, estimatedApiUsd: null, subscriptionEquivalentUsd: 4, unclassifiedUsd: null, missingCost: 1},
-    {bot: 'Ventas | Norte', model: 'sonnet', billingKind: 'subscription', source: 'omb', turns: 4, apiReportedUsd: null, estimatedApiUsd: null, subscriptionEquivalentUsd: 30, unclassifiedUsd: null, missingCost: 1}]},
+    {bot: 'Soporte', model: 'haiku', billingKind: 'subscription', source: 'omb', turns: 2, apiReportedUsd: null, estimatedApiUsd: null, subscriptionEquivalentUsd: 4, unclassifiedUsd: null, missingCost: 0},
+    {bot: 'Ventas | Norte', model: 'sonnet', billingKind: 'subscription', source: 'omb', turns: 4, apiReportedUsd: null, estimatedApiUsd: null, subscriptionEquivalentUsd: 30, unclassifiedUsd: null, missingCost: 0}]},
   traces: [
     {id: 't1', startedAt: '2026-11-10T10:00:00Z', bots: [{name: 'Soporte'}], tools: 3, errors: 1, usage: {apiReportedUsd: 2.25, subscriptionEquivalentUsd: null}},
     {id: 't2', startedAt: '2026-11-09T10:00:00Z', bots: [{name: 'Soporte'}, {name: 'Ventas | Norte'}], tools: 1, errors: 0, usage: {apiReportedUsd: null, subscriptionEquivalentUsd: 1.5}},
@@ -251,32 +251,29 @@ test('weekly digest reports the week from the observability export without inven
   // Unknown is never shown as zero; subscription use is labeled as an equivalent.
   assert.match(text, /\| Soporte \| 8 \| \$18\.50 \| sin dato \| \$4\.00 \|/);
   assert.match(text, /\| Soporte \| \$18\.50 \| \$20\.00 \| 93 \| cerca del tope \|/);
-  assert.match(text, /2 turnos sin costo informado/);
-  assert.match(text, /Fuente no disponible: harness/);
   assert.match(text, /no una factura/);
-  const english = digest({...observability(), collectedAt: '2026-11-11T08:00:00.000Z'}, {}, {lang: 'en', now}).text;
+  const english = digest(observability(), {}, {lang: 'en', now}).text;
   assert.match(english, /# Weekly digest 2026-11-11/);
-  assert.match(english, /> The data is more than an hour old/);
   assert.match(english, /No caps are configured/);
 }, ['ops-assistant']));
 
 test('spend caps compare month-to-date cost per bot, by the chosen basis, and reject bad settings', () => project(({root}) => {
   const {spend} = require(path.join(root, 'extensions/ops-assistant/digest.cjs'));
-  const api = spend(observability(), {botMonthlyUsd: {Soporte: 18, '*': 25}});
+  const api = spend(observability(), {botMonthlyUsd: {Soporte: 18, '*': 25}}, 0.8, now);
   assert.equal(api.basis, 'api'); assert.equal(api.month, '2026-11'); assert.equal(api.configured, true);
   assert.deepEqual(api.exceeded, ['Soporte']);
   // On the API basis a subscription bot has no known cost: reported as unknown, not as zero spend over a cap.
   const ventas = api.bots.find(b => b.bot === 'Ventas | Norte');
-  assert.deepEqual([ventas.spentUsd, ventas.capUsd, ventas.state, ventas.missingCost, ventas.percent], [null, 25, 'unknown', 1, null]);
-  const all = spend(observability(), {botMonthlyUsd: {Soporte: 30, '*': 25}, botMonthlyUsdBasis: 'all'});
+  assert.deepEqual([ventas.spentUsd, ventas.capUsd, ventas.state, ventas.missingCost, ventas.percent], [null, 25, 'unknown', 0, null]);
+  const all = spend(observability(), {botMonthlyUsd: {Soporte: 30, '*': 25}, botMonthlyUsdBasis: 'all'}, 0.8, now);
   assert.deepEqual(all.exceeded, ['Ventas | Norte']);
   assert.deepEqual(all.warn, []);
   assert.equal(all.bots.find(b => b.bot === 'Soporte').spentUsd, 22.5);
-  const none = spend(observability(), {});
+  const none = spend(observability(), {}, 0.8, now);
   assert.equal(none.configured, false);
   assert.ok(none.bots.every(b => b.state === 'none'));
   for (const bad of [{botMonthlyUsd: {Soporte: '20'}}, {botMonthlyUsd: [20]}, {botMonthlyUsd: {Soporte: -1}}, {botMonthlyUsd: null}, {botMonthlyUsdBasis: 'wrong'}])
-    assert.throws(() => spend(observability(), bad), /botMonthlyUsd/);
+    assert.throws(() => spend(observability(), bad, 0.8, now), /botMonthlyUsd/);
 }, ['ops-assistant']));
 
 test('spend-cap run fails once per bot and month, and the digest preserves existing pages', () => project(({root, put, run}) => {
@@ -355,6 +352,37 @@ test('digest and spend reject incomplete ledger exports', () => project(({put, r
       assert.match(result.stderr, /ledger.*unverified/);
       assert.equal(result.stdout, '');
     }
+  }
+}, ['ops-assistant']));
+
+test('digest and spend reject stale and wrong-month exports', () => project(({put, run}) => {
+  const current = new Date();
+  const previous = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
+  const fresh = {...observability(), collectedAt: current.toISOString(), from: current.toISOString().slice(0, 7) + '-01'};
+  put('project/observability.json', JSON.stringify({botMonthlyUsd: {Soporte: 100}}));
+  for (const change of [{from: previous}, {collectedAt: new Date(current.getTime() - 7200000).toISOString()}]) {
+    put('.data/panel/observability.json', JSON.stringify({...fresh, ...change}));
+    for (const action of ['digest', 'spend']) {
+      const result = run(['node', 'extensions/ops-assistant/digest.cjs', action]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /stale|another month/);
+      assert.equal(result.stdout, '');
+    }
+  }
+}, ['ops-assistant']));
+
+test('incomplete coverage and unknown costs cannot produce within-cap states', () => project(({root}) => {
+  const {spend, digest} = require(path.join(root, 'extensions/ops-assistant/digest.cjs'));
+  for (const change of [
+    {coverage: {tracesTruncated: true, runsTruncated: false}},
+    {sources: {...observability().sources, harness: 'unavailable'}},
+    {usage: {...observability().usage, totals: {turns: 12, missingCost: 1}}},
+  ]) {
+    const data = {...observability(), ...change};
+    const state = spend(data, {botMonthlyUsd: {Soporte: 100}}, 0.8, now);
+    assert.equal(state.bots.find(bot => bot.bot === 'Soporte').state, 'unknown');
+    assert.match(digest(data, {botMonthlyUsd: {Soporte: 100}}, {lang: 'en', now}).text, /incomplete data/);
+    assert.doesNotMatch(digest(data, {botMonthlyUsd: {Soporte: 100}}, {lang: 'en', now}).text, /within the cap/);
   }
 }, ['ops-assistant']));
 

@@ -33,7 +33,11 @@ function settings(ctx) {
 // "api" counts API-reported and estimated API cost; "all" adds the subscription
 // equivalent and unclassified cost. Unknown amounts are never counted as zero spend:
 // they are reported as missing.
-function spend(data, config, warnAt = 0.8) {
+function spend(data, config, warnAt = 0.8, now = new Date()) {
+  const collected = Date.parse(data.collectedAt), current = now.getTime();
+  if (!Number.isFinite(collected) || current - collected > 3600000 || collected > current + 60000 ||
+      data.from !== `${now.toISOString().slice(0, 7)}-01`)
+    throw new Error('observability export is stale or belongs to another month; refresh fyso-observability');
   if (data.sources?.ledger !== 'ok' || data.invalidRows > 0 || data.warnings?.includes('invalidLedgerRows'))
     throw new Error('observability ledger is unavailable or contains invalid rows; spend is unverified');
   const caps = config.botMonthlyUsd;
@@ -42,6 +46,9 @@ function spend(data, config, warnAt = 0.8) {
   const basis = config.botMonthlyUsdBasis === 'all' ? 'all' : 'api';
   if (caps !== undefined && (typeof caps !== 'object' || caps === null || Array.isArray(caps) || Object.values(caps).some(v => num(v) === null)))
     throw new Error('project/observability.json: botMonthlyUsd must map bot names (or "*") to amounts in USD');
+  const incomplete = !data.coverage || data.coverage.tracesTruncated !== false || data.coverage.runsTruncated !== false ||
+    data.sources?.harness !== 'ok' || !Array.isArray(data.usage?.groups) ||
+    typeof data.usage?.totals?.missingCost !== 'number' || data.usage.totals.missingCost > 0;
   const bots = new Map();
   for (const group of data.usage?.groups || []) {
     const row = bots.get(group.bot) || {bot: group.bot, parts: [], missingCost: 0, turns: 0};
@@ -51,7 +58,7 @@ function spend(data, config, warnAt = 0.8) {
   }
   const rows = [...bots.values()].map(row => {
     const spentUsd = sum(row.parts), capUsd = caps ? num(caps[row.bot]) ?? num(caps['*']) : null;
-    const state = capUsd === null ? 'none' : spentUsd !== null && spentUsd >= capUsd ? 'exceeded' : spentUsd !== null && spentUsd >= capUsd * warnAt ? 'warn' : spentUsd === null || row.missingCost ? 'unknown' : 'ok';
+    const state = capUsd === null ? 'none' : incomplete || spentUsd === null || row.missingCost ? 'unknown' : spentUsd >= capUsd ? 'exceeded' : spentUsd >= capUsd * warnAt ? 'warn' : 'ok';
     return {bot: row.bot, spentUsd, capUsd, percent: capUsd && spentUsd !== null ? Math.round((spentUsd / capUsd) * 100) : null, state, turns: row.turns, missingCost: row.missingCost};
   }).sort((a, b) => (b.spentUsd ?? 0) - (a.spentUsd ?? 0));
   return {month: (data.from || '').slice(0, 7), basis, configured: !!caps && Object.keys(caps).length > 0, bots: rows,
@@ -61,10 +68,6 @@ function spend(data, config, warnAt = 0.8) {
 // Alert once per bot and month, like OpenMausBot's own spend alert marks.
 function spendCheck(env = process.env) {
   const ctx = context(env), data = readExport(ctx);
-  const collected = Date.parse(data.collectedAt), now = Date.now();
-  if (!Number.isFinite(collected) || now - collected > 3600000 || collected > now + 60000 ||
-      (data.from || '').slice(0, 7) !== new Date(now).toISOString().slice(0, 7))
-    throw new Error('observability export is stale or belongs to another month; refresh fyso-observability');
   const state = spend(data, settings(ctx));
   const file = path.join(ctx.data, 'ext', 'ops-assistant', 'spend-alerts.json');
   let marks = {};
@@ -121,7 +124,7 @@ function digest(data, config, {days = 7, lang = 'es', now = new Date()} = {}) {
     else row.other++;
     byDag.set(run.dag, row);
   }
-  const caps = spend(data, config), monthly = new Map();
+  const caps = spend(data, config, 0.8, now), monthly = new Map();
   for (const group of data.usage?.groups || []) {
     const row = monthly.get(group.bot) || {turns: 0, api: [], est: [], sub: []};
     row.turns += group.turns || 0; row.api.push(group.apiReportedUsd); row.est.push(group.estimatedApiUsd); row.sub.push(group.subscriptionEquivalentUsd);
