@@ -131,7 +131,9 @@ TOTP is available natively but is not automatically provisioned or required.
 
 `mise run setup` creates the first human login with a hidden password prompt
 (12–72 bytes; spaces are allowed, so a memorable passphrase works), or the
-installer's private `FYSO_INITIAL_PASSWORD_FILE`. It never
+installer's private `FYSO_INITIAL_PASSWORD_FILE`. An empty answer, or no terminal
+(SSH, a script), generates a readable password of four short groups
+(`kfmt-pwze-rqsu-7dnx`, about 79 bits) and prints it. It never
 falls back to `admin/admin`. Initial human passwords and Dagu's new random
 technical password are separate. Existing projects retain their technical
 credential until it is explicitly rotated.
@@ -143,12 +145,26 @@ in `project/auth/tinyauth.yaml`. Panel users can already install and run
 extensions, so this grants nothing new; declare the app to restrict it. Apps of
 `project/apps/` stay explicit.
 
-Manage local users while this project's stack is stopped:
+Manage local users and their passwords (D64):
 
 ```sh
-mise run web-auth:users add alice
+mise run web-auth:password                  # show the administrator's password
+mise run web-auth:password -- alice         # show another user's
+mise run web-auth:password -- --new         # set a new generated one and show it
+mise run web-auth:users add alice           # typed twice, or empty to generate
 mise run web-auth:users remove alice
 ```
+
+The login service only receives bcrypt hashes (`FYSO_AUTH_USERS`). Each password is
+also kept, encrypted, in `secrets.enc.yaml` (`FYSO_AUTH_PASSWORDS`, a JSON map) so it
+can be read again: whoever can decrypt that file can already replace a hash and sign
+in, so this adds no access. Passwords are printed only by these terminal tasks (they
+are `raw`, because mise redacts secrets in task output); the panel never shows them.
+A user created before D64, or by an installer that sends only the hash, has no stored
+password: `web-auth:password` says so and `--new` fixes it.
+
+The stack may keep running: the login service alone is stopped and started around
+the change, and it reads the users fresh from the encrypted file.
 
 `add` also changes an existing user's password. Changes preserve unrelated
 encrypted secrets and invalidate **all** existing web sessions. The bootstrap
