@@ -25,7 +25,8 @@ function fakeOmb() {
       if(req.url==='/api/bots/b1/skills')return send(200,{skills:[...held.values()]});
       if(req.url==='/api/bots/b1/skill-template'&&req.method==='POST'){
         const input=JSON.parse(body);
-        const entry={name:input.name,enabled:input.enabled,sha256:sha(input.text),warnings:/curl[^\n]*\|\s*sh/.test(input.text)?['pipes a download straight into a shell']:[]};
+        if(behavior.failPost){held.set(input.name,{name:input.name,enabled:false,sha256:sha(input.text)});return send(409,{error:'collision'});}
+        const entry={name:input.name,enabled:input.enabled,sha256:sha(input.text),importedAt:new Date().toISOString(),warnings:/curl[^\n]*\|\s*sh/.test(input.text)?['pipes a download straight into a shell']:[]};
         held.set(input.name,entry);return send(201,{installed:behavior.badScan ? {...entry,sha256:'0'.repeat(64)} : entry});
       }
       const m=/^\/api\/bots\/b1\/skills\/([a-z0-9-]+)$/.exec(req.url);
@@ -112,7 +113,7 @@ test('a skill is read before installing, installed pinned to a commit and kept o
   assert.equal(entry.src,dir);assert.equal(entry.path,'skills/greeter');assert.equal(entry.commit,first);assert.equal(entry.license,'MIT');
   assert.equal(entry.sha256,shown.sha256);assert.equal(entry.review,undefined);
   // The scan imported it switched off into this project's OpenMausBot and removed it again.
-  assert.ok(omb.calls.includes('POST /api/bots/b1/skill-template'));assert.ok(omb.calls.includes('DELETE /api/bots/b1/skills/greeter'));assert.equal(omb.held.size,0);
+  assert.ok(omb.calls.includes('POST /api/bots/b1/skill-template'));assert.ok(omb.calls.some(c=>/^DELETE \/api\/bots\/b1\/skills\/fyso-scan-[a-f0-9]{32}$/.test(c)));assert.equal(omb.held.size,0);
   assert.equal(git(root,'log','-1','--format=%s'),`skills: add greeter ${first.slice(0,12)}`);
   assert.deepEqual(git(root,'show','--name-only','--format=','HEAD').split('\n').sort(),
     ['project/bots/skills/greeter/LICENSE','project/bots/skills/greeter/SKILL.md','project/bots/skills/greeter/notes/style.md','project/bots/third-party-skills.json']);
@@ -236,4 +237,36 @@ test('an invalid native scan attestation fails closed and removes the probe',()=
   const added=await json(['add',dir,'greeter']);assert.equal(added.skill.state,'scan');
   assert.equal(omb.held.size,0);assert.equal((await run(['confirm','greeter'])).status,1);
   omb.behavior.badScan=false;assert.equal((await json(['scan','greeter'])).skill.state,'review');
+}));
+
+
+test('symlinked skill and parent paths cannot pass the confirmation gate',()=>fixture(async({base,root,json,exec,put})=>{
+  const {dir}=catalog(base);await json(['add',dir,'greeter']);await json(['confirm','greeter']);
+  put('project/bots/team.yaml','version: 1\nbots:\n  - name: Helper\n    skills:\n      - file: skills/greeter/SKILL.md\n');
+  const skill=path.join(root,'project/bots/skills/greeter'), moved=path.join(root,'moved');
+  fs.renameSync(skill,moved);fs.symlinkSync(moved,skill);
+  let rendered=await exec('render-team.cjs',['project/bots/team.yaml']);
+  assert.equal(JSON.parse(rendered.stdout).bots[0].skills[0].enabled,false);
+  fs.unlinkSync(skill);fs.renameSync(moved,skill);
+  const parent=path.join(root,'project/bots/skills'), relocated=path.join(root,'relocated');
+  fs.renameSync(parent,relocated);fs.symlinkSync(relocated,parent);
+  rendered=await exec('render-team.cjs',['project/bots/team.yaml']);
+  assert.equal(JSON.parse(rendered.stdout).bots[0].skills[0].enabled,false);
+}));
+
+test('update preserves preexisting staging data on success and failure',()=>fixture(async({base,root,json,run,put})=>{
+  const {dir}=catalog(base);await json(['add',dir,'greeter']);
+  put('project/bots/skills/.greeter.new/keep','untouched');
+  commit(dir,{'skills/greeter/SKILL.md':skillMd('greeter','New content.')});
+  await json(['update','greeter']);
+  commit(dir,{'skills/greeter/config.txt':'SECRET=1'});
+  assert.equal((await run(['update','greeter'])).status,1);
+  assert.equal(fs.readFileSync(path.join(root,'project/bots/skills/.greeter.new/keep'),'utf8'),'untouched');
+}));
+
+test('failed native import never deletes a concurrent copy',()=>fixture(async({base,omb,json,run})=>{
+  const {dir}=catalog(base);omb.behavior.failPost=true;
+  const added=await json(['add',dir,'greeter']);assert.equal(added.skill.state,'scan');
+  assert.equal(omb.held.size,1);assert.equal(omb.calls.some(c=>c.startsWith('DELETE ')),false);
+  assert.equal((await run(['confirm','greeter'])).status,1);
 }));

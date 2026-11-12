@@ -146,13 +146,22 @@ function folderHash(folder, sharedLicense) {
   for (const [file, data] of [...entries].sort(([a], [b]) => a.localeCompare(b))) hash.update(JSON.stringify([file, data.length])).update(data);
   return hash.digest('hex');
 }
-const currentHash = name => { try { return folderHash(path.join(DIR, name)); } catch { return null; } };
+const currentHash = name => { try {
+  let part = path.resolve('.');
+  for (const segment of path.join(DIR, name).split(path.sep)) {
+    part = path.join(part, segment);
+    if (fs.lstatSync(part).isSymbolicLink()) return null;
+  }
+  return folderHash(part);
+} catch { return null; } };
 
 /** Name of the third-party skill a team file entry points to, or null. */
 function thirdParty(file, lock = readLock()) {
   if (typeof file !== 'string' || path.basename(file) !== 'SKILL.md') return null;
-  const folder = real(path.dirname(file)), name = path.basename(folder);
-  return path.dirname(folder) === real(DIR) && Object.hasOwn(lock, name) ? name : null;
+  const folder = path.resolve(path.dirname(file)), name = path.basename(folder);
+  if (path.dirname(folder) === path.resolve(DIR) && Object.hasOwn(lock, name)) return name;
+  const resolved = real(folder), resolvedName = path.basename(resolved);
+  return path.dirname(resolved) === real(DIR) && Object.hasOwn(lock, resolvedName) ? resolvedName : null;
 }
 
 /** Bots of the project declaration that have each third-party skill on. */
@@ -309,15 +318,23 @@ async function ombScan(name, description, text) {
   const hash = sha256(text);
   for (const bot of (await api('/api/bots?messages=0')).bots || []) {
     const id = encodeURIComponent(bot.id);
-    const held = ((await api(`/api/bots/${id}/skills`)).skills || []).find(s => s.name === name);
-    if (held?.sha256 === hash) return warnings(held.warnings);   // the same content is already there: its scan stands
-    if (held) continue;
+    const probe = `fyso-scan-${crypto.randomBytes(16).toString('hex')}`;
+    const existing = (await api(`/api/bots/${id}/skills`)).skills || [];
+    if (existing.some(s => s.name === probe)) continue;
+    let installed;
     try {
-      const {installed} = await api(`/api/bots/${id}/skill-template`, {method:'POST',
-        body:JSON.stringify({name, description, source:'fyso scan', text, enabled:false, warnings:[]})});
+      ({installed} = await api(`/api/bots/${id}/skill-template`, {method:'POST',
+        body:JSON.stringify({name:probe, description, source:'fyso scan', text, enabled:false, warnings:[]})}));
       if (installed?.sha256 !== hash || installed.enabled !== false) throw Error('OpenMausBot did not attest the disabled content');
       return warnings(installed.warnings);
-    } finally { await api(`/api/bots/${id}/skills/${name}`, {method:'DELETE'}); }
+    } finally {
+      if (installed) {
+        const held = ((await api(`/api/bots/${id}/skills`)).skills || []).find(s => s.name === probe);
+        if (!held || held.sha256 !== hash || held.enabled !== false ||
+            (installed.importedAt && held.importedAt !== installed.importedAt)) throw Error('OpenMausBot scan probe ownership changed');
+        await api(`/api/bots/${id}/skills/${probe}`, {method:'DELETE'});
+      }
+    }
   }
   throw Error('no bot is free to run the scan');
 }
@@ -377,7 +394,6 @@ function commit(text, name) {
 /** Copy a skill folder: regular files only, bounded, checked for secrets before it is kept. */
 function copySkill(from, to, skill) {
   let files = 0, bytes = 0;
-  fs.rmSync(to, {recursive:true, force:true});
   try {
     (function walk(rel) {
       fs.mkdirSync(path.join(to, rel), {recursive:true});
@@ -437,7 +453,9 @@ async function update(name, ref, reviewed) {
   if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
   const lock = readLock(), entry = lock[requireName(name)];
   if (!entry) throw Error(`${name} is not installed`);
-  const staged = path.join(DIR, `.${name}.new`);
+  fs.mkdirSync(DIR, {recursive:true});
+  const temp = fs.mkdtempSync(path.join(DIR, `.${name}-`)), staged = path.join(temp, 'skill');
+  try {
   const skill = withRepo(entry.src, ref, (dir, at) => {
     const all = findSkills(dir), found = all.find(s => s.path === entry.path && s.name === name) || pick(all, name, entry.src);
     if (found.name !== name) throw Error(`${entry.src} no longer has a skill named ${name}`);
@@ -456,6 +474,7 @@ async function update(name, ref, reviewed) {
   // New content is new to the scan and to the person; bots keep the confirmed copy until then.
   writeLock(lock[name].scan?.sha256 === skill.sha256 ? lock : await scan(name, lock, {quiet:true}));
   return result('update', name, commit(`skills: update ${name} ${skill.commit.slice(0, 12)}`, name), {changed:true, from:entry.commit, to:skill.commit});
+  } finally { fs.rmSync(temp, {recursive:true, force:true}); }
 }
 
 function remove(name) {
