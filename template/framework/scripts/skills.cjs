@@ -26,13 +26,13 @@ const clean = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f�
 const slug = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 const validName = name => typeof name === 'string' && name.length <= 64 && NAME.test(name);
-const requireName = name => { if (!validName(name)) throw Error('expected the name of an installed skill'); return name; };
+const requireName = name => { if (!validName(name)) throw new Error('expected the name of an installed skill'); return name; };
 
 // ── Sources ────────────────────────────────────────────────────────────────────────
 
 function sources() {
   const list = fs.existsSync(SOURCES) ? yaml.parse(fs.readFileSync(SOURCES, 'utf8')) ?? [] : DEFAULT_SOURCES;
-  if (!Array.isArray(list) || list.some(s => typeof s !== 'string')) throw Error(`${SOURCES}: expected a list of git sources`);
+  if (!Array.isArray(list) || list.some(s => typeof s !== 'string')) throw new Error(`${SOURCES}: expected a list of git sources`);
   return list;
 }
 
@@ -40,7 +40,7 @@ function sources() {
 function parseSource(input) {
   const text = String(input || '').trim();
   const github = (owner, repo, rest = {}) => {
-    if ([owner, repo].some(part => part === '.' || part === '..')) throw Error('that is not a repository');
+    if ([owner, repo].some(part => part === '.' || part === '..')) throw new Error('that is not a repository');
     return {src:`gh:${owner}/${repo}`, ...rest};
   };
   let m;
@@ -48,17 +48,17 @@ function parseSource(input) {
   if ((m = /^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:\/tree\/([^/]+)(?:\/(.+?))?)?\/?$/i.exec(text))) return github(m[1], m[2], {...(m[3] && {ref:m[3]}), ...(m[4] && {dir:m[4]})});
   if ((m = /^(?:gh:)?([\w.-]+)\/([\w.-]+)$/.exec(text)) && !fs.existsSync(text)) return github(m[1], m[2]);
   // `::` would select a git remote helper (ext::, fd::): never from a pasted source.
-  if (!text || /\s/.test(text) || text.startsWith('-') || text.includes('::')) throw Error('expected a git repository: owner/repo, a GitHub or skills.sh address, or a git URL');
+  if (!text || /\s/.test(text) || text.startsWith('-') || text.includes('::')) throw new Error('expected a git repository: owner/repo, a GitHub or skills.sh address, or a git URL');
   if (!fs.existsSync(text)) {
-    let url; try { url = new URL(text); } catch { throw Error('expected a public HTTPS git repository'); }
-    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw Error('expected a public HTTPS git repository without credentials or query');
+    let url; try { url = new URL(text); } catch { throw new Error('expected a public HTTPS git repository'); }
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('expected a public HTTPS git repository without credentials or query');
   }
   return {src:text};
 }
 
 /** Clone a source at a ref (default: the tip of its default branch); `use` gets the folder and the commit. */
 function withRepo(src, ref, use) {
-  if (ref && !/^[\w][\w./-]{0,199}$/.test(ref)) throw Error('expected a commit, tag or branch');
+  if (ref && !/^[\w][\w./-]{0,199}$/.test(ref)) throw new Error('expected a commit, tag or branch');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fyso-skill-'));
   try {
     try {
@@ -67,7 +67,7 @@ function withRepo(src, ref, use) {
         git(['clone', '--quiet', '--filter=blob:none', '--no-checkout', '--', gitUrl(src), dir]);
         try { git(['-C', dir, 'checkout', '--quiet', '--detach', ref]); } catch { git(['-C', dir, 'checkout', '--quiet', '--detach', `origin/${ref}`]); }
       }
-    } catch (e) { throw Error(`${src}: ${message(e)}`); }
+    } catch (e) { throw new Error(`${src}: ${message(e)}`); }
     return use(dir, git(['-C', dir, 'rev-parse', 'HEAD']).trim());
   } finally { fs.rmSync(dir, {recursive:true, force:true}); }
 }
@@ -95,9 +95,9 @@ function readSkill(root, rel) {
 /** Every folder with a valid SKILL.md under `start`; a skill folder is not searched further. */
 function findSkills(root, start = '') {
   const base = path.resolve(root, start);
-  if (base !== path.resolve(root) && !base.startsWith(path.resolve(root) + path.sep)) throw Error('the folder is outside the repository');
-  if (!fs.existsSync(base)) throw Error(`no folder ${start} in that repository`);
-  if (real(base) !== real(root) && !real(base).startsWith(real(root) + path.sep)) throw Error('the folder is outside the repository');
+  if (base !== path.resolve(root) && !base.startsWith(path.resolve(root) + path.sep)) throw new Error('the folder is outside the repository');
+  if (!fs.existsSync(base)) throw new Error(`no folder ${start} in that repository`);
+  if (real(base) !== real(root) && !real(base).startsWith(real(root) + path.sep)) throw new Error('the folder is outside the repository');
   const found = [];
   (function walk(rel, depth) {
     const entries = fs.readdirSync(path.join(root, rel), {withFileTypes:true});
@@ -116,8 +116,8 @@ function pick(skills, wanted, src) {
   const want = slug(wanted);
   const match = want ? skills.filter(s => s.name === want || slug(path.basename(s.path)) === want) : skills;
   if (match.length === 1) return match[0];
-  if (!match.length) throw Error(wanted ? `no skill named "${clean(wanted, 64)}" in ${src}` : `no SKILL.md found in ${src}`);
-  throw Error(`${src} has ${match.length} skills; name one: ${match.slice(0, 20).map(s => s.name).join(', ')}`);
+  if (!match.length) throw new Error(wanted ? `no skill named "${clean(wanted, 64)}" in ${src}` : `no SKILL.md found in ${src}`);
+  throw new Error(`${src} has ${match.length} skills; name one: ${match.slice(0, 20).map(s => s.name).join(', ')}`);
 }
 
 // ── Record ─────────────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ function checkMutationPath(target, directory) {
       }
       const last = current === path.resolve(target);
       if (stat.isSymbolicLink() || (!last || directory ? !stat.isDirectory() : !stat.isFile()))
-        throw Error(`unsafe skill mutation path: ${current}`);
+        throw new Error(`unsafe skill mutation path: ${current}`);
     }
 }
 function mutationPaths(name) {
@@ -152,7 +152,7 @@ function writeLock(lock) {
 const skillFile = name => path.join(DIR, name, 'SKILL.md');
 // Approval covers every retained byte, including license and supporting files.
 function folderHash(folder, sharedLicense) {
-  if (!fs.lstatSync(folder).isDirectory()) throw Error('skill folder must be a regular directory');
+  if (!fs.lstatSync(folder).isDirectory()) throw new Error('skill folder must be a regular directory');
   const entries = new Map(); let bytes = 0;
   (function walk(rel) {
     for (const e of fs.readdirSync(path.join(folder, rel), {withFileTypes:true})) {
@@ -160,9 +160,9 @@ function folderHash(folder, sharedLicense) {
       const item = path.join(rel, e.name), file = path.join(folder, item);
       if (e.isDirectory()) walk(item);
       else {
-        if (!e.isFile()) throw Error(`${item} is a link or a special file; skills with those are refused`);
+        if (!e.isFile()) throw new Error(`${item} is a link or a special file; skills with those are refused`);
         bytes += fs.statSync(file).size;
-        if (entries.size >= MAX_FILES || bytes > MAX_BYTES) throw Error('skill exceeds the file or size limit');
+        if (entries.size >= MAX_FILES || bytes > MAX_BYTES) throw new Error('skill exceeds the file or size limit');
         entries.set(item.split(path.sep).join('/'), fs.readFileSync(file));
       }
     }
@@ -244,9 +244,9 @@ function gate(entry, bot = '') {
 async function directory(query) {
   const base = process.env.FYSO_SKILLS_DIRECTORY_URL || 'https://skills.sh';
   const res = await fetch(`${base}/api/search?${new URLSearchParams({q:query, limit:'20'})}`, {signal:AbortSignal.timeout(10_000)});
-  if (!res.ok) throw Error(`${DIRECTORY} answered ${res.status}`);
+  if (!res.ok) throw new Error(`${DIRECTORY} answered ${res.status}`);
   const data = await res.json();
-  if (!Array.isArray(data?.skills)) throw Error(`${DIRECTORY} returned an unsupported search response`);
+  if (!Array.isArray(data?.skills)) throw new Error(`${DIRECTORY} returned an unsupported search response`);
   return data.skills
     .filter(s => /^[\w.-]+\/[\w.-]+$/.test(s?.source || '') && validName(s.skillId))
     .map(s => ({name:slug(s.skillId), src:`gh:${s.source}`, origin:'directory',
@@ -291,7 +291,7 @@ function resolve(source, wanted, ref, use, recordedPath, exactPath = false) {
   return withRepo(parsed.src, ref || parsed.ref, (dir, commit) => {
     const all = findSkills(dir, parsed.dir || '');
     const skill = exactPath ? all.find(s => s.path === recordedPath && s.name === wanted) : selectSkill(all, wanted || parsed.skill, parsed.src, recordedPath);
-    if (!skill) throw Error('reviewed skill path no longer matches; preview again');
+    if (!skill) throw new Error('reviewed skill path no longer matches; preview again');
     return use({...skill, src:parsed.src, commit, sha256:folderHash(path.join(dir, skill.path), skill.sharedLicense)}, path.join(dir, skill.path));
   });
 }
@@ -314,7 +314,7 @@ function preview(source, wanted, ref, recordedPath, exactPath = false) {
 /** The installed copy of one skill: what the person confirms. */
 function local(name) {
   const skill = inventory().find(s => s.name === requireName(name));
-  if (!skill) throw Error(`${name} is not installed`);
+  if (!skill) throw new Error(`${name} is not installed`);
   const folder = path.join(DIR, name), files = [];
   (function walk(rel) {
     for (const e of fs.readdirSync(path.join(folder, rel), {withFileTypes:true})) {
@@ -336,15 +336,15 @@ function local(name) {
  */
 async function ombScan(name, description, text) {
   const port = process.env.FYSO_OMB_PORT;
-  if (!/^\d+$/.test(port || '')) throw Error('FYSO_OMB_PORT is not set: the scan only talks to this project\'s OpenMausBot');
+  if (!/^\d+$/.test(port || '')) throw new Error('FYSO_OMB_PORT is not set: the scan only talks to this project\'s OpenMausBot');
   const api = async (url, init) => {
     const res = await fetch(`http://127.0.0.1:${port}${url}`, {...init, headers:{'content-type':'application/json'}, signal:AbortSignal.timeout(20_000)});
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw Error(`OpenMausBot ${res.status}: ${clean(body.error, 300)}`);
+    if (!res.ok) throw new Error(`OpenMausBot ${res.status}: ${clean(body.error, 300)}`);
     return body;
   };
   const warnings = found => {
-    if (!Array.isArray(found) || found.some(w => typeof w !== 'string')) throw Error('OpenMausBot returned no valid scan result');
+    if (!Array.isArray(found) || found.some(w => typeof w !== 'string')) throw new Error('OpenMausBot returned no valid scan result');
     return found.map(w => clean(w, 2000));
   };
   const hash = sha256(text);
@@ -357,25 +357,25 @@ async function ombScan(name, description, text) {
     try {
       ({installed} = await api(`/api/bots/${id}/skill-template`, {method:'POST',
         body:JSON.stringify({name:probe, description, source:'fyso scan', text, enabled:false, warnings:[]})}));
-      if (installed?.sha256 !== hash || installed.enabled !== false) throw Error('OpenMausBot did not attest the disabled content');
+      if (installed?.sha256 !== hash || installed.enabled !== false) throw new Error('OpenMausBot did not attest the disabled content');
       return warnings(installed.warnings);
     } finally {
       if (installed) {
         const held = ((await api(`/api/bots/${id}/skills`)).skills || []).find(s => s.name === probe);
         if (!held || held.sha256 !== hash || held.enabled !== false ||
-            (installed.importedAt && held.importedAt !== installed.importedAt)) throw Error('OpenMausBot scan probe ownership changed');
+            (installed.importedAt && held.importedAt !== installed.importedAt)) throw new Error('OpenMausBot scan probe ownership changed');
         await api(`/api/bots/${id}/skills/${probe}`, {method:'DELETE'});
       }
     }
   }
-  throw Error('no bot is free to run the scan');
+  throw new Error('no bot is free to run the scan');
 }
 
 async function scan(name, lock = readLock(), {quiet = false} = {}) {
   mutationPaths(name);
   const entry = lock[requireName(name)];
-  if (!entry) throw Error(`${name} is not installed`);
-  if (currentHash(name) !== entry.sha256) throw Error(`${name} was changed after it was installed; run mise run skills:update ${name}`);
+  if (!entry) throw new Error(`${name} is not installed`);
+  if (currentHash(name) !== entry.sha256) throw new Error(`${name} was changed after it was installed; run mise run skills:update ${name}`);
   try {
     const warnings = await ombScan(name, entry.description, fs.readFileSync(skillFile(name), 'utf8'));
     entry.scan = {by:'openmausbot', at:new Date().toISOString(), sha256:entry.sha256, warnings};
@@ -388,9 +388,9 @@ async function scan(name, lock = readLock(), {quiet = false} = {}) {
 
 // Immutable preview/apply plans for platform MCP clients. Human confirmation is separate.
 function plan(mode, source, wanted, name, ref, selectedPath) {
-  if (!['add', 'update'].includes(mode)) throw Error('plan mode must be add or update');
+  if (!['add', 'update'].includes(mode)) throw new Error('plan mode must be add or update');
   const lock = readLock(), held = mode === 'update' ? lock[requireName(name)] : null;
-  if (mode === 'update' && !held) throw Error('skill is not installed');
+  if (mode === 'update' && !held) throw new Error('skill is not installed');
   const detail = preview(held?.src || source, held ? name : wanted, ref, held?.path ?? selectedPath, !held && selectedPath !== undefined);
   const planId = crypto.randomBytes(16).toString('hex');
   const folder = path.join(process.env.FYSO_DATA || '.data', 'skill-plans');
@@ -400,10 +400,10 @@ function plan(mode, source, wanted, name, ref, selectedPath) {
   return {collectedAt:new Date().toISOString(), planId, preview:detail};
 }
 async function applyPlan(planId) {
-  if (!/^[a-f0-9]{32}$/.test(planId || '')) throw Error('expected a skill planId');
+  if (!/^[a-f0-9]{32}$/.test(planId || '')) throw new Error('expected a skill planId');
   const file = path.join(process.env.FYSO_DATA || '.data', 'skill-plans', `${planId}.json`);
   const planned = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (planned.expires < Date.now() || planned.base !== JSON.stringify(readLock())) throw Error('skill plan is stale; preview again');
+  if (planned.expires < Date.now() || planned.base !== JSON.stringify(readLock())) throw new Error('skill plan is stale; preview again');
   const d = planned.detail;
   const output = planned.mode === 'add' ? await add(d.src, d.name, d.commit, d.sha256, d.path) : await update(planned.name, d.commit, d.sha256, d.path);
   fs.rmSync(file);
@@ -433,10 +433,10 @@ function copySkill(from, to, skill) {
       for (const e of fs.readdirSync(path.join(from, rel), {withFileTypes:true})) {
         const item = path.join(rel, e.name);
         if (e.isDirectory()) { if (e.name !== '.git') walk(item); }
-        else if (!e.isFile()) throw Error(`${item} is a link or a special file; skills with those are refused`);
+        else if (!e.isFile()) throw new Error(`${item} is a link or a special file; skills with those are refused`);
         else {
           bytes += fs.statSync(path.join(from, item)).size;
-          if (++files > MAX_FILES || bytes > MAX_BYTES) throw Error(`the skill is larger than ${MAX_FILES} files or ${MAX_BYTES / 1048576} MB`);
+          if (++files > MAX_FILES || bytes > MAX_BYTES) throw new Error(`the skill is larger than ${MAX_FILES} files or ${MAX_BYTES / 1048576} MB`);
           fs.copyFileSync(path.join(from, item), path.join(to, item));
         }
       }
@@ -444,8 +444,8 @@ function copySkill(from, to, skill) {
     // A license kept at the repository root travels with the copy.
     if (skill.sharedLicense) { fs.copyFileSync(skill.sharedLicense, path.join(to, path.basename(skill.sharedLicense))); files++; }
     const leaks = spawnSync('gitleaks', ['dir', to, '--no-banner', '--redact'], {encoding:'utf8'});
-    if (leaks.error) throw Error('gitleaks is not available (mise install)');
-    if (leaks.status) throw Error('the skill contains something that looks like a secret (gitleaks); it was not installed');
+    if (leaks.error) throw new Error('gitleaks is not available (mise install)');
+    if (leaks.status) throw new Error('the skill contains something that looks like a secret (gitleaks); it was not installed');
   } catch (e) { mutationPaths(); checkMutationPath(to, true); fs.rmSync(to, {recursive:true, force:true}); throw e; }
   return files;
 }
@@ -464,19 +464,19 @@ const result = (op, name, change, extra = {}) => {
 
 async function add(source, wanted, ref, reviewed, reviewedPath) {
   mutationPaths();
-  if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
+  if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw new Error('preview an immutable commit and SHA256 before applying');
   // The source is saved in the record, which check-paths scans before every snapshot.
   if (path.isAbsolute(String(source)) || String(source).startsWith('~')) {
     const warning = `${source} is a path of this machine; it would be saved in ${LOCK} and fail check-paths. Publish the repository to git.`;
-    if (process.env.SKILLS_APPLY) throw Error(warning);
+    if (process.env.SKILLS_APPLY) throw new Error(warning);
     console.error(`warning: ${warning}`);
   }
   const lock = readLock();
   const skill = resolve(source, wanted, ref, (found, folder) => {
-    if (reviewed && reviewed !== found.sha256) throw Error('skill changed since preview; read it again');
+    if (reviewed && reviewed !== found.sha256) throw new Error('skill changed since preview; read it again');
     mutationPaths(found.name);
-    if (lock[found.name]) throw Error(`${found.name} is already installed (mise run skills:update ${found.name})`);
-    if (fs.existsSync(path.join(DIR, found.name))) throw Error(`${DIR}/${found.name} already exists and is not a third-party skill`);
+    if (lock[found.name]) throw new Error(`${found.name} is already installed (mise run skills:update ${found.name})`);
+    if (fs.existsSync(path.join(DIR, found.name))) throw new Error(`${DIR}/${found.name} already exists and is not a third-party skill`);
     return {...found, files:copySkill(folder, path.join(DIR, found.name), found)};
   }, reviewedPath, reviewedPath !== undefined);
   lock[skill.name] = record(skill, skill.files);
@@ -486,17 +486,17 @@ async function add(source, wanted, ref, reviewed, reviewedPath) {
 
 async function update(name, ref, reviewed, reviewedPath) {
   mutationPaths(name);
-  if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw Error('preview an immutable commit and SHA256 before applying');
+  if (process.env.SKILLS_APPLY && (!/^[a-f0-9]{40}$/.test(ref || '') || !reviewed)) throw new Error('preview an immutable commit and SHA256 before applying');
   const lock = readLock(), entry = lock[requireName(name)];
-  if (!entry) throw Error(`${name} is not installed`);
+  if (!entry) throw new Error(`${name} is not installed`);
   fs.mkdirSync(DIR, {recursive:true});
   const temp = fs.mkdtempSync(path.join(DIR, `.${name}-`)), staged = path.join(temp, 'skill');
   try {
   const skill = withRepo(entry.src, ref, (dir, at) => {
     const all = findSkills(dir), found = reviewedPath !== undefined ? all.find(s => s.path === reviewedPath && s.name === name) : selectSkill(all, name, entry.src, entry.path);
-    if (!found || found.name !== name) throw Error(`${entry.src} no longer has a skill named ${name}`);
+    if (!found || found.name !== name) throw new Error(`${entry.src} no longer has a skill named ${name}`);
     const next = {...found, src:entry.src, commit:at, sha256:folderHash(path.join(dir, found.path), found.sharedLicense)};
-    if (reviewed && reviewed !== next.sha256) throw Error('skill changed since preview; read it again');
+    if (reviewed && reviewed !== next.sha256) throw new Error('skill changed since preview; read it again');
     return {...next, files:copySkill(path.join(dir, found.path), staged, found)};
   });
   if (skill.commit === entry.commit && currentHash(name) === entry.sha256) {
@@ -516,9 +516,9 @@ async function update(name, ref, reviewed, reviewedPath) {
 function remove(name) {
   mutationPaths(name);
   const lock = readLock();
-  if (!lock[requireName(name)]) throw Error(`${name} is not installed`);
+  if (!lock[requireName(name)]) throw new Error(`${name} is not installed`);
   const bots = teamUses(lock)[name];
-  if (bots?.length) throw Error(`${name} is on for ${bots.join(', ')}; switch it off in each agent and apply before removing it`);
+  if (bots?.length) throw new Error(`${name} is on for ${bots.join(', ')}; switch it off in each agent and apply before removing it`);
   fs.rmSync(path.join(DIR, name), {recursive:true, force:true});
   delete lock[name];
   writeLock(lock);
@@ -534,10 +534,10 @@ async function rescan(name) {
 function confirm(name, reviewed) {
   mutationPaths(name);
   const lock = readLock(), entry = lock[requireName(name)];
-  if (!entry) throw Error(`${name} is not installed`);
-  if (currentHash(name) !== entry.sha256) throw Error(`${name} was changed after it was installed; update it and review it again`);
-  if (entry.scan?.sha256 !== entry.sha256) throw Error(`${name} has not been scanned yet (mise run skills:scan ${name})`);
-  if (reviewed && reviewed !== entry.sha256) throw Error(`${name} changed since it was shown; read it again`);
+  if (!entry) throw new Error(`${name} is not installed`);
+  if (currentHash(name) !== entry.sha256) throw new Error(`${name} was changed after it was installed; update it and review it again`);
+  if (entry.scan?.sha256 !== entry.sha256) throw new Error(`${name} has not been scanned yet (mise run skills:scan ${name})`);
+  if (reviewed && reviewed !== entry.sha256) throw new Error(`${name} changed since it was shown; read it again`);
   entry.review = {at:new Date().toISOString(), sha256:entry.sha256};
   writeLock(lock);
   return result('confirm', name, commit(`skills: confirm ${name}`, name));
@@ -561,9 +561,9 @@ if (require.main === module) (async () => {
       case 'remove': return out(remove(env.NAME));
       case 'scan': return out(await rescan(env.NAME));
       case 'confirm':
-        if (!env.SHA256) throw Error('SHA256 of the reviewed skill folder is required');
+        if (!env.SHA256) throw new Error('SHA256 of the reviewed skill folder is required');
         return out(confirm(env.NAME, env.SHA256));
-      default: throw Error('OP must be add, update, remove, scan or confirm');
+      default: throw new Error('OP must be add, update, remove, scan or confirm');
     }
     case 'panel': return writePanel();
     case 'search': {
@@ -588,6 +588,6 @@ if (require.main === module) (async () => {
     case 'remove': return out(remove(args[0]));
     case 'scan': return out(await rescan(args[0]));
     case 'confirm': return out(confirm(args[0], args[1]));
-    default: throw Error('Usage: skills.cjs <search [text]|show <source> [skill] [commit]|add <source> [skill] [commit]|update <name> [commit]|remove <name>|scan <name>|confirm <name>|list>');
+    default: throw new Error('Usage: skills.cjs <search [text]|show <source> [skill] [commit]|add <source> [skill] [commit]|update <name> [commit]|remove <name>|scan <name>|confirm <name>|list>');
   }
 })().catch(e => { console.error(e.stderr ? message(e) : e.message); process.exitCode = 1; });
