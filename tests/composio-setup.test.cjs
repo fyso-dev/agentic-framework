@@ -89,3 +89,35 @@ test('managed MCP requests use the same private authentication and origin bounda
   assert.deepEqual(calls.map(call=>call.slice(0,2)),[['create','demo'],['enable','demo'],['remove','demo']]);
  }finally{await new Promise(resolve=>server.close(resolve));}
 }));
+
+test('remote MCP commands share the private boundary, answer POST only and never leak on errors (D65)',()=>fixture(async f=>{
+ const agent=require('../template/framework/scripts/agent-remote.cjs'),token='t'.repeat(43);
+ const env={...f.env,FYSO_PROJECT:'demo-shop',FYSO_WEB_DOMAIN:'host1.proxy.example.com',FYSO_WEB_SCHEME:'https'};
+ let stored=token;
+ const server=createServer(env,undefined,undefined,undefined,e=>agent.describe(e,stored));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const url=`http://127.0.0.1:${server.address().port}/api/agent/remote`,headers={Authorization:'Basic '+Buffer.from('fixture:fixture').toString('base64'),Origin:'https://panel.host1.proxy.example.com','Content-Type':'application/json'};
+ try{
+  assert.equal((await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
+  assert.equal((await fetch(url,{headers})).status,405);
+  for(const Origin of ['https://foreign.invalid','http://panel.host1.proxy.example.com:19540'])
+   assert.equal((await fetch(url,{method:'POST',headers:{...headers,Origin},body:'{}'})).status,403);
+  const ok=await fetch(url,{method:'POST',headers,body:'{}'});
+  assert.equal(ok.status,200);assert.equal(ok.headers.get('cache-control'),'no-store');
+  const body=await ok.json();
+  assert.equal(body.server,'fyso-demo-shop');assert.equal(body.url,'https://panel.host1.proxy.example.com/mcp');
+  assert.deepEqual(body.clients.map(c=>c.id),['claude-code','codex','opencode','gemini','other']);
+  for(const client of body.clients)assert.ok(client.commands.join('\n').includes(token)&&client.commands.join('\n').includes(body.url),client.id);
+  assert.match(body.clients[1].commands[1],/--bearer-token-env-var FYSO_DEMO_SHOP_MCP_TOKEN$/);
+  assert.equal(JSON.parse(body.clients[4].commands[0]).mcpServers['fyso-demo-shop'].headers.Authorization,`Bearer ${token}`);
+  stored='';
+  const missing=await fetch(url,{method:'POST',headers,body:'{}'});
+  assert.equal(missing.status,409);assert.deepEqual(await missing.json(),{error:'noToken'});
+ }finally{await new Promise(resolve=>server.close(resolve));}
+ const plain=createServer({...env,FYSO_WEB_SCHEME:'http'},undefined,undefined,undefined,e=>agent.describe(e,token));
+ await new Promise(resolve=>plain.listen(0,'127.0.0.1',resolve));
+ try{
+  const off=await fetch(`http://127.0.0.1:${plain.address().port}/api/agent/remote`,{method:'POST',headers:{...headers,Origin:'http://panel.host1.proxy.example.com:19540'},body:'{}'});
+  assert.equal(off.status,409);const text=await off.text();assert.equal(text,'{"error":"httpsRequired"}');assert.ok(!text.includes(token));
+ }finally{await new Promise(resolve=>plain.close(resolve));}
+}));

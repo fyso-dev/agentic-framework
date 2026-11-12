@@ -49,7 +49,7 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
     throw new SetupError('saveFailed',500);
   }finally{fs.rmSync(lock,{recursive:true,force:true});}
 }
-function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args)) {
+function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args),describeRemote=(...args)=>require('./agent-remote.cjs').describe(...args)) {
   const expected=Buffer.from('Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
   const origin=require('./web-origin.cjs').origin('panel',env,env.FYSO_WEB_DOMAIN||'localhost');
   return http.createServer(async(req,res)=>{
@@ -59,7 +59,9 @@ function createServer(env=process.env,save=configure,manage=require('./managed-m
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return reply(401,{error:'unauthorized'});
     const mcp=/^\/api\/connectors\/mcp(?:\/([a-z][a-z0-9_-]{0,31}))?$/.exec(req.url||'');
     const extension=/^\/api\/extensions\/([a-z][a-z0-9-]{1,30})\/secrets$/.exec(req.url||'');
-    if(req.url!=='/api/composio/setup'&&!mcp&&!extension)return reply(404,{error:'notFound'});
+    // Remote MCP connection commands, token included (D65): read on request, never through Dagu.
+    const remote=req.url==='/api/agent/remote';
+    if(req.url!=='/api/composio/setup'&&!mcp&&!extension&&!remote)return reply(404,{error:'notFound'});
     const allowed=mcp?(mcp[1]?['PATCH','DELETE']:['POST']):['POST'];
     if(!allowed.includes(req.method))return reply(405,{error:'methodNotAllowed'});
     if(req.headers.origin!==origin||req.headers['sec-fetch-site']==='cross-site')return reply(403,{error:'origin'});
@@ -69,6 +71,10 @@ function createServer(env=process.env,save=configure,manage=require('./managed-m
       let input;try{input=body?JSON.parse(body):{};}catch{throw new SetupError('invalidInput');}
       if(mcp){const op=req.method==='POST'?'create':req.method==='PATCH'?'enable':'remove';const result=await manage(op,mcp[1]||input.name,input,env);return reply(200,result);}
       if(extension)return reply(200,await saveExtension(extension[1],input,env));
+      if(remote){
+        const agent=require('./agent-remote.cjs');
+        try{return reply(200,describeRemote(env));}catch(error){if(error instanceof agent.RemoteError)return reply(error.status,{error:error.code});throw error;}
+      }
       const result=await save(input,env);reply(result.active?200:202,result);
     }catch(error){const known=error instanceof SetupError||error instanceof require('./managed-mcp.cjs').McpError||error instanceof require('./extension-secrets.cjs').SecretsError;reply(known?error.status:500,{error:known?error.code:'saveFailed'});}
   });

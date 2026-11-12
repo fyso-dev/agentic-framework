@@ -312,6 +312,11 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       }) }) });
       return;
     }
+    if (mode === "remote") {
+      add({ dag, id, createdAt, duration: 1200, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+        mode, server: `fyso-${PROJECT.slug}`, url: `${location.origin}/mcp`, created: false }) }) });
+      return;
+    }
     const failed = scenario === "failed" && mode === "connect";
     if (!failed && mode === "connect") agentsOn.add(target);
     if (mode === "disconnect") agentsOn.delete(target);

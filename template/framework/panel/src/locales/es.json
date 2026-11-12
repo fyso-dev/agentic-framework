@@ -901,7 +901,7 @@
     "remoteTitle": "Abriste el panel desde otro equipo",
     "remoteBody": "Conectar desde aquí configuraría las apps del servidor, no las tuyas. Para conectar tu agente desde otro equipo el proyecto necesita HTTPS: instala en él una extensión de acceso HTTPS (por ejemplo, NetBird).",
     "remoteReadyTitle": "Conecta tu agente a este proyecto",
-    "remoteReadyBody": "En el equipo del proyecto, ejecuta este comando en la terminal. Muestra la dirección y el token con la orden lista para Claude Code, Codex u otro cliente MCP. El token solo aparece ahí, nunca en el panel.",
+    "remoteReadyBody": "Pulsa Ejecutar para ver aquí la orden lista para cada cliente (Claude Code, Codex, OpenCode, Gemini CLI u otro). También puedes ejecutar este comando en la terminal del equipo del proyecto.",
     "remoteAddress": "Dirección del MCP de este proyecto:",
     "tryTitle": "Prueba la conexión en una conversación nueva",
     "prompt": "Lee fyso_context y ejecuta fyso_status para revisar mi proyecto. Dime qué tengo y qué conviene configurar primero.",
@@ -911,7 +911,22 @@
     "trouble3": "Revisa el error y los registros del workflow fyso-agent-connect en Dagu.",
     "setupTitle": "Maneja el proyecto desde tu IA",
     "setupBody": "Opcional: conecta Claude o Codex para configurar el proyecto conversando.",
-    "setupLink": "Conectar"
+    "setupLink": "Conectar",
+    "remoteRun": "Ejecutar",
+    "remoteRunning": "Ejecutando…",
+    "remoteSecret": "Estas órdenes incluyen el token de este proyecto: quien las tenga puede usar sus herramientas. Cópialas solo en tu equipo.",
+    "remoteOther": "Otro cliente MCP",
+    "remoteNote": {
+      "env": "El token queda en una variable de entorno; añade el export a tu perfil de shell.",
+      "json": "Configuración para clientes que usan un archivo JSON."
+    },
+    "remoteError": {
+      "httpsRequired": "El proyecto todavía no tiene acceso HTTPS.",
+      "noToken": "El token no está disponible. Vuelve a pulsar Ejecutar.",
+      "origin": "Abre el panel desde su dirección habitual e inténtalo de nuevo.",
+      "unauthorized": "Tu sesión venció. Entra de nuevo.",
+      "failed": "No se pudieron obtener las órdenes de conexión."
+    }
   },
   "update": {
     "title": "Framework",

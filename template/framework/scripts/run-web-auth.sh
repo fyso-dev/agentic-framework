@@ -5,6 +5,10 @@ source "$(dirname "$0")/lib.sh"
 # Shared login (D61): nothing to run here. The process stays up so the stack's
 # dependencies and readiness (health.sh asks the shared service) need no second shape.
 if shared_login; then exec tail -f /dev/null; fi
+# Users are read fresh: this process is restarted after a password change, and a
+# restarted process still has the environment of `mise run up`.
+FYSO_AUTH_USERS=$(mise exec -- printenv FYSO_AUTH_USERS 2>/dev/null || printf '%s' "${FYSO_AUTH_USERS:-}")
+export FYSO_AUTH_USERS
 require_env FYSO_DATA FYSO_ROOT FYSO_WEB_DOMAIN FYSO_HTTP_PORT FYSO_AUTH_PORT FYSO_AUTH_USERS
 web_scheme >/dev/null
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "The gateway listens on loopback only. Remote access goes through a private forwarder or an HTTPS provider extension."

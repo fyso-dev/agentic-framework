@@ -994,6 +994,14 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
   .as-srv .mono { flex: 1 1 auto; min-width: 0; }
 }
 
+/* Remote MCP: run the task and list each client's command (D65). */
+.as-remote-run { display: flex; flex-direction: column; gap: 10px; }
+.as-run { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.as-run .copyline { flex: 1 1 260px; min-width: 0; }
+.as-clients { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.as-clients li { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.as-clients h3 { margin: 0; font-size: 13px; font-weight: 700; }
+.as-clients .copyline code { white-space: pre; }
 .sk-chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; }
 .sk-facts dd { min-width: 0; }
 .modal-foot:has(.sk-read) { flex-wrap: wrap; }

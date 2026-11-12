@@ -901,7 +901,7 @@
     "remoteTitle": "You opened the panel from another machine",
     "remoteBody": "Connecting from here would configure the server's apps, not yours. To connect your agent from another machine the project needs HTTPS: install an HTTPS access extension on it (for example, NetBird).",
     "remoteReadyTitle": "Connect your agent to this project",
-    "remoteReadyBody": "On the project's machine, run this command in the terminal. It shows the address and the token with the command ready for Claude Code, Codex or another MCP client. The token appears only there, never in the panel.",
+    "remoteReadyBody": "Press Run to see here the command ready for each client (Claude Code, Codex, OpenCode, Gemini CLI or another). You can also run this command in a terminal on the project's machine.",
     "remoteAddress": "This project's MCP address:",
     "tryTitle": "Try the connection in a new conversation",
     "prompt": "Read fyso_context and run fyso_status to review my project. Tell me what I have and what to set up first.",
@@ -911,7 +911,22 @@
     "trouble3": "Check the error and the logs of the fyso-agent-connect workflow in Dagu.",
     "setupTitle": "Run the project from your AI",
     "setupBody": "Optional: connect Claude or Codex to configure the project by chatting.",
-    "setupLink": "Connect"
+    "setupLink": "Connect",
+    "remoteRun": "Run",
+    "remoteRunning": "Running…",
+    "remoteSecret": "These commands include this project's token: whoever has them can use its tools. Copy them only on your own machine.",
+    "remoteOther": "Another MCP client",
+    "remoteNote": {
+      "env": "The token stays in an environment variable; add the export to your shell profile.",
+      "json": "Configuration for clients that use a JSON file."
+    },
+    "remoteError": {
+      "httpsRequired": "The project has no HTTPS access yet.",
+      "noToken": "The token is not available. Press Run again.",
+      "origin": "Open the panel from its usual address and try again.",
+      "unauthorized": "Your session expired. Sign in again.",
+      "failed": "The connection commands could not be fetched."
+    }
   },
   "update": {
     "title": "Framework",

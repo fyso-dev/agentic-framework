@@ -195,7 +195,7 @@ subsequent roster polling never overwrites a connector selection the person edit
 
 ### `fyso-agent-connect` — assistant MCP registration
 
-Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
+Params: `TARGET` is exactly `claude-desktop`, `codex` or `claude-code`; `MODE` is `connect` (default) or `disconnect`. `MODE=remote` (D65, no `TARGET`) makes sure the remote MCP token exists and outputs `{mode, server, url, created}`, never the token; the page then reads the per-client commands from `POST /api/agent/remote` (private setup adapter, same session and origin rules as `/api/composio/setup`). The adapter validates both before invoking the installer's native `agent-connect.cjs`, without shell interpolation. Nonzero connector exit codes fail the run. Output `result` is `{ target, mode, message }`.
 
 The MCP page enqueues this DAG and uses the shared action state, errors and Dagu log links. The workflow changes the configuration of the OS user running Dagu on that host, not the browser's machine. It does not launch or restart assistants. Demo mode explicitly labels simulated actions.
 

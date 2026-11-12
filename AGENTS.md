@@ -23,7 +23,7 @@ This repo is the **Copier template** of the Fyso Agentic Framework (working name
 
 - **Language:** code, comments, commits, PRs and docs are in **English**. UI copy goes through **i18n** (`i18next`, `locales/<lang>.json`, `es` default + `en`). Never hard-code UI strings.
 - **Ownership (in `template/`):** `framework/**` belongs to the template. `project/**` and `state/**` belong to each generated project and are never overwritten by `copier update`. Do not put project-specific content in `framework/`.
-- **Secrets:** never commit plaintext secrets. Use `sops` + `age` (`secrets.enc.yaml`). The panel never shows secret values.
+- **Secrets:** never commit plaintext secrets. Use `sops` + `age` (`secrets.enc.yaml`). The panel never shows secret values, with one recorded exception: the remote MCP connection commands, on the person's explicit request (D65).
 - **Versioning:** configuration lives in git. Nothing may hold configuration that cannot be rebuilt from the repo.
 - **Isolation:** never connect to the user's own Dagu, OpenMausBot or herdr session. Use this project's data dirs (`.data/…`), its port block and a named herdr session ([PLAN §3.1](docs/PLAN.md#31-isolation-every-project-runs-its-own-instances)). Every `openmausbot` CLI call must target an explicit `--port`/`OPENMAUSBOT_URL`: without one it auto-discovers the user's desktop app on 8799.
 - **No machine-specific paths:** never write absolute paths of a machine (home directories, Homebrew prefixes, temp dirs) in tracked files. Derive them from the script location, the git root or mise `config_root`, or take them from env vars. `scripts/check-paths.sh` must pass before every commit.

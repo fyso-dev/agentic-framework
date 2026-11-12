@@ -172,8 +172,28 @@ codex mcp add fyso-<slug> --url https://panel.<web_domain>/mcp --bearer-token-en
 | Tools | the platform tools; never Dagu's forwarded tools (D57) |
 
 One token per project: whoever holds it has the project's platform tools, so it is a
-password. The panel page `#/mcp`, opened from another machine over HTTPS, shows the
-address and the task to run, not the token.
+password.
+
+**From the panel (D65).** `#/mcp`, opened from another machine over HTTPS, offers *Run*
+next to the copyable task. It enqueues `fyso-agent-connect` with `MODE=remote`
+(`agent-remote.sh --ensure`: creates the token if missing, restarts `mcp-remote`,
+returns `{mode, server, url, created}` and never the token), then posts to
+`/api/agent/remote` on the private setup adapter, which reads the token from
+`secrets.enc.yaml` and answers `{server, url, clients: [{id, label, note?, commands}]}`.
+The page lists the commands per client with a copy button each:
+
+| Client | Command (checked against the client's own `mcp add --help`) |
+|---|---|
+| Claude Code | `claude mcp add --transport http --scope user <name> <url> --header "Authorization: Bearer <token>"` |
+| Codex | `export <NAME>_MCP_TOKEN=<token>` and `codex mcp add <name> --url <url> --bearer-token-env-var <NAME>_MCP_TOKEN` |
+| OpenCode | `opencode mcp add <name> --url <url> --header "Authorization=Bearer <token>"` |
+| Gemini CLI | `gemini mcp add --transport http --scope user <name> <url> -H "Authorization: Bearer <token>"` |
+| Other | a JSON `mcpServers` entry with `type: http`, `url` and the `Authorization` header |
+
+The endpoint answers 409 `httpsRequired` or `noToken` instead of commands when the
+project has no HTTPS provider or no token, and shares the adapter's boundary: web
+session, exact panel origin, POST only, `no-store`. This is the one place the panel
+shows a secret.
 
 Verified (2026-11-11): `tests/mcp-remote.test.cjs` (initialize, tools without `dagu_*`,
 token, Origin, method, size and "off" cases against the real server on a socket) and
