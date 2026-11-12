@@ -179,9 +179,12 @@ token, Origin, method, size and "off" cases against the real server on a socket)
 `tests/test_web_auth_http.py` (real Caddy: `/mcp` skips the login on the panel host only,
 in both schemes). `agent:remote` was run by hand in a throwaway folder with real sops
 3.13.3 and an age key: it stored a 43-character token encrypted, kept the existing
-secret and printed the commands. Not verified: a real Claude Code or Codex client
-through a real HTTPS provider, and the task inside a generated, running project
-(the `mcp-remote` restart).
+secret and printed the commands. End to end on a real project behind the NetBird
+reverse proxy: `mise run agent:remote` created the token and restarted `mcp-remote`;
+over the public address the endpoint answered 401 without or with a wrong token, 403
+with `Origin`, and `initialize` plus `tools/list` (26 tools, none `dagu_*`) with the
+right one; `claude mcp add --transport http …` then showed the server as connected.
+Not verified: a Codex client, and tool calls that change the project through this path.
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment. Desktop agents reach its tools through `fyso-<slug>` instead (forwarded, D57).
 

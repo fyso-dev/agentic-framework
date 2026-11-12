@@ -84,8 +84,13 @@ every request.
 Verified (2026-11-11): real Caddy 2.11.9 and Tinyauth 5.2.0 run the whole gateway suite
 in both modes (`tests/test_web_auth_http.py`, 25 tests); in HTTPS mode the login
 redirects to `https://auth.<domain>/`, the cookie is `Secure` and the listening address
-is rejected as an origin. Not verified: a browser session through a real provider, and
-the bundled SilverBullet extension behind HTTPS.
+is rejected as an origin. A real project (framework `v0.1.0-rc.3`, `fyso-ext-netbird`
+`v0.4.0`, self-hosted NetBird reverse proxy) serves its panel, login, Dagu, OpenMausBot
+and two project apps on `https://<app>.<host>.<cluster domain>` with trusted
+certificates; a browser request to the panel is redirected to `https://auth.…/login`
+with an `https` return address, and `mise run doctor` passes. Not verified: a person
+signing in with a browser through the provider, and the bundled SilverBullet extension
+behind HTTPS.
 
 ## User-visible flow
 
