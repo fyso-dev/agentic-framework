@@ -101,7 +101,11 @@ function findSkills(root, start = '') {
   const found = [];
   (function walk(rel, depth) {
     const entries = fs.readdirSync(path.join(root, rel), {withFileTypes:true});
-    if (entries.some(e => e.name === 'SKILL.md' && e.isFile())) { const skill = readSkill(root, rel); if (skill) found.push(skill); return; }
+    if (entries.some(e => e.name === 'SKILL.md' && e.isFile())) {
+      const skill = readSkill(root, rel);
+      if (skill) found.push(skill);
+      return;
+    }
     if (depth < 6) for (const e of entries) if (e.isDirectory() && e.name !== '.git' && e.name !== 'node_modules') walk(path.join(rel, e.name), depth + 1);
   })(path.relative(root, base), 0);
   return found.sort((a, b) => a.name.localeCompare(b.name));
@@ -123,7 +127,12 @@ function checkMutationPath(target, directory) {
     for (const segment of target.split(path.sep)) {
       current = path.join(current, segment);
       let stat;
-      try { stat = fs.lstatSync(current); } catch (e) { if (e.code === 'ENOENT') break; throw e; }
+      try {
+        stat = fs.lstatSync(current);
+      } catch (e) {
+        if (e.code === 'ENOENT') break;
+        throw e;
+      }
       const last = current === path.resolve(target);
       if (stat.isSymbolicLink() || (!last || directory ? !stat.isDirectory() : !stat.isFile()))
         throw Error(`unsafe skill mutation path: ${current}`);

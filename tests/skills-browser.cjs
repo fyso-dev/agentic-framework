@@ -42,5 +42,8 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
   await page.goto(`${base}/?mock=empty&lang=es#/apps?tab=skills`);
   await page.getByRole('searchbox').waitFor();assert.equal(await page.getByRole('button',{name:'Search',exact:true}).count(),0);
   assert.deepEqual(errors,[]);console.log('PASS mock panel: search, read, install, review gate, confirm, upgrade preview, remove, Spanish; no page errors');
- } finally {if(browser)await browser.close();await new Promise(r=>server.close(r));}
+ } finally {
+  if (browser) await browser.close();
+  await new Promise(r=>server.close(r));
+ }
 })().catch(e=>{console.error(e);process.exitCode=1;});
