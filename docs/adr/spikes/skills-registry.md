@@ -52,4 +52,4 @@ Before apply, show origin, commit, SKILL.md and license. Bind apply to the revie
 
 Rejected: a custom catalog/index, scraping, identity-bearing v1 API, global CLI installs, plugin installation, silently trusting missing scan results, automatic human confirmation over MCP, and copying supporting resources into bot workspaces through a second custom loader.
 
-Runtime lifecycle and build/test results are recorded in [the contract](../../third-party-skills.md). D73 is provisional and may need renumbering when concurrent decisions merge.
+Runtime lifecycle and build/test results are recorded in [the contract](../../third-party-skills.md).

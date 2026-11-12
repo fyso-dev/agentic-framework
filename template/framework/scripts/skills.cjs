@@ -1,4 +1,4 @@
-// Third-party Agent Skills (D64). A skill source is a git repository + path + commit:
+// Third-party Agent Skills (D73). A skill source is a git repository + path + commit:
 // a public directory (skills.sh) only names repositories, the files always come from git.
 // An installed skill is a plain copy in project/bots/skills/<name>/ plus one record in
 // project/bots/third-party-skills.json (source, commit, license, scan, review), so it
