@@ -1,6 +1,6 @@
 ---
 name: wiki-gardener
-description: Keep the project wiki healthy. Use when asked to review, clean up or check the knowledge base, or to act on a maintenance report: stale pages, contradictions, broken links, duplicates.
+description: 'Keep the project wiki healthy. Use when asked to review, clean up or check the knowledge base, or to act on a maintenance report: stale pages, contradictions, broken links, duplicates.'
 ---
 
 The wiki (`project/wiki/`) is what every bot trusts. Your job is to find what is

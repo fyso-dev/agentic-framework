@@ -24,25 +24,25 @@ bots:
     model: {{ fast }}
     approval: ask
     tools: { allow: ["native:*"] }
-    soul: { file: ${FYSO_ROOT}/extensions/pack-accounting/souls/client-intake.md }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/client-intake.md' }
 
   - name: Bookkeeping Assistant
     title: Prepares working papers and reconciliation drafts for an accountant to review
     model: {{ strong }}
     approval: ask
     tools: { allow: ["native:*"] }
-    soul: { file: ${FYSO_ROOT}/extensions/pack-accounting/souls/bookkeeping-assistant.md }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/bookkeeping-assistant.md' }
 
   - name: Deadline Keeper
     title: Tracks the firm's own calendar of obligations and reminds in time
     model: {{ fast }}
     approval: ask
     tools: { allow: ["native:*"] }
-    soul: { file: ${FYSO_ROOT}/extensions/pack-accounting/souls/deadline-keeper.md }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/deadline-keeper.md' }
 
   - name: Client Writer
     title: Drafts messages and letters to clients for a person to send
     model: {{ fast }}
     approval: ask
     tools: { allow: ["native:*"] }
-    soul: { file: ${FYSO_ROOT}/extensions/pack-accounting/souls/client-writer.md }
+    soul: { file: '${FYSO_ROOT}/extensions/pack-accounting/souls/client-writer.md' }
