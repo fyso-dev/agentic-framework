@@ -10,8 +10,8 @@ _preserve_symlinks: true
 _exclude:
   - "copier.yaml"
   - "copier.yml"
-  - "!framework/extensions/_template/copier.yml"
-  - "!framework/extensions/silverbullet/copier.yml"
+  # Bundled extensions keep their own Copier configuration (the starter and each opt-in extension).
+  - "!framework/extensions/*/copier.yml"
   - "~*"
   - "*.py[co]"
   - "__pycache__"

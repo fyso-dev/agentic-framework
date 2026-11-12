@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/assets/panel.css"><title></title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  main.page { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+  #files { flex: 1; width: 100%; min-height: 320px; border: 0; }
+</style></head>
+<script src="./vendor/i18next-26.5.11.min.js"></script>
+<body><main class="page"><h1 id="title"></h1><p id="description"></p>
+<p><a id="open" target="_blank" rel="noopener"></a></p>
+<iframe id="files"></iframe></main>
+<script type="module">
+// Panel page (extensions-contract §9). The list itself is served on the files site,
+// next to the files, so it can read Caddy's listing; this page only frames it.
+const params = new URLSearchParams(location.search);
+const lang = params.get('lang') === 'en' ? 'en' : 'es';
+const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+document.documentElement.lang = lang;
+document.documentElement.className = theme === 'dark' ? 'fy-dark' : 'fy-light';
+const resources = await (await fetch(`./locales/${lang}.json`)).json();
+await i18next.init({lng: lang, fallbackLng: 'es', resources: {[lang]: {translation: resources}}});
+const messages = new Proxy({}, {get: (_, key) => i18next.t(key)});
+document.title = messages.title;
+document.getElementById('title').textContent = messages.title;
+document.getElementById('description').textContent = messages.description;
+// Same project, sibling site: panel.<domain> -> files.<domain>, same scheme and port.
+const files = new URL(location.origin);
+files.hostname = files.hostname.replace(/^panel\./, 'files.');
+const list = `${files.origin}/.ui/index.html?lang=${lang}&theme=${theme}`;
+const frame = document.getElementById('files');
+frame.title = messages.title;
+frame.src = list;
+const open = document.getElementById('open');
+open.href = list;
+open.textContent = messages.open;
+</script></body></html>

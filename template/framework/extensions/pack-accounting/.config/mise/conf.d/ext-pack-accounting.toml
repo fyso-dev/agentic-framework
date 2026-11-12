@@ -1,0 +1,4 @@
+# No extra tool. The preview is OpenMausBot's own dry run against THIS project's server.
+[tasks."pack-accounting:preview"]
+description = "Show what the accounting pack would add to this project's bots (changes nothing)"
+run = "framework/scripts/bots.sh plan extensions/pack-accounting/team.yaml"

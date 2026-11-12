@@ -1,0 +1,28 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-ops-assistant.yml
+_templates_suffix: .slotjinja
+digest_schedule:
+  type: str
+  default: "0 8 * * 1"
+  help: When the weekly digest is written (five-field cron, server time). Empty runs it only on demand.
+  validator: >-
+    {% if digest_schedule and not (digest_schedule | regex_search('^[0-9*/,-]+( [0-9*/,-]+){4}$')) %}
+    Use a five-field cron expression, or leave it empty.
+    {% endif %}
+digest_language:
+  type: str
+  default: es
+  choices: [es, en]
+  help: Language of the digest page
+spend_schedule:
+  type: str
+  default: "0 9 * * *"
+  help: When the monthly spend caps are checked (five-field cron, server time). Empty runs it only on demand.
+  validator: >-
+    {% if spend_schedule and not (spend_schedule | regex_search('^[0-9*/,-]+( [0-9*/,-]+){4}$')) %}
+    Use a five-field cron expression, or leave it empty.
+    {% endif %}
+_exclude:
+  - copier.yml
+  - /README.md
+  - .git

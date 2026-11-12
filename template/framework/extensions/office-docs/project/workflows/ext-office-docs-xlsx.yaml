@@ -1,0 +1,30 @@
+# Write an Excel workbook from a data file with Dagu's own xlsx.write action (no
+# spreadsheet application). Started by a bot that has the excel-sheets skill:
+#   dagu_execute name=ext-office-docs-xlsx params="SOURCE=… NAME=…" wait=true
+# The workbook is written to .data/ext/office-docs/out/<NAME>.xlsx, replacing an
+# earlier one with the same name.
+description: Write an Excel workbook from a CSV, JSON or JSON Lines file
+type: graph
+max_active_runs: 1
+params:
+  - SOURCE: ""        # .csv, .json or .jsonl inside the project, e.g. .data/ext/office-docs/work/ventas.csv
+  - NAME: ""          # workbook name, without extension
+  - SHEET: Datos      # sheet name
+env:
+  - ROOT: ${FYSO_ROOT}
+  - OUT: ${FYSO_DATA}/ext/office-docs/out
+working_dir: ${ROOT}
+steps:
+  - id: check
+    run: bash extensions/office-docs/xlsx-check.sh
+  - id: write
+    depends: [check]
+    action: xlsx.write
+    with:
+      path: ${OUT}/${NAME}.xlsx
+      input: ${ROOT}/${SOURCE}
+      sheet: ${SHEET}
+  - id: result
+    depends: [write]
+    run: echo ".data/ext/office-docs/out/${NAME}.xlsx"
+    output: RESULT

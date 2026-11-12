@@ -1,0 +1,13 @@
+{
+  "title": "Deliverables",
+  "filter": "Search by name",
+  "refresh": "Refresh",
+  "name": "File",
+  "date": "Date",
+  "size": "Size",
+  "download": "Download",
+  "loading": "Loading…",
+  "empty": "No files yet. Ask a bot for a document and it will appear here.",
+  "noMatch": "No file matches the search.",
+  "error": "The list could not be loaded. Try again."
+}
