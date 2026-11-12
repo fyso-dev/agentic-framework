@@ -68,6 +68,26 @@ test('deliver refuses secrets, login files, snapshots, hidden files and anything
   } finally { fs.rmSync(outside, {recursive: true, force: true}); }
 }, ['deliverables']));
 
+test('deliver rejects sensitive resolved directory components', () => project(({root, put, run}) => {
+  for (const dir of ['credentials', 'auth', 'secret-store', 'nested/token-cache']) {
+    const file = `project/${dir}/config.json`;
+    put(file, '{}');
+    const result = run(['node', 'extensions/deliverables/deliver.cjs', 'put', file]);
+    assert.equal(result.status, 1, dir);
+    assert.match(result.stderr, /cannot be delivered/);
+  }
+  fs.symlinkSync(path.join(root, 'project/credentials/config.json'), path.join(root, 'project/alias.json'));
+  assert.equal(run(['node', 'extensions/deliverables/deliver.cjs', 'put', 'project/alias.json']).status, 1);
+  put('project/ordinary/config.json', '{}');
+  assert.equal(run(['node', 'extensions/deliverables/deliver.cjs', 'put', 'project/ordinary/config.json']).status, 0);
+  const nested = path.join(root, 'credentials-project');
+  fs.mkdirSync(path.join(nested, 'framework/scripts'), {recursive: true});
+  fs.copyFileSync(path.join(root, 'framework/scripts/web-origin.cjs'), path.join(nested, 'framework/scripts/web-origin.cjs'));
+  put('credentials-project/project/report.txt', 'report');
+  assert.equal(run(['node', 'extensions/deliverables/deliver.cjs', 'put', 'project/report.txt'],
+    {FYSO_ROOT: nested, FYSO_DATA: path.join(nested, '.data')}).status, 0);
+}, ['deliverables']));
+
 test('deliverables MCP server speaks stdio JSON-RPC with two tools and reports failures as tool errors', () => project(async ({root, put, env}) => {
   put('project/informe.pdf', 'pdf');
   const child = spawn(process.execPath, ['extensions/deliverables/deliver.cjs', 'mcp'], {cwd: root, env, stdio: ['pipe', 'pipe', 'inherit']});
@@ -133,6 +153,25 @@ test('wiki gardener finds broken links, old and unlinked pages, and ignores code
   assert.deepEqual(found.orphans, ['Suelta.md']);
   assert.equal(found.truncated, false);
   assert.deepEqual(links('[[A|b]] ![x](y.png) [t](z.md "title")').map(l => l.target), ['A', 'z.md']);
+}, ['knowledge-skills']));
+
+test('wiki gardener uses worktree changes without refreshing clean history', () => project(({root, put, run}) => {
+  for (const name of ['clean', 'dirty', 'staged']) put(`project/wiki/${name}.md`, name);
+  const git = (args, extra = {}) => {
+    const result = run(['git', ...args], extra);
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git(['init', '-q']);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'add', 'project/wiki']);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'fixture'],
+    {GIT_AUTHOR_DATE: '2020-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z'});
+  put('project/wiki/dirty.md', 'modified');
+  put('project/wiki/staged.md', 'staged change');
+  git(['add', 'project/wiki/staged.md']);
+  put('project/wiki/new.md', 'new');
+  const result = run(['node', 'extensions/knowledge-skills/garden.cjs', 'check']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).stale.map(item => item.page), ['clean.md']);
 }, ['knowledge-skills']));
 
 test('wiki gardener distinguishes an empty wiki from traversal failures', () => project(({root, put, run}) => {

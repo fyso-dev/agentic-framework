@@ -13,7 +13,7 @@ const VERSION = '0.1.0';
 // Never handed out, wherever they are: login users, snapshots, keys and anything that
 // looks like a credential. Hidden paths are refused too, except extensions' runtime data.
 const DENIED = [/^project\/auth(\/|$)/, /^state(\/|$)/, /\.enc\./, /\.(key|pem|age|p12|pfx)$/i,
-  /(^|\/)[^/]*(secret|credential|token|password)[^/]*$/i, /(^|\/)node_modules(\/|$)/];
+  /(^|\/)[^/]*(secret|credential|token|password)[^/]*(\/|$)/i, /(^|\/)auth(\/|$)/i, /(^|\/)node_modules(\/|$)/];
 const HIDDEN = /(^|\/)\./;
 const ALLOWED_HIDDEN = /^\.data\/ext\/[a-z][a-z0-9-]{1,30}\//;
 

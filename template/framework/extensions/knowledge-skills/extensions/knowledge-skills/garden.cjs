@@ -45,6 +45,15 @@ function changedAt(root, wiki, files) {
       }
     }
   } catch {}
+  try {
+    const status = execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=all', '--', path.relative(root, wiki) || '.'],
+      {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024});
+    const prefix = posix(path.relative(root, wiki)) + '/';
+    for (const entry of status.split('\0')) {
+      const name = entry.slice(3);
+      if (name.startsWith(prefix)) times.delete(name.slice(prefix.length));
+    }
+  } catch {}
   fillMissingTimes(times, wiki, files);
   return times;
 }
