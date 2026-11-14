@@ -15,10 +15,15 @@ require_env() {
 # Run a command with a cleared environment: only the basics plus the
 # variables given as NAME=value arguments before the command (PLAN §3.1).
 clean_exec() {
+  # A caller can isolate mise's configuration and auto-trust state using XDG.
+  # Preserve only these paths, and let explicit NAME=value arguments override them.
+  local xdg_vars=()
+  [ -z "${XDG_STATE_HOME:-}" ] || xdg_vars+=("XDG_STATE_HOME=$XDG_STATE_HOME")
+  [ -z "${XDG_CONFIG_HOME:-}" ] || xdg_vars+=("XDG_CONFIG_HOME=$XDG_CONFIG_HOME")
   exec env -i \
     HOME="$HOME" USER="${USER:-}" LOGNAME="${LOGNAME:-}" \
     PATH="$PATH" LANG="${LANG:-en_US.UTF-8}" TERM="${TERM:-dumb}" \
-    TMPDIR="${TMPDIR:-/tmp}" "$@"
+    TMPDIR="${TMPDIR:-/tmp}" "${xdg_vars[@]}" "$@"
 }
 
 port_in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }

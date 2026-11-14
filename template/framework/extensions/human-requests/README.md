@@ -1,0 +1,9 @@
+# Human requests extension
+
+Copier extension for Dagu human tasks, bundled with the framework template. From a generated project, install it with `mise run ext:add ./framework/extensions/human-requests -- --defaults`. Enable the `human-requests` skill per bot in the panel. No extra service, port, or secret is required.
+
+This is an experimental local implementation, not a published catalog entry. In isolated tests, a real bot created a request through Dagu 2.24.0, a second browser session answered through the authenticated gateway, and the answer returned to the same OpenMausBot conversation. A stopped-server retry was tested with a single fictional effect; the normal generated-stack lifecycle is not yet verified for that experiment. A saved answer is checked against the run's choices before delivery, including for API callers. Dagu stores the answer before this validation: an invalid submission cannot be corrected in place and needs a new request. See the skill for the creation contract.
+
+The bundled directory is not an independently versioned Copier source. An installation from that directory has no `_commit` reference, and `mise run ext:update human-requests` cannot update it through Copier's normal three-way update. Do not treat a framework update as an automatic update of an installed copy; a versioned extension source or a separately designed migration is still needed.
+
+The recipient label is a routing hint, not authorization. The responder is self-declared. HTTP return is disabled until an operator configures a single exact HTTPS destination and credential; the receiver must implement the [idempotency contract](extensions/human-requests/HTTP.md). OpenMausBot accepts a deterministic send ID for duplicate messages, but acknowledgement does not prove the bot completed its work or that external effects are exactly once. Do not use this for sensitive approvals without individual identity and access controls.

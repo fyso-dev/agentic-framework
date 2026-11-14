@@ -120,6 +120,8 @@ export const Spinner = ({ size = 12 }: { size?: number }) => (
 /** Generic app icon names from the contract (`App.icon`). */
 export function AppIcon({ name, size }: { name: string; size?: number }) {
   switch (name) {
+    case "checklist":
+      return <IconChecklist size={size} />;
     case "workflow":
       return <IconWorkflow size={size} />;
     case "bot":

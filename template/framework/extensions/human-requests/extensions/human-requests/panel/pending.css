@@ -1,0 +1,35 @@
+.pending-page { max-width: 900px; margin: auto; padding: 32px 28px 48px; }
+.pending-header h1 { margin-bottom: 8px; }
+.pending-header p { max-width: 620px; line-height: 1.55; }
+.pending-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin: 28px 0 20px; }
+.pending-toolbar label, .pending-field { display: grid; gap: 7px; }
+.pending-list { display: grid; gap: 18px; padding: 0; list-style: none; }
+.pending-card { padding: 24px; }
+.pending-meta { display: flex; flex-wrap: wrap; gap: 12px; }
+.pending-recipient { font-size: .88rem; font-weight: 600; }
+.pending-question { margin: 24px 0 20px; }
+.pending-eyebrow { font-size: .8rem; font-weight: 600; opacity: .75; }
+.pending-prompt { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; font-size: 1.1rem; margin: 6px 0 0; }
+.pending-fields { display: grid; gap: 18px; max-width: 560px; }
+.pending-fields input, .pending-fields textarea, .pending-fields select, .pending-toolbar input { width: 100%; padding: 10px; border: 1px solid var(--fy-border, #aaa); border-radius: 8px; background: transparent; color: inherit; }
+.pending-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.pending-result { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--fy-border, #aaa); border-radius: 8px; line-height: 1.5; }
+.pending-result p { margin: 0; }
+.pending-result p + p { margin-top: 8px; }
+.pending-history { margin-top: 36px; }
+.pending-history > p, .pending-history-note { line-height: 1.5; opacity: .8; }
+.pending-history-list { list-style: none; padding: 0; display: grid; gap: 10px; }
+.pending-history-item { border: 1px solid var(--fy-border, #aaa); border-radius: 10px; }
+.pending-history-item summary { cursor: pointer; padding: 14px 16px; }
+.pending-history-title { display: block; margin-bottom: 5px; overflow-wrap: anywhere; }
+.pending-history-item summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.pending-history-detail { padding: 0 16px 14px; }
+.pending-empty { padding: 24px; border: 1px solid var(--fy-border, #aaa); border-radius: 12px; }
+.pending-empty p { margin: 0 0 6px; font-weight: 600; }
+.pending-empty span, .pending-footer { opacity: .75; }
+.pending-footer { margin-top: 32px; font-size: .88rem; line-height: 1.5; }
+.pending-footer a { display: inline-block; margin-top: 4px; }
+@media (max-width: 600px) { .pending-page { padding: 20px 16px 32px; } .pending-card { padding: 18px; } }
+
+.pending-history-outputs dt { font-weight: 600; margin-top: 12px; }
+.pending-history-outputs dd { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -44,6 +44,11 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
+| Human requests: bundled experimental extension, first-version direction and non-sensitive fictional scenario (D76; not yet accepted) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
+| Human requests: experimental HTTP return contract | [extension guide](../template/framework/extensions/human-requests/extensions/human-requests/HTTP.md) |
+| Human requests: proposed test-only approval scenario | [scenario](../template/framework/extensions/human-requests/extensions/human-requests/docs/approval-case.md) |
+| Human requests: experimental native OpenMausBot send identifiers | [experiment](adr/human-requests-send-id-experiment.md) |
+| Isolating XDG state in clean service execution | [spike](adr/spikes/clean-exec-xdg.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
