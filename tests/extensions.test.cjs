@@ -108,3 +108,22 @@ test('page registrations cannot expose secret slots or missing public files',()=
   put('extensions/reports/pages/overview.yaml','name: Reports\nurl: /extensions/reports/panel/missing.html\n');
   result=invoke();assert.equal(result.status,1);assert.match(result.stderr,/missing page entry/);
 }));
+test('a page may declare a run counter as data; anything else is refused',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-reports.yml','_src_path: fixture\n');
+  put('extensions/reports/panel/index.html','<!doctype html>');
+  const page=badge=>put('extensions/reports/pages/inbox.yaml',`name: Inbox\nurl: /extensions/reports/panel/index.html\n${badge}`);
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  page('badge:\n  dagu_runs: {status: waiting, labels: [human-request]}\n  warn_labels: [blocking=true]\n  attention: true\n');
+  let result=invoke();assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout)[0].pages[0].badge,{dagu_runs:{status:'waiting',labels:['human-request']},warn_labels:['blocking=true'],attention:true});
+  page('');result=invoke();assert.equal(result.status,0);assert.equal('badge' in JSON.parse(result.stdout)[0].pages[0],false);
+  for (const invalid of [
+    'badge:\n  dagu_runs: {status: running, labels: [x]}\n',
+    'badge:\n  dagu_runs: {status: waiting, labels: []}\n',
+    'badge:\n  dagu_runs: {status: waiting, labels: ["a b"]}\n',
+    'badge:\n  dagu_runs: {status: waiting, labels: [x], query: "x"}\n',
+    'badge:\n  dagu_runs: {status: waiting, labels: [x]}\n  script: /extensions/reports/panel/count.js\n',
+    'badge:\n  dagu_runs: {status: waiting, labels: [x]}\n  attention: "yes"\n',
+    'badge: 3\n',
+  ]) { page(invalid); result=invoke(); assert.equal(result.status,1,invalid); assert.match(result.stderr,/invalid page badge/); }
+}));

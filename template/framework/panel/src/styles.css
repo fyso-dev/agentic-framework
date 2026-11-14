@@ -997,11 +997,5 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
 .as-clients h3 { margin: 0; font-size: 13px; font-weight: 700; }
 .as-clients .copyline code { white-space: pre; }
 
-.people-page { display: flex; flex-direction: column; gap: 18px; }
-.people-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
-.people-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; }
-.people-row small { display: block; overflow-wrap: anywhere; margin-top: 4px; }
-.people-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.people-editor { display: grid; gap: 12px; padding: 20px; }
-
-.people-page > .btn { align-self: flex-start; }
+.attention-pill { text-decoration: none; }
+.attention-pill:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

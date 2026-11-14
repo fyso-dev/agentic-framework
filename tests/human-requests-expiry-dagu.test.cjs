@@ -39,9 +39,11 @@ test('real sweep expires once and tolerates a concurrent human answer', {timeout
   const workflow='ext-human-requests-request';
   const detail=id=>`/dag-runs/${workflow}/${id}`;
   async function create(id) {
-    await call(`/dags/${workflow}/start`,{dagRunId:id,labels:['deadline=1'],params:JSON.stringify({QUESTION:'Synthetic overdue request',ORIGIN_TYPE:'none'})});
+    await call(`/dags/${workflow}/start`,{dagRunId:id,labels:['deadline=1'],params:JSON.stringify({REQUEST:JSON.stringify({title:'Synthetic overdue request',requester:'Fixture bot',doing:'Testing',needs:'An answer',if_silent:'It expires'}),ORIGIN_TYPE:'none'})});
     await wait(async()=>{const d=(await call(detail(id))).dagRunDetails;return d.statusLabel.toLowerCase()==='waiting';});
   }
+  // The run also keeps the card the person saw; these assertions are about the answer.
+  const answer=async id=>{const {hrCard,...rest}=(await call(detail(id)+'/outputs')).outputs;assert.equal(JSON.parse(hrCard).v,1);return rest;};
   const finished=id=>wait(async()=>{const d=(await call(detail(id))).dagRunDetails;return ['succeeded','failed'].includes(d.statusLabel.toLowerCase())&&d;});
   await create('expired-once');
   async function sweepRun(id) {
@@ -51,9 +53,9 @@ test('real sweep expires once and tolerates a concurrent human answer', {timeout
   assert.equal((await sweepRun('sweep-first')).statusLabel.toLowerCase(),'succeeded');
   const d=await finished('expired-once'); assert.equal(d.statusLabel.toLowerCase(),'succeeded');
   assert.equal(d.nodes.find(n=>n.step.id==='deliver').statusLabel.toLowerCase(),'succeeded');
-  assert.deepEqual((await call(detail('expired-once')+'/outputs')).outputs,{answer:'',comment:'',responder:'system',decision:'expired'});
+  assert.deepEqual((await answer('expired-once')),{answer:'',comment:'',responder:'system',decision:'expired'});
   assert.equal((await sweepRun('sweep-second')).statusLabel.toLowerCase(),'succeeded');
-  assert.deepEqual((await call(detail('expired-once')+'/outputs')).outputs,{answer:'',comment:'',responder:'system',decision:'expired'});
+  assert.deepEqual((await answer('expired-once')),{answer:'',comment:'',responder:'system',decision:'expired'});
   await create('human-race');
   const {sweep}=require('../template/framework/extensions/human-requests/extensions/human-requests/sweep.cjs');
   let raced=false, conflict=0;
@@ -67,7 +69,7 @@ test('real sweep expires once and tolerates a concurrent human answer', {timeout
   };
   await sweep(env,fetcher); assert.equal(raced,true); assert.equal(conflict,1);
   const human=await finished('human-race'); assert.equal(human.statusLabel.toLowerCase(),'succeeded');
-  assert.deepEqual((await call(detail('human-race')+'/outputs')).outputs,{answer:'Yes',comment:'',responder:'fixture',decision:'answered'});
+  assert.deepEqual((await answer('human-race')),{answer:'Yes',comment:'',responder:'fixture',decision:'answered'});
   await create('queue-failure-one'); await create('queue-failure-two');
   const queue=path.join(root,'dagu/data/queue'), backup=path.join(root,'queue-backup');
   fs.renameSync(queue,backup); fs.writeFileSync(queue,'fault');
@@ -82,7 +84,7 @@ test('real sweep expires once and tolerates a concurrent human answer', {timeout
   await sweep(env);
   for (const id of ['queue-failure-one','queue-failure-two']) {
     const result=await finished(id); assert.equal(result.statusLabel.toLowerCase(),'succeeded');
-    assert.deepEqual((await call(detail(id)+'/outputs')).outputs,{answer:'',comment:'',responder:'system',decision:'expired'});
+    assert.deepEqual((await answer(id)),{answer:'',comment:'',responder:'system',decision:'expired'});
   }
   console.log('Repeat sweep recovered both expired requests without replacing human input');
   console.log('PASS real sweep, repeat, expiry outputs and HTTP 409 human race');

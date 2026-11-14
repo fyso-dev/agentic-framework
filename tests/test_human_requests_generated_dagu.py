@@ -172,7 +172,7 @@ class GeneratedDaguTest(unittest.TestCase):
                 with self.assertRaises(urllib.error.HTTPError) as unauth: api('/dag-runs',authenticated=False)
                 self.assertEqual(unauth.exception.code,401)
                 name='ext-human-requests-request';run=os.environ.get('FYSO_TEST_RUN_ID','generated-run');detail=f'/dag-runs/{name}/{run}'
-                params={'QUESTION':'Fictional generated project test','CONTEXT':'No external action','RECIPIENT':'team','ORIGIN_TYPE':'none','ORIGIN_REF':'','BLOCKING':'false'}
+                params={'REQUEST':json.dumps({'title':'Fictional generated project test','requester':'Fixture bot','doing':'Testing','needs':'An answer','if_silent':'Nothing happens'}),'RECIPIENT':'team','ORIGIN_TYPE':'none','ORIGIN_REF':'','BLOCKING':'false'}
                 expected_socket=os.environ.get('FYSO_TEST_SOCKET')
                 if expected_socket:
                     try: Path(expected_socket).lstat()

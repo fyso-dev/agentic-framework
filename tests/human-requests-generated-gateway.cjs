@@ -54,7 +54,7 @@ async function stop(child){
  const call=async(endpoint,body)=>{assertOwned();const r=await fetch(apiBase+endpoint,{method:body?'POST':'GET',headers:{Authorization:authorization,...(body&&{'content-type':'application/json'})},...(body&&{body:JSON.stringify(body)}),signal:AbortSignal.timeout(4000)});if(!r.ok)throw Error(`Dagu status ${r.status}`);return r.json()};
  await wait(async()=>{try{return !!(await call('/health'))}catch{return false}},'Dagu health');
  assertOwned();try{fs.lstatSync(socket);throw Error('Fixture Dagu socket became occupied')}catch(e){if(e.code!=='ENOENT')throw e}
- await call(`/dags/${workflow}/start`,{dagRunId:runId,labels:['assignee=team'],params:JSON.stringify({QUESTION:'Pregunta sintética de proyecto generado',CONTEXT:'Prueba local sin cambios externos.',ORIGIN_TYPE:'none'})});
+ await call(`/dags/${workflow}/start`,{dagRunId:runId,labels:['assignee=team'],params:JSON.stringify({REQUEST:JSON.stringify({title:'Pregunta sintética de proyecto generado',requester:'Agente de prueba',doing:'Revisar una propuesta ficticia.',needs:'Una decisión.',if_silent:'No pasa nada.'}),ORIGIN_TYPE:'none'})});
  const detail=`/dag-runs/${workflow}/${runId}`;await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='waiting','waiting request');
  browser=await chromium.launchPersistentContext(profile,{executablePath:process.env.FYSO_TEST_CHROME,headless:true,locale:'es-AR',viewport:{width:1280,height:950},env:{...baseEnv}});
  const page=await browser.newPage(),errors=[];page.on('pageerror',()=>errors.push('pageerror'));

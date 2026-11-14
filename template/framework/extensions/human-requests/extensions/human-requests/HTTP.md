@@ -29,7 +29,7 @@ The caller's URL must still equal `FYSO_HR_HTTP_DESTINATION`. If that URL uses a
 
 ## Receiver obligations
 
-The extension POSTs a JSON object with request ID, question, answer, comment, responder and decision. All included data is delivered to the configured receiver; the person configuring the destination is responsible for permitting that disclosure. The request includes `Authorization: Bearer <secret>` and a deterministic `Idempotency-Key` derived from project and run IDs. Project names are not globally unique: callers must choose run IDs that are unique across all installations sending to the same receiver (for example, UUIDs), and reuse the same ID only for the same request. The destination must:
+The extension POSTs a JSON object with request ID, question (the request's title), answer, comment, responder and decision. All included data is delivered to the configured receiver; the person configuring the destination is responsible for permitting that disclosure. The request includes `Authorization: Bearer <secret>` and a deterministic `Idempotency-Key` derived from project and run IDs. Project names are not globally unique: callers must choose run IDs that are unique across all installations sending to the same receiver (for example, UUIDs), and reuse the same ID only for the same request. The destination must:
 
 1. Authenticate the bearer and validate the payload.
 2. Atomically persist the key and associated payload with its effect. A replay with the same key and identical body must return the original result without repeating the effect; the same key with a different body must be rejected.

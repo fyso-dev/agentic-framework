@@ -57,7 +57,7 @@ test('Dagu delivers validated human answer to an exact private HTTPS address', {
   await wait(async()=>{const r=await fetch(`${base}/health`,{headers:{Authorization:auth}});return r.ok;});
   const workflow='ext-human-requests-request',run='fixture-http-dagu-1',runPath=`/dag-runs/${workflow}/${run}`;
   const labels=['choices-hex='+Buffer.from(JSON.stringify(['Accept','Reject']),'utf8').toString('hex')];
-  await call(`/dags/${workflow}/start`,{dagRunId:run,labels,params:JSON.stringify({QUESTION:'Fixture decision',ORIGIN_TYPE:'http',ORIGIN_REF:destination})});
+  await call(`/dags/${workflow}/start`,{dagRunId:run,labels,params:JSON.stringify({REQUEST:JSON.stringify({title:'Fixture decision',requester:'Agente de prueba',doing:'Revisar una propuesta ficticia.',needs:'Una decisión.',if_silent:'No pasa nada.',options:[{choice:'Accept',effect:'Proceeds.'},{choice:'Reject',effect:'Stops.'}]}),ORIGIN_TYPE:'http',ORIGIN_REF:destination})});
   await wait(async()=>{const detail=(await call(runPath)).dagRunDetails;return detail.statusLabel.toLowerCase()==='waiting';});
   await call(`${runPath}/human-tasks/ask/complete`,{answer:'Accept',comment:'',responder:'fixture',decision:'answered'});
   const result=await wait(async()=>{const detail=(await call(runPath)).dagRunDetails;return ['failed','succeeded'].includes(detail.statusLabel.toLowerCase())&&detail;});
@@ -73,7 +73,7 @@ test('Dagu delivers validated human answer to an exact private HTTPS address', {
   assert.equal(messages[1].body,messages[0].body);
   assert.equal(effects,1,'the fictional receiver must deduplicate the retry');
   const bad='fixture-http-dagu-2',badPath=`/dag-runs/${workflow}/${bad}`;
-  await call(`/dags/${workflow}/start`,{dagRunId:bad,labels,params:JSON.stringify({QUESTION:'Fixture decision',ORIGIN_TYPE:'http',ORIGIN_REF:destination})});
+  await call(`/dags/${workflow}/start`,{dagRunId:bad,labels,params:JSON.stringify({REQUEST:JSON.stringify({title:'Fixture decision',requester:'Agente de prueba',doing:'Revisar una propuesta ficticia.',needs:'Una decisión.',if_silent:'No pasa nada.',options:[{choice:'Accept',effect:'Proceeds.'},{choice:'Reject',effect:'Stops.'}]}),ORIGIN_TYPE:'http',ORIGIN_REF:destination})});
   await wait(async()=>{const detail=(await call(badPath)).dagRunDetails;return detail.statusLabel.toLowerCase()==='waiting';});
   await call(`${badPath}/human-tasks/ask/complete`,{answer:'Not an option',comment:'',responder:'fixture',decision:'answered'});
   const rejected=await wait(async()=>{const detail=(await call(badPath)).dagRunDetails;return ['failed','succeeded'].includes(detail.statusLabel.toLowerCase())&&detail;});

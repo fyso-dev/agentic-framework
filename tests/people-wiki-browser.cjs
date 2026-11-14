@@ -19,7 +19,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
  }catch{res.writeHead(500);res.end();}});
  await new Promise((resolve,reject)=>{server.on('error',reject);server.listen(0,'127.0.0.1',resolve)});
  browser=await chromium.launchPersistentContext(path.join(root,'profile'),{executablePath:chrome,headless:true,locale:'es-AR',viewport:{width:1280,height:900},env});const page=await browser.newPage(),errors=[];page.on('pageerror',()=>errors.push('pageerror'));
- await page.goto(`http://127.0.0.1:${server.address().port}/?mock=ready&lang=es#/people`);await page.getByRole('heading',{name:'Personas'}).waitFor();await page.getByText('Todavía no hay personas.').waitFor();
+ await page.goto(`http://127.0.0.1:${server.address().port}/?mock=ready&lang=es#/extensions/human-requests/people`);await page.getByRole('heading',{name:'Personas'}).waitFor();await page.getByText('Todavía no hay personas.').waitFor();
  await page.getByRole('button',{name:'Agregar persona'}).click();await page.getByLabel('Nombre',{exact:true}).fill('Ana de prueba');await page.getByRole('button',{name:'Guardar'}).click();await page.getByText('Ana de prueba',{exact:true}).waitFor();
  const first=await page.locator('.people-row small').innerText();await page.getByRole('button',{name:'Editar'}).click();await page.getByLabel('Nombre',{exact:true}).fill('Ana actualizada');await page.getByRole('button',{name:'Guardar'}).click();await page.getByText('Ana actualizada',{exact:true}).waitFor();assert.equal(await page.locator('.people-row small').innerText(),first);
  await page.reload();await page.getByText('Ana actualizada',{exact:true}).waitFor();if(process.env.FYSO_TEST_SCREENSHOT)await page.screenshot({path:process.env.FYSO_TEST_SCREENSHOT,fullPage:true});

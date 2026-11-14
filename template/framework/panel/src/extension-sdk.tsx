@@ -1,4 +1,4 @@
-// Stable v1 authoring surface for optional extension-owned static pages.
+// Stable authoring surface for optional extension-owned static pages (v2 adds page counters).
 import { createRoot } from 'react-dom/client';
 import { type ComponentType } from 'react';
 import i18next from 'i18next';
@@ -16,6 +16,7 @@ export { useStore } from './store';
 export { botRoster } from './lib/botRoster';
 export { ActionButton, ActionStatus } from './components/Action';
 export { External, RelTime } from './components/ui';
+export { refreshBadges } from './lib/extensionBadges';
 export const PANEL_API_VERSION = extensionApi.version;
 export async function mountExtensionPage(Page:ComponentType, messages:Record<string,Record<string,unknown>>) {
   for (const [language,resources] of Object.entries(messages)) i18next.addResourceBundle(language,'translation',resources,true,true);

@@ -38,7 +38,7 @@ test('direct human-task API rejects invalid answers and responders before delive
   const workflow='ext-human-requests-request';
   const labels=['choices-hex='+Buffer.from(JSON.stringify(['Sí','No']),'utf8').toString('hex')];
   async function run(id, value, responder = 'fixture', decision = 'answered', chosenLabels = labels) {
-    await call(`/dags/${workflow}/start`,{dagRunId:id,labels:chosenLabels,params:JSON.stringify({QUESTION:'Fixture',ORIGIN_TYPE:'omb',ORIGIN_REF:JSON.stringify({bot:'fixture',task:'fixture'})})});
+    await call(`/dags/${workflow}/start`,{dagRunId:id,labels:chosenLabels,params:JSON.stringify({REQUEST:JSON.stringify({title:'Fixture',requester:'Fixture bot',doing:'Testing',needs:'A choice',if_silent:'Nothing happens',options:[{choice:'Sí',effect:'Continues'},{choice:'No',effect:'Stops'}]}),ORIGIN_TYPE:'omb',ORIGIN_REF:JSON.stringify({bot:'fixture',task:'fixture'})})});
     const detailUrl=`/dag-runs/${workflow}/${id}`;
     const pending=await wait(async()=>{const data=(await call(detailUrl)).dagRunDetails;return data.statusLabel.toLowerCase()==='waiting'&&data;});
     assert.ok(pending.labels.includes('human-request')); assert.ok(pending.labels.includes(chosenLabels[0]));
@@ -54,8 +54,8 @@ test('direct human-task API rejects invalid answers and responders before delive
   assert.equal((await run('valid-unicode','Sí')).statusLabel.toLowerCase(),'succeeded');
   assert.equal((await run('valid-cancel','','Ana','cancelled')).statusLabel.toLowerCase(),'succeeded');
   assert.equal((await run('valid-expiry','','system','expired')).statusLabel.toLowerCase(),'succeeded');
-  assert.equal((await run('malformed-cancel','','Ana','cancelled',['choices-hex=f'])).statusLabel.toLowerCase(),'succeeded');
-  assert.equal((await run('malformed-expire','','system','expired',['choices-hex=f'])).statusLabel.toLowerCase(),'succeeded');
-  assert.equal((await run('malformed-answer','Sí','Ana','answered',['choices-hex=f'])).statusLabel.toLowerCase(),'failed');
-  assert.equal(fs.readFileSync(output,'utf8'),'sentsentsentsentsent');
+  // A request whose choices label is malformed is refused at creation: no person ever sees it.
+  await call(`/dags/${workflow}/start`,{dagRunId:'malformed-choices',labels:['choices-hex=f'],params:JSON.stringify({REQUEST:JSON.stringify({title:'Fixture',requester:'Fixture bot',doing:'Testing',needs:'A choice',if_silent:'Nothing happens',options:[{choice:'Sí',effect:'Continues'},{choice:'No',effect:'Stops'}]}),ORIGIN_TYPE:'none'})});
+  assert.equal((await wait(async()=>{const data=(await call('/dag-runs/'+workflow+'/malformed-choices')).dagRunDetails;return ['failed','succeeded','waiting'].includes(data.statusLabel.toLowerCase())&&data;})).statusLabel.toLowerCase(),'failed');
+  assert.equal(fs.readFileSync(output,'utf8'),'sentsentsent');
 });

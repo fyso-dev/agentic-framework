@@ -23,9 +23,12 @@ function httpConfig(env, destination, command = spawnSync) {
   return {allowlist:[url],bearer:secret.stdout.replace(/\r?\n$/,''),...(privateAddress && {privateAddress})};
 }
 
+// The request's title identifies it to the origin; the full card stays in the run.
+function title(raw) { try { const value = JSON.parse(raw).title; return typeof value === 'string' ? value : ''; } catch { return ''; } }
+
 async function deliver(env = process.env, dependencies = {}) {
   const response = {
-    requestId: env.DAG_RUN_ID || '', question: env.REQUEST_QUESTION || '',
+    requestId: env.DAG_RUN_ID || '', question: title(env.REQUEST_JSON),
     answer: env.REQUEST_ANSWER || '', comment: env.REQUEST_COMMENT || '',
     responder: env.REQUEST_RESPONDER || '', decision: env.REQUEST_DECISION || '',
   };

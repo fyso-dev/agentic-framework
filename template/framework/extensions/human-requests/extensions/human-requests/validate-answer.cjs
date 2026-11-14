@@ -3,8 +3,8 @@
 // edited in place and the operator must create a replacement request.
 const {TextDecoder} = require('node:util');
 
-async function validateAnswer(response, env = process.env, fetcher = fetch) {
-  const id = response.requestId;
+// The run as Dagu holds it: the authority for labels, whatever the caller sent.
+async function readRun(id, env = process.env, fetcher = fetch) {
   const port = env.FYSO_DAGU_PORT;
   const user = env.FYSO_ADMIN_USER;
   const password = env.FYSO_ADMIN_PASSWORD;
@@ -27,19 +27,29 @@ async function validateAnswer(response, env = process.env, fetcher = fetch) {
   if (!details || details.name !== 'ext-human-requests-request' || details.dagRunId !== id ||
       !Array.isArray(details.labels) || !details.labels.every(label => typeof label === 'string') ||
       !details.labels.includes('human-request')) throw Error('Cannot validate request');
+  return details;
+}
+
+// The choices of a run, or null when it declares none.
+function declaredChoices(labels) {
+  const encodedLabels = labels.filter(label => label.startsWith('choices-hex='));
+  if (encodedLabels.length > 1) throw Error('Invalid request choices');
+  if (!encodedLabels.length) return null;
+  const encoded = encodedLabels[0].slice('choices-hex='.length);
+  if (encoded.length > 65536 || !/^(?:[0-9a-f]{2})+$/i.test(encoded)) throw Error('Invalid request choices');
+  let choices;
+  try {
+    choices = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(Buffer.from(encoded, 'hex')));
+  } catch { throw Error('Invalid request choices'); }
+  if (!Array.isArray(choices) || !choices.every(choice => typeof choice === 'string' && choice.trim())) throw Error('Invalid request choices');
+  return choices;
+}
+
+async function validateAnswer(response, env = process.env, fetcher = fetch) {
+  const details = await readRun(response.requestId, env, fetcher);
 
   if (response.decision === 'answered') {
-    const encodedLabels = details.labels.filter(label => label.startsWith('choices-hex='));
-    if (encodedLabels.length > 1) throw Error('Invalid request choices');
-    let choices = null;
-    if (encodedLabels.length) {
-      const encoded = encodedLabels[0].slice('choices-hex='.length);
-      if (encoded.length > 65536 || !/^(?:[0-9a-f]{2})+$/i.test(encoded)) throw Error('Invalid request choices');
-      try {
-        choices = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(Buffer.from(encoded, 'hex')));
-      } catch { throw Error('Invalid request choices'); }
-      if (!Array.isArray(choices) || !choices.every(choice => typeof choice === 'string' && choice.trim())) throw Error('Invalid request choices');
-    }
+    const choices = declaredChoices(details.labels);
     if (typeof response.responder !== 'string' || !response.responder.trim() ||
         typeof response.answer !== 'string' || !response.answer.trim() ||
         (choices && choices.length && !choices.includes(response.answer))) throw Error('Invalid request answer');
@@ -51,4 +61,4 @@ async function validateAnswer(response, env = process.env, fetcher = fetch) {
   } else throw Error('Invalid request decision');
 }
 
-module.exports = {validateAnswer};
+module.exports = {validateAnswer, readRun, declaredChoices};

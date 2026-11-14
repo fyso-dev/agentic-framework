@@ -2,18 +2,31 @@ description: Ask a person and return the response to the originating work
 type: graph
 labels: [human-request]
 params:
-  - QUESTION: ""
-  - CONTEXT: ""
+  # One JSON object: title, requester, doing, needs, if_silent, and optionally
+  # blocked, options [{choice, effect}], recommendation and links [{label, url}].
+  - REQUEST: ""
   - RECIPIENT: team
   - ORIGIN_TYPE: none
   - ORIGIN_REF: ""
   - BLOCKING: "false"
 working_dir: ${FYSO_ROOT}
 steps:
+  # Validates the request and prints the card the person reads. A push-back
+  # runs it again with the person's question for the originating conversation.
+  - id: prepare
+    env:
+      - REQUEST_JSON: ${params.REQUEST}
+      - REQUEST_RECIPIENT: ${params.RECIPIENT}
+      - REQUEST_ORIGIN_TYPE: ${params.ORIGIN_TYPE}
+      - REQUEST_ORIGIN_REF: ${params.ORIGIN_REF}
+      - REQUEST_BLOCKING: ${params.BLOCKING}
+    command: node extensions/human-requests/prepare.cjs
+    output: HR_CARD
   - id: ask
+    depends: [prepare]
     action: human.task
     with:
-      prompt: "${params.QUESTION}\n\n${params.CONTEXT}"
+      prompt: "${HR_CARD}"
       form:
         type: object
         properties:
@@ -22,6 +35,14 @@ steps:
           responder: {type: string, title: Responder, default: ""}
           decision: {type: string, title: Decision, enum: [answered, cancelled, expired], default: answered}
         required: [decision]
+      push_back:
+        rewind_to: prepare
+        form:
+          type: object
+          properties:
+            HR_QUESTION: {type: string, title: Question, minLength: 1, maxLength: 2000}
+            HR_ASKER: {type: string, title: Asker, default: "", maxLength: 80}
+          required: [HR_QUESTION]
   # Run outputs preserve submitted values for operators even if delivery fails.
   - id: record
     depends: [ask]
@@ -47,5 +68,5 @@ steps:
       - REQUEST_DECISION: ${steps.ask.outputs.decision}
       - REQUEST_ORIGIN_TYPE: ${params.ORIGIN_TYPE}
       - REQUEST_ORIGIN_REF: ${params.ORIGIN_REF}
-      - REQUEST_QUESTION: ${params.QUESTION}
+      - REQUEST_JSON: ${params.REQUEST}
     command: node extensions/human-requests/deliver.cjs

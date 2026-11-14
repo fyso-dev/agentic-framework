@@ -103,7 +103,7 @@ class HumanRequestsHistory(unittest.TestCase):
         for name, form in cases.items():
             with self.subTest(name=name):
                 run = 'history-' + name
-                self.call(f'/dags/{dag}/start', {'dagRunId': run, 'params': json.dumps({'QUESTION': 'History fixture', 'CONTEXT': 'Fictional'})})
+                self.call(f'/dags/{dag}/start', {'dagRunId': run, 'params': json.dumps({'REQUEST': json.dumps({'title':'History fixture','requester':'Fixture bot','doing':'Testing','needs':'An answer','if_silent':'Nothing happens'})})})
                 detail = lambda: self.call(f'/dag-runs/{dag}/{run}')['dagRunDetails']
                 self.wait(lambda: detail()['statusLabel'] == 'waiting')
                 self.call(f'/dag-runs/{dag}/{run}/human-tasks/ask/complete', form)

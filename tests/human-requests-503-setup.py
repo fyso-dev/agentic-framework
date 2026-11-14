@@ -36,7 +36,7 @@ def owned_listener():
  return False
 wait(lambda: owned_listener() and call('/health')[0]==200)
 if not owned_listener(): raise RuntimeError('Dagu listener does not belong to fixture')
-params={'QUESTION':'Prueba ficticia de recuperación','CONTEXT':'Sin efecto real','RECIPIENT':'team','ORIGIN_TYPE':'none','ORIGIN_REF':'','BLOCKING':'false'}
+params={'REQUEST':json.dumps({'title':'Prueba ficticia de recuperación','requester':'Fixture bot','doing':'Testing','needs':'An answer','if_silent':'Nothing happens'}),'RECIPIENT':'team','ORIGIN_TYPE':'none','ORIGIN_REF':'','BLOCKING':'false'}
 assert call('/dags/ext-human-requests-request/start',{'dagRunId':'recovery-ui','params':json.dumps(params)})[0]==200
 base='/dag-runs/ext-human-requests-request/recovery-ui'
 wait(lambda:call(base)[1]['dagRunDetails']['statusLabel']=='waiting')
