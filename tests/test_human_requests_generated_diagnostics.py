@@ -24,11 +24,11 @@ class DiagnosticTest(unittest.TestCase):
     def test_run_error_text_redacts_fixture_credentials_urls_and_paths(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);log=root/'run.log'
-            log.write_text('ERROR exec /private/tmp/hidden/node failed: permission denied password=fixture-password\n')
-            detail={'error':'failed to start /private/tmp/hidden/node', 'log':str(log), 'nodes':[]}
+            log.write_text('ERROR exec /example/hidden/node failed: permission denied password=fixture-password\n')
+            detail={'error':'failed to start /example/hidden/node', 'log':str(log), 'nodes':[]}
             result=module.sanitized_run_failure(detail,root)
             self.assertIn('permission denied',result);self.assertIn('failed to start',result)
-            self.assertNotIn('/private/tmp',result);self.assertNotIn('fixture-password',result)
+            self.assertNotIn('/example/hidden',result);self.assertNotIn('fixture-password',result)
     def test_only_safe_fixture_socket_basename_is_preserved(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);log=root/'run.log'
