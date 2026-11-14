@@ -6,4 +6,9 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_HTTP_PORT
-clean_exec mise exec -- node framework/scripts/fyso-mcp.cjs --http "$(mcp_socket)"
+# Keep only the explicit key and tool-store locations needed by this nested mise.
+mcp_env=()
+[ -z "${MISE_SOPS_AGE_KEY_FILE:-}" ] || mcp_env+=("MISE_SOPS_AGE_KEY_FILE=$MISE_SOPS_AGE_KEY_FILE")
+[ -z "${SOPS_AGE_KEY_FILE:-}" ] || mcp_env+=("SOPS_AGE_KEY_FILE=$SOPS_AGE_KEY_FILE")
+[ -z "${MISE_DATA_DIR:-}" ] || mcp_env+=("MISE_DATA_DIR=$MISE_DATA_DIR")
+clean_exec ${mcp_env[@]+"${mcp_env[@]}"} mise exec -- node framework/scripts/fyso-mcp.cjs --http "$(mcp_socket)"
