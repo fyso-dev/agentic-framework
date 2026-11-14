@@ -1,6 +1,6 @@
 # Human requests for agents
 
-Status: **experimental first-version design; not delivered or release-ready**. A manually assembled isolated fixture exercised the real bot-to-browser-to-bot path and one controlled recovery case. Normal generated-project setup, startup and an unskipped green doctor have now passed; the complete generated bot/browser conversation and acceptance by a non-technical user remain outstanding. This document defines the intended first version; it does not claim its deployment or acceptance.
+Status: **experimental first-version design; not delivered or release-ready**. On a generated project with a real bot (OpenMausBot 0.1.141, Codex engine), a request addressed to the bot's conversation was created through Dagu's API, the bot answered a person's question from that conversation, and after the decision it continued there. Still outstanding: a bot creating its own request in a generated Codex project (its Dagu MCP is reported unavailable), and acceptance by a non-technical user. This document defines the intended first version; it does not claim its deployment or acceptance.
 
 Related: [D76](PLAN.md#2-decisions-log) · [original Dagu spike](adr/spikes/human-requests.md) · [continuation brief](human-requests-next-steps.md) · [recovery evidence](../artifacts/delivery-evidence/human-requests/integrated-gate.md) · [restart evidence](../artifacts/delivery-evidence/human-requests/restart-gate.md).
 
@@ -35,10 +35,24 @@ The SDK does **not** expose the run-list and human-task completion endpoints. Th
 
 Promotion into core is a later, separately recorded decision if framework workflows or other extensions require it, nearly every project installs it, or a pending count is required in the main navigation. Promotion would rename the workflows to `fyso-*`, move the page into the core panel and move the agent rule to `agent-context.md`; it requires a new PLAN decision. Until then, extensions may not assume it is installed. Local-user/password changes and installers remain a separate workstream; the separate descriptive people directory (D77) supplies optional stable recipient IDs without provisioning login accounts.
 
+## What the person sees
+
+A person is not expected to look for requests, and rarely answers at once. The first version is built around that:
+
+- **Told on every screen.** The panel shows a counter beside **Pending** in its menu and a notice in its top bar, highlighted when a request holds up work. Both come from a counter the extension's page declares ([contract §9](extensions-contract.md#page-counters-panel-api-2)); the core knows nothing about requests. There is no notification outside the panel yet.
+- **An inbox, not a pile of forms.** One line per request: who asks, about what, for whom, since when, and whether work is on hold. What holds up work comes first.
+- **Enough to decide.** The detail shows what the agent was doing, what it needs, what is on hold, what happens if nobody answers, the choices with the effect of each, the agent's recommendation and links.
+- **Ask before deciding.** From a request that came from a conversation, the person can ask the agent a question. The reply appears under the question and the request stays open. Requests without a conversation say that the agent cannot be asked.
+- **Who is answering.** The person picks their name once from the people directory, or types it; the browser remembers it. It labels answers and narrows the list to their requests and the team's. It is not an identity check.
+
+The page is one client of the request's API. Another channel (mail, chat) can list, read, ask, decide and cancel through the same Dagu calls.
+
 ## Request contract
 
-- The agent starts `ext-human-requests-request` through Dagu MCP or API with a caller-selected stable run ID, question, context, recipient, blocking indication and origin. A recipient is a routing label (`assignee=...`), not an access-control rule. `team` is the fallback only when the requester has not identified a person.
-- The request must name the asking agent and work, explain why input is needed, what each option permits, and what happens if nobody responds. Agents do not invent recipients or claim an action was performed before it happens. Never include credentials or unnecessary personal data.
+- The agent starts `ext-human-requests-request` through Dagu MCP or API with a caller-selected stable run ID, a recipient, a blocking indication, an origin and one `REQUEST` parameter. A recipient is a routing label (`assignee=...`), not an access-control rule; labels accept only ASCII letters, digits and `- _ . /`, so a person is addressed by their directory ID. `team` is the fallback only when the requester has not identified a person.
+- `REQUEST` is a JSON object: `title`, `requester`, `doing`, `needs` and `if_silent` are required; `blocked`, `options` (each a `choice` and its `effect`), `recommendation` and `links` are optional. The first step validates it and fails the run when a required field is missing or when `options` differ from the `choices-hex` label, so an incomplete request never reaches a person. Agents do not invent recipients or claim an action was performed before it happens. Never include credentials or unnecessary personal data.
+- The human task's prompt is a JSON card (`v`, `request`, `thread`, `canAsk`, `blocking`, `recipient`) that any client reads from the run. The run keeps the last card in its outputs after it closes.
+- A question is a native push-back of the human task to the first step, with `HR_QUESTION` and `HR_ASKER`. That step sends the question to the originating OpenMausBot conversation with a stable send ID, waits for that turn and appends question and reply to the card's `thread`. An unreachable or slow agent is recorded as such and the request reopens; nothing fails. Only an `omb` origin can be asked.
 - The run carries `human-request`; optional choices are encoded in `choices-hex`, and optional expiry in one `deadline` label. Labels are visible to project operators. Dagu does not natively enforce the recipient or deadline. The page lists the waiting run and reads its prompt and flat form through the bridge.
 - Answer and cancellation use the same native human-task completion call; expiration is recorded by `ext-human-requests-sweep`. Submission, delivery and completed agent work are distinct states. The page shows recent activity and the recorded answer, with delivery-step status; a delivery acknowledgement does not prove the bot acted.
 - Dagu stores a submitted answer before the delivery-side choice guard checks it. If direct API input is invalid, the run fails without delivering the answer; it cannot be corrected in place and a replacement request is needed. The UI may validate earlier, but direct callers must not rely on UI validation.
