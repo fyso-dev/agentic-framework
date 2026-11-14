@@ -29,7 +29,7 @@ async function stop(child){
  throw Error('Fixture process group failed to stop; preserving data');
 }
 (async()=>{let browser, clean=false;try{
- const base=await ports(),domain=`generated-${base}.localhost`,http=base+1,technical='fixture-service-password',password='fixture-web-password-43';
+ const base=await ports(),domain=`generated-${base}.localhost`,http=base+1,technical='fixture-service-password',password='fixture-web-password-43',cancel=process.env.FYSO_TEST_CANCEL==='1';
  const runId='hr-'+crypto.randomUUID().replaceAll('-',''),workflow='ext-human-requests-request';
  const digest=crypto.createHash('md5').update(workflow+runId).digest('hex').slice(0,6),socket=path.join(fs.realpathSync('/tmp'),`@dagu_${workflow}_${digest}.sock`);
  try{fs.lstatSync(socket);throw Error('Fixture Dagu socket occupied')}catch(e){if(e.code!=='ENOENT')throw e}
@@ -58,19 +58,23 @@ async function stop(child){
  const detail=`/dag-runs/${workflow}/${runId}`;await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='waiting','waiting request');
  browser=await chromium.launchPersistentContext(profile,{executablePath:process.env.FYSO_TEST_CHROME,headless:true,locale:'es-AR',viewport:{width:1280,height:950},env:{...baseEnv}});
  const page=await browser.newPage(),errors=[];page.on('pageerror',()=>errors.push('pageerror'));
- await page.route('**/*',async route=>{try{const url=new URL(route.request().url());if(url.protocol!=='http:'||!url.hostname.endsWith(`.${domain}`)||url.port!==String(base))throw Error('Outside fixture');assertOwned();await route.continue()}catch{await route.abort()}});
+ await page.route('**/*',async route=>{try{const req=route.request(),url=new URL(req.url());if(url.protocol!=='http:'||!url.hostname.endsWith(`.${domain}`)||url.port!==String(base)||!owns(base,caddy.pid))throw Error('Outside fixture');if(req.method()!=='GET'||url.pathname.startsWith('/api/dagu/'))assertOwned();await route.continue()}catch{await route.abort()}});
  const gateway=`http://panel.${domain}:${base}`;assertOwned();await page.goto(gateway);
  await page.locator('input[name=username]').fill('admin');await page.locator('input[name=password]').fill(password);
  const login=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/user/login'&&r.request().method()==='POST');await page.locator('button[type=submit]').click();assert.equal((await login).status(),200);
- await page.goto(`${gateway}/#/extensions/human-requests/pending`);
+ await page.waitForURL(url=>url.hostname===`panel.${domain}`,{waitUntil:'domcontentloaded'});
+ try{await page.getByRole('link',{name:'Pendientes'}).click()}catch(error){fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-navigation-error.png'),fullPage:true});throw error}
+ fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});
  const frame=page.frameLocator('iframe');await frame.getByText('Pregunta sintética de proyecto generado',{exact:false}).waitFor();
  fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-pending.png'),fullPage:true});
- await frame.getByLabel('Tu respuesta (Obligatorio)').fill('Aprobado');await frame.getByLabel('Tu nombre (Obligatorio)').fill('Persona de prueba');
- const completion=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith(`/${runId}/human-tasks/ask/complete`)&&r.request().method()==='POST');await frame.getByRole('button',{name:'Enviar respuesta'}).click();assert.equal((await completion).status(),200);
- await frame.getByText('Respuesta guardada.',{exact:false}).waitFor();await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='succeeded','finished');
- assert.deepEqual((await call(detail+'/outputs')).outputs,{answer:'Aprobado',comment:'',responder:'Persona de prueba',decision:'answered'});
- await page.reload();const card=frame.locator('.pending-history-item').filter({hasText:'Pregunta sintética de proyecto generado'});await card.locator('summary').click();await card.getByText('Aprobado',{exact:true}).waitFor();
- await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-history.png'),fullPage:true});assert.deepEqual(errors,[]);
- console.log(JSON.stringify({copier:'9.19.1',generatedInventory:true,panelIframe:true,login:200,completion:200,outputs:true,historyAfterRefresh:true,pageErrors:errors.length,origin:'none'}));clean=true;
+ await frame.getByLabel('Tu nombre (Obligatorio)').fill('Persona de prueba');
+ if(!cancel)await frame.getByLabel('Tu respuesta (Obligatorio)').fill('Aprobado');
+ else page.once('dialog',dialog=>dialog.accept());
+ const completion=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith(`/${runId}/human-tasks/ask/complete`)&&r.request().method()==='POST');await frame.getByRole('button',{name:cancel?'Cancelar solicitud':'Enviar respuesta'}).click();assert.equal((await completion).status(),200);
+ await frame.getByText(cancel?'Solicitud cancelada.':'Respuesta guardada.',{exact:false}).waitFor();await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='succeeded','finished');
+ assert.deepEqual((await call(detail+'/outputs')).outputs,{answer:cancel?'':'Aprobado',comment:'',responder:'Persona de prueba',decision:cancel?'cancelled':'answered'});
+ await page.reload();const card=frame.locator('.pending-history-item').filter({hasText:'Pregunta sintética de proyecto generado'});try{await card.locator('summary').click()}catch(error){await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-history-error.png'),fullPage:true});throw error}await card.getByText(cancel?'Cancelada':'Aprobado',{exact:true}).waitFor();
+ await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,cancel?'generated-gateway-cancelled.png':'generated-gateway-history.png'),fullPage:true});assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({copier:'9.19.1',generatedInventory:true,panelIframe:true,login:200,completion:200,outputs:true,historyAfterRefresh:true,pageErrors:errors.length,decision:cancel?'cancelled':'answered',origin:'none'}));clean=true;
  }finally{if(browser)await browser.close();let cleanupError;for(const child of children.reverse()){try{await stop(child)}catch(e){cleanupError=cleanupError||e}}if(cleanupError)throw cleanupError;if(children.length)console.log('Fixture process groups stopped');if(clean)fs.rmSync(root,{recursive:true,force:true});else console.error('Fixture retained for safe diagnostics');}
 })().catch(e=>{console.error(e.message);process.exitCode=1});
