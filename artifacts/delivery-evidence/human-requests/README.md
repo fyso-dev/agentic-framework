@@ -1,32 +1,17 @@
 # Human requests — local validation
 
-## Overview
+Status: **experimental; not a release or a complete generated-stack acceptance**. The current evidence uses fictional, non-sensitive requests. Recipient labels route requests but do not enforce access; responder names are self-declared.
 
-An experimental extension lists human requests and accepts responses in a generated local project. The authenticated browser flow was manually checked against Dagu 2.24.0. This is not a production or OpenMausBot conversation acceptance.
+| Scope | Observation | Evidence |
+| --- | --- | --- |
+| Bot → browser → same conversation and delivery retry | A real bot created a request in an assembled isolated fixture. A second authenticated browser answered, and two delivery retries produced one matching message and one controlled test effect. The extension page used SDK mock mode. | [Recovery gate](integrated-gate.md), [browser](final-retry-browser.md) |
+| Restart while waiting | Four fixture components restarted; the response reached the originating task and one controlled effect was observed. | [Restart gate](restart-gate.md), [browser](restart-browser.md) |
+| Saved completion with resume failure | Dagu 2.24 retained the response after a forced queue failure; the native resume endpoint and an isolated browser recovery action succeeded. | [503 recovery](dagu-503-recovery.md) |
+| Generated project, native Dagu runner | Copier 9.19.1 generated a project and installed the bundled extension; its `run-dagu.sh` started isolated Dagu 2.24, a fictional request was answered and `ask`, `record`, and `deliver` succeeded with `origin=none`. No mise command was used. | [Generated Dagu test](generated-dagu.md) |
+| Full generated lifecycle, bot and `mise run doctor` | Not established. The generated Dagu test does not exercise the full stack, an actual bot, the panel gateway or engine authentication. | [Proposal and remaining acceptance](../../../docs/human-requests-proposal.md) |
 
-## User flow
+The older screenshot below depicts a fictional request in an earlier prototype and is not evidence for the current generated-project or bot flows.
 
-An agent or program starts a request workflow. A person opens Pending, reviews the prompt and choices, enters their name and responds. Dagu saves the answer and queues the workflow's delivery step. The responder name is self-declared and the recipient is a filter, not an access restriction.
+![Earlier Pending prototype](pending.png)
 
-## Acceptance matrix
-
-| Scenario | Status | Evidence |
-|---|---|---|
-| Authenticated list, detail and response | ✅ | Manual Chrome, local generated project, Dagu 2.24.0: GET list/detail and POST completion returned 200; saved message displayed, no console errors or warnings. |
-| Workflow result and expiry | ✅ | Local Dagu 2.24.0: answer and expiry workflows succeeded; an identical second answer was accepted idempotently. |
-| Continue OpenMausBot conversation | ⚠️ | Not verified against a real conversation. |
-| Authenticated engine | ⚠️ | Not tested; doctor used explicit failing wrappers for engine login checks to avoid inspecting personal credentials. |
-
-## Visual evidence
-
-The screenshot shows the local Pending screen and a fictional request. It was captured manually during the earlier browser check using Dagu 2.25.2; the later 2.24.0 retest is described above.
-
-![Pending screen with a fictional request](pending.png)
-
-## Automated validation
-
-`node --test tests/human-requests-extension.test.cjs tests/human-requests-panel.test.cjs`: 8 passed. Copier 9.19.1 generated the extension into a temporary project; `mise run ext:add` installed it in a separate generated stack.
-
-## Scope and limitations
-
-The generated stack required a project-local PATH adjustment to select Dagu 2.24.0; the underlying framework PATH issue was not changed here. Doctor was not fully green: two engine authentication checks were deliberately failed, while service and isolation checks passed. HTTP callbacks are disabled. Options are validated in the page, not on direct Dagu API calls. No end-to-end delivery to an OpenMausBot conversation or external system was demonstrated.
+HTTP callbacks have isolated tests, including a fictional receiver and TLS; receiver-side idempotency and external networking require independent validation. The bundled extension does not currently support Copier's normal update lifecycle because it lacks a versioned source reference. No real sensitive approval or extension installation was authorized by the fictional examples.

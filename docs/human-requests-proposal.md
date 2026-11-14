@@ -25,6 +25,8 @@ The first implementation is the opt-in **bundled Copier extension** at `template
 
 In a generated project, `mise run ext:add ./framework/extensions/human-requests -- --defaults` selects this bundled source. A two-stage Copier 9.19.1 test copies the framework into a disposable project, checks that the bundled extension's Copier manifest is present, and installs the extension into that project. It does not run the project's lifecycle or prove that the `mise` task and activation work end to end. Reproduce with `FYSO_TEST_COPIER` pointing to the pinned Copier executable and `python3 -m unittest tests.test_human_requests_copier`.
 
+A separate [generated-project Dagu test](../artifacts/delivery-evidence/human-requests/generated-dagu.md) used the generated `run-dagu.sh` with no mise command and confirmed an authenticated `origin=none` request through to its outputs. This does not cover the full generated stack, panel or bot.
+
 The bundled source currently has no independent version reference: an isolated Copier test produced answers without `_commit`, and `copier update` rejected that installation. A framework update therefore does not automatically migrate an installed extension. A versioned extension source or a separately designed migration remains necessary before promising the normal extension-upgrade lifecycle.
 
 An extension keeps this optional capability independently installable and removable without adding a core feature flag or background process. It cannot automatically provide the rule to every agent, add a pending count to the core navigation, or be assumed present by other extensions.
@@ -42,6 +44,8 @@ Promotion into core is a later, separately recorded decision if framework workfl
 - Dagu stores a submitted answer before the delivery-side choice guard checks it. If direct API input is invalid, the run fails without delivering the answer; it cannot be corrected in place and a replacement request is needed. The UI may validate earlier, but direct callers must not rely on UI validation.
 - One `human.task` cannot be cancelled by a native waiting-run cancellation in the tested Dagu version, so cancellation is a recorded decision. Expiry completes overdue requests with `expired`; cancellation and expiry are never treated as approval.
 - Answers survive a failed return in the run's recorded outputs. A retry must not ask the person again. Delivery to a missing task, ambiguous result and unavailable destination must remain visible rather than silently succeeding.
+
+The tested Dagu 2.24.0 Unix socket implementation places run sockets in the host-wide temporary directory. Its suffix uses only six hexadecimal digits derived from the DAG name and run ID, and it removes that path before binding ([address](https://github.com/dagucloud/dagu/blob/v2.24.0/internal/cmn/sock/addr.go), [server](https://github.com/dagucloud/dagu/blob/v2.24.0/internal/cmn/sock/server.go)). Consequently, even different run IDs can collide across projects running the same DAG; checking whether the path exists beforehand does not eliminate a race. This is an upstream limitation, not an exactly-once guarantee. Assess and resolve it before treating concurrent multi-project use as release-ready.
 
 ### Origins and retry
 
