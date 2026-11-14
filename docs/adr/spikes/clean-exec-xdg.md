@@ -20,6 +20,8 @@ The Dagu integration test is skipped unless `FYSO_TEST_DAGU_BIN` is supplied. It
 
 An additional generated-project probe exposed a macOS Bash 3.2 regression: expanding the empty XDG array under `set -u` stopped the service before Dagu started. The shell test now runs `/bin/bash -u`; it reproduced that failure with both XDG variables unset, then passed after using an empty-array-safe expansion. This shell regression test alone does not establish a complete project startup.
 
+A later macOS setup fixture exposed another isolation issue: bare `mktemp` selected the system's user temporary directory despite the fixture's `TMPDIR`. The setup script now supplies an explicit template under `TMPDIR`; with that change, a generated project completed its real `mise run setup` in a sandbox with a fixture-owned age identity and isolated mise state. This did not start services or run doctor. The sandbox denies direct writes outside the fixture, but that observation is not proof against indirect effects through system services.
+
 ## Risks and limits
 
 - `XDG_CONFIG_HOME` affects configuration discovery in tools other than mise, including agents and services. Explicit service-specific assignments take precedence, but compatibility must be checked for each affected process.
