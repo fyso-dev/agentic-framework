@@ -18,6 +18,8 @@ FYSO_TEST_DAGU_BIN="$PINNED_DAGU_BIN" python3 -m unittest tests/test_clean_exec_
 
 The Dagu integration test is skipped unless `FYSO_TEST_DAGU_BIN` is supplied. It uses temporary files and loopback listeners and stops its own Dagu process. `PINNED_DAGU_BIN` must name a binary already available without changing global trust.
 
+An additional generated-project probe exposed a macOS Bash 3.2 regression: expanding the empty XDG array under `set -u` stopped the service before Dagu started. The shell test now runs `/bin/bash -u`; it reproduced that failure with both XDG variables unset, then passed after using an empty-array-safe expansion. This shell regression test alone does not establish a complete project startup.
+
 ## Risks and limits
 
 - `XDG_CONFIG_HOME` affects configuration discovery in tools other than mise, including agents and services. Explicit service-specific assignments take precedence, but compatibility must be checked for each affected process.

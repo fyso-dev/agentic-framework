@@ -23,7 +23,7 @@ clean_exec() {
   exec env -i \
     HOME="$HOME" USER="${USER:-}" LOGNAME="${LOGNAME:-}" \
     PATH="$PATH" LANG="${LANG:-en_US.UTF-8}" TERM="${TERM:-dumb}" \
-    TMPDIR="${TMPDIR:-/tmp}" "${xdg_vars[@]}" "$@"
+    TMPDIR="${TMPDIR:-/tmp}" ${xdg_vars[@]+"${xdg_vars[@]}"} "$@"
 }
 
 port_in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }

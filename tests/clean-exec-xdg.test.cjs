@@ -14,7 +14,7 @@ const childConfig = path.join(os.tmpdir(), 'fyso child config');
 function environment(inherited, explicit = []) {
   const env = { ...process.env, XDG_STATE_HOME: state, XDG_CONFIG_HOME: config, FYSO_SECRET_CANARY: 'not-for-child', ...inherited };
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete env[key];
-  const result = spawnSync('bash', ['-c', 'source "$1"; shift; clean_exec "$@" /usr/bin/env', 'probe', lib, ...explicit], { env, encoding:'utf8' });
+  const result = spawnSync('/bin/bash', ['-uc', 'source "$1"; shift; clean_exec "$@" /usr/bin/env', 'probe', lib, ...explicit], { env, encoding:'utf8' });
   assert.equal(result.status, 0, result.stderr);
   return Object.fromEntries(result.stdout.trim().split('\n').map(line => {
     const index = line.indexOf('=');
@@ -33,6 +33,15 @@ test('unset XDG paths remain unset, preserving ordinary default configuration', 
   const env = environment({ XDG_STATE_HOME: undefined, XDG_CONFIG_HOME: undefined });
   assert.equal(env.XDG_STATE_HOME, undefined);
   assert.equal(env.XDG_CONFIG_HOME, undefined);
+});
+
+test('either XDG path can be set on its own under nounset', () => {
+  const onlyState = environment({ XDG_CONFIG_HOME: undefined });
+  assert.equal(onlyState.XDG_STATE_HOME, state);
+  assert.equal(onlyState.XDG_CONFIG_HOME, undefined);
+  const onlyConfig = environment({ XDG_STATE_HOME: undefined });
+  assert.equal(onlyConfig.XDG_CONFIG_HOME, config);
+  assert.equal(onlyConfig.XDG_STATE_HOME, undefined);
 });
 
 test('a child-specific XDG override wins over the inherited config path', () => {
