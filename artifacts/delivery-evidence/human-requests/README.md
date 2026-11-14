@@ -9,7 +9,7 @@ Status: **experimental; not a release or a complete generated-stack acceptance**
 | Saved completion with resume failure | Dagu 2.24 retained the response after a forced queue failure; the native resume endpoint and an isolated browser recovery action succeeded. | [503 recovery](dagu-503-recovery.md) |
 | Generated project, native Dagu runner | Copier 9.19.1 generated a project and installed the bundled extension; its `run-dagu.sh` started isolated Dagu 2.24, a fictional request was answered and `ask`, `record`, and `deliver` succeeded with `origin=none`. No mise command was used. | [Generated Dagu test](generated-dagu.md) |
 | Generated project, panel and gateway | The generated panel showed the installed page; a fictional response went through the authenticated gateway and remained visible after reload. The workflow used `origin=none` and Dagu was started directly. | [Generated panel test](generated-gateway.md) |
-| Full generated lifecycle, bot and `mise run doctor` | Not established. The generated Dagu test does not exercise the full stack, an actual bot, the panel gateway or engine authentication. | [Proposal and remaining acceptance](../../../docs/human-requests-proposal.md) |
+| Normal generated setup, startup and doctor | Actual mise tasks passed with all services ready and genuine engine status checks. A successful model conversation remains separate. | [Lifecycle smoke](generated-lifecycle.md) |
 
 The older screenshot below depicts a fictional request in an earlier prototype and is not evidence for the current generated-project or bot flows.
 

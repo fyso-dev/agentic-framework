@@ -1,6 +1,6 @@
 # Human requests for agents
 
-Status: **experimental first-version design; not delivered or release-ready**. A manually assembled isolated fixture exercised the real bot-to-browser-to-bot path and one controlled recovery case. A normal generated-project lifecycle, an unskipped green doctor and acceptance by a non-technical user remain outstanding. This document defines the intended first version; it does not claim its deployment or acceptance.
+Status: **experimental first-version design; not delivered or release-ready**. A manually assembled isolated fixture exercised the real bot-to-browser-to-bot path and one controlled recovery case. Normal generated-project setup, startup and an unskipped green doctor have now passed; the complete generated bot/browser conversation and acceptance by a non-technical user remain outstanding. This document defines the intended first version; it does not claim its deployment or acceptance.
 
 Related: [D76](PLAN.md#2-decisions-log) · [original Dagu spike](adr/spikes/human-requests.md) · [continuation brief](human-requests-next-steps.md) · [recovery evidence](../artifacts/delivery-evidence/human-requests/integrated-gate.md) · [restart evidence](../artifacts/delivery-evidence/human-requests/restart-gate.md).
 
@@ -79,6 +79,6 @@ Before deciding that the feature is usable or ready for release:
 
 1. Make the full bot → second authenticated browser → same task flow reproducible in a normally generated project, including a delivery failure and safe retry. Preserve before/after conversation and step evidence, test a missing task and restart while waiting, and distinguish saved, accepted and acted outcomes.
 2. Test actual callback receiver contract, including receiver authentication, exact destination policy, successful and failed acknowledgement, and repeat/timeout behavior. Do not claim receiver-side exactly-once effects without independent evidence.
-3. Confirm pinned executable selection in the normal project lifecycle, run relevant automated tests and `scripts/check-paths.sh`, and obtain a fully green `mise run doctor` on an isolated generated project without skipped engine checks. Installer suites are required only if that separate workstream is included.
+3. Keep the [normal generated lifecycle smoke](../artifacts/delivery-evidence/human-requests/generated-lifecycle.md), relevant automated tests and `scripts/check-paths.sh` green. Actual setup, startup and doctor passed without skipped checks; engine directories had to be present in the fixture PATH. Installer suites are required only if that separate workstream is included.
 4. Observe a non-technical person answering a real, non-sensitive scenario without help and validate the information, discovery and recovery path. The fictional scenario above is not that acceptance.
 5. Keep `docs/README.md`, the spike findings and evidence current, and decide any publication or catalog entry separately. No push, merge, catalog publication or production deployment is implied by this document.
