@@ -14,6 +14,7 @@ export type AppsTab = "open" | "ext";
 
 export type Route =
   | { name: "setup" }
+  | { name: "people" }
   | { name: "bots"; review?: boolean; native?: string; tab?: BotTab }
   | { name: "bot"; index: number | null; tab?: BotTab }
   | { name: "connectors"; botId?:string }
@@ -25,6 +26,7 @@ export type Route =
 export function parseHash(hash: string): Route {
   const [pathname,query]=hash.replace(/^#\/?/, "").split("?");
   const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] === "people") return { name: "people" };
   if (parts[0] === "mcp") return { name: "mcp" };
   if (parts[0] === "observability") return { name: "observability" };
   if (parts[0] === "connectors") {const botId=new URLSearchParams(query||" ").get("bot");return { name: "connectors",...(botId?{botId}:{}) };}
@@ -45,6 +47,7 @@ export function parseHash(hash: string): Route {
 export const href = {
   setup: "#/",
   bots: "#/bots",
+  people: "#/people",
   review: "#/bots/review",
   newBot: "#/bots/new",
   bot: (index: number) => `#/bots/${index}`,

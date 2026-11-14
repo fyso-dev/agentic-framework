@@ -61,7 +61,8 @@
     "appsDown_one": "{{count}} app no responde",
     "appsDown_other": "{{count}} apps no responden",
     "observability": "Observabilidad",
-    "connectors": "Conectores"
+    "connectors": "Conectores",
+    "people": "Personas"
   },
   "setup": {
     "title": "Puesta a punto",
@@ -866,5 +867,23 @@
     "versionTip": "Commit del template instalado",
     "done": "Actualizado {{from}} → {{to}} (commit {{commit}}). Si cambiaron Dagu, OpenMausBot o Caddy, reiniciá el stack.",
     "current": "Ya estaba al día ({{to}})."
+  },
+  "people": {
+    "title": "Personas",
+    "intro": "Organizá las personas que participan en el proyecto.",
+    "shared": "Las personas usan el acceso compartido del proyecto. Esta lista no crea cuentas ni verifica identidades.",
+    "loading": "Cargando personas…",
+    "empty": "Todavía no hay personas.",
+    "error": "No se pudo completar la operación. Actualizá y volvé a intentar.",
+    "add": "Agregar persona",
+    "edit": "Editar",
+    "remove": "Eliminar",
+    "name": "Nombre",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "removeConfirm": "¿Eliminar a {{name}} de la lista? Las solicitudes anteriores conservarán su destinatario.",
+    "changed": "La persona fue modificada o eliminada. Actualizá la lista antes de continuar.",
+    "saved": "Cambios guardados.",
+    "id": "Identificador"
   }
 }

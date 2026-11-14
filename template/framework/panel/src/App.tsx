@@ -11,6 +11,7 @@ import { Observability } from "./screens/Observability";
 import { ExtensionPage } from "./screens/ExtensionPage";
 import { Mcp } from "./screens/Mcp";
 import { Setup } from "./screens/Setup";
+import { People } from "./screens/People";
 import { useStore } from "./store";
 
 export function App() {
@@ -25,6 +26,9 @@ export function App() {
 
   let screen;
   switch (route.name) {
+    case "people":
+      screen = <People />;
+      break;
     case "bots":
       screen = <Bots review={!!route.review} native={route.native} tab={route.tab} />;
       break;

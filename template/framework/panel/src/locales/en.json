@@ -61,7 +61,8 @@
     "appsDown_one": "{{count}} app is not responding",
     "appsDown_other": "{{count}} apps are not responding",
     "observability": "Observability",
-    "connectors": "Connectors"
+    "connectors": "Connectors",
+    "people": "People"
   },
   "setup": {
     "title": "Setup",
@@ -866,5 +867,23 @@
     "versionTip": "Installed template commit",
     "done": "Updated {{from}} → {{to}} (commit {{commit}}). If Dagu, OpenMausBot or Caddy changed, restart the stack.",
     "current": "Already up to date ({{to}})."
+  },
+  "people": {
+    "title": "People",
+    "intro": "Organize the people taking part in this project.",
+    "shared": "People use the project’s shared access. This list does not create accounts or verify identities.",
+    "loading": "Loading people…",
+    "empty": "There are no people yet.",
+    "error": "The operation could not be completed. Refresh and try again.",
+    "add": "Add person",
+    "edit": "Edit",
+    "remove": "Remove",
+    "name": "Name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "removeConfirm": "Remove {{name}} from the list? Existing requests will keep their recipient.",
+    "changed": "This person changed or was removed. Refresh the list before continuing.",
+    "saved": "Changes saved.",
+    "id": "Identifier"
   }
 }
