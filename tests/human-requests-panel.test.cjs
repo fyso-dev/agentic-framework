@@ -7,10 +7,22 @@ const source = fs.readFileSync(path.join(__dirname, '../template/framework/exten
 const apiSource = source.slice(source.indexOf('const enc ='), source.indexOf('function Field('));
 function context(fetch) {
   const ctx = vm.createContext({fetch, URLSearchParams, encodeURIComponent, window: {dispatchEvent() {}}, Event: class {}});
-  vm.runInContext(`${apiSource}\nglobalThis.testApi = {api, listRequests, listHistory, historyDetail, assignee, deliveryState, readableDate, latestHistory};`, ctx);
+  vm.runInContext(`${apiSource}\nglobalThis.testApi = {api, listRequests, listHistory, historyDetail, assignee, deliveryState, readableDate, latestHistory, listPeople, recipientName, recipientMatches};`, ctx);
   return ctx.testApi;
 }
 const response = (status, data) => ({status, ok: status >= 200 && status < 300, json: async () => data});
+test('optional people directory resolves stable IDs and preserves old or missing labels', async () => {
+  const id='550e8400-e29b-41d4-a716-446655440000', other='00000000-0000-4000-8000-000000000000';
+  const client=context(async url => url.includes('/wiki?') ? response(200,{items:[{id:'fyso-people/'+id}],pagination:{hasNextPage:false}}) : response(200,{content:JSON.stringify({version:1,name:'Ana'})}));
+  const people=await client.listPeople(), run={labels:['assignee='+id]}, legacy={labels:['assignee=María']}, deleted={labels:['assignee='+other]}, team={labels:[]};
+  assert.equal(people.length,1);assert.equal(client.recipientName(run,people),'Ana');
+  assert.equal(client.recipientName(legacy,people),'María');assert.equal(client.recipientName(deleted,people),other);assert.equal(client.assignee(team),'team');
+  assert.equal(client.recipientMatches(run,'ana','',people),true);assert.equal(client.recipientMatches(run,'',id,people),true);
+  assert.equal(client.recipientMatches(legacy,'maría','',people),true);assert.equal(client.recipientMatches(team,'','team',people),true);
+  assert.equal(client.recipientMatches(deleted,other,'',[]),true);
+  await assert.rejects(context(async()=>response(404,{})).listPeople());
+});
+
 test('loads all waiting runs with label and cursor from Dagu', async () => {
   const calls = [];
   const api = context(async (url, init) => {calls.push([url, init]); return calls.length === 1 ? response(200, {dagRuns: [{name: 'one', labels: ['assignee=alice']}], nextCursor: 'next token'}) : response(200, {dagRuns: [{name: 'two'}]});});
@@ -101,7 +113,7 @@ test('cancelling a request records cancellation without requiring an answer', as
   const form={properties:{answer:{type:'string'},responder:{type:'string'},decision:{type:'string',enum:['answered','cancelled','expired']}},required:['decision']};
   const initial=[{node:{step:{id:'ask',humanTask:{prompt:'Example'}}},form},{answer:'',responder:'Ana',decision:'answered'},'',false,'',''];
   let index=0, submitted;
-  const ctx=vm.createContext({h:(type,props,...children)=>({type,props:props||{},children}),useState:()=>[initial[index++],()=>{}],useEffect:()=>{},useTranslation:()=>({t:key=>key}),Field:()=>{},labelsOf:()=>[],assignee:()=> 'team',enc:encodeURIComponent,window:{confirm:()=>true},api:async(_path,options)=>{submitted=JSON.parse(options.body)}});
+  const ctx=vm.createContext({h:(type,props,...children)=>({type,props:props||{},children}),useState:()=>[initial[index++],()=>{}],useEffect:()=>{},useTranslation:()=>({t:key=>key}),Field:()=>{},labelsOf:()=>[],assignee:()=> 'team',recipientName:()=> 'team',enc:encodeURIComponent,window:{confirm:()=>true},api:async(_path,options)=>{submitted=JSON.parse(options.body)}});
   vm.runInContext(`${requestSource}\nglobalThis.render=Request;`,ctx);
   const tree=ctx.render({run:{name:'ext-human-requests-request',dagRunId:'one'},onDone:()=>{}});
   function find(node){if(!node||typeof node!=='object')return null;if(node.type==='button'&&node.props.type==='button')return node;for(const child of node.children||[]){const result=find(child);if(result)return result;}return null;}
@@ -135,7 +147,7 @@ test('pending stored answer can resume without reposting the form', async () => 
   const requestSource=source.slice(source.indexOf('function Request('),source.indexOf('function HistoryItem('));
   const initial=[{node:{step:{id:'ask',humanTask:{prompt:'Test'}}},form:{properties:{}}},{},'',false,'resumePending','',true];
   let index=0, call;
-  const ctx=vm.createContext({h:(type,props,...children)=>({type,props:props||{},children}),useState:()=>[initial[index++],()=>{}],useEffect:()=>{},useTranslation:()=>({t:key=>key}),Field:()=>{},labelsOf:()=>[],assignee:()=> 'team',enc:encodeURIComponent,api:async(path,options)=>{call={path,options}},window:{confirm:()=>true}});
+  const ctx=vm.createContext({h:(type,props,...children)=>({type,props:props||{},children}),useState:()=>[initial[index++],()=>{}],useEffect:()=>{},useTranslation:()=>({t:key=>key}),Field:()=>{},labelsOf:()=>[],assignee:()=> 'team',recipientName:()=> 'team',enc:encodeURIComponent,api:async(path,options)=>{call={path,options}},window:{confirm:()=>true}});
   vm.runInContext(`${requestSource}\nglobalThis.render=Request;`,ctx);
   const tree=ctx.render({run:{name:'ext-human-requests-request',dagRunId:'run-1'},onDone:()=>{}});
   function find(n){if(!n||typeof n!=='object')return; if(n.type==='button' && n.children.includes('pending.resume'))return n; for(const c of n.children||[]){const result=find(c);if(result)return result;}}

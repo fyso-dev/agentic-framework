@@ -1,0 +1,19 @@
+// Synthetic panel smoke: no credentials or user browser profile.
+const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
+const chrome=process.env.FYSO_TEST_CHROME,assets=process.env.FYSO_TEST_PANEL_ASSETS;if(!chrome||!assets)throw Error('Set FYSO_TEST_CHROME and FYSO_TEST_PANEL_ASSETS');
+const panel=path.resolve(__dirname,'../template/framework/extensions/human-requests/extensions/human-requests/panel'),id='550e8400-e29b-41d4-a716-446655440000',removed='00000000-0000-4000-8000-000000000000',missing=process.env.FYSO_TEST_NO_DIRECTORY==='1';
+const run=(id,label)=>({name:'ext-human-requests-request',dagRunId:id,statusLabel:'waiting',labels:['assignee='+label]});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,'http://localhost');function json(body){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(body));}
+ if(url.pathname==='/api/dagu/wiki'){if(missing){res.writeHead(404);return res.end()}return json({items:[{id:'fyso-people/'+id}],pagination:{hasNextPage:false}})}
+ if(url.pathname==='/api/dagu/wiki/page')return json({content:JSON.stringify({version:1,name:'Ana'})});
+ if(url.pathname==='/api/dagu/dag-runs')return json({dagRuns:url.searchParams.has('status')?[run('a',id),run('b','María'),run('c',removed),run('d','team')]:[]});
+ const match=url.pathname.match(/^\/api\/dagu\/dag-runs\/[^/]+\/([^/]+)$/);if(match)return json({dagRunDetails:{nodes:[{statusLabel:'waiting',step:{id:'ask',humanTask:{prompt:'Pregunta '+match[1],form:{properties:{answer:{type:'string'},responder:{type:'string'}}}}}}]}});
+ const root=url.pathname.startsWith('/assets/')?assets:panel, rel=url.pathname.startsWith('/assets/')?url.pathname.slice(8):url.pathname.replace(/^\/extensions\/human-requests\/panel\//,'');
+ try{const data=fs.readFileSync(path.join(root,rel));res.writeHead(200,{'content-type':rel.endsWith('.js')?'text/javascript':rel.endsWith('.css')?'text/css':rel.endsWith('.json')?'application/json':'text/html'});res.end(data)}catch{res.writeHead(404);res.end()}
+});
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-people-filter-'));let browser;try{
+ browser=await chromium.launchPersistentContext(dir,{executablePath:chrome,headless:true,locale:'es-AR'});const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/extensions/human-requests/panel/index.html?mock=ready&lang=es`);await page.getByText('Pregunta a').waitFor();
+ if(missing){assert.equal(await page.getByLabel('Elegir persona').count(),0);await page.getByText('Para: '+id).waitFor();await page.getByPlaceholder('Todos los destinatarios').fill('María');await page.getByText('Pregunta b').waitFor();assert.equal(await page.getByText('Pregunta a').count(),0)}
+ else {await page.getByText('Para: Ana').waitFor();await page.getByText('Para: '+removed).waitFor();await page.getByText('Para: María').waitFor();await page.getByLabel('Elegir persona').selectOption(id);await page.getByText('Pregunta a').waitFor();assert.equal(await page.getByText('Pregunta b').count(),0);await page.getByLabel('Elegir persona').selectOption('team');await page.getByText('Pregunta d').waitFor();assert.equal(await page.getByText('Pregunta a').count(),0);await page.getByPlaceholder('Todos los destinatarios').fill(removed);await page.getByText('Pregunta c').waitFor();assert.equal(await page.getByText('Pregunta d').count(),0)}
+ console.log('PASS: optional directory and historical recipient fallback');
+ }finally{if(browser)await browser.close();server.close();fs.rmSync(dir,{recursive:true,force:true})}})().catch(e=>{console.error(e.message);process.exitCode=1;server.close()});

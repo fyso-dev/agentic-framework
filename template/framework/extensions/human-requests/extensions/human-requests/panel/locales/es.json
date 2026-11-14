@@ -67,6 +67,7 @@
     "resume": "Reintentar reanudación",
     "resumeQueued": "Se solicitó la reanudación. Consultá el estado para ver el resultado.",
     "resumeError": "No se pudo solicitar la reanudación. Volvé a intentarlo.",
-    "answerRequired": "Escribí una respuesta antes de enviarla."
+    "answerRequired": "Escribí una respuesta antes de enviarla.",
+    "peopleFilter": "Elegir persona"
   }
 }

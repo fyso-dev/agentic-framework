@@ -45,7 +45,7 @@ async function stop(child){
  run(node,['framework/scripts/panel-data.cjs','config'],{env,cwd:project});
  const inventory=JSON.parse(fs.readFileSync(path.join(project,'.data/panel/extensions.json')));assert.ok(inventory.some(x=>x.id==='human-requests'&&x.pages.some(p=>p.id==='pending')));
  run(node,['framework/scripts/web-auth-config.cjs'],{env,cwd:project});
- const daguEnv={...env,DAGU_HOME:path.join(root,'dagu'),DAGU_DAGS_DIR:dagDir,DAGU_HOST:'127.0.0.1',DAGU_PORT:String(http),DAGU_SCHEDULER_PORT:String(base+2),DAGU_WORKER_HEALTH_PORT:String(base+3),DAGU_COORDINATOR_HOST:'127.0.0.1',DAGU_COORDINATOR_PORT:String(base+6),DAGU_COORDINATOR_HEALTH_PORT:String(base+7),DAGU_PEER_INSECURE:'true',DAGU_AUTH_MODE:'basic',DAGU_AUTH_BASIC_USERNAME:'fixture',DAGU_AUTH_BASIC_PASSWORD:technical,DAGU_ENV_PASSTHROUGH_PREFIXES:'FYSO_'};
+ const daguEnv={...env,DAGU_HOME:path.join(root,'dagu'),DAGU_DAGS_DIR:dagDir,DAGU_WIKI_DIR:path.join(project,'project/wiki'),DAGU_HOST:'127.0.0.1',DAGU_PORT:String(http),DAGU_SCHEDULER_PORT:String(base+2),DAGU_WORKER_HEALTH_PORT:String(base+3),DAGU_COORDINATOR_HOST:'127.0.0.1',DAGU_COORDINATOR_PORT:String(base+6),DAGU_COORDINATOR_HEALTH_PORT:String(base+7),DAGU_PEER_INSECURE:'true',DAGU_AUTH_MODE:'basic',DAGU_AUTH_BASIC_USERNAME:'fixture',DAGU_AUTH_BASIC_PASSWORD:technical,DAGU_ENV_PASSTHROUGH_PREFIXES:'FYSO_'};
  const dagu=start('dagu',process.env.FYSO_TEST_DAGU,['start-all'],daguEnv),auth=start('auth',process.env.FYSO_TEST_TINYAUTH,[],{...env,TINYAUTH_CONFIGFILE:path.join(project,'.data/web-auth/runtime/config.yaml')}),caddy=start('caddy',process.env.FYSO_TEST_CADDY,['run','--config',path.join(project,'Caddyfile')],env);
  await wait(()=>owns(http,dagu.pid)&&owns(base+9,auth.pid)&&owns(base,caddy.pid),'owned listeners');
  if(process.env.FYSO_TEST_FAIL_AFTER_START==='1')throw Error('Intentional early fixture failure');
@@ -63,6 +63,17 @@ async function stop(child){
  await page.locator('input[name=username]').fill('admin');await page.locator('input[name=password]').fill(password);
  const login=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/user/login'&&r.request().method()==='POST');await page.locator('button[type=submit]').click();assert.equal((await login).status(),200);
  await page.waitForURL(url=>url.hostname===`panel.${domain}`,{waitUntil:'domcontentloaded'});
+ if(process.env.FYSO_TEST_PEOPLE==='1'){
+  await page.getByRole('link',{name:'Personas'}).click();
+  await page.getByRole('button',{name:'Agregar persona'}).click();await page.getByLabel('Nombre',{exact:true}).fill('Persona ficticia');await page.getByRole('button',{name:'Guardar'}).click();
+  await page.getByText('Persona ficticia',{exact:true}).waitFor();const identity=await page.locator('.people-row small').innerText();
+  await page.getByRole('button',{name:'Editar',exact:true}).click();await page.getByLabel('Nombre',{exact:true}).fill('Persona ficticia editada');await page.getByRole('button',{name:'Guardar'}).click();
+  await page.getByText('Persona ficticia editada',{exact:true}).waitFor();assert.equal(await page.locator('.people-row small').innerText(),identity);
+  await page.reload();await page.getByText('Persona ficticia editada',{exact:true}).waitFor();
+  const directory=path.join(project,'project/wiki/fyso-people');assert.equal(fs.readdirSync(directory).filter(x=>x.endsWith('.md')).length,1);
+  fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-people.png'),fullPage:true});
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Eliminar',exact:true}).click();await page.getByText('Todavía no hay personas.').waitFor();assert.ok(!fs.existsSync(directory)||fs.readdirSync(directory).filter(x=>x.endsWith('.md')).length===0);
+ }
  try{await page.getByRole('link',{name:'Pendientes'}).click()}catch(error){fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-navigation-error.png'),fullPage:true});throw error}
  fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});
  const frame=page.frameLocator('iframe');await frame.getByText('Pregunta sintética de proyecto generado',{exact:false}).waitFor();
@@ -75,6 +86,6 @@ async function stop(child){
  assert.deepEqual((await call(detail+'/outputs')).outputs,{answer:cancel?'':'Aprobado',comment:'',responder:'Persona de prueba',decision:cancel?'cancelled':'answered'});
  await page.reload();const card=frame.locator('.pending-history-item').filter({hasText:'Pregunta sintética de proyecto generado'});try{await card.locator('summary').click()}catch(error){await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-history-error.png'),fullPage:true});throw error}await card.getByText(cancel?'Cancelada':'Aprobado',{exact:true}).waitFor();
  await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,cancel?'generated-gateway-cancelled.png':'generated-gateway-history.png'),fullPage:true});assert.deepEqual(errors,[]);
- console.log(JSON.stringify({copier:'9.19.1',generatedInventory:true,panelIframe:true,login:200,completion:200,outputs:true,historyAfterRefresh:true,pageErrors:errors.length,decision:cancel?'cancelled':'answered',origin:'none'}));clean=true;
+ console.log(JSON.stringify({copier:'9.19.1',generatedInventory:true,panelIframe:true,login:200,completion:200,outputs:true,historyAfterRefresh:true,peopleCrud:process.env.FYSO_TEST_PEOPLE==='1',pageErrors:errors.length,decision:cancel?'cancelled':'answered',origin:'none'}));clean=true;
  }finally{if(browser)await browser.close();let cleanupError;for(const child of children.reverse()){try{await stop(child)}catch(e){cleanupError=cleanupError||e}}if(cleanupError)throw cleanupError;if(children.length)console.log('Fixture process groups stopped');if(clean)fs.rmSync(root,{recursive:true,force:true});else console.error('Fixture retained for safe diagnostics');}
 })().catch(e=>{console.error(e.message);process.exitCode=1});

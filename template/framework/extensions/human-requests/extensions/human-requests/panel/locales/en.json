@@ -67,6 +67,7 @@
     "resume": "Retry resuming",
     "resumeQueued": "Resuming was requested. Check the status for the result.",
     "resumeError": "Could not request resuming. Try again.",
-    "answerRequired": "Enter an answer before submitting."
+    "answerRequired": "Enter an answer before submitting.",
+    "peopleFilter": "Choose person"
   }
 }

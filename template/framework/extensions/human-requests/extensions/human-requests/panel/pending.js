@@ -60,6 +60,30 @@ async function latestHistory(ref, isActive, onSuccess, onFailure) {
 }
 const labelsOf = run => Array.isArray(run.labels) ? run.labels : [];
 const assignee = run => labelsOf(run).find(label => label.startsWith('assignee='))?.slice(9) || 'team';
+const personId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+// The directory is optional; absence or a failed read must not hide requests.
+async function listPeople() {
+  const people = [];
+  for (let page = 1; page <= 100; page++) {
+    const query = new URLSearchParams({flat:'true', prefix:'fyso-people', page:String(page), perPage:'100'});
+    const data = await api(`wiki?${query}`);
+    if (!Array.isArray(data.items) || typeof data.pagination?.hasNextPage !== 'boolean') throw Error('Invalid directory');
+    const ids = data.items.map(item => item.id).filter(id => typeof id === 'string' && id.startsWith('fyso-people/') && personId.test(id.slice(12)));
+    const records = await Promise.all(ids.map(async id => {
+      try { const page = await api(`wiki/page?path=${enc(id)}`); const data = JSON.parse(page.content); return data.version === 1 && typeof data.name === 'string' && data.name.trim() ? {id:id.slice(12),name:data.name} : null; }
+      catch { return null; }
+    }));
+    people.push(...records.filter(Boolean));
+    if (!data.pagination.hasNextPage) return people.sort((a,b)=>a.name.localeCompare(b.name));
+  }
+  throw Error('Directory exceeds page limit');
+}
+const recipientName = (run, people) => people.find(person => person.id === assignee(run))?.name || assignee(run);
+function recipientMatches(run, filter, selection, people) {
+  if (selection) return assignee(run) === selection;
+  const value = filter.trim().toLowerCase();
+  return !value || assignee(run).toLowerCase().includes(value) || recipientName(run, people).toLowerCase().includes(value);
+}
 function readableDate(value, language) {
   const date = new Date(value);
   if (!value || Number.isNaN(date.getTime())) return '';
@@ -110,7 +134,7 @@ function Field({name, spec, required, value, change, prefix, requestWorkflow}) {
   else control = h('input', {...props, type: 'number', step: spec.type === 'integer' ? '1' : 'any', min: spec.minimum, max: spec.maximum});
   return h('label', {className: 'pending-field', htmlFor: props.id}, h('span', null, title, required ? ` (${t('pending.required')})` : ''), spec.description && h('small', null, spec.description), control);
 }
-function Request({run, onDone}) {
+function Request({run, onDone, people = []}) {
   const {t} = useTranslation();
   const [detail, setDetail] = useState(null), [values, setValues] = useState({}), [error, setError] = useState(''), [busy, setBusy] = useState(false), [saved, setSaved] = useState(''), [delivery, setDelivery] = useState(''), [resumePending, setResumePending] = useState(false);
   useEffect(() => { let active = true; api(`dag-runs/${enc(run.name)}/${enc(run.dagRunId)}`).then(data => {
@@ -184,14 +208,14 @@ function Request({run, onDone}) {
   }
   const unsupported = Object.values(props).some(spec => !['string','boolean','number','integer'].includes(spec.type));
   const isRequest = run.name === 'ext-human-requests-request';
-  const recipient = assignee(run) === 'team' ? t('pending.team') : assignee(run);
+  const recipient = assignee(run) === 'team' ? t('pending.team') : recipientName(run, people);
   const displayFields = Object.entries(props).filter(([name]) => !isRequest || name !== 'decision');
   return h('li', {className: 'card pending-card'}, h('div', {className: 'pending-meta'}, h('span', {className: 'pending-recipient'}, `${t('pending.for')}: ${recipient}`)),
     detail && h('div', {className: 'pending-question'}, h('span', {className: 'pending-eyebrow'}, t('pending.question')), h('p', {className: 'pending-prompt'}, detail.node.step.humanTask.prompt)),
     error && h('p', {role: 'alert'}, t(`pending.${error}`)), saved && h('div', {className: 'pending-result', role: 'status', 'aria-live': 'polite'}, h('p', null, t(`pending.${saved}`)), delivery && h('p', null, t(`pending.delivery.${delivery}`)), resumePending && h('button', {type:'button', className:'btn btn-pri', disabled:busy, onClick:resume}, t(busy ? 'pending.sending' : 'pending.resume'))),
     detail && !saved && (unsupported ? h('div', null, h('p', {role: 'alert'}, t('pending.unsupported')), isRequest && h('div', null, h(Field, {name:'responder', spec:{type:'string'}, prefix:run.dagRunId, required:true, value:values.responder, change:(key, value) => setValues(old => ({...old, [key]:value}))}), h('button', {type:'button', className:'btn btn-soft', disabled:busy, onClick:() => {if (window.confirm(t('pending.cancelConfirm'))) submit(null, 'cancelled');}}, t('pending.cancelled')))) : h('form', {onSubmit: event => submit(event)}, h('div', {className: 'pending-fields'}, ...displayFields.map(([name, spec]) => h(Field, {key: name, name, spec, prefix: run.dagRunId, requestWorkflow: isRequest, required: (detail.form.required || []).includes(name) || (isRequest && (name === 'responder' || name === 'answer')), value: values[name], change: (key, value) => setValues(old => ({...old, [key]: value}))}))), h('div', {className: 'pending-actions'}, h('button', {className: 'btn btn-pri', disabled: busy, type: 'submit'}, t(busy ? 'pending.sending' : 'pending.submit')), isRequest && h('button', {className: 'btn btn-soft', disabled: busy, type: 'button', onClick: () => { if (window.confirm(t('pending.cancelConfirm'))) submit(null, 'cancelled'); }}, t('pending.cancelled'))))));
 }
-function HistoryItem({run}) {
+function HistoryItem({run, people = []}) {
   const {t, i18n} = useTranslation();
   const [open, setOpen] = useState(false), [detail, setDetail] = useState(null), [error, setError] = useState(false);
   const [outputs, setOutputs] = useState(null), [outputsError, setOutputsError] = useState(false), [recordPending, setRecordPending] = useState(false), [recordDelayed, setRecordDelayed] = useState(false);
@@ -229,7 +253,7 @@ function HistoryItem({run}) {
   const ask = detail?.dagRunDetails?.nodes?.find(node => node.step?.humanTask);
   const askStatus = String(ask?.statusLabel || '').toLowerCase();
   const state = askStatus === 'succeeded' ? deliveryState(detail) : ['waiting','running','not_started','queued'].includes(askStatus) ? 'awaitingAnswer' : 'unknown';
-  const recipient = assignee(run) === 'team' ? t('pending.team') : assignee(run);
+  const recipient = assignee(run) === 'team' ? t('pending.team') : recipientName(run, people);
   const finished = readableDate(run.finishedAt, i18n?.language);
   return h('li', {className: 'pending-history-item'}, h('details', {open, onToggle: event => setOpen(event.currentTarget.open)},
     h('summary', null, h('strong', {className:'pending-history-title'}, ask?.step?.humanTask?.prompt?.split(/\r?\n/)[0]?.slice(0, 160) || (error ? t('pending.historyUnknownQuestion') : t('pending.loading'))), h('span', null, `${t('pending.for')}: ${recipient}`), finished && h('time', {dateTime: run.finishedAt}, ` · ${finished}`)),
@@ -246,9 +270,11 @@ function Pending() {
   const {project} = useStore();
   let historyUrl = '';
   try { const url = new URL(project.data?.urls?.dagu); if (['http:', 'https:'].includes(url.protocol)) historyUrl = `${url.origin}/dags/ext-human-requests-request`; } catch { /* project configuration is still loading */ }
+  const [people, setPeople] = useState([]), [selection, setSelection] = useState('');
   const [runs, setRuns] = useState([]), [filter, setFilter] = useState(''), [loading, setLoading] = useState(true), [error, setError] = useState(false), [generation, setGeneration] = useState(0);
   const [history, setHistory] = useState(null), [historyError, setHistoryError] = useState(false), [lastSubmitted, setLastSubmitted] = useState(null);
   const historyGeneration = useRef(0);
+  useEffect(() => {let active = true; listPeople().then(data => {if (active) {setPeople(data);if (!data.length) setSelection('');}}).catch(() => {if (active) {setPeople([]);setSelection('');}}); return () => {active = false;};}, [generation]);
   useEffect(() => { let active = true; setLoading(true); setError(false); listRequests().then(data => active && setRuns(data)).catch(() => active && setError(true)).finally(() => active && setLoading(false)); return () => {active = false;}; }, [generation]);
   useEffect(() => { let active = true; setHistory(null); setHistoryError(false); latestHistory(historyGeneration, () => active, setHistory, () => setHistoryError(true)); return () => {active = false;}; }, [generation]);
   useEffect(() => {
@@ -263,13 +289,13 @@ function Pending() {
     refresh(0);
     return () => {active = false; clearTimeout(timer);};
   }, [lastSubmitted]);
-  const visible = runs.filter(run => !filter.trim() || assignee(run).toLowerCase().includes(filter.trim().toLowerCase()));
-  const visibleHistory = (history?.runs || []).filter(run => !filter.trim() || assignee(run).toLowerCase().includes(filter.trim().toLowerCase()));
+  const visible = runs.filter(run => recipientMatches(run, filter, selection, people));
+  const visibleHistory = (history?.runs || []).filter(run => recipientMatches(run, filter, selection, people));
   return h('main', {className: 'pending-page'}, h('header', {className: 'pending-header'}, h('h1', null, t('pending.title')), h('p', null, t('pending.intro'))),
-    h('div', {className: 'pending-toolbar'}, h('label', null, t('pending.filter'), h('input', {value: filter, placeholder: t('pending.all'), onChange: e => setFilter(e.target.value)})), h('button', {type: 'button', className: 'btn btn-soft', onClick: () => setGeneration(generation + 1)}, t('pending.refresh'))),
-    loading ? h('p', {role: 'status'}, t('pending.loading')) : error ? h('p', {role: 'alert'}, t('pending.error')) : visible.length ? h('ul', {className: 'pending-list'}, ...visible.map(run => h(Request, {key: `${run.name}/${run.dagRunId}`, run, onDone: () => setLastSubmitted({name: run.name, dagRunId: run.dagRunId})}))) : h('div', {className: 'pending-empty'}, h('p', null, t('pending.empty')), h('span', null, t('pending.emptyHelp'))),
+    h('div', {className: 'pending-toolbar'}, h('label', null, t('pending.filter'), h('input', {value: filter, placeholder: t('pending.all'), onChange: e => {setFilter(e.target.value);setSelection('');}})), people.length > 0 && h('label', null, t('pending.peopleFilter'), h('select', {value:selection, onChange:e => {setSelection(e.target.value);setFilter('');}}, h('option',{value:''},t('pending.all')), h('option',{value:'team'},t('pending.team')), selection && selection !== 'team' && !people.some(person => person.id === selection) && h('option',{value:selection},selection), ...people.map(person => h('option',{key:person.id,value:person.id},person.name)))), h('button', {type: 'button', className: 'btn btn-soft', onClick: () => setGeneration(generation + 1)}, t('pending.refresh'))),
+    loading ? h('p', {role: 'status'}, t('pending.loading')) : error ? h('p', {role: 'alert'}, t('pending.error')) : visible.length ? h('ul', {className: 'pending-list'}, ...visible.map(run => h(Request, {key: `${run.name}/${run.dagRunId}`, run, people, onDone: () => setLastSubmitted({name: run.name, dagRunId: run.dagRunId})}))) : h('div', {className: 'pending-empty'}, h('p', null, t('pending.empty')), h('span', null, t('pending.emptyHelp'))),
     h('section', {className:'pending-history', 'aria-labelledby':'history-title'}, h('h2', {id:'history-title'}, t('pending.historyTitle')), h('p', null, t('pending.historyIntro')),
-      historyError ? h('p', {role:'alert'}, t('pending.historyError')) : !history ? h('p', {role:'status'}, t('pending.loading')) : visibleHistory.length ? h('ul', {className:'pending-history-list'}, ...visibleHistory.map(run => h(HistoryItem, {key:`${run.name}/${run.dagRunId}`,run}))) : h('p', null, t('pending.historyEmpty')),
+      historyError ? h('p', {role:'alert'}, t('pending.historyError')) : !history ? h('p', {role:'status'}, t('pending.loading')) : visibleHistory.length ? h('ul', {className:'pending-history-list'}, ...visibleHistory.map(run => h(HistoryItem, {key:`${run.name}/${run.dagRunId}`,run, people}))) : h('p', null, t('pending.historyEmpty')),
       history?.truncated && h('p', {className:'pending-history-note'}, t('pending.historyLimited'))),
     h('footer', {className: 'pending-footer'}, h('p', null, t('pending.identity')), historyUrl && h('a', {href: historyUrl, target: '_blank', rel: 'noopener noreferrer'}, t('pending.history'))));
 }

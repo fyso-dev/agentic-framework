@@ -7,3 +7,5 @@ Each person has a randomly generated stable UUID and a name. The panel stores on
 The panel reads the current page before editing or removing it and reports a conflict if its content has changed. Dagu 2.24's wiki update API does not expose an atomic compare-and-swap: simultaneous changes to the *same* person can still race and the last write may win. Separate pages prevent unrelated people from overwriting one another. Removing or renaming a person does not modify past requests or their labels.
 
 The directory is descriptive; it is not an authorization system or private inbox. Shared credentials cannot establish which person answered. Access control, invitations and per-person identity remain separate work.
+
+The human-requests extension optionally resolves recipient IDs using this directory and offers a person filter. Existing free-text labels and `team` remain valid. A deleted or unavailable person falls back to the stored label; requests are never rewritten. This does not verify the responder or make a request private.

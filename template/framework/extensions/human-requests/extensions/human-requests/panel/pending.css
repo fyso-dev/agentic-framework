@@ -11,7 +11,7 @@
 .pending-eyebrow { font-size: .8rem; font-weight: 600; opacity: .75; }
 .pending-prompt { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; font-size: 1.1rem; margin: 6px 0 0; }
 .pending-fields { display: grid; gap: 18px; max-width: 560px; }
-.pending-fields input, .pending-fields textarea, .pending-fields select, .pending-toolbar input { width: 100%; padding: 10px; border: 1px solid var(--fy-border, #aaa); border-radius: 8px; background: transparent; color: inherit; }
+.pending-fields input, .pending-fields textarea, .pending-fields select, .pending-toolbar input, .pending-toolbar select { width: 100%; padding: 10px; border: 1px solid var(--fy-border, #aaa); border-radius: 8px; background: transparent; color: inherit; }
 .pending-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 .pending-result { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--fy-border, #aaa); border-radius: 8px; line-height: 1.5; }
 .pending-result p { margin: 0; }
