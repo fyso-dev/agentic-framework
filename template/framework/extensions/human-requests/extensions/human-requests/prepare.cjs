@@ -16,14 +16,14 @@ function parseRequest(raw) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error('REQUEST must be a JSON object');
   const request = {};
   for (const [key, max] of Object.entries(LIMITS)) {
-    if (data[key] === undefined || data[key] === '') {
+    if (data[key] === undefined || data[key] === null || data[key] === '') {
       if (REQUIRED.includes(key)) throw Error(`REQUEST.${key} is required`);
       continue;
     }
     if (!text(data[key], max)) throw Error(`REQUEST.${key} must be text of at most ${max} characters`);
     request[key] = data[key].trim();
   }
-  if (data.options !== undefined) {
+  if (data.options !== undefined && data.options !== null) {
     if (!Array.isArray(data.options) || !data.options.length || data.options.length > 8) throw Error('REQUEST.options must list 1 to 8 choices');
     request.options = data.options.map(option => {
       if (!option || !text(option.choice, 200) || !text(option.effect, 500)) throw Error('Each option needs a choice and its effect');
@@ -32,7 +32,7 @@ function parseRequest(raw) {
     if (new Set(request.options.map(option => option.choice)).size !== request.options.length) throw Error('REQUEST.options repeats a choice');
     if (request.recommendation && !request.options.some(option => option.choice === request.recommendation)) throw Error('REQUEST.recommendation must be one of the choices');
   }
-  if (data.links !== undefined) {
+  if (data.links !== undefined && data.links !== null) {
     if (!Array.isArray(data.links) || data.links.length > 8) throw Error('REQUEST.links must list at most 8 links');
     request.links = data.links.map(link => {
       if (!link || !text(link.label, 120) || typeof link.url !== 'string' || link.url.length > 2000) throw Error('Each link needs a label and a URL');

@@ -11,7 +11,14 @@ const BY_NAME = {
   step_log: ['dagRunId', 'subRunId', 'stepName', 'item', 'bodyStepName', 'query'],
   foreach_items: ['dagRunId', 'subRunId', 'stepName', 'query'], foreach_item: ['dagRunId', 'subRunId', 'stepName', 'item'],
 };
-const EXECUTE = ['action', 'name', 'dagRunId', 'params', 'wait', 'singleton', 'stepName', 'includeDownstream', 'subDAGRunId', 'inputs', 'reason', 'attemptId'];
+const EXECUTE = ['action', 'name', 'dagRunId', 'params', 'wait', 'singleton', 'stepName', 'includeDownstream', 'subDAGRunId', 'inputs', 'reason', 'attemptId', 'labels'];
+// Run labels carry data a workflow reads (a recipient, a deadline). `workspace=` is the one
+// label that decides what a scope may see, so a scoped caller can never set it on a run.
+const RUN_LABEL = /^[A-Za-z0-9][A-Za-z0-9_.\/=-]{0,8191}$/;
+const runLabels = labels => {
+  if (!Array.isArray(labels) || labels.length > 16 || !labels.every(label => typeof label === 'string' && RUN_LABEL.test(label))) deny('labels must be at most 16 plain run labels in a workflow scope');
+  if (labels.some(label => /^workspace(=|$)/i.test(label))) deny('a workspace label is not available in a workflow scope');
+};
 const QUERY = /^(?:(?:tail|head|offset|limit|stream|parent|status|page|perPage)=[\w.-]{1,40})(?:&(?:tail|head|offset|limit|stream|parent|status|page|perPage)=[\w.-]{1,40})*$/;
 const deny = message => { throw Error(message); };
 const only = (args, keys, what) => { for (const key of Object.keys(args)) if (!keys.includes(key)) deny(`${key} is not available for ${what} in a workflow scope`); };
@@ -30,6 +37,7 @@ function guard(root, scope, system, resolve = () => scopes.allowed(root, scope, 
     check(tool, args = {}) {
       if (tool === 'dagu_execute') {
         only(args, EXECUTE, 'dagu_execute');
+        if (args.labels !== undefined) runLabels(args.labels);
         return void inScope(args.name);
       }
       if (tool !== 'dagu_read') deny(`${tool} is not available in a workflow scope: this bot reads and runs workflows, it does not change them`);

@@ -392,3 +392,13 @@ test('the scope server gives a bot Dagu read and execute for its scope only, wit
     assert.deepEqual(runs.structuredContent.data.items,[{name:'orders',dagRunId:'r1'}]);   // Dagu also returned orders-secret
   } finally {child.stdin.end();srv.close();fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a workflow scope lets a run carry plain labels but never a workspace label',()=>{
+  const names=new Map([['orders',{name:'orders',class:'project'}]]);
+  const g=guard('/nowhere','ventas',[],()=>names);
+  const start=labels=>g.check('dagu_execute',{action:'start',name:'orders',labels});
+  assert.doesNotThrow(()=>start(['assignee=team','blocking=true','deadline=1794932355','choices-hex='+'ab'.repeat(900)]));
+  for(const labels of [['workspace=ops'],['assignee=team','Workspace=ops'],['workspace'],'assignee=team',[42],['a b'],['=x'],['ok=ñ'],Array(17).fill('a=b')])
+    assert.throws(()=>start(labels),/workspace label is not available|plain run labels/,JSON.stringify(labels).slice(0,60));
+  assert.throws(()=>g.check('dagu_execute',{action:'start',name:'other',labels:['a=b']}),/not in scope/);
+});
