@@ -46,6 +46,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
 | Shared-access people directory, without login accounts (D77) | [people-directory.md](people-directory.md) |
 | Human requests: bundled experimental extension, first-version direction and non-sensitive fictional scenario (D76; not yet accepted) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
+| Human requests: local test walkthrough | [Try the first version](../artifacts/delivery-evidence/human-requests/try-it.md) |
 | Human requests: normal generated setup, startup and doctor smoke | [lifecycle evidence](../artifacts/delivery-evidence/human-requests/generated-lifecycle.md) |
 | Human requests: experimental HTTP return contract | [extension guide](../template/framework/extensions/human-requests/extensions/human-requests/HTTP.md) |
 | Human requests: proposed test-only approval scenario | [scenario](../template/framework/extensions/human-requests/extensions/human-requests/docs/approval-case.md) |

@@ -1,5 +1,7 @@
 # Human requests — local validation
 
+[Local test walkthrough](try-it.md).
+
 Status: **experimental; not a release or a complete generated-stack acceptance**. The current evidence uses fictional, non-sensitive requests. Recipient labels route requests but do not enforce access; responder names are self-declared.
 
 | Scope | Observation | Evidence |
