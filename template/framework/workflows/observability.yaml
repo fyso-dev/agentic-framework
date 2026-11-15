@@ -1,3 +1,4 @@
+name: fyso-observability
 description: Refresh the private observability summary from native OMB and Dagu records
 labels:
   - fyso=system

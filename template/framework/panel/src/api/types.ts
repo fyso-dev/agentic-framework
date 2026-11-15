@@ -228,7 +228,7 @@ export type Backend = {
   getApps(): Promise<App[]>;
   getExtensions(): Promise<Extension[]>;
   getSkills(): Promise<ThirdPartySkill[]>;
-  /** Always `enqueue`, never `start` (contract §2). Returns the dagRunId. */
+  /** Run an action (contract §2): `start` when the workflow may overlap, otherwise `enqueue` (D80). Returns the dagRunId. */
   enqueue(dag: string, params?: Record<string, string>): Promise<string>;
   getRun(dag: string, runId: string): Promise<Run>;
   getOutputs(dag: string, runId: string): Promise<Record<string, unknown>>;

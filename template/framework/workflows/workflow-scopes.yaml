@@ -1,3 +1,4 @@
+name: fyso-workflow-scopes
 description: Read, save or delete a workflow scope (a subset of workflows for a group of bots) and commit it
 type: graph
 max_active_runs: 1

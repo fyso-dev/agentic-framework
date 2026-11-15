@@ -1,8 +1,11 @@
+name: fyso-setup-check
 description: Panel setup-check
 labels:
   - fyso=system
 type: graph
-max_active_runs: 1
+# Checks read into a per-run temporary directory and regenerate .mcp.json atomically
+# from the same inputs. Runs may overlap, so the panel starts them at once (D80).
+max_active_runs: 4
 env:
   - ROOT: ${FYSO_ROOT}
 working_dir: ${ROOT}

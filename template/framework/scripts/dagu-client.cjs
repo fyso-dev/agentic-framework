@@ -1,5 +1,5 @@
 // Run one of this project's Dagu workflows and return its output, like the panel does
-// (enqueue, poll, read outputs). Used by the Bot Architect CLI and the fyso MCP server.
+// (start or enqueue, poll, read outputs; D80). Used by the Bot Architect CLI and the fyso MCP server.
 const FAILED = ['failed', 'aborted', 'rejected', 'cancelled'];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -14,14 +14,21 @@ function client(env = process.env) {
     if (!r.ok) throw new Error(`Dagu ${init?.method || 'GET'} ${path} failed (${r.status}): ${(await r.text()).slice(0, 300)}`);
     return r.json();
   };
+  // D80: start at once only workflows that may overlap; Dagu's queue scan waits up to 3 s.
+  const overlap = new Map();
+  const mayOverlap = name => {
+    if (!overlap.has(name)) overlap.set(name, get(`/dags/${encodeURIComponent(name)}`)
+      .then(r => (r.dag?.maxActiveRuns ?? 1) !== 1).catch(() => { overlap.delete(name); return false; }));
+    return overlap.get(name);
+  };
   return {
-    /** Enqueue `name` with string params and wait. Resolves `{runId, output}` (output parsed as JSON when it is). */
+    /** Start or enqueue `name` with string params and wait. Resolves `{runId, output}` (output parsed as JSON when it is). */
     async run(name, params = {}, {output, timeoutMs = 300000} = {}) {
       const dag = encodeURIComponent(name);
       const body = Object.keys(params).length ? {params: JSON.stringify(params)} : {};
-      const {dagRunId} = await get(`/dags/${dag}/enqueue`, {method: 'POST', body: JSON.stringify(body)});
+      const {dagRunId} = await get(`/dags/${dag}/${await mayOverlap(name) ? 'start' : 'enqueue'}`, {method: 'POST', body: JSON.stringify(body)});
       const run = encodeURIComponent(dagRunId);
-      for (const end = Date.now() + timeoutMs; Date.now() < end;) {
+      for (let polls = 0, end = Date.now() + timeoutMs; Date.now() < end; polls++) {
         let detail;
         try { detail = (await get(`/dag-runs/${dag}/${run}`)).dagRunDetails; } catch { await sleep(1000); continue; }
         if (detail.statusLabel === 'succeeded' || detail.statusLabel === 'partially_succeeded') {
@@ -34,7 +41,7 @@ function client(env = process.env) {
           const reason = detail.nodes?.find(n => n.error)?.error || detail.error || detail.statusLabel;
           throw new Error(`${name} ${detail.statusLabel} (run ${dagRunId}): ${reason}`);
         }
-        await sleep(1000);
+        await sleep(Math.min(1000, Math.round(200 * 1.5 ** polls)));
       }
       throw new Error(`${name} still running after ${Math.round(timeoutMs / 1000)} s (run ${dagRunId}); inspect it in Dagu`);
     },

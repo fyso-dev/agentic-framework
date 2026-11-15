@@ -1,4 +1,4 @@
-// One action = one Dagu workflow (contract §2). Always enqueue, then poll the run.
+// One action = one Dagu workflow (contract §2). Start or enqueue it (D80), then poll the run.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HttpError } from "../api/http";
 import { visualOf, type Backend, type Run } from "../api/types";
@@ -31,6 +31,8 @@ export type Action<T> = ActionState<T> & {
 };
 
 const POLL_MS = 1200;
+// Most actions finish in well under a second: poll soon, then back off to POLL_MS.
+const pollDelay = (n: number) => Math.min(POLL_MS, Math.round(200 * 1.5 ** n));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const message = (e: unknown) => (e instanceof HttpError ? e.message : e instanceof Error ? e.message : String(e));
 
@@ -80,7 +82,7 @@ export function useDaguAction<T>(
   /** Poll until the run leaves the running states. */
   const follow = useCallback(
     async (runId: string, my: number, since: number): Promise<T | undefined> => {
-      for (;;) {
+      for (let polls = 0; ; polls++) {
         if (!alive.current || my !== token.current) return undefined;
         let run: Run;
         try {
@@ -94,7 +96,7 @@ export function useDaguAction<T>(
         const v = visualOf(run.statusLabel);
         if (v === "running") {
           set({ phase: "running", run, since: Number.isNaN(started) ? since : started }, my);
-          await sleep(POLL_MS);
+          await sleep(pollDelay(polls));
           continue;
         }
         if (v === "ok") {

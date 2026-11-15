@@ -1,3 +1,4 @@
+name: fyso-connector-preferences
 description: Native Claude MCP and skills preferences; no personal configuration is read by this workflow
 labels:
   - fyso=system

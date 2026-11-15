@@ -1,3 +1,4 @@
+name: fyso-update
 description: Update this project to a newer framework revision (one commit, fast-forward)
 labels:
   - fyso=system

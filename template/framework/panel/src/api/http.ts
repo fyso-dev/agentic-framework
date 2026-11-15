@@ -48,6 +48,23 @@ export function toRun(d: DaguRunDetails, fallbackId = ""): Run {
   };
 }
 
+
+// D80: Dagu 2.24.0 scans its queue at most every 3 s, so every enqueued action waits 0–3 s
+// before it starts. `start` begins at once but ignores `max_active_runs` (even with
+// `singleton`, concurrent starts all run), so it is used only for workflows that declare
+// they may overlap (`max_active_runs` other than 1). The answer is cached per page load.
+const overlap = new Map<string, Promise<boolean>>();
+function mayOverlap(dag: string): Promise<boolean> {
+  let known = overlap.get(dag);
+  if (!known) {
+    known = json<{ dag?: { maxActiveRuns?: number } }>(dagu(`dags/${enc(dag)}`))
+      .then((r) => (r.dag?.maxActiveRuns ?? 1) !== 1)
+      .catch(() => { overlap.delete(dag); return false; });
+    overlap.set(dag, known);
+  }
+  return known;
+}
+
 export const httpBackend: Backend = {
   getBotVersioning: () => json("/config/bot-versioning.json"),
   getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("/api/omb/bots")).bots,
@@ -64,7 +81,9 @@ export const httpBackend: Backend = {
 
   async enqueue(dag, params) {
     const body = params ? { params: JSON.stringify(params) } : {};
-    const res = await json<{ dagRunId: string }>(dagu(`dags/${enc(dag)}/enqueue`), {
+    // D80: a workflow that may overlap starts at once; one that must not waits in Dagu's queue.
+    const how = (await mayOverlap(dag)) ? "start" : "enqueue";
+    const res = await json<{ dagRunId: string }>(dagu(`dags/${enc(dag)}/${how}`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
