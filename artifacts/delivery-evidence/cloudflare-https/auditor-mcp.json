@@ -1,0 +1,10 @@
+{
+  "project": "grupoauditor",
+  "url": "https://panel.auditor.jc.fyso.dev/mcp",
+  "dagRunId": "034wH64TrUQjeZkvqBTiDt",
+  "status": "succeeded",
+  "tokenAbsentFromDaguOutputs": true,
+  "mcpInitialized": true,
+  "platformTools": 26,
+  "noDaguTools": true
+}

@@ -1,0 +1,347 @@
+diff --git a/README.md b/README.md
+index 807212a..8da2c36 100644
+--- a/README.md
++++ b/README.md
+@@ -147,6 +147,37 @@ where you want that.
+ | `mise.toml`, `hub/` | Template | Pinned tools, tasks and glue scripts |
+ | `.data/` | Rebuildable | Built login service, generated runtime config, sessions, logs |
+ 
++## Private HTTPS (work in progress)
++
++The optional native Caddy TLS listener accepts `HUB_WEB_SCHEME=https`,
++`HUB_TLS_PORT` (default 8490), `HUB_TLS_CERT_FILE` and `HUB_TLS_KEY_FILE` in
++the host's mise configuration. Obtain a certificate covering the portal, login,
++console and every declared project app before enabling it. Cloudflare DNS-01 can
++issue wildcard certificates while applications remain private on Tailscale.
++
++Forward private TCP 443 to the loopback TLS listener. Preserve the existing
++Tailscale Serve configuration before changing any route. This is TCP forwarding,
++not TLS termination by Tailscale, because the certificate covers your own domain.
++Keep all application DNS records unproxied and pointed at the private Tailscale IP.
++
++The renderer uses secure cookies, HTTPS public links and exact HTTPS origin checks
++in this mode. Configure each project with the same parent domain, the hub's
++`auth_upstream`, and a D62 provider setting `FYSO_WEB_SCHEME=https`.
++Every certificate renewal must reload Caddy. Validate its generated configuration
++before restarting; missing certificate files fail the pre-stop check.
++
++Tests are in `tests/https.test.cjs`. Set `FYSO_TEST_CADDY` and
++`FYSO_TEST_TINYAUTH` to explicit native binaries and `FYSO_TEST_FRAMEWORK_ROOT`
++to a framework checkout to run the complete fixture with `node --test`.
++The fixture uses real Tinyauth/Caddy, three native framework gateways and simulated
++app/console upstreams: one login, secure session cookies, all declared routes,
++cross-origin rejection, cookie stripping and global logout replay rejection.
++It generates self-signed fixture certificates and validates them against an explicit
++test trust anchor. It does not bypass verification for deployed certificates.
++
++This implementation has local fixture coverage, not live issuance or authenticated
++deployment acceptance. Do not treat it as a completed migration.
++
+ ## Update
+ 
+ ```sh
+diff --git a/template/hub/scripts/health.sh b/template/hub/scripts/health.sh
+index 536cafa..4f934df 100755
+--- a/template/hub/scripts/health.sh
++++ b/template/hub/scripts/health.sh
+@@ -10,6 +10,8 @@ case "${1:-}" in
+   browser) result=$(curl --max-time 5 -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+            -A 'Mozilla/5.0 AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36' \
+            -H "Host: portal.$HUB_DOMAIN:$HUB_HTTP_PORT" "http://127.0.0.1:$HUB_HTTP_PORT/")
+-         [[ "$result" = "302 http://auth.$HUB_DOMAIN:$HUB_HTTP_PORT/login?"* ]] ;;
++         scheme=${HUB_WEB_SCHEME:-http}
++         suffix=":$HUB_HTTP_PORT"; [ "$scheme" != https ] || suffix=""
++         [[ "$result" = "302 $scheme://auth.$HUB_DOMAIN$suffix/login?"* ]] ;;
+   *) fail "usage: health.sh <auth|caddy|browser>" ;;
+ esac
+diff --git a/template/hub/scripts/render.cjs b/template/hub/scripts/render.cjs
+index 792f6ef..88f01b0 100644
+--- a/template/hub/scripts/render.cjs
++++ b/template/hub/scripts/render.cjs
+@@ -9,11 +9,16 @@
+ const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+ const {createRequire} = require('node:module');
+ const {execFileSync} = require('node:child_process');
++const {X509Certificate, createPrivateKey} = require('node:crypto');
+ const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
+ 
+ const env = process.env;
+ const ROOT = env.HUB_ROOT || process.cwd();
+ const DEFAULT_APPS = ['panel', 'dagu', 'omb'];
++const scheme = env.HUB_WEB_SCHEME || 'http';
++if (!['http', 'https'].includes(scheme)) throw Error('HUB_WEB_SCHEME must be http or https');
++const publicOrigin = (app, domain = env.HUB_DOMAIN, port = env.HUB_HTTP_PORT) =>
++  `${scheme}://${app}.${domain}${scheme === 'https' ? '' : `:${port}`}`;
+ 
+ function environments() {
+   const doc = yaml.parse(fs.readFileSync(path.join(ROOT, 'hub.yaml'), 'utf8')) || {};
+@@ -62,13 +67,13 @@ const icon = (name, size) => `<svg width="${size}" height="${size}" viewBox="0 0
+ 
+ // The entry page uses the panel's design system: hub/assets/hub.css, served next to it.
+ function page(list, texts) {
+-  const origin = `http://console.${env.HUB_DOMAIN}:${env.HUB_HTTP_PORT}`;
++  const origin = publicOrigin('console');
+   const tile = (glyph, label, url) =>
+     `<li><a class="ap-tile" href="${html(url)}"><span class="ap-ic">${icon(glyph, 22)}</span>` +
+     `<div class="ap-tile-text"><h3>${html(label)}</h3><p>${html(new URL(url).host)}</p></div>` +
+     `<span class="ap-go">${icon('go', 16)}</span></a></li>`;
+   const sections = list.map(item => {
+-    const tiles = item.apps.map(app => tile(app, texts[`app_${app}`] || app, `http://${app}.${item.domain}:${item.port}/`));
++    const tiles = item.apps.map(app => tile(app, texts[`app_${app}`] || app, `${publicOrigin(app,item.domain,item.port)}/`));
+     if (item.folder) tiles.push(tile('console', texts.console, `${origin}/${item.slug}/`));
+     return `<section><h2 class="ap-cap">${html(item.name)} <span class="n">${tiles.length}</span></h2>\n<ul class="ap-grid">\n${tiles.join('\n')}\n</ul></section>`;
+   }).join('\n');
+@@ -82,7 +87,7 @@ function page(list, texts) {
+ <link rel="stylesheet" href="assets/hub.css">
+ <header class="topbar">
+ <div class="brand"><span class="logo" aria-hidden="true">F</span><span class="brand-name">${html(env.HUB_NAME)}</span></div>
+-<a class="btn btn-ghost" href="http://auth.${env.HUB_DOMAIN}:${env.HUB_HTTP_PORT}/logout">${html(texts.sign_out)}</a>
++<a class="btn btn-ghost" href="${html(publicOrigin('auth'))}/logout">${html(texts.sign_out)}</a>
+ </header>
+ <main class="page">
+ <div class="page-head"><h1>${html(texts.title)}</h1></div>
+@@ -101,12 +106,12 @@ function tinyauth(list, users, runtime) {
+   };
+   for (const item of list) for (const name of item.apps) apps[`${item.slug}-${name}`] = app(`${name}.${item.domain}`, item.allow);
+   return {
+-    appUrl: `http://auth.${env.HUB_DOMAIN}:${env.HUB_HTTP_PORT}`,
++    appUrl: publicOrigin('auth'),
+     server: {address:'127.0.0.1', port:Number(env.HUB_AUTH_PORT)},
+     database: {driver:'sqlite', path:path.join(runtime, 'sessions.db')},
+     labelProvider: 'none', analytics: {enabled:false}, resources: {enabled:false},
+     auth: {
+-      users, secureCookie:false, subdomainsEnabled:true, trustedProxies:['127.0.0.1/32'],
++      users, secureCookie:scheme === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32'],
+       sessionExpiry:2592000, sessionMaxLifetime:2592000, loginMaxRetries:5, loginTimeout:300,
+       acls: {policy:'deny'},
+     },
+@@ -114,6 +119,32 @@ function tinyauth(list, users, runtime) {
+   };
+ }
+ 
++// Optional native TLS listener: private TCP forwarding reaches this port, while
++// every application retains its existing loopback gateway and authentication.
++function tlsListener(list) {
++  if (scheme !== 'https') return '';
++  const cert = env.HUB_TLS_CERT_FILE, key = env.HUB_TLS_KEY_FILE;
++  const port = Number(env.HUB_TLS_PORT || 8490);
++  if (!cert || !key || !fs.existsSync(cert) || !fs.existsSync(key)) throw Error('HTTPS requires existing HUB_TLS_CERT_FILE and HUB_TLS_KEY_FILE');
++  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('Invalid HUB_TLS_PORT');
++  const routes = [{hosts:['portal','auth','console'].map(app=>`${app}.${env.HUB_DOMAIN}`),port:Number(env.HUB_HTTP_PORT)},
++    ...list.map(item=>({hosts:item.apps.map(app=>`${app}.${item.domain}`),port:item.port}))];
++  // Validate before stopping a working hub or activating a renewal.
++  const certificate = new X509Certificate(fs.readFileSync(cert));
++  if (fs.statSync(key).mode & 0o077) throw Error('TLS key permissions must be private');
++  if (!certificate.checkPrivateKey(createPrivateKey(fs.readFileSync(key)))) throw Error('TLS certificate and key do not match');
++  if (Date.parse(certificate.validFrom) > Date.now() || Date.parse(certificate.validTo) <= Date.now()) throw Error('TLS certificate is not currently valid');
++  for (const host of routes.flatMap(r=>r.hosts)) {
++    if (!certificate.checkHost(host)) throw Error(`TLS certificate does not cover ${host}`);
++  }
++  const addresses = routes.flatMap(r=>r.hosts).map(host=>`https://${host}:${port}`);
++  let out = `\n${addresses.join(', ')} {\n\ttls ${JSON.stringify(cert)} ${JSON.stringify(key)}\n`;
++  routes.forEach((r,i)=>{
++    out += `\t@route${i} host ${r.hosts.join(' ')}\n\thandle @route${i} {\n\t\treverse_proxy 127.0.0.1:${r.port} {\n\t\t\theader_up Host {host}\n\t\t}\n\t}\n`;
++  });
++  return out + '\trespond 404\n}\n';
++}
++
+ function caddyfile(list, runtime) {
+   const consoles = list.filter(item => item.folder).map(item =>
+     `\thandle /${item.slug}/* {\n\t\treverse_proxy unix//tmp/fyso-hub-${env.HUB_HTTP_PORT}-${item.slug}.sock\n\t}`).join('\n');
+@@ -129,7 +160,7 @@ function caddyfile(list, runtime) {
+ 
+ (hub_login) {
+ 	route {
+-		@foreignOrigin expression \`{http.request.header.Origin} != "" && {http.request.header.Origin} != {http.request.scheme} + "://" + {http.request.hostport}\`
++		@foreignOrigin expression \`{http.request.header.Origin} != "" && {http.request.header.Origin} != "${scheme}://" + ${scheme === 'https' ? '{http.request.host}' : '{http.request.hostport}'}\`
+ 		respond @foreignOrigin 403
+ 		request_header -Authorization
+ 		request_header -Remote-*
+@@ -141,6 +172,7 @@ function caddyfile(list, runtime) {
+ 		forward_auth 127.0.0.1:${env.HUB_AUTH_PORT} {
+ 			uri /api/auth/caddy
+ 			copy_headers Remote-User Remote-Name Remote-Email Remote-Groups
++			header_up X-Forwarded-Proto ${scheme}
+ 		}
+ 		# The session never reaches what is behind the login.
+ 		request_header Cookie "(^|;[ \\t]*)tinyauth-session-[^=;]+=[^;]*" ""
+@@ -150,7 +182,9 @@ function caddyfile(list, runtime) {
+ http://auth.${env.HUB_DOMAIN}:${env.HUB_HTTP_PORT} {
+ 	@internal path /api/auth/*
+ 	respond @internal 404
+-	reverse_proxy 127.0.0.1:${env.HUB_AUTH_PORT}
++	reverse_proxy 127.0.0.1:${env.HUB_AUTH_PORT} {
++		header_up X-Forwarded-Proto ${scheme}
++	}
+ }
+ 
+ http://portal.${env.HUB_DOMAIN}:${env.HUB_HTTP_PORT} {
+@@ -166,6 +200,7 @@ ${consoles}
+ 		respond 404
+ 	}
+ }
++${tlsListener(list)}
+ `;
+ }
+ 
+@@ -190,7 +225,7 @@ try {
+   for (const name of ['HUB_DOMAIN', 'HUB_HTTP_PORT']) if (!env[name]) throw Error(`${name} is not set; run this through mise`);
+   const list = environments();
+   const mode = process.argv[2];
+-  if (mode === '--check') process.exit(0);
++  if (mode === '--check') { tlsListener(list); process.exit(0); }
+   if (mode === '--list') {
+     for (const item of list) console.log([item.slug, item.domain, item.port, item.folder].join('\t'));
+     process.exit(0);
+diff --git a/template/hub/scripts/tls-reload.sh b/template/hub/scripts/tls-reload.sh
+new file mode 100755
+index 0000000..4163368
+--- /dev/null
++++ b/template/hub/scripts/tls-reload.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++# A certificate renewal must validate before replacing the active TLS config.
++set -euo pipefail
++source "$(dirname "$0")/lib.sh"
++node hub/scripts/render.cjs --check
++caddy validate --config "$RUNTIME/Caddyfile" --adapter caddyfile
++exec caddy reload --address "localhost:$HUB_CADDY_ADMIN_PORT" --config "$RUNTIME/Caddyfile" --adapter caddyfile
+diff --git a/template/hub/scripts/up.sh b/template/hub/scripts/up.sh
+index 5bfae9b..613a89c 100755
+--- a/template/hub/scripts/up.sh
++++ b/template/hub/scripts/up.sh
+@@ -21,7 +21,9 @@ pc up --detached >>"$HUB_DATA/logs/up.log" 2>&1
+ printf 'Starting'
+ for _ in $(seq 1 60); do
+   if hub/scripts/health.sh caddy 2>/dev/null && hub/scripts/health.sh browser 2>/dev/null; then
+-    printf ' ready.\n\n  Hub  http://portal.%s:%s\n\n  mise run status · mise run logs <auth|caddy> · mise run doctor · mise run down\n' "$HUB_DOMAIN" "$HUB_HTTP_PORT"
++    scheme=${HUB_WEB_SCHEME:-http}
++    suffix=":$HUB_HTTP_PORT"; [ "$scheme" != https ] || suffix=""
++    printf ' ready.\n\n  Hub  %s://portal.%s%s\n\n  mise run status · mise run logs <auth|caddy> · mise run doctor · mise run down\n' "$scheme" "$HUB_DOMAIN" "$suffix"
+     exit 0
+   fi
+   printf '.'; sleep 1
+diff --git a/tests/https.test.cjs b/tests/https.test.cjs
+new file mode 100644
+index 0000000..6f47e97
+--- /dev/null
++++ b/tests/https.test.cjs
+@@ -0,0 +1,118 @@
++const {test}=require('node:test');
++const assert=require('node:assert/strict');
++const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
++const {spawnSync}=require('node:child_process');
++function fixture(t,scheme){
++ const root=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-hub-tls-'));t.after(()=>{if(!process.env.FYSO_TEST_KEEP_FIXTURE)fs.rmSync(root,{recursive:true,force:true})});
++ fs.cpSync(path.join(__dirname,'../template/hub'),path.join(root,'hub'),{recursive:true});
++ fs.writeFileSync(path.join(root,'hub.yaml'),JSON.stringify({environments:[{name:'Auditor',slug:'auditor',domain:'auditor.jc.example.com',port:39400,apps:['panel','dagu','omb','docs']}]}));
++ const env={...process.env,HUB_ROOT:root,HUB_DATA:path.join(root,'.data'),HUB_DOMAIN:'jc.example.com',HUB_HTTP_PORT:'39480',HUB_AUTH_PORT:'39489',HUB_CADDY_ADMIN_PORT:'39488',HUB_TLS_PORT:'39490',HUB_WEB_SCHEME:scheme,HUB_AUTH_USERS:'admin:fixture-hash'};
++ return {root,env,render:()=>spawnSync(process.execPath,[path.join(root,'hub/scripts/render.cjs')],{env,encoding:'utf8'})};
++}
++test('HTTP compatibility remains available',t=>{
++ const f=fixture(t,'http'),r=f.render();assert.equal(r.status,0,r.stderr);
++ const config=JSON.parse(fs.readFileSync(path.join(f.env.HUB_DATA,'runtime/tinyauth.yaml')));
++ assert.equal(config.auth.secureCookie,false);assert.equal(config.appUrl,'http://auth.jc.example.com:39480');
++});
++test('HTTPS cannot activate with missing certificate files',t=>{
++ const f=fixture(t,'https'),r=f.render();assert.notEqual(r.status,0);assert.match(r.stderr,/existing HUB_TLS_CERT_FILE/);
++});
++test('native TLS config validates and secure origins cover every app',{skip:!process.env.FYSO_TEST_CADDY},t=>{
++ const f=fixture(t,'https');f.env.HUB_TLS_CERT_FILE=path.join(f.root,'cert.pem');f.env.HUB_TLS_KEY_FILE=path.join(f.root,'key.pem');
++ const cert=spawnSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-days','30','-subj','/CN=*.jc.example.com','-addext','subjectAltName=DNS:*.jc.example.com,DNS:*.auditor.jc.example.com','-keyout',f.env.HUB_TLS_KEY_FILE,'-out',f.env.HUB_TLS_CERT_FILE],{encoding:'utf8'});assert.equal(cert.status,0,'fixture certificate generated');
++ const r=f.render();assert.equal(r.status,0,r.stderr);
++ const dir=path.join(f.env.HUB_DATA,'runtime');const config=JSON.parse(fs.readFileSync(path.join(dir,'tinyauth.yaml')));
++ assert.equal(config.auth.secureCookie,true);assert.equal(config.appUrl,'https://auth.jc.example.com');
++ const html=fs.readFileSync(path.join(dir,'www/index.html'),'utf8');assert.ok(html.includes('https://panel.auditor.jc.example.com/'));assert.ok(!html.includes('href="http://'));
++ const caddy=spawnSync(process.env.FYSO_TEST_CADDY,['validate','--config',path.join(dir,'Caddyfile'),'--adapter','caddyfile'],{env:{...process.env,XDG_DATA_HOME:path.join(f.root,'caddy'),XDG_CONFIG_HOME:path.join(f.root,'caddy')},encoding:'utf8'});
++ assert.equal(caddy.status,0,caddy.stderr);
++});
++
++const nativeReady=process.env.FYSO_TEST_CADDY && process.env.FYSO_TEST_TINYAUTH && process.env.FYSO_TEST_FRAMEWORK_ROOT;
++test('one native HTTPS session spans hub and three gateways, rejects foreign writes and logout replay', {skip:!nativeReady,timeout:40000}, async t=>{
++ const http=require('node:http'),https=require('node:https');
++ const {spawn}=require('node:child_process');
++ const f=fixture(t,'https'),slugs=['auditor','emos','manolito'];
++ const configs=slugs.map((slug,i)=>({name:slug,slug,domain:`${slug}.jc.example.com`,port:39400+i*20,apps:['panel','dagu','omb','docs'],path:f.root}));
++ fs.writeFileSync(path.join(f.root,'hub.yaml'),JSON.stringify({environments:configs}));
++ f.env.HUB_TLS_CERT_FILE=path.join(f.root,'cert.pem');f.env.HUB_TLS_KEY_FILE=path.join(f.root,'key.pem');
++ const sans=['*.jc.example.com',...slugs.map(s=>`*.${s}.jc.example.com`)];
++ const cert=spawnSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-days','30','-subj','/CN=*.jc.example.com','-addext',`subjectAltName=${sans.map(s=>'DNS:'+s).join(',')}`,'-keyout',f.env.HUB_TLS_KEY_FILE,'-out',f.env.HUB_TLS_CERT_FILE],{encoding:'utf8'});
++ assert.equal(cert.status,0,'fixture certificate generated');
++ const password='isolated-fixture-password';
++ const hash=spawnSync(process.env.FYSO_TEST_CADDY,['hash-password','--bcrypt-cost','4'],{input:password,encoding:'utf8'});
++ assert.equal(hash.status,0);f.env.HUB_AUTH_USERS='admin:'+hash.stdout.trim();
++ const r=f.render();assert.equal(r.status,0,r.stderr);
++ const children=[],servers=[],sockets=[];
++ t.after(async()=>{
++  for(const s of servers)await new Promise(resolve=>s.close(resolve));
++  await Promise.all(children.map(c=>new Promise(resolve=>{if(c.exitCode!==null)return resolve();c.once('exit',resolve);c.kill('SIGTERM')})));
++  for(const socket of sockets)fs.rmSync(socket,{force:true});
++ });
++ function start(binary,args,env){
++  const fd=fs.openSync(path.join(f.root,`native-${children.length}.log`),'w');
++  const c=spawn(binary,args,{cwd:f.root,env:{...process.env,...env},stdio:['ignore',fd,fd]});fs.closeSync(fd);children.push(c);return c;
++ }
++ const echo=(req,res)=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({user:req.headers['remote-user']||null,webCookieLeaked:(req.headers.cookie||'').includes('tinyauth-session-')}))};
++ const backend=http.createServer(echo);await new Promise((resolve,reject)=>{backend.once('error',reject);backend.listen(39550,'127.0.0.1',resolve)});servers.push(backend);
++ for(const item of configs){
++  const socket=path.join('/tmp',`fyso-hub-${f.env.HUB_HTTP_PORT}-${item.slug}.sock`);
++  assert.equal(fs.existsSync(socket),false,'isolated fixture socket must be unused');
++  const server=http.createServer(echo);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(socket,resolve)});servers.push(server);sockets.push(socket);
++  const root=path.join(f.root,item.slug);for(const sub of ['panel','project/apps/docs','extensions'])fs.mkdirSync(path.join(root,sub),{recursive:true});
++  fs.writeFileSync(path.join(root,'panel/index.html'),`<title>${item.slug}</title>`);
++  fs.writeFileSync(path.join(root,'project/apps/docs/Caddyfile'),`http://docs.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {\n import fyso_login\n reverse_proxy 127.0.0.1:39550\n}\n`);
++  const gateway=path.join(process.env.FYSO_TEST_FRAMEWORK_ROOT,'template/Caddyfile');
++  start(process.env.FYSO_TEST_CADDY,['run','--config',gateway,'--adapter','caddyfile'],{
++   FYSO_ROOT:root,FYSO_DATA:root,FYSO_PANEL_ROOT:path.join(root,'panel'),FYSO_HTTP_PORT:String(item.port),FYSO_WEB_DOMAIN:item.domain,
++   FYSO_AUTH_UPSTREAM:'127.0.0.1:39489',FYSO_WEB_SCHEME:'https',FYSO_WEB_PORT_SUFFIX:'',FYSO_BIND:'127.0.0.1',FYSO_CADDY_ADMIN_PORT:String(item.port+8),
++   FYSO_DAGU_PORT:'39550',FYSO_OMB_PORT:'39550',FYSO_DAGU_AUTH:'Basic fixture',FYSO_OMB_TOKEN:'fixture',
++   FYSO_CONNECTOR_SETUP_SOCKET:path.join(f.root,'unused-setup.sock'),FYSO_MCP_SOCKET:path.join(f.root,'unused-mcp.sock'),
++   XDG_DATA_HOME:path.join(root,'xdg-data'),XDG_CONFIG_HOME:path.join(root,'xdg-config'),
++  });
++ }
++ const runtime=path.join(f.env.HUB_DATA,'runtime');
++ start(process.env.FYSO_TEST_TINYAUTH,[],{TINYAUTH_CONFIGFILE:path.join(runtime,'tinyauth.yaml')});
++ start(process.env.FYSO_TEST_CADDY,['run','--config',path.join(runtime,'Caddyfile'),'--adapter','caddyfile'],{XDG_DATA_HOME:path.join(f.root,'hub-data'),XDG_CONFIG_HOME:path.join(f.root,'hub-config')});
++ const ca=fs.readFileSync(f.env.HUB_TLS_CERT_FILE);
++ function request(host,pathname,options={}){
++  return new Promise((resolve,reject)=>{
++   const req=https.request({hostname:'127.0.0.1',port:Number(f.env.HUB_TLS_PORT),servername:host,ca,method:options.method||'GET',path:pathname,
++    headers:{Host:host,'User-Agent':'Fyso-API',...options.headers}},res=>{let body='';res.on('data',d=>body+=d);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body}))});
++   req.on('error',reject);req.end(options.body);
++  });
++ }
++ let ready=false;
++ for(let i=0;i<100;i++){
++  if(children.some(c=>c.exitCode!==null))throw Error('Native fixture process exited; inspect isolated logs');
++  try{if((await request('auth.jc.example.com','/api/healthz')).status===200){ready=true;break}}catch{}
++  await new Promise(resolve=>setTimeout(resolve,100));
++ }
++ assert.ok(ready,'native auth and TLS listener ready');
++ assert.equal((await request('portal.jc.example.com','/')).status,401);
++ const login=await request('auth.jc.example.com','/api/user/login',{method:'POST',headers:{Origin:'https://auth.jc.example.com','Content-Type':'application/json'},body:JSON.stringify({username:'admin',password})});
++ assert.equal(login.status,200,'single hub authentication');
++ const cookies=login.headers['set-cookie']||[];
++ assert.ok(cookies.some(c=>/; Secure/i.test(c)));assert.ok(cookies.some(c=>/; HttpOnly/i.test(c)));
++ const Cookie=cookies.map(c=>c.split(';')[0]).join('; ');assert.ok(Cookie,'native session cookie issued');
++ assert.equal((await request('portal.jc.example.com','/',{headers:{Cookie}})).status,200);
++ for(const item of configs){
++  const panel='panel.'+item.domain;
++  assert.equal((await request(panel,'/')).status,401);
++  assert.equal((await request(panel,'/',{headers:{Cookie}})).status,200,'shared session opens '+item.slug);
++  assert.equal((await request(panel,'/api/agent/remote',{method:'POST',headers:{Cookie,Origin:'https://foreign.example.com','Content-Type':'application/json'},body:'{}'})).status,403);
++  for(const app of ['dagu','omb','docs']){
++   const reply=await request(`${app}.${item.domain}`,'/',{headers:{Cookie}});assert.equal(reply.status,200,app+' reachable');
++   const data=JSON.parse(reply.body);assert.equal(data.user,'admin');assert.equal(data.webCookieLeaked,false);
++  }
++  const consoleReply=await request('console.jc.example.com',`/${item.slug}/`,{headers:{Cookie}});
++  assert.equal(consoleReply.status,200);assert.equal(JSON.parse(consoleReply.body).webCookieLeaked,false);
++ }
++ assert.equal((await request('portal.jc.example.com','/',{method:'POST',headers:{Cookie,Origin:'https://foreign.example.com'}})).status,403);
++ const logout=await request('panel.auditor.jc.example.com','/api/session/logout',{method:'POST',headers:{Cookie,Origin:'https://panel.auditor.jc.example.com'}});
++ assert.equal(logout.status,200);
++ for(const host of ['portal.jc.example.com','console.jc.example.com',...configs.map(c=>'panel.'+c.domain)]){
++  const pathname=host.startsWith('console.')?'/auditor/':'/';
++  assert.equal((await request(host,pathname,{headers:{Cookie}})).status,401,'logout rejects replay across all targets');
++ }
++});

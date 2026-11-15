@@ -1,0 +1,10 @@
+{
+  "project": "manolito",
+  "url": "https://panel.manolito.jc.fyso.dev/mcp",
+  "dagRunId": "034wH6IfWGFYdNk9r1qSos",
+  "status": "succeeded",
+  "tokenAbsentFromDaguOutputs": true,
+  "mcpInitialized": true,
+  "platformTools": 26,
+  "noDaguTools": true
+}

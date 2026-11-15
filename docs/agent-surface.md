@@ -21,6 +21,7 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 | `fyso_check` | setup checklist | `fyso-setup-check` |
 | `fyso_doctor` | `mise run doctor` output and result | `doctor.sh` (read-only) |
 | `fyso_bots_list`, `fyso_bot_read` | native bots, one profile + revision | `fyso-bot-architect` `OP=list\|read` |
+| `fyso_feedback` | record a problem for review as a new project wiki page | Dagu's native `dagu_change` wiki operation |
 | `fyso_bot_run` | send a message to a bot and wait for its reply; optionally continue a task | native `openmausbot run` on the explicit project port |
 | `fyso_bot_plan` | preview create/update/delete of one bot → `planId` | `fyso-bot-architect` `OP=plan` |
 | `fyso_bot_apply` | apply a plan by `planId` (snapshot, apply, commit) | `fyso-bot-architect` `OP=apply` |
@@ -37,6 +38,8 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 | `fyso_observability` | conversations, execution, AI consumption | `fyso-observability` |
 
 **Not exposed, on purpose** (terminal tasks for a person): secret values (`mise run secrets`), removing extensions (`mise run ext:remove`), starting/stopping the stack (`mise run up/down`), web login users, engine logins and application OAuth. The server's `instructions` tell agents to plan before applying bots and never to ask for secret values.
+
+**Problem feedback (D75).** `fyso_feedback` accepts a title, description and optional component and creates a separate UUID-named page in `project/wiki/feedback/` through Dagu's native wiki operation. It returns the page path after Dagu confirms the write. This records feedback for human review; it does not send a notification or create an external issue. Agents must omit secrets and personal data. Dagu must be reachable. New default bots with explicit allow-lists include `mcp:fyso:fyso_feedback`; existing project-owned bot configurations are preserved and need that selector added explicitly if they do not already allow `mcp:fyso:*`.
 
 ### Understanding the project (D57)
 

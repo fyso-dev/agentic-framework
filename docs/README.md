@@ -11,6 +11,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
+| Product growth: extensibility first, opt-in use-case functionality | [Placement and promotion criteria](extensions-contract.md#core-versus-extension-placement) |
 | Principle: orchestrate existing software, never reinvent, always feel simple | [PLAN §0](PLAN.md#0-principle) |
 | Goal and tool map (need → existing software) | [PLAN §1](PLAN.md#1-goal) |
 | Brand: Fyso (working name: Fyso Agentic Framework) | [PLAN header](PLAN.md) |
@@ -20,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D74; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D75, D78; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -44,6 +45,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
+| Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
@@ -67,6 +69,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 ## Layer 4 — Execution
 *What is being built, in what order, and where it stands.*
+
+Development workflow: [Bounded delivery](bounded-delivery.md) — critical integration first, investigation checkpoints, finite acceptance criteria and resumable handoffs. Start from the [delivery brief](templates/delivery-brief.md) only when a non-trivial task has no existing record.
 
 | Phase | Goal | Status |
 |---|---|---|
@@ -93,6 +97,20 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
+
+2026-11-14: Recorded extension-first product growth in AGENTS, PLAN and the extension contract: a simple default experience, optional use-case capabilities, minimal generic slots and explicit criteria for promotion to core. No runtime migration is implied.
+
+2026-11-14: Added mandatory bounded-delivery guidance to `AGENTS.md`, with a workflow and brief template. Human-requests development exposed late integration discovery, scope rework and disposable-fixture recovery. The guidance requires early real-path proof and explicit beta/release acceptance, while preserving required isolation and doctor checks. See [bounded delivery](bounded-delivery.md).
+
+2026-11-12: Live VM inspection found restarted gateways retaining the original
+process-compose authentication environment despite updated shared-login config.
+A regression test reproduced the local-authority fallback; auth helpers now read
+the current mise configuration. Cloudflare OAuth can read the zone but DNS and
+certificate requests return 403; issuance and authenticated HTTPS acceptance remain
+unverified at that stage. The administrator subsequently supplied the token:
+private DNS/HTTPS and three live MCP connections now pass, as do all four doctors;
+deployed shared-session/browser acceptance remains pending. Issuance temporarily
+stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-extension.md).
 
 | Date | Entry |
 |---|---|
@@ -240,3 +258,5 @@ The owner extension review fixes and focused verification are recorded in [busin
 | 2026-11-12 | **Remote agent and Dagu access (D74).** The existing project token grants Dagu's native tools and `fyso_bot_run`, which uses the native OMB CLI on the project port. Remote transport tests use simulated Dagu and OMB; real remote agent execution remains to be verified. [Contract](agent-surface.md#remote-clients-d63) |
 
 | 2026-11-11 | SilverBullet import entry: the panel routes `ext-silverbullet-import` to the Knowledge page instead of enqueuing it without an upload batch. Verified in the GrupoAuditor VM. [ADR](adr/silverbullet-import-entry.md) |
+
+| 2026-11-12 | **Project feedback (D75).** `fyso_feedback` records a new review page through Dagu's native wiki operation. An isolated Dagu 2.24.0 server confirmed the MCP call creates the expected page. No notification or external issue is sent; existing bots need the tool explicitly selected. [Contract](agent-surface.md) |

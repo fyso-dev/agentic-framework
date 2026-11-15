@@ -20,7 +20,7 @@ function fakeDagu(outputs,mcpTools) {
         if(msg.method==='initialize'){const id=`s${++state.opened}`;state.sessions.add(id);res.setHeader('Mcp-Session-Id',id);return send({jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'dagu',version:'t'}}});}
         if(!state.sessions.has(sid)){res.statusCode=404;return res.end('session not found');}
         if(msg.id===undefined){res.statusCode=202;return res.end();}
-        const result=msg.method==='tools/list'?{tools:mcpTools}:msg.params?.arguments?.target==='runs'?{content:[{type:'text',text:'Dagu read completed.'}],structuredContent:{data:{items:[{name:'orders',dagRunId:'r1'},{name:'orders-secret',dagRunId:'r2'}]},target:'runs'}}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
+        const result=msg.method==='tools/list'?{tools:mcpTools}:msg.params?.arguments?.type==='upsert_wiki_page'?{content:[{type:'text',text:'saved'}],structuredContent:{applied:true}}:msg.params?.arguments?.target==='runs'?{content:[{type:'text',text:'Dagu read completed.'}],structuredContent:{data:{items:[{name:'orders',dagRunId:'r1'},{name:'orders-secret',dagRunId:'r2'}]},target:'runs'}}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
         if(msg.method==='tools/call')mcpCalls.push({...msg.params,session:sid});
         if(state.sse){res.setHeader('Content-Type','text/event-stream');return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc:'2.0',method:'notifications/progress',params:{}})}\n\nevent: message\ndata: ${JSON.stringify({jsonrpc:'2.0',id:msg.id,result})}\n\n`);}
         return send({jsonrpc:'2.0',id:msg.id,result});
@@ -67,6 +67,20 @@ test('connection discovery uses the same native architect workflow as the panel'
     const response=(await c.call('tools/call',{name:'fyso_connections',arguments:{}})).result;
     assert.deepEqual(response.structuredContent,catalog);
     assert.deepEqual(calls.at(-1),{dag:'fyso-bot-architect',params:{OP:'connections'}});
+  } finally {c.close();srv.close();}
+});
+
+test('feedback records separate project wiki pages through Dagu, even with --no-dagu',async()=>{
+  const {srv,mcpCalls,port}=await fakeDagu({},DAGU_TOOLS);const c=mcp(port,{},['--no-dagu']);
+  try {
+    const submit=()=>c.call('tools/call',{name:'fyso_feedback',arguments:{title:'Broken workflow',description:'Expected success; got an error.',component:'Dagu'}});
+    const first=(await submit()).result.structuredContent, second=(await submit()).result.structuredContent;
+    assert.notEqual(first.id,second.id);assert.equal(first.status,'saved');assert.equal(first.notification,'none');
+    const sent=mcpCalls[0];assert.equal(sent.name,'dagu_change');assert.equal(sent.arguments.type,'upsert_wiki_page');assert.equal(sent.arguments.mode,'apply');assert.equal(sent.arguments.path,`feedback/${first.id}`);
+    assert.match(sent.arguments.content,/Broken workflow/);assert.match(sent.arguments.content,/Expected success/);
+    assert.equal((await c.call('tools/call',{name:'fyso_feedback',arguments:{title:' ',description:'x'}})).result.isError,true);
+    assert.equal((await c.call('tools/call',{name:'fyso_feedback',arguments:{title:'x',description:'x'.repeat(16001)}})).result.isError,true);
+    assert.equal(mcpCalls.length,2);
   } finally {c.close();srv.close();}
 });
 
