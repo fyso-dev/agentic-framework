@@ -16,7 +16,7 @@ import { accessFor, ensurePiHumanRequestOrigin, piHumanRequestOriginBlocked, sel
 import { go, href, type BotTab } from "../lib/router";
 import {
   byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
-  SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, teamNames, invalidTeamRemoval, upsertBot, type Approval, type Bot,
+  SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, teamNames, invalidTeamRemoval, appliedTeamForRemoval, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
 import { BotStatePill } from "./Bots";
@@ -69,6 +69,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const [name, setName] = useState(initial.name);
   const [title, setTitle] = useState(initial.title);
   const [team, setTeam] = useState(initial.team);
+  const appliedTeam = appliedTeamForRemoval(bot, s.runtimeBots.status === 'ok' ? s.runtimeBots.data ?? [] : null, s.baseBots);
   // Teams the file declares or already uses (D81); a new name creates the team on apply.
   const teams = useMemo(() => { try { return teamNames(parseTeam(s.workingText ?? "version: 1\n")); } catch { return []; } }, [s.workingText]);
   const [engine, setEngine] = useState(initial.engine);
@@ -162,7 +163,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   };
 
   const save = async () => {
-    const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel"), team: invalidTeamRemoval(initial.team, team) ? t("form.teamLeave") : undefined };
+    const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel"), team: invalidTeamRemoval(appliedTeam, team) ? t("form.teamLeave") : undefined };
     setErrors(next);
     if (next.name || next.model || next.team) { pickTab("perfil"); return; }
     if (next.soul) { pickTab("instrucciones"); requestAnimationFrame(() => soulRef.current?.focus()); return; }
@@ -277,7 +278,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
                 <input id={`${id}-team`} className="input" value={team} maxLength={60} autoComplete="off" list={`${id}-teams`}
                   placeholder={t("bots.team.none")} aria-invalid={!!errors.team} aria-describedby={`${id}-team-hint`} onChange={(e) => { setTeam(e.target.value.replace(/\n/g, " ")); setErrors((current) => ({ ...current, team: undefined })); }} />
                 <datalist id={`${id}-teams`}>{teams.map((n) => <option key={n} value={n} />)}</datalist>
-                <p id={`${id}-team-hint`} className={errors.team ? "field-err" : "hint"}>{t(bot?.team && !team.trim() ? "form.teamLeave" : bot?.chief ? "form.teamChief" : "form.teamHint")}</p>
+                <p id={`${id}-team-hint`} className={errors.team ? "field-err" : "hint"}>{t(invalidTeamRemoval(appliedTeam, team) ? "form.teamLeave" : bot?.chief ? "form.teamChief" : "form.teamHint")}</p>
               </div>
             </div>
 

@@ -60,6 +60,15 @@ test('the panel rejects clearing an existing team because OMB ignores it',async(
   assert.equal(invalidTeamRemoval('Sales','Support'),false);
   assert.equal(invalidTeamRemoval('',''),false);
 });
+test('clearing a draft-only team is allowed while native membership remains protected',async()=>{
+  const {appliedTeamForRemoval,invalidTeamRemoval}=await team();
+  const draft={name:'Agent',index:0,team:'Sales'};
+  const base=[{...draft,team:''}];
+  assert.equal(invalidTeamRemoval(appliedTeamForRemoval(draft,[{name:'Agent',section:''}],base),''),false);
+  assert.equal(invalidTeamRemoval(appliedTeamForRemoval(draft,[],[]),''),false);
+  assert.equal(invalidTeamRemoval(appliedTeamForRemoval(draft,[{name:'Agent',section:'Sales'}],base),''),true);
+  assert.equal(invalidTeamRemoval(appliedTeamForRemoval(draft,null,[draft]),''),true);
+});
 test('moving a bot to another team is a change of that bot, not a delete plus a create',async()=>{
   const {parseTeam,readBots,upsertBot,diffBots,listedBots}=await team();
   const before=listedBots(readBots(parseTeam(TEAM)));

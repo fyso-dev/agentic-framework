@@ -173,6 +173,15 @@ export const isDefaultChief = (b: Pick<Bot, "chief" | "team">) => b.chief && !b.
 /** OMB ignores an omitted team on existing bots; don't present that as a move. */
 export const invalidTeamRemoval = (previous: string, next: string) => !!previous.trim() && !next.trim();
 
+/** Prefer native membership; a draft-only assignment is not an applied team. */
+export function appliedTeamForRemoval(bot: Bot | null, runtime: {name: string; section?: string}[] | null, base: Bot[]): string {
+  if (!bot) return '';
+  const original = base.find(entry => entry.name === bot.name) ?? base.find(entry => entry.index === bot.index);
+  if (runtime === null) return original?.team ?? '';
+  const matches = runtime.filter(entry => entry.name === (original?.name ?? bot.name));
+  return matches.length === 1 ? matches[0].section ?? '' : original?.team ?? '';
+}
+
 /** Bots the panel lists: the default MausBot is not managed here; a team's chief is (D81). */
 export const listedBots = (bots: Bot[]) => bots.filter((b) => !isDefaultChief(b));
 
