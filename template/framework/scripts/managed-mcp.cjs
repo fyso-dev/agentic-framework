@@ -74,7 +74,9 @@ async function operate(op,name,input,env=process.env,request=fetch,command=execF
   };
   if(op==='restore') {
     if(!fs.existsSync(file))return {restored:0,pending:0};
-    const saved=read(),names=new Set((await api('mcp/servers')).servers.map(server=>server.name));let restored=0,pending=0;
+    const saved=read();
+    if(!Object.keys(saved.mcpServers).length)return {restored:0,pending:0};
+    const names=new Set((await api('mcp/servers')).servers.map(server=>server.name));let restored=0,pending=0;
     for(const [key,value] of Object.entries(saved.mcpServers)){if(await apply(key,value,names.has(key)))restored++;else pending++;}
     return {restored,pending};
   }

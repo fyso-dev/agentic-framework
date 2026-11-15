@@ -228,7 +228,9 @@
     "notFound": "That agent is not in team.yaml.",
     "skillFrom": "{{ext}} extension",
     "skillsExt": "They come from the installed extensions. They are applied with the agent’s other changes.",
-    "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them."
+    "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them.",
+    "piHumanRequestContext": "To resume requests in this conversation, Pi can read this agent's conversations and those it opened with other agents.",
+    "piHumanRequestBlocked": "Conversation listing is blocked. Pi can create requests, but cannot receive questions or return to this conversation until it is enabled."
   },
   "preview": {
     "deleteHistoryWarning": "Deleting a bot from OpenMausBot permanently removes its conversation history. The configuration snapshot does not contain that history.",

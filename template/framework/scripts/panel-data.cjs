@@ -53,12 +53,12 @@ if (process.argv[2] === 'config') {
   // Only the engines that matter to this project: the ones its bots use, plus the
   // framework's default engines when they are ready to be picked in the bot form.
   const used = new Set(usedEngines(team));
-  const defaults = new Set(['claude', 'claudeApi', 'codex']);
+  const defaults = new Set(['claude', 'claudeApi', 'codex', 'pi']);
   const engines = models.instances.map(e => ({
     id:e.instanceId, label:e.displayName, kind:e.access === 'subscription' ? 'subscription':'api',
-    ok:e.instanceId === 'claude' ? env.FYSO_CLAUDE_OK === 'true' : e.instanceId === 'codex' ? env.FYSO_CODEX_OK === 'true' : e.snapshot?.state === 'available',
+    ok:e.instanceId === 'claude' ? env.FYSO_CLAUDE_OK === 'true' : e.instanceId === 'codex' ? env.FYSO_CODEX_OK === 'true' : e.instanceId === 'pi' ? env.FYSO_PI_OK === 'true' : e.snapshot?.state === 'available',
     models:(e.models?.options || []).map(m => m.id),
-    ...(['claude','codex'].includes(e.instanceId) ? {fixHint:e.instanceId === 'claude' ? 'claude /login':'codex login --device-auth'} : {})
+    ...(['claude','codex','pi'].includes(e.instanceId) ? {fixHint:e.instanceId === 'claude' ? 'claude /login' : e.instanceId === 'pi' ? 'pi auth login openai-codex' : 'codex login --device-auth'} : {})
   })).filter(e => used.has(e.id) || (defaults.has(e.id) && e.ok));
   const extensions = (process.argv[5] && fs.existsSync(process.argv[5]) ? fs.readFileSync(process.argv[5], 'utf8') : '')
     .split('\n').filter(Boolean).map(line => line.split('\t')).filter(([, state]) => ['done','pending','failed'].includes(state)).map(([id, state]) => ({id, state}));

@@ -7,7 +7,7 @@ description: Write knowledge base pages from uploaded documents with an AI agent
 type: graph
 params:
   - BATCH: ""                # id of the upload batch, set by the panel
-  - PROVIDER: {{ _external_data.project.engine | default('claude') }}         # claude | codex (their subscription logins; no API key)
+  - PROVIDER: {{ 'codex' if (_external_data.project.engine | default('claude')) == 'pi' else (_external_data.project.engine | default('claude')) }}         # claude | codex (their subscription logins; no API key)
   - MODEL: ""                # empty: the provider's default model
   - LANG_UI: es              # language of the report page: es | en
 env:

@@ -25,6 +25,16 @@ The framework adapts to the AI subscriptions the customer actually has:
 | Model list in the panel | ⚠️ OMB's raw list per engine (includes local Ollama models), with no recommendation |
 | Model IDs stay valid | ❌ `codex/gpt-6.1-sol` is not listed by OMB 0.1.140 on the Etendo host (`gpt-6-sol` is); nothing detects stale IDs |
 
+## Pi beta integration (in progress)
+
+The template can generate bots using the pinned Pi engine and its `openai-codex` ChatGPT login. OpenMausBot starts Pi through a project-owned wrapper that disables Pi's independent MCP and extension discovery, while OpenMausBot continues to mount the selected project MCP tools. The setup check and doctor inspect Pi's authentication without printing credentials. The model-repair path refuses to replace a retired Pi model with a default from another provider.
+
+The Builder and the bundled SilverBullet import still use Dagu's existing Claude/Codex coding harness. A project generated with Pi therefore defaults those separate workflows to Codex; a working Codex login is needed for that work. Pi bot acceptance on a complete generated stack and `mise run doctor` remain pending.
+
+When a running project's declared team uses Pi, doctor checks that its OpenMausBot has the enabled project-owned `dagu` definition, with the expected script and no server-level environment overrides, and that the native MCP test exposes `dagu_read` and `dagu_execute`. The Pi Dagu-only server does not advertise cached tools when Dagu is down. This checks the registered connection; it does not prove that a particular bot's tool scope or model turn can use it.
+
+A Pi bot in a generated-project component test used its installed skill to create a request, answer a clarification, and continue in the same conversation after the decision. Its launcher obtains the exact turn identity from OpenMausBot 0.1.141's native per-turn agents descriptor, forwards only the IDs, and fails closed if the descriptor is missing or invalid. This is an internal integration pinned to that OMB version, not a stable upstream identity API. New Pi team definitions permit the read-only `agents:list_threads` tool to mount the agents server. When enabling the human-requests skill for a Pi bot with an allow-list, the panel adds that one selection and explains its visibility; an explicit denial remains in force and is shown as a limitation. Existing project-owned team definitions need the change applied through their normal review flow. Full-stack acceptance remains pending. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md)
+
 ## Pending
 
 1. **One source of recommendations.** A small project-owned file (e.g.

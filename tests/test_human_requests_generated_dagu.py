@@ -189,8 +189,12 @@ class GeneratedDaguTest(unittest.TestCase):
                 finished=wait(lambda:(d if (d:=api(detail)['dagRunDetails'])['statusLabel'] in ('succeeded','failed') else None))
                 self.assertEqual(finished['statusLabel'],'succeeded',
                                  'Request failed after response: '+sanitized_run_failure(finished,root))
-                self.assertEqual([(n['step']['id'],n['statusLabel']) for n in finished['nodes']],[('ask','succeeded'),('record','succeeded'),('deliver','succeeded')])
+                self.assertEqual([(n['step']['id'],n['statusLabel']) for n in finished['nodes']],[('prepare','succeeded'),('ask','succeeded'),('record','succeeded'),('deliver','succeeded')])
                 outputs=api(detail+'/outputs')['outputs']
+                card=json.loads(outputs.pop('hrCard'))
+                self.assertEqual(card['request']['title'],'Fictional generated project test')
+                self.assertEqual(card['thread'],[])
+                self.assertFalse(card['canAsk'])
                 self.assertEqual(outputs,{'answer':'approved','comment':'fictional','responder':'test person','decision':'answered'})
                 print('PASS Copier 9.19.1, bundled extension, generated run-dagu.sh, authenticated Dagu and origin=none outputs')
             finally:

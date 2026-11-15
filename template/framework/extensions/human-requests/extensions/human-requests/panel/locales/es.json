@@ -74,7 +74,7 @@
     "cancelledSaved": "Solicitud cancelada.",
     "delivery": {
       "pending": "El aviso al agente sigue pendiente.",
-      "processed": "El aviso al agente terminó. Esto no confirma que el agente haya completado su trabajo.",
+      "processed": "La respuesta se procesó. Esto no confirma que el agente haya completado su trabajo.",
       "failed": "La respuesta está guardada, pero el aviso al agente falló. Consultá el historial; no envíes una respuesta distinta a esta solicitud.",
       "invalid": "La respuesta guardada o las opciones no son válidas. Pedile al agente que cree una solicitud nueva; no se entregó esta respuesta.",
       "unknown": "No se pudo confirmar el estado del aviso al agente. Consultá el historial.",

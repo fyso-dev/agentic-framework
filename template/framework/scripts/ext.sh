@@ -103,7 +103,7 @@ case "$action" in
       [ -e "$answers" ] || fail "$id is not installed"
       # A running project always has uncommitted state (bot memory), and Copier refuses
       # to update a dirty tree. Upgrade in a clean worktree of HEAD, then fast-forward.
-      wt=$(mktemp -d)
+      wt=$(mktemp -d "${TMPDIR:-/tmp}/fyso-ext-update.XXXXXXXX")
       git worktree add -q --detach "$wt" HEAD >&2
       trap 'git worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
       # A relative local source (../fyso-ext-foo) means the project root, not the worktree.

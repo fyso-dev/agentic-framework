@@ -65,25 +65,28 @@ async function stop(child){
  await page.waitForURL(url=>url.hostname===`panel.${domain}`,{waitUntil:'domcontentloaded'});
  if(process.env.FYSO_TEST_PEOPLE==='1'){
   await page.getByRole('link',{name:'Personas'}).click();
-  await page.getByRole('button',{name:'Agregar persona'}).click();await page.getByLabel('Nombre',{exact:true}).fill('Persona ficticia');await page.getByRole('button',{name:'Guardar'}).click();
-  await page.getByText('Persona ficticia',{exact:true}).waitFor();const identity=await page.locator('.people-row small').innerText();
-  await page.getByRole('button',{name:'Editar',exact:true}).click();await page.getByLabel('Nombre',{exact:true}).fill('Persona ficticia editada');await page.getByRole('button',{name:'Guardar'}).click();
-  await page.getByText('Persona ficticia editada',{exact:true}).waitFor();assert.equal(await page.locator('.people-row small').innerText(),identity);
-  await page.reload();await page.getByText('Persona ficticia editada',{exact:true}).waitFor();
+  const people=page.frameLocator('iframe');
+  await people.getByRole('button',{name:'Agregar persona'}).click();await people.getByLabel('Nombre',{exact:true}).fill('Persona ficticia');await people.getByRole('button',{name:'Guardar'}).click();
+  await people.getByText('Persona ficticia',{exact:true}).waitFor();const identity=await people.locator('.people-row small').innerText();
+  await people.getByRole('button',{name:'Editar',exact:true}).click();await people.getByLabel('Nombre',{exact:true}).fill('Persona ficticia editada');await people.getByRole('button',{name:'Guardar'}).click();
+  await people.getByText('Persona ficticia editada',{exact:true}).waitFor();assert.equal(await people.locator('.people-row small').innerText(),identity);
+  await page.reload();await people.getByText('Persona ficticia editada',{exact:true}).waitFor();
   const directory=path.join(project,'project/wiki/fyso-people');assert.equal(fs.readdirSync(directory).filter(x=>x.endsWith('.md')).length,1);
   fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-people.png'),fullPage:true});
-  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Eliminar',exact:true}).click();await page.getByText('Todavía no hay personas.').waitFor();assert.ok(!fs.existsSync(directory)||fs.readdirSync(directory).filter(x=>x.endsWith('.md')).length===0);
+  await people.getByRole('button',{name:'Eliminar',exact:true}).click();await people.getByRole('button',{name:'Sí, eliminar',exact:true}).click();await people.getByText('Todavía no hay personas.').waitFor();assert.ok(!fs.existsSync(directory)||fs.readdirSync(directory).filter(x=>x.endsWith('.md')).length===0);
  }
  try{await page.getByRole('link',{name:'Pendientes'}).click()}catch(error){fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-navigation-error.png'),fullPage:true});throw error}
  fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});
- const frame=page.frameLocator('iframe');await frame.getByText('Pregunta sintética de proyecto generado',{exact:false}).waitFor();
+ const frame=page.frameLocator('iframe');await frame.getByRole('heading',{name:'Pregunta sintética de proyecto generado'}).waitFor();
  fs.mkdirSync(process.env.FYSO_TEST_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-pending.png'),fullPage:true});
- await frame.getByLabel('Tu nombre (Obligatorio)').fill('Persona de prueba');
- if(!cancel)await frame.getByLabel('Tu respuesta (Obligatorio)').fill('Aprobado');
- else page.once('dialog',dialog=>dialog.accept());
- const completion=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith(`/${runId}/human-tasks/ask/complete`)&&r.request().method()==='POST');await frame.getByRole('button',{name:cancel?'Cancelar solicitud':'Enviar respuesta'}).click();assert.equal((await completion).status(),200);
- await frame.getByText(cancel?'Solicitud cancelada.':'Respuesta guardada.',{exact:false}).waitFor();await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='succeeded','finished');
- assert.deepEqual((await call(detail+'/outputs')).outputs,{answer:cancel?'':'Aprobado',comment:'',responder:'Persona de prueba',decision:cancel?'cancelled':'answered'});
+ await frame.getByPlaceholder('Tu nombre').fill('Persona de prueba');
+ if(!cancel)await frame.getByLabel('Tu respuesta',{exact:true}).fill('Aprobado');
+ else await frame.getByRole('button',{name:'Cancelar solicitud'}).click();
+ const completion=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith(`/${runId}/human-tasks/ask/complete`)&&r.request().method()==='POST');await frame.getByRole('button',{name:cancel?'Sí, cancelar':'Enviar decisión'}).click();assert.equal((await completion).status(),200);
+ await frame.getByText(cancel?'Solicitud cancelada.':'Decisión guardada.',{exact:false}).waitFor();await wait(async()=>String((await call(detail)).dagRunDetails.statusLabel).toLowerCase()==='succeeded','finished');
+ const outputs=(await call(detail+'/outputs')).outputs,hrCard=JSON.parse(outputs.hrCard);delete outputs.hrCard;
+ assert.equal(hrCard.request.title,'Pregunta sintética de proyecto generado');
+ assert.deepEqual(outputs,{answer:cancel?'':'Aprobado',comment:'',responder:'Persona de prueba',decision:cancel?'cancelled':'answered'});
  await page.reload();const card=frame.locator('.pending-history-item').filter({hasText:'Pregunta sintética de proyecto generado'});try{await card.locator('summary').click()}catch(error){await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,'generated-gateway-history-error.png'),fullPage:true});throw error}await card.getByText(cancel?'Cancelada':'Aprobado',{exact:true}).waitFor();
  await page.screenshot({path:path.join(process.env.FYSO_TEST_ARTIFACT_DIR,cancel?'generated-gateway-cancelled.png':'generated-gateway-history.png'),fullPage:true});assert.deepEqual(errors,[]);
  console.log(JSON.stringify({copier:'9.19.1',generatedInventory:true,panelIframe:true,login:200,completion:200,outputs:true,historyAfterRefresh:true,peopleCrud:process.env.FYSO_TEST_PEOPLE==='1',pageErrors:errors.length,decision:cancel?'cancelled':'answered',origin:'none'}));clean=true;

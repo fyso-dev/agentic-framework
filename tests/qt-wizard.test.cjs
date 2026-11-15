@@ -39,3 +39,7 @@ test('missing or short local login passwords fail before any request handoff',()
   assert.throws(()=>f.run());assert.equal(f.calls.length,0);assert.equal(f.ops.length,0);
  }
 });
+test('Pi choice is passed to the installer backend',()=>{
+ const f=setup();f.page.projectEngine.currentIndex=2;f.page.panelPassword.text='fictional password';f.run();
+ const handoff=f.calls.find(c=>c[0]==='bash');assert.equal(JSON.parse(handoff[2]).engine,'pi');
+});

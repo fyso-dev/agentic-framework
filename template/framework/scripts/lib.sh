@@ -17,9 +17,10 @@ require_env() {
 clean_exec() {
   # A caller can isolate mise's configuration and auto-trust state using XDG.
   # Preserve only these paths, and let explicit NAME=value arguments override them.
-  local xdg_vars=()
-  [ -z "${XDG_STATE_HOME:-}" ] || xdg_vars+=("XDG_STATE_HOME=$XDG_STATE_HOME")
-  [ -z "${XDG_CONFIG_HOME:-}" ] || xdg_vars+=("XDG_CONFIG_HOME=$XDG_CONFIG_HOME")
+  local xdg_vars=() name
+  for name in XDG_STATE_HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME MISE_DATA_DIR MISE_CACHE_DIR MISE_STATE_DIR; do
+    [ -z "${!name:-}" ] || xdg_vars+=("$name=${!name}")
+  done
   exec env -i \
     HOME="$HOME" USER="${USER:-}" LOGNAME="${LOGNAME:-}" \
     PATH="$PATH" LANG="${LANG:-en_US.UTF-8}" TERM="${TERM:-dumb}" \

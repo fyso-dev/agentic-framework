@@ -25,6 +25,11 @@ function offered(env = process.env) {
   return map;
 }
 
+// Pi catalogs can contain several providers; a retired model must not silently
+// switch a bot's billing, login or provider when OMB's default differs.
+const safeDefault = (engine, current, fallback) => engine !== 'pi' ||
+  (current.includes('/') && fallback.includes('/') && current.split('/')[0] === fallback.split('/')[0]);
+
 // Line-based on purpose: team.yaml may hold ${VAR} placeholders inside flow maps, which
 // are not valid YAML, and only `model:` values change; everything else stays byte for byte.
 function repair(file, engines, {write = true} = {}) {
@@ -37,7 +42,7 @@ function repair(file, engines, {write = true} = {}) {
     const m = /^(\s*model:\s*)(["']?)([A-Za-z0-9_-]+)\/([^"'\s#]+)\2(\s*(#.*)?)$/.exec(line);
     if (!m) return;
     const [, lead, q, engine, name, tail] = m, e = engines.get(engine);
-    if (!e || !e.default || e.ids.has(name)) return;
+    if (!e || !e.default || e.ids.has(name) || !safeDefault(engine, name, e.default)) return;
     lines[i] = `${lead}${q}${engine}/${e.default}${q}${tail}`;
     changes.push({bot, from: `${engine}/${name}`, to: `${engine}/${e.default}`});
   });
@@ -56,7 +61,7 @@ async function runtime(rendered, out, engines, env = process.env) {
   const notes = [], models = [];
   for (const b of live) {
     const sel = b.modelSelection || {}, e = engines.get(sel.instanceId);
-    if (!sel.model || !e || !e.default || e.ids.has(sel.model)) continue;
+    if (!sel.model || !e || !e.default || e.ids.has(sel.model) || !safeDefault(sel.instanceId, sel.model, e.default)) continue;
     models.push({name: b.name, model: `${sel.instanceId}/${e.default}`});
     notes.push(`bot "${b.name}": ${sel.instanceId}/${sel.model} → ${sel.instanceId}/${e.default} (model only)`);
   }

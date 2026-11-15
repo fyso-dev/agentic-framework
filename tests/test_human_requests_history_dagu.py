@@ -5,6 +5,7 @@ loopback server and data; no existing Dagu or OpenMausBot is accessed.
 """
 import json
 import os
+import shutil
 from pathlib import Path
 import socket
 import subprocess
@@ -28,6 +29,8 @@ class HumanRequestsHistory(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix='fyso-hr-history-')
         cls.addClassCleanup(cls.temp.cleanup)
         root = Path(cls.temp.name)
+        extension = ROOT / 'template/framework/extensions/human-requests/extensions/human-requests'
+        shutil.copytree(extension, root / 'extensions/human-requests')
         dags = root / 'dags'
         dags.mkdir()
         # The answer and record steps are the product workflow. Failing the
@@ -36,7 +39,7 @@ class HumanRequestsHistory(unittest.TestCase):
         command = 'command: node extensions/human-requests/deliver.cjs'
         if command not in original:
             raise RuntimeError('workflow delivery command changed')
-        (dags / 'hr-history-probe.yaml').write_text(original.replace(command, 'command: "false"'))
+        (dags / 'ext-human-requests-request.yaml').write_text(original.replace(command, 'command: "false"'))
         sockets = []
         try:
             for _ in range(5):
@@ -52,7 +55,8 @@ class HumanRequestsHistory(unittest.TestCase):
                'DAGU_HOST': '127.0.0.1', 'DAGU_PORT': str(ports[0]), 'DAGU_SCHEDULER_PORT': str(ports[1]),
                'DAGU_COORDINATOR_HOST': '127.0.0.1', 'DAGU_COORDINATOR_PORT': str(ports[2]),
                'DAGU_COORDINATOR_HEALTH_PORT': str(ports[3]), 'DAGU_WORKER_HEALTH_PORT': str(ports[4]),
-               'DAGU_AUTH_MODE': 'none', 'DAGU_ENV_PASSTHROUGH_PREFIXES': 'FYSO_', 'FYSO_ROOT': str(root)}
+               'DAGU_AUTH_MODE': 'none', 'DAGU_ENV_PASSTHROUGH_PREFIXES': 'FYSO_', 'FYSO_ROOT': str(root),
+               'FYSO_DAGU_PORT': str(ports[0]), 'FYSO_ADMIN_USER': 'fixture', 'FYSO_ADMIN_PASSWORD': 'fixture'}
         env.pop('SHELL', None)
         cls.process = subprocess.Popen([cls.binary, 'start-all'], cwd=root, env=env,
                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -99,7 +103,7 @@ class HumanRequestsHistory(unittest.TestCase):
             'cancel': {'answer': '', 'comment': 'sin aprobación', 'responder': 'María', 'decision': 'cancelled'},
             'expire': {'answer': '', 'comment': '', 'responder': 'system', 'decision': 'expired'},
         }
-        dag = 'hr-history-probe'
+        dag = 'ext-human-requests-request'
         for name, form in cases.items():
             with self.subTest(name=name):
                 run = 'history-' + name
@@ -108,7 +112,10 @@ class HumanRequestsHistory(unittest.TestCase):
                 self.wait(lambda: detail()['statusLabel'] == 'waiting')
                 self.call(f'/dag-runs/{dag}/{run}/human-tasks/ask/complete', form)
                 self.wait(lambda: detail()['statusLabel'] == 'failed')
-                self.assertEqual(self.call(f'/dag-runs/{dag}/{run}/outputs')['outputs'], form)
+                outputs = self.call(f'/dag-runs/{dag}/{run}/outputs')['outputs']
+                card = json.loads(outputs.pop('hrCard'))
+                self.assertEqual(card['request']['title'], 'History fixture')
+                self.assertEqual(outputs, form)
                 record_log = json.dumps(self.call(f'/dag-runs/{dag}/{run}/steps/record/log'), ensure_ascii=False)
                 for value in form.values():
                     if value:

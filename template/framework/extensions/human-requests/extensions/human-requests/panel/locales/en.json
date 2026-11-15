@@ -74,7 +74,7 @@
     "cancelledSaved": "Request cancelled.",
     "delivery": {
       "pending": "Telling the agent is still pending.",
-      "processed": "The agent was told. This does not confirm that the agent completed its work.",
+      "processed": "The response was processed. This does not confirm that the agent completed its work.",
       "failed": "The response is saved, but telling the agent failed. Check the history; do not submit a different answer to this request.",
       "invalid": "The saved response or choices are invalid. Ask the agent to create a new request; this response was not delivered.",
       "unknown": "Could not confirm whether the agent was told. Check the history.",

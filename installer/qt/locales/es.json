@@ -24,6 +24,7 @@
   "github_failed": "No se completó el inicio de sesión en GitHub.",
   "github_code": "Abre https://github.com/login/device e ingresa el código {code}. Completa el inicio de sesión y luego presiona Aceptar.",
   "engine_login": "Primero instala {engine} e inicia sesión con {command}. Después vuelve a abrir el instalador.",
+  "pi_login_help": "Pi necesita tu sesión de ChatGPT. En una terminal, ejecuta {command}, inicia sesión y después ejecuta {doctor_command}.",
   "done": "Proyecto verificado.\nCarpeta: {folder}\nPanel: {url}\nUsuario: {admin}",
   "log": "Registro técnico: {path}",
   "linux_folder": "Elige una carpeta dentro del sistema de archivos Linux, fuera de /mnt.",

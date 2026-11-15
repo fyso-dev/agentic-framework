@@ -27,7 +27,7 @@ Include only facts you know; say when information is missing. No secrets, no unn
 
 ## Creating one
 
-Use the Dagu MCP to start the root workflow `ext-human-requests-request` with a stable run ID of your own (reuse it on a retry) and these parameters: `REQUEST`, `RECIPIENT`, `BLOCKING` (`"true"` when work is on hold), `ORIGIN_TYPE` and `ORIGIN_REF`.
+Use the Dagu MCP to start the root workflow `ext-human-requests-request` with a stable run ID of your own (reuse it on a retry) and these parameters: `REQUEST`, `RECIPIENT`, `BLOCKING` (`"true"` when work is on hold), `ORIGIN_TYPE` and `ORIGIN_REF`. In the MCP `params` object, encode `REQUEST` as a JSON **string**, not a nested object: Dagu converts nested objects to a non-JSON representation. Encode `ORIGIN_REF` as a JSON string too when using `omb`.
 
 Run labels carry what lists and validation read. They accept only `a-z A-Z 0-9 - _ . /`, are visible in run lists and must hold nothing sensitive:
 

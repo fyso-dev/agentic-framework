@@ -25,6 +25,8 @@ const option = name => { const at = process.argv.indexOf(name); return at < 0 ? 
 const SCOPE = option('--scope');
 const scopeGuard = SCOPE === null ? null : require('./dagu-scope.cjs').guard(ROOT, SCOPE, (option('--system') || '').split(',').filter(Boolean));
 const HTTP_SOCKET = option('--http');
+const DAGU_ONLY = process.argv.includes('--dagu-only');
+if (DAGU_ONLY && (SCOPE !== null || HTTP_SOCKET !== null || process.argv.includes('--no-dagu'))) throw Error('--dagu-only cannot be combined with scope, HTTP or no-dagu');
 const FORWARD_DAGU = HTTP_SOCKET === null && (!!scopeGuard || !process.argv.includes('--no-dagu'));
 const scopes = require('./workflow-scopes.cjs');
 let forwarder;
@@ -263,6 +265,7 @@ async function handle(msg) {
   switch (method) {
     case 'initialize': {
       const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
+      if (DAGU_ONLY) return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso-dagu', version: VERSION}};
       if (scopeGuard) return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: `fyso-dagu-${SCOPE}`, version: VERSION},
         instructions: `Dagu workflows of scope "${SCOPE}" in this project. You can read and run these workflows only: ${[...scopeGuard.names().keys()].join(', ') || 'none yet'}. List them with dagu_read target=dags. Changing workflows, inline specs, searches and the wiki are not available here.`};
       return {protocolVersion, capabilities: {tools: {listChanged: false}}, serverInfo: {name: 'fyso', version: VERSION},
@@ -270,16 +273,17 @@ async function handle(msg) {
     }
     case 'ping': return {};
     case 'tools/list': {
-      const own = scopeGuard ? [] : Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
+      const own = scopeGuard || DAGU_ONLY ? [] : Object.entries(TOOLS).map(([name, t]) => ({name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations && {annotations: t.annotations})}));
       let forwarded = [];
-      if (FORWARD_DAGU) try { forwarded = await daguMcp().tools(); } catch {}
+      if (FORWARD_DAGU) try { forwarded = await daguMcp().tools({allowCache: !DAGU_ONLY}); } catch {}
       return {tools: [...own, ...(scopeGuard ? scopeGuard.tools(forwarded) : forwarded)]};
     }
     case 'tools/call': {
-      const tool = scopeGuard ? undefined : TOOLS[params.name];
+      const tool = scopeGuard || DAGU_ONLY ? undefined : TOOLS[params.name];
       if (!tool && FORWARD_DAGU && /^dagu_[a-z_]+$/.test(params.name || '')) {
         try {
           const args = params.arguments || {};
+          if (DAGU_ONLY) return require('./dagu-scope.cjs').textCompatible(await daguMcp().call(params.name, args));
           if (!scopeGuard) return await daguMcp().call(params.name, args);
           const local = scopeGuard.check(params.name, args);   // throws when outside the scope
           return local || scopeGuard.shape(params.name, args, await daguMcp().call(params.name, scopeGuard.rewrite(params.name, args)));
@@ -375,6 +379,11 @@ function serveHttp(socket, env = process.env) {
   fs.rmSync(socket, {force: true});
   const mask = process.umask(0o177);   // the socket is this user's only
   server.listen(socket, () => { process.umask(mask); console.error(off || `Remote MCP ready on ${socket}.`); });
+  // Closing the server unlinks the socket; a default SIGTERM exit would leave it in /tmp.
+  for (const signal of ['SIGTERM', 'SIGINT']) process.once(signal, () => {
+    server.close(() => process.exit(0));
+    server.closeAllConnections?.();
+  });
   return server;
 }
 

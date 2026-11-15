@@ -1,0 +1,103 @@
+{
+  "fixture": "<fixture>",
+  "steps": [
+    {
+      "step": "preflight",
+      "t": 1.0,
+      "portBase": 34100,
+      "foreignDagu": 0
+    },
+    {
+      "step": "copier",
+      "t": 18.4,
+      "exit": 0
+    },
+    {
+      "step": "git-init",
+      "t": 18.9,
+      "exit": 0
+    },
+    {
+      "step": "mise-trust",
+      "t": 19.0,
+      "exit": 0
+    },
+    {
+      "step": "setup",
+      "t": 21.1,
+      "exit": 0
+    },
+    {
+      "step": "ext-add",
+      "t": 23.6,
+      "exit": 0
+    },
+    {
+      "step": "git-commit-ext",
+      "t": 23.8,
+      "exit": 0
+    },
+    {
+      "step": "up",
+      "t": 41.0,
+      "exit": 0
+    },
+    {
+      "step": "doctor",
+      "t": 43.2,
+      "exit": 0
+    },
+    {
+      "step": "bot-created-request",
+      "t": 88.1,
+      "taskId": true
+    },
+    {
+      "step": "origin-verified",
+      "t": 88.1,
+      "canAsk": true
+    },
+    {
+      "step": "browser",
+      "t": 102.4,
+      "exit": 0
+    },
+    {
+      "step": "bot-continued",
+      "t": 123.6,
+      "sameConversation": true
+    },
+    {
+      "step": "down",
+      "t": 124.6,
+      "exit": 0
+    }
+  ],
+  "checks": {
+    "preexistingDaguSockets": 0,
+    "doctor": "passed",
+    "botFlow": {
+      "sameConversation": true,
+      "workflowStatus": "succeeded",
+      "botAfterDecision": "¡Hola! Qué alegría saludarte. Espero que estés muy bien y que tengas un día lleno de cosas lindas.",
+      "browser": {
+        "login": 200,
+        "pushBack": 200,
+        "clarification": "El agente\n**Cálido** suena cercano y amable; **Formal**, respetuoso y profesional; **Divertido**, ligero y con humor. La elección solo cambia el estilo del saludo, no su propósito. El pedido sigue abierto.",
+        "decisionHttp": 200,
+        "answer": "Cálido",
+        "pageErrors": 0
+      }
+    },
+    "cleanup": {
+      "fixtureProcesses": [],
+      "foreignDagu": [],
+      "portsListening": [],
+      "fixedSockets": [],
+      "daguSockets": []
+    },
+    "globalStateChanges": [],
+    "sandboxDenials": 2118
+  },
+  "passed": true
+}

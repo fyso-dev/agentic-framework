@@ -1,0 +1,14 @@
+{
+  "runId": "pi-panel-beta-four-saludo-tono-20261114-1922",
+  "sameConversation": true,
+  "workflowStatus": "succeeded",
+  "botAfterDecision": "Con tono cercano: «¡Hola! Qué lindo saludarte. ¿Cómo va todo?»",
+  "browser": {
+    "login": 200,
+    "pushBack": 200,
+    "clarification": "El agente\nEl tono cercano suena cálido y amistoso; el formal, respetuoso y profesional; el divertido, ligero y juguetón. La elección sigue pendiente.",
+    "decisionHttp": 200,
+    "answer": "Cercano",
+    "pageErrors": 0
+  }
+}

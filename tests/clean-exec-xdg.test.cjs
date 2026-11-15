@@ -49,3 +49,17 @@ test('a child-specific XDG override wins over the inherited config path', () => 
   assert.equal(env.XDG_CONFIG_HOME, childConfig);
   assert.equal(env.XDG_STATE_HOME, state);
 });
+
+test('clean_exec preserves explicit tool-data and cache isolation while filtering unrelated values', () => {
+  const data=path.join(os.tmpdir(),'fyso data');
+  const cache=path.join(os.tmpdir(),'fyso cache');
+  const env=environment({XDG_DATA_HOME:data,XDG_CACHE_HOME:cache,MISE_DATA_DIR:data,MISE_CACHE_DIR:cache,MISE_STATE_DIR:state});
+  assert.equal(env.XDG_DATA_HOME,data);
+  assert.equal(env.XDG_CACHE_HOME,cache);
+  assert.equal(env.MISE_DATA_DIR,data);
+  assert.equal(env.MISE_CACHE_DIR,cache);
+  assert.equal(env.MISE_STATE_DIR,state);
+  assert.equal(env.FYSO_SECRET_CANARY,undefined);
+  const overridden=environment({MISE_DATA_DIR:data},[`MISE_DATA_DIR=${childConfig}`]);
+  assert.equal(overridden.MISE_DATA_DIR,childConfig);
+});

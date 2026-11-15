@@ -5,7 +5,10 @@
 # Fine-tune instructions and memory in OpenMausBot; structure lives here (PLAN D13).
 # Models come from the engine chosen at generation (PLAN D32); the other engine
 # stays optional. Change a bot's model here to use another signed-in engine.
-{%- if engine == 'codex' %}
+{%- if engine == 'pi' %}
+{%- set strong = 'pi/openai-codex/gpt-6.1-sol' %}
+{%- set fast = 'pi/openai-codex/gpt-6-luna' %}
+{%- elif engine == 'codex' %}
 {%- set strong = 'codex/gpt-6.1-sol' %}
 {%- set fast = 'codex/gpt-6-luna' %}
 {%- else %}
@@ -30,26 +33,26 @@ bots:
     title: Designs and fixes Dagu workflows
     model: {{ strong }}
     approval: full             # writes workflows through the Dagu MCP without asking
-    tools: { allow: ["native:*", "mcp:dagu:*"] }
+    tools: { allow: ["native:*", "mcp:dagu:*"{% if engine == 'pi' %}, "mcp:agents:list_threads"{% endif %}] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }
 
   - name: Run Operator
     title: Watches runs, explains failures, retries
     model: {{ fast }}
     approval: ask
-    tools: { allow: ["native:*", "mcp:dagu:dagu_read", "mcp:dagu:dagu_execute"] }
+    tools: { allow: ["native:*", "mcp:dagu:dagu_read", "mcp:dagu:dagu_execute"{% if engine == 'pi' %}, "mcp:agents:list_threads"{% endif %}] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/run-operator.md }
 
   - name: Builder
     title: Turns requests into branches and PRs (fyso-dev-task)
     model: {{ strong }}
     approval: full             # starts fyso-dev-task through the Dagu MCP without asking
-    tools: { allow: ["native:*", "mcp:dagu:*"] }
+    tools: { allow: ["native:*", "mcp:dagu:*"{% if engine == 'pi' %}, "mcp:agents:list_threads"{% endif %}] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/builder.md }
 
   - name: Bot Architect
     title: Creates and maintains project bots through versioned native plans
     model: {{ strong }}
     approval: full
-    tools: { allow: ["native:*", "mcp:fyso:*"] }
+    tools: { allow: ["native:*", "mcp:fyso:*"{% if engine == 'pi' %}, "mcp:agents:list_threads"{% endif %}] }
     soul: { file: ${FYSO_ROOT}/framework/bots/souls/bot-architect.md }

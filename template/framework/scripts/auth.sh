@@ -14,6 +14,10 @@ if command -v codex >/dev/null; then
   codex login status >/dev/null 2>&1 && echo "✓ Codex signed in" || echo "→ Codex: run 'codex login --device-auth'"
 fi
 
+if command -v pi >/dev/null; then
+  pi auth check --provider openai-codex --no-refresh >/dev/null 2>&1 && echo "✓ Pi ChatGPT signed in" || echo "→ Pi: run pi auth login openai-codex"
+fi
+
 # API keys from secrets.enc.yaml, given to OpenMausBot's "Claude (API key)" engine only,
 # so they never replace the subscription of claude/… bots.
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then

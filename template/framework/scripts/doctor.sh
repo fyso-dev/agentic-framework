@@ -56,7 +56,8 @@ login() { # <engine> <status command...>
 }
 login claude claude auth status
 login codex codex login status
-[ "$signed" -gt 0 ] || bad "no coding engine is signed in: run 'claude' and /login, or 'codex login --device-auth'"
+login pi pi auth check --provider openai-codex --no-refresh
+[ "$signed" -gt 0 ] || bad "no coding engine is signed in: run 'claude' and /login, 'codex login --device-auth', or 'pi auth login openai-codex'"
 
 echo "Isolation"
 [ "${OPENMAUSBOT_URL:-}" = "http://127.0.0.1:$FYSO_OMB_PORT" ] \
@@ -67,6 +68,10 @@ if stack_running; then
   echo "Running stack"
   framework/scripts/health.sh dagu  && ok "Dagu answers on :$FYSO_DAGU_PORT"  || bad "Dagu does not answer"
   framework/scripts/health.sh omb   && ok "OpenMausBot answers on :$FYSO_OMB_PORT" || bad "OpenMausBot does not answer"
+  if [[ $used == *" pi "* ]]; then
+    node framework/scripts/check-native-dagu.cjs && ok "OpenMausBot's project Dagu MCP responds (bot access tested separately)" \
+      || bad "OpenMausBot's project Dagu MCP is missing, disabled, misconfigured or unavailable"
+  fi
   env_id=$(openmausbot doctor --json --port "$FYSO_OMB_PORT" 2>/dev/null \
     | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).server.environmentId||"")}catch{console.log("")}})')
   if [ -n "$env_id" ] && [ "$env_id" = "$(cat "$FYSO_DATA/omb/environment-id" 2>/dev/null)" ]; then

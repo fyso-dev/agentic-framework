@@ -3,7 +3,10 @@
 Set FYSO_TEST_DAGU_BIN to the pinned Dagu 2.24.0 binary. This creates only
 temporary data and loopback listeners and runs a stub, never the mise CLI.
 """
+import base64
 import json
+import shutil
+import shlex
 import os
 from pathlib import Path
 import socket
@@ -31,32 +34,38 @@ class DaguCleanExecXdg(unittest.TestCase):
         self.assertEqual(version, '2.24.0')
         with tempfile.TemporaryDirectory(prefix='fyso-dagu-xdg-') as directory:
             root = Path(directory)
-            (root / 'dags').mkdir()
-            (root / 'config.yaml').write_text('{}\n')
+            dags = root / 'project/workflows'
+            dags.mkdir(parents=True)
+            scripts = root / 'framework/scripts'
+            scripts.mkdir(parents=True)
+            shutil.copy2(LIB, scripts / 'lib.sh')
+            shutil.copy2(ROOT / 'template/framework/scripts/run-dagu.sh', scripts / 'run-dagu.sh')
+            (root / 'bin').mkdir()
+            (root / 'bin/dagu').symlink_to(DAGU)
             stub = root / 'mise-stub'
-            stub.write_text('#!/bin/sh\nprintf "%s\\n%s\\n%s\\n%s\\n" "${XDG_STATE_HOME-}" "${XDG_CONFIG_HOME-}" "${FYSO_XDG_SENTINEL-}" "${CANARY_SECRET-}" > "$FYSO_OUTPUT_FILE"\n')
+            stub.write_text('#!/bin/sh\nprintf "%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n" "${XDG_STATE_HOME-}" "${XDG_CONFIG_HOME-}" "${XDG_DATA_HOME-}" "${XDG_CACHE_HOME-}" "${MISE_DATA_DIR-}" "${MISE_CACHE_DIR-}" "${MISE_STATE_DIR-}" "${FYSO_PROJECT-}" "${CANARY_SECRET-}" "${MISE_SOPS_AGE_KEY_FILE-}" > ' + shlex.quote(str(root / 'observed')) + '\n')
             stub.chmod(0o700)
-            (root / 'dags/probe.yaml').write_text('type: graph\nsteps:\n  - id: probe\n    command: ' + str(stub) + '\n')
+            (dags / 'probe.yaml').write_text('type: graph\nsteps:\n  - id: probe\n    command: ' + str(stub) + '\n')
             ports = set()
-            while len(ports) < 3:
+            while len(ports) < 5:
                 ports.add(free_port())
-            port, scheduler, worker = ports
+            port, scheduler, worker, coordinator, coordinator_health = ports
             env = os.environ.copy()
             env.update({
-                'DAGU_HOME': str(root / 'home'), 'DAGU_HOST': '127.0.0.1', 'DAGU_PORT': str(port),
-                'DAGU_AUTH_MODE': 'none', 'DAGU_SCHEDULER_PORT': str(scheduler),
-                'DAGU_WORKER_HEALTH_PORT': str(worker), 'DAGU_COORDINATOR_ENABLED': 'false',
-                'DAGU_DAGS_DIR': str(root / 'dags'),
-                'DAGU_ENV_PASSTHROUGH_PREFIXES': 'FYSO_,OPENMAUSBOT_,ALLOW_INSECURE_HTTP',
+                'PATH': str(root / 'bin') + os.pathsep + env.get('PATH', ''),
+                'FYSO_ROOT': str(root), 'FYSO_DATA': str(root / 'data'), 'FYSO_PROJECT': 'test',
+                'FYSO_HTTP_PORT': '8400', 'FYSO_DAGU_PORT': str(port),
+                'FYSO_DAGU_SCHEDULER_PORT': str(scheduler), 'FYSO_DAGU_WORKER_HEALTH_PORT': str(worker),
+                'FYSO_DAGU_COORDINATOR_PORT': str(coordinator), 'FYSO_DAGU_COORDINATOR_HEALTH_PORT': str(coordinator_health),
+                'FYSO_OMB_PORT': '8404', 'OPENMAUSBOT_URL': 'http://127.0.0.1:8404',
+                'FYSO_ADMIN_USER': 'fixture', 'FYSO_ADMIN_PASSWORD': 'fictional-fixture',
                 'XDG_STATE_HOME': str(root / 'state'), 'XDG_CONFIG_HOME': str(root / 'config'),
-                'FYSO_OUTPUT_FILE': str(root / 'observed'), 'FYSO_XDG_SENTINEL': 'ok',
-                'CANARY_SECRET': 'must-not-leak',
+                'XDG_DATA_HOME': str(root / 'xdg-data'), 'XDG_CACHE_HOME': str(root / 'xdg-cache'),
+                'MISE_DATA_DIR': str(root / 'mise-data'), 'MISE_CACHE_DIR': str(root / 'mise-cache'), 'MISE_STATE_DIR': str(root / 'mise-state'),
+
+                'CANARY_SECRET': 'must-not-leak', 'MISE_SOPS_AGE_KEY_FILE': 'must-not-leak',
             })
-            allow = [name for name in env if name.startswith('DAGU_') or name in ('FYSO_OUTPUT_FILE', 'FYSO_XDG_SENTINEL')]
-            command = ['bash', '-c', 'source "$1"; shift; clean_exec "$@"', 'probe', str(LIB)]
-            command += [name + '=' + env[name] for name in allow]
-            command += [DAGU, 'start-all', '--dagu-home', env['DAGU_HOME'], '--config', str(root / 'config.yaml'),
-                        '--host', '127.0.0.1', '--port', str(port), '--dags', str(root / 'dags')]
+            command = ['bash', str(scripts / 'run-dagu.sh')]
             with (root / 'server.log').open('w') as log:
                 process = subprocess.Popen(command, env=env, cwd=root, stdout=log, stderr=log, start_new_session=True)
             try:
@@ -72,7 +81,7 @@ class DaguCleanExecXdg(unittest.TestCase):
                     self.fail('isolated Dagu server did not become ready')
                 request = urllib.request.Request(base + '/api/v1/dags/probe/start',
                     data=json.dumps({'dagRunId': 'xdg-probe'}).encode(),
-                    headers={'Content-Type': 'application/json'}, method='POST')
+                    headers={'Content-Type': 'application/json', 'Authorization': 'Basic ' + base64.b64encode(b'fixture:fictional-fixture').decode()}, method='POST')
                 with urllib.request.urlopen(request, timeout=3) as response:
                     self.assertEqual(response.status, 200)
                 observed = root / 'observed'
@@ -83,8 +92,8 @@ class DaguCleanExecXdg(unittest.TestCase):
                 else:
                     self.fail('stub did not execute')
                 values = observed.read_text().splitlines()
-                self.assertEqual(values[:3], [env['XDG_STATE_HOME'], env['XDG_CONFIG_HOME'], 'ok'])
-                self.assertEqual(values[3:], [''])
+                self.assertEqual(values[:8], [env[k] for k in ('XDG_STATE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'MISE_DATA_DIR', 'MISE_CACHE_DIR', 'MISE_STATE_DIR', 'FYSO_PROJECT')])
+                self.assertEqual(values[8:], ['', ''])
             finally:
                 process.terminate()
                 try:

@@ -53,7 +53,7 @@ Component.prototype.createOperations = function() {
     component.createOperations(); // native extraction and safe maintenance ownership
     if (!installer.isInstaller()) return;
     var page = component.userInterface('Project');
-    var request = {name:page.projectName.text, folder:page.projectFolder.text, engine:page.projectEngine.currentIndex === 1 ? 'codex':'claude',
+    var request = {name:page.projectName.text, folder:page.projectFolder.text, engine:page.projectEngine.currentIndex === 2 ? 'pi' : (page.projectEngine.currentIndex === 1 ? 'codex':'claude'),
         admin:page.panelUser.text, password:page.panelPassword.text, port:page.portBase.text, lang:lang};
     if (!request.name.trim() || !request.password || request.password.length < 12 ||
         !/^[a-zA-Z][a-zA-Z0-9_.-]{1,63}$/.test(request.admin) ||
