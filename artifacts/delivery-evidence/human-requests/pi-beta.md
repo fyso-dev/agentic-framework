@@ -1,6 +1,6 @@
 # Pi and ChatGPT beta validation
 
-Status: **full generated-stack lifecycle passed once on macOS (2026-11-14)**; distribution limits below remain.
+Status: **full generated-stack lifecycle passed once on macOS (2026-11-14)**; the extension is published as a versioned source (v0.1.0, 2026-11-15).
 
 ## Full lifecycle acceptance
 
@@ -12,9 +12,23 @@ Conditions and limits:
 - The first run passed functionally but left `/tmp/fyso-mcp-<port>.sock`: the remote MCP server had no SIGTERM handler. It now closes its server on SIGTERM/SIGINT (regression test in `tests/fyso-mcp.test.cjs`); the second run was clean.
 - The Tinyauth binary was copied prebuilt and tools were symlinked read-only from the existing mise installs; installing them was not exercised. Reads are not isolated. Hosts on the local network at :443 remain reachable.
 - Expected sandbox denials: dtrace helper noise, OpenMausBot probing local model ports, `security` (so doctor reports Claude/Codex as signed out) and Pi's `models-store.json.lock`; the flow passed without them.
-- One run on one macOS host. Not Windows/Linux, not an interactive GUI install, not a published extension source. The Codex CLI integration remains unresolved; Pi is the working engine.
+- One run on one macOS host. Not Windows/Linux, not an interactive GUI install. The extension source is now published and tagged (see below). The Codex CLI integration remains unresolved; Pi is the working engine.
 
 The [independent review packet](independent-review.md) identifies the unreviewed isolation changes, focused checks and decision still needed before a full lifecycle test.
+
+## Published versioned source
+
+2026-11-15. The extension is published as the private repository `fyso-dev/fyso-ext-human-requests`, tag **v0.1.0**, and listed in the official catalog `fyso-dev/fyso-extensions` (D31), following the SilverBullet precedent. Its `extensions/`, `project/` and answers template are byte-identical to the bundled copy; the only `copier.yml` change (excluding the repository `.gitignore`) is applied to both.
+
+Check on a project generated from this branch with Copier 9.19.1, real Git and the real `ext.sh`, with no stack started:
+
+- installing the bundled directory recorded only `_src_path: ./framework/extensions/human-requests` (no `_commit`);
+- `ext.sh add gh:fyso-dev/fyso-ext-human-requests -- --defaults --overwrite --vcs-ref v0.1.0` recorded `_commit: v0.1.0` and changed only the answers file;
+- after committing unrelated work, `ext.sh update human-requests -- --defaults` completed with a clean tree;
+- the regenerated panel inventory reported `src gh:fyso-dev/fyso-ext-human-requests`, `version v0.1.0`, pages `pending` and `people` and the `human-requests` skill;
+- `marketplace.cjs resolve human-requests` returned `gh:fyso-dev/fyso-ext-human-requests v0.1.0`.
+
+The first v0.1.0 tag lacked the `.gitignore` exclusion: this check showed the migration replacing the project's `.gitignore` (dropping `.data/` and `.mcp.json`). The tag was recreated on the fix before any use. Updating to a newer tag is covered by the local tagged fixture in `tests/test_human_requests_copier.py`. Not rerun for this packaging-only change: `mise run doctor` and the browser/model acceptance. Access requires read permission on the private repository, as for SilverBullet.
 
 ## Real model and MCP
 
@@ -86,12 +100,12 @@ The automated local fixture used a synthetic account and request. Login and the 
 - Qt installer backend: **13 tests passed**, using temporary fixtures and mock installation commands. If Pi is signed out, its log now gives the project-specific sign-in and doctor commands without displaying a password.
 - Qt wizard contract: **5 tests passed**, including Pi selection; this is not a real GUI test.
 - Installer, packaging and tray contracts: **17 tests passed**. The macOS installer initially lacked labels for the newly pinned Pi step in both languages; those labels were added. This does not prove an interactive or clean-machine installation.
-- Copier installation and panel inventory passed in a no-network fixture. A separate local Git fixture tagged successive versions of the actual bundled extension and successfully ran both `ext.sh apply update` and `ext.sh update`, preserving an unrelated file. On macOS this exposed an isolated-temp-directory failure: the panel update now supplies an explicit template under `TMPDIR`. The fixture does not publish an extension, and the bundled source still has no independently versioned release.
+- Copier installation and panel inventory passed in a no-network fixture. A separate local Git fixture tagged successive versions of the actual bundled extension and successfully ran both `ext.sh apply update` and `ext.sh update`, preserving an unrelated file. On macOS this exposed an isolated-temp-directory failure: the panel update now supplies an explicit template under `TMPDIR`. The fixture does not publish an extension; the published source is recorded under [Published versioned source](#published-versioned-source).
 - Synthetic headless-browser recipient filtering passed both with and without a people directory. A separate synthetic panel flow passed for entering a name, asking a question, reading its answer and deciding. Both used a temporary browser profile and mocked APIs. The older history browser fixture targets an earlier panel design and has not passed against the current UI.
 - The Pi MCP regression failed before the scoped change and passed afterward. A separate model-repair regression failed before the provider-preservation check and passed afterward.
 
 ## Remaining acceptance
 
 - Repeat bot-created request, clarification and continuation with the pinned Pi executable, registered project skill and generated project configuration, without injecting the skill or independently substituting for tool results.
-- Extension installation and both update paths have fixture coverage, but the bundled extension has no independently versioned source yet.
+- Extension installation and both update paths have fixture coverage, and the extension is published as an independently versioned source (v0.1.0).
 - Run appropriate installer smoke tests and document actual behavior on supported hosts. Do not claim Windows or a clean-machine installation from the Qt contract tests.

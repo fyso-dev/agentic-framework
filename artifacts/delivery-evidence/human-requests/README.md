@@ -19,4 +19,4 @@ The older screenshot below depicts a fictional request in an earlier prototype a
 
 ![Earlier Pending prototype](pending.png)
 
-HTTP callbacks have isolated tests, including a fictional receiver and TLS; receiver-side idempotency and external networking require independent validation. The bundled extension does not currently support Copier's normal update lifecycle because it lacks a versioned source reference. No real sensitive approval or extension installation was authorized by the fictional examples.
+HTTP callbacks have isolated tests, including a fictional receiver and TLS; receiver-side idempotency and external networking require independent validation. The extension is published as `gh:fyso-dev/fyso-ext-human-requests` (v0.1.0) and supports Copier's normal update lifecycle from that source; installations from the bundled directory must migrate once (see [pi-beta](pi-beta.md#published-versioned-source)). No real sensitive approval or extension installation was authorized by the fictional examples.
