@@ -27,7 +27,7 @@ In a generated project, `mise run ext:add ./framework/extensions/human-requests 
 
 A separate [generated-project Dagu test](../artifacts/delivery-evidence/human-requests/generated-dagu.md) used the generated `run-dagu.sh` with no mise command and confirmed an authenticated `origin=none` request through to its outputs. This does not cover the full generated stack, panel or bot.
 
-The bundled source currently has no independent version reference: an isolated Copier test produced answers without `_commit`, and `copier update` rejected that installation. A framework update therefore does not automatically migrate an installed extension. A versioned extension source or a separately designed migration remains necessary before promising the normal extension-upgrade lifecycle.
+The extension is published independently as [fyso-ext-human-requests](https://github.com/fyso-dev/fyso-ext-human-requests) (first tag v0.1.0) and listed in the official catalog, so `mise run ext:add human-requests` records `_commit` and `ext:update` uses Copier's normal three-way update. An installation from the bundled directory has no `_commit`: a framework update does not update it, and it must be migrated once with `mise run ext:add gh:fyso-dev/fyso-ext-human-requests -- --defaults --overwrite --vcs-ref v0.1.0`.
 
 An extension keeps this optional capability independently installable and removable without adding a core feature flag or background process. It cannot automatically provide the rule to every agent, add a pending count to the core navigation, or be assumed present by other extensions.
 

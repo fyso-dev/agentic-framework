@@ -38,7 +38,7 @@ class HumanRequestsCopierTest(unittest.TestCase):
             run(['git', 'init', '-q'], source); commit(source); run(['git', 'tag', 'v0.1.0'], source)
             run([copier, 'copy', '--defaults', '../fyso-ext-human-requests', '.'])
             scripts = project / 'framework/scripts'; scripts.mkdir(parents=True)
-            for name in ['ext.sh', 'lib.sh', 'extensions.cjs']:
+            for name in ['ext.sh', 'lib.sh', 'extensions.cjs', 'github-auth.cjs']:
                 shutil.copy2(ROOT / 'template/framework/scripts' / name, scripts)
             for name in ['mcp-config.cjs', 'panel-data.cjs']:
                 (scripts / name).write_text('process.exit(0);\n')
