@@ -1,0 +1,10 @@
+{
+  "project": "emos",
+  "url": "https://panel.emos.jc.fyso.dev/mcp",
+  "dagRunId": "034wH6Bkhp3E1o9evPzVTn",
+  "status": "succeeded",
+  "tokenAbsentFromDaguOutputs": true,
+  "mcpInitialized": true,
+  "platformTools": 26,
+  "noDaguTools": true
+}

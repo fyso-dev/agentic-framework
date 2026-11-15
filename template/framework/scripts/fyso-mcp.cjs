@@ -101,6 +101,22 @@ const TOOLS = {
     annotations: {readOnlyHint: true},
     run: () => architect({OP: 'connections'}),
   },
+  fyso_feedback: {
+    description: 'Report an observed project or framework problem for a person to review. Saves a new page in this project wiki; it does not notify anyone or create a GitHub issue. Include evidence and reproduction steps when known, and never include secrets or personal data.',
+    inputSchema: obj({title: str('Short problem title'), description: str('What happened, expected behavior, and evidence or steps to reproduce'), component: str('Optional affected component')}, ['title', 'description']),
+    annotations: {destructiveHint: false},
+    async run({title, description, component = ''}) {
+      for (const [name, value, max] of [['title', title, 200], ['description', description, 16000], ['component', component, 200]]) {
+        if (value.length > max || (name !== 'component' && !value.trim())) throw new Error(`${name} must be nonempty and at most ${max} characters`);
+      }
+      const id = require('node:crypto').randomUUID();
+      const page = `feedback/${id}`;
+      const content = `# Feedback\n\n- ID: ${id}\n- Reported: ${new Date().toISOString()}\n- Status: New\n\n## Title\n\n${title.trim()}\n\n## Component\n\n${component.trim() || 'Not specified'}\n\n## Description and evidence\n\n${description.trim()}\n`;
+      const result = await daguMcp().call('dagu_change', {mode: 'apply', type: 'upsert_wiki_page', workspace: 'default', path: page, content});
+      if (result.isError || result.structuredContent?.applied !== true) throw new Error(`Feedback was not confirmed saved: ${JSON.stringify(result)}`);
+      return {id, path: `project/wiki/${page}.md`, status: 'saved', notification: 'none'};
+    },
+  },
   fyso_bots_list: {
     description: 'List the native OpenMausBot bots of this project (id, name, title, model, busy).',
     inputSchema: obj(),

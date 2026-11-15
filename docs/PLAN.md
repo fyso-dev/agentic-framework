@@ -10,6 +10,8 @@ Brand: **Fyso**. "Fyso Agentic Framework" is a working name; the final product n
 
 Every piece of this framework is an existing tool, wired together with configuration files and a few small scripts. Custom code is allowed only when no existing tool does the job, and it must stay small: the panel SPA and some glue scripts. When in doubt, choose the option with fewer moving parts.
 
+**Grow extensibility before functionality.** The default framework should remain simple for its users. Projects install use-case capabilities as optional extensions. Core growth should primarily enable extensions through small generic contracts, rather than accumulate domain features, screens or required services. Existing universal runtime responsibilities remain in core; exceptions require the placement criteria in [the extensions contract](extensions-contract.md#core-versus-extension-placement).
+
 ## 1. Goal
 
 A reusable, versioned template for agentic projects. Each project gets:
@@ -33,6 +35,8 @@ A reusable, versioned template for agentic projects. Each project gets:
 ## 2. Decisions log
 
 Append-only. A superseded decision stays, marked with what replaced it.
+
+2026-11-14 — **Extension-first product growth.** Clarifies D17, D30 and D41: use-case functionality is opt-in; the core owns generic extension capabilities and essential shared runtime behavior. A missing extension slot calls for a minimal reusable contract, not automatic inclusion of the feature in core. Promotion requires demonstrated shared need, an inadequate extension boundary and a recorded decision covering user-facing complexity and compatibility. See [placement criteria](extensions-contract.md#core-versus-extension-placement). This policy does not authorize a bulk migration of existing functionality.
 
 | # | Decision |
 |---|---|
@@ -111,6 +115,9 @@ Append-only. A superseded decision stays, marked with what replaced it.
 | D73 | **Third-party Agent Skills: git copies with provenance and explicit review.** Discover via configured git repositories and best-effort anonymous skills.sh CLI search; copy a selected folder pinned to a full commit into project-owned `project/bots/skills/`, retain its license and provenance. Panel and MCP preview immutable content before apply. Native OMB scan plus human confirmation binds the retained folder digest; reuse D54 per-bot toggles and native disabled entries. No catalog service, plugin installer or support-file loader. OMB 0.1.141 imports SKILL.md only; supporting-file functionality is not claimed. [Spike](adr/spikes/skills-registry.md) · [Contract](third-party-skills.md) |
 
 | D74 | **The existing remote MCP token grants the full project agent surface.** Supersedes the D63 exclusion of Dagu: the same authenticated HTTPS endpoint forwards Dagu's native tools, including execution and changes. The token therefore grants command execution as the project user. `fyso_bot_run` invokes the native OpenMausBot CLI on the explicit project port, with a new conversation by default or a specified task, and returns its reply. The caller must treat a timeout or interrupted request as potentially still running. No additional credentials or unscoped Dagu endpoint are exposed. [Agent surface](agent-surface.md#remote-clients-d63) |
+
+| D75 | **Agent feedback stays in the project for human review.** `fyso_feedback` creates a distinct page under `project/wiki/feedback/` using Dagu's native wiki operation and returns its path. It sends no notification and opens no external issue. Agents omit secrets and personal data. Default new bots with tool allow-lists receive the one feedback selector; existing project-owned bot declarations are not changed. [Agent surface](agent-surface.md) |
+| D78 | **Private HTTPS may use Cloudflare DNS-01 in a provider extension.** The core retains D62. A reusable Copier extension orchestrates pinned lego for certificate issuance/renewal, encrypted zone-scoped DNS credentials, native Dagu scheduling and Caddy TLS. Tailscale remains the private transport; application DNS records are unproxied and existing records are never replaced implicitly. The hub stays the single identity authority. DNS permissions, real issuance and browser acceptance are mandatory deployment gates. Implementation in progress: [contract](cloudflare-extension.md). |
 
 ## 3. Architecture
 

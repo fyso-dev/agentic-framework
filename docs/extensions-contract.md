@@ -7,6 +7,35 @@ An **extension** is a small Copier template, applied on top of a generated proje
 
 `<ext>` is the extension id: `^[a-z][a-z0-9-]{1,30}$`. It is the same everywhere below.
 
+## Core versus extension placement
+
+The framework grows primarily in extensibility. Keep the default installation understandable and useful without capabilities for unrelated use cases. This is a product boundary as well as a code boundary.
+
+| Responsibility | Default home |
+|---|---|
+| Shared runtime, isolation, authentication boundary, generic extension lifecycle and hosting | Core |
+| Domain workflows, provider integrations, specialized screens, tools and skills | Opt-in extension |
+| One project's content, configuration and business rules | Project-owned files or a project distribution |
+
+Before implementing a capability:
+
+1. Check whether native software and existing extension slots already provide it.
+2. Keep use-case behavior in an extension, including its UI, translations, setup, health checks and dependencies.
+3. If a slot is missing, document the concrete limitation and add the smallest generic contract needed. Keep feature-name branches, specialized routes and domain-specific schemas out of the host. Avoid speculative plugin abstractions.
+4. Verify both the default project without the extension and the installed extension. Uninstalled functionality must not add navigation, setup requirements, credentials, services or failing health checks to the default experience.
+
+An extension should feel integrated once installed: use the shared navigation, language, theme, setup and lifecycle contracts. Modularity must not require the user to understand internal service wiring. Installation and removal must preserve project-owned data according to the documented lifecycle; removal must not silently delete user content.
+
+### Promotion to core
+
+Promote behavior only when all of the following are demonstrated:
+
+- It is an essential shared framework responsibility or a reusable primitive needed by multiple concrete use cases, rather than a convenience for one feature.
+- Existing extension contracts cannot meet the requirement cleanly, and a small generic slot has been considered first.
+- A PLAN decision or ADR explains ownership, compatibility, default UI and operational cost, alternatives and acceptance checks for projects without the original feature.
+
+Multiple extensions sharing a need justifies evaluating a shared primitive; it does not automatically justify moving their domain functionality into core. Bundling extension source or adding a feature flag does not make specialized behavior a core responsibility. Existing functionality is not migrated automatically under this policy: assess it within explicitly scoped work.
+
 ## 1. Lifecycle
 
 | Action | Command | What it runs |

@@ -1,0 +1,28 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-cloudflare.yml
+_templates_suffix: .slotjinja
+_external_data:
+  project: .copier-answers.yml
+certificate_domain:
+  type: str
+  help: Primary certificate name (the private host's parent domain)
+  validator: >-
+    {% if not (certificate_domain | regex_search('^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$')) %}
+    Use a DNS name without a wildcard, scheme or port.
+    {% endif %}
+certificate_email:
+  type: str
+  help: Email for the ACME account
+  validator: >-
+    {% if not (certificate_email | regex_search('^[^\s@]+@[^\s@]+\.[^\s@]+$')) %}
+    Use an email address.
+    {% endif %}
+certificate_names:
+  type: str
+  default: "*.{{ certificate_domain }}"
+  help: Additional DNS names, one per line (wildcards allowed)
+  multiline: true
+_exclude:
+  - copier.yml
+  - README.md
+  - .git

@@ -1,0 +1,13 @@
+description: Issue or renew the private host certificate using Cloudflare DNS-01
+labels:
+  - fyso=system
+type: graph
+schedule: "17 3 * * *"
+max_active_runs: 1
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: certificate
+    command: framework/scripts/run-ext.sh cloudflare -- bash extensions/cloudflare/certificate.sh
+    output: RESULT

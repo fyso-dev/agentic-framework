@@ -1,0 +1,14 @@
+[tools]
+"github:go-acme/lego" = "5.6.0"
+
+[env]
+FYSO_CLOUDFLARE_DOMAIN = {{ certificate_domain | to_json }}
+FYSO_CLOUDFLARE_EMAIL = {{ certificate_email | to_json }}
+
+[tasks."cloudflare:certificate"]
+description = "Issue or renew the private host certificate through Cloudflare DNS-01"
+run = "framework/scripts/run-ext.sh cloudflare -- bash extensions/cloudflare/certificate.sh"
+
+[tasks."cloudflare:doctor"]
+description = "Check certificate names, expiry and private-key permissions"
+run = "node extensions/cloudflare/doctor.cjs"
