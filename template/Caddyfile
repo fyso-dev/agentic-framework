@@ -182,6 +182,20 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	handle /api/omb/* {
 		respond 404
 	}
+	# Extension APIs (D79): same-origin reads and actions behind the web session, to the
+	# extension's own private socket (mode 0600). The extension receives only the path
+	# after its id; cookies, Authorization and forged identity headers are already gone.
+	# One regexp-matched block (not `handle /api/ext/*`): a path handle here would be re-sorted
+	# by Caddy ahead of the extension page route below.
+	@extensionApis path_regexp ^/api/ext(/|$)
+	handle @extensionApis {
+		@extensionApi path_regexp extensionApi ^/api/ext/([a-z][a-z0-9-]{1,30})/(.*)$
+		handle @extensionApi {
+			rewrite * /{re.extensionApi.2}
+			reverse_proxy unix//tmp/fyso-ext-{re.extensionApi.1}-{$FYSO_HTTP_PORT}.sock
+		}
+		respond 404
+	}
 	handle_path /api/dagu/* {
 		rewrite * /api/v1{uri}
 		reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT} {
