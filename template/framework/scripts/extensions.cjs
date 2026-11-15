@@ -97,17 +97,24 @@ function check(env = process.env) {
   for (const id of installed()) {try {pages(id);} catch(error) {errors.push(error.message);}}
   return errors;
 }
+/** Same short /tmp convention as the framework's other sockets (macOS caps paths at 104 bytes). */
+function extensionSocket(id, port = process.env.FYSO_HTTP_PORT) {
+  if (!validId(id) || !/^[0-9]+$/.test(String(port || ''))) throw Error('extension socket needs a valid id and FYSO_HTTP_PORT');
+  return `/tmp/fyso-ext-${id}-${port}.sock`;
+}
 function run(id, command) {
   if (!validId(id) || command.shift() !== '--' || !command.length) throw Error('Usage: run-ext.sh <ext> -- <cmd…>');
   const absent = missing(id);
   if (absent.length) throw Error(`${id}: required secret(s) empty: ${absent.join(', ')}`);
   const names = new Set(['PATH','HOME',...secrets(id).map(s => s.name)]);
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('FYSO_AUTH_') && (names.has(k) || k.startsWith('FYSO_'))));
+  // The private socket behind /api/ext/<id>/ (D79); the extension creates it with mode 0600.
+  if (/^[0-9]+$/.test(process.env.FYSO_HTTP_PORT || '')) env.FYSO_EXT_SOCKET = extensionSocket(id);
   const child = spawnSync(command[0],command.slice(1),{env,stdio:'inherit'});
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, setSource, glob, validId, secrets, missing, setup, workflows, inventory, check};
+module.exports = {read, setSource, glob, validId, secrets, missing, setup, workflows, inventory, check, extensionSocket};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));
