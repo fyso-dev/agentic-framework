@@ -11,14 +11,20 @@ export function ExtensionWorkflow({ dag }: { dag: string }) {
   // Output keys differ per extension; the panel shows the run, not its output.
   const action = useDaguAction<unknown>(backend, dag, "result", { loadLast: true });
   const logs = useLogsUrl(dag);
+  const uploadImport = dag === "ext-silverbullet-import";
   return (
     <li className="card action" style={{ listStyle: "none" }}>
       <div className="action-head">
         <p className="grow ellipsis"><span className="mono">{dag}</span></p>
         <ActionStatus action={action as Action<unknown>} />
         <External href={logs} className="step-link">{t("common.viewInDagu")} </External>
+        {uploadImport ? (
+          <a className="btn btn-primary" href="#/extensions/silverbullet/knowledge">{t("ext.importOpen")}</a>
+        ) : (
         <ActionButton action={action as Action<unknown>} label={t("ext.run")} busyLabel={t("ext.running")} onRun={() => void action.start()} />
+        )}
       </div>
+      {uploadImport && <p className="mute">{t("ext.importHint")}</p>}
       <ActionError action={action as Action<unknown>} />
     </li>
   );

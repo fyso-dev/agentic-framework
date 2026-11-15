@@ -440,7 +440,9 @@
       "example": "That looks like an example, not your key ({{names}}). Create a new key on the keys page and copy the block shown in the key's dialog: it is shown in full only once."
     },
     "run": "Run now",
-    "running": "Running…"
+    "running": "Running…",
+    "importOpen": "Import documents",
+    "importHint": "Start imports from Knowledge after uploading and selecting documents."
   },
   "skills": {
     "installedTitle": "Installed third-party skills",
