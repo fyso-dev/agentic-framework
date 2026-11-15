@@ -5,7 +5,7 @@
 # explicitly named BOT_* in secrets.enc.yaml (PLAN §3.1).
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
-require_env FYSO_DATA FYSO_OMB_PORT FYSO_OMB_WEBHOOK_PORT FYSO_HTTP_PORT FYSO_DAGU_PORT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD
+require_env FYSO_ROOT FYSO_DATA FYSO_OMB_PORT FYSO_OMB_WEBHOOK_PORT FYSO_HTTP_PORT FYSO_DAGU_PORT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD
 web_scheme >/dev/null
 mkdir -p "$FYSO_DATA/omb" "$FYSO_DATA/npm-cache"
 bot_env=()
@@ -29,7 +29,12 @@ if [ -n "$composio_secret" ]; then
 elif [ -n "${FYSO_COMPOSIO_API_KEY:-}" ]; then
   bot_env+=("COMPOSIO_API_KEY=$FYSO_COMPOSIO_API_KEY")
 fi
+# Resolve Pi before inserting the project wrapper; keep the resolved binary private
+# to this OMB instance and do not alter the caller's PATH.
+pi_exec=$(command -v pi || true)
 clean_exec \
+  FYSO_PI_EXEC="$pi_exec" \
+  PATH="$FYSO_ROOT/framework/bin:$PATH" \
   ${bot_env[@]+"${bot_env[@]}"} \
   OMB_PORT="$FYSO_OMB_PORT" \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" \

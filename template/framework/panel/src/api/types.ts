@@ -36,7 +36,9 @@ export type ExtensionSecret = {
   set: boolean;
 };
 
-export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string};
+/** Counter an extension page declares (extensions-contract §9): the panel counts matching Dagu runs. */
+export type ExtensionPageBadge = { dagu_runs: { status: "waiting"; labels: string[] }; warn_labels?: string[]; attention?: boolean };
+export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string; badge?:ExtensionPageBadge};
 
 export type Extension = {
   id: string;

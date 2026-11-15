@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D75, D78; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D78; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -43,9 +43,19 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
-| Engine and model selection: switching, mixing providers, recommended models (open issue) | [engine-selection.md](engine-selection.md) |
+| Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
 | Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
+| Shared-access people directory, a page of the human-requests extension, without login accounts (D76) | [people-directory.md](people-directory.md) |
+| Human requests: bundled experimental extension with inbox, structured requests, questions to the agent and a menu counter (D76; not yet accepted) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
+| Human requests: generated Codex integration blocker | [Failed end-to-end prerequisite](../artifacts/delivery-evidence/human-requests/generated-codex-blocker.md) |
+| Human requests: Pi and ChatGPT beta, full generated lifecycle passed once on macOS; remote MCP now removes its socket on SIGTERM | [lifecycle and real-model evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |
+| Human requests: local test walkthrough | [Try the first version](../artifacts/delivery-evidence/human-requests/try-it.md) |
+| Human requests: normal generated setup, startup and doctor smoke | [lifecycle evidence](../artifacts/delivery-evidence/human-requests/generated-lifecycle.md) |
+| Human requests: experimental HTTP return contract | [extension guide](../template/framework/extensions/human-requests/extensions/human-requests/HTTP.md) |
+| Human requests: proposed test-only approval scenario | [scenario](../template/framework/extensions/human-requests/extensions/human-requests/docs/approval-case.md) |
+| Human requests: experimental native OpenMausBot send identifiers | [experiment](adr/human-requests-send-id-experiment.md) |
+| Isolating XDG state in clean service execution | [spike](adr/spikes/clean-exec-xdg.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
 | Panel design spec v2 (for Claude Design) | [panel-spec.md](panel-spec.md) |
@@ -86,7 +96,7 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 | 6 | Deploy and template lifecycle | ⬜ not started |
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz and generic extension pages verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
-| 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents; project understanding and 93% action coverage for desktop agents (D57); workflow scopes (D60) | ✅ verified locally · [contract](agent-surface.md) |
+| 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents; project understanding and 93% action coverage for desktop agents (D57); workflow scopes (D60); native Pi Dagu connection (D77) | ✅ verified locally · [contract](agent-surface.md) |
 | 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
 | 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
@@ -115,6 +125,12 @@ stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-exten
 | Date | Entry |
 |---|---|
 | 2026-11-12 | **Third-party skills (D73).** skills.sh anonymous CLI endpoint verified; documented v1 requires Vercel identity. Native OMB 0.1.141 disabled import scans SKILL.md and omits supporting files. Git copies retain full provenance/license and require human confirmation; panel/MCP apply immutable previews. [Spike](adr/spikes/skills-registry.md) · [contract and verification](third-party-skills.md). |
+| 2026-11-14 | **Pi doctor, stack stopped.** A generated fixture passed `mise run doctor` with only its connector-setup component; a deliberately occupied fixture port was detected. The running-stack branch and full lifecycle remain pending independent review. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |
+| 2026-11-14 | **Pi request skill in the agent form.** Enabling the skill adds only the native conversation-list selection to a restricted Pi bot; explicit denials remain untouched and are explained. Mock-browser fixtures checked the review draft and denied case. [Engine selection](engine-selection.md#pi-beta-integration-in-progress) |
+| 2026-11-14 | **Pi sandbox boundary probe.** A disposable macOS probe checked selected file and port allowances, denial of unrelated IPv4/IPv6 loopback, and DNS through the system resolver socket. Independent review and full lifecycle remain outstanding. [Findings](adr/spikes/clean-exec-xdg.md#pi-beta-isolation-follow-up) |
+| 2026-11-14 | **Extension update isolation.** A temporary tagged Git source of the bundled human-requests extension updated successfully through the panel and CLI extension-update paths and preserved unrelated work. The worktree now uses an explicit `TMPDIR` template on macOS. The bundled source itself is not a versioned release. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |
+| 2026-11-14 | **Pi human request acceptance in progress.** In an isolated generated-project component fixture, an authenticated person used the panel to ask a real Pi bot a clarification and decide; Dagu succeeded and the bot finished in the same conversation. The exact origin comes from the pinned OMB native per-turn agents descriptor. Full lifecycle and doctor remain pending. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |
+| 2026-11-14 | **Scoped MCP text compatibility (in progress).** Structured Dagu results are also exposed as text to clients that discard MCP structured content; run lists remain filtered before conversion. The focused MCP suite passes; a generated-project Pi acceptance remains pending. [Contract](agent-surface.md#workflow-scopes-d60) |
 | 2026-11-10 | **Longer default local web sessions.** New projects use 30 days for native Tinyauth session expiry and maximum lifetime to avoid hourly logins. Existing project-owned authentication settings are preserved; adoption and memorable passphrases are documented in [web authentication](web-auth.md). |
 | 2026-11-10 | **Panel roster refresh and exact bot removal.** The panel refreshes the declaration alongside the native roster, retains stale drafts without applying them and shows native avatars when available. Bot deletion previews identify exact runtime IDs and warn about conversation history loss. [Contract](panel-contract.md#3-action-workflows) |
 | 2026-11-10 | Product vocabulary: project assistants are **Agentes** (Spanish) / **Agents** (English) in panel and Knowledge UI copy. Native product/profile names and technical identifiers remain stable. [Vocabulary contract](panel-spec.md#product-vocabulary). |
@@ -260,3 +276,7 @@ stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-exten
 | 2026-11-11 | SilverBullet import entry: the panel routes `ext-silverbullet-import` to the Knowledge page instead of enqueuing it without an upload batch. Verified in the GrupoAuditor VM. [ADR](adr/silverbullet-import-entry.md) |
 
 | 2026-11-12 | **Project feedback (D75).** `fyso_feedback` records a new review page through Dagu's native wiki operation. An isolated Dagu 2.24.0 server confirmed the MCP call creates the expected page. No notification or external issue is sent; existing bots need the tool explicitly selected. [Contract](agent-surface.md) |
+
+| 2026-11-14 | **Human requests: person-facing experience and page counters (D76).** The extension contract gains declared page counters (panel API 2): the panel shows "Pending" with a count in its menu and top bar on every screen, with no request-specific code in the core; the People screen moved out of the core into the extension. Requests are structured cards validated at creation, and a person can ask the agent a question before deciding through Dagu's native push-back. Verified: 59 unit and real-Dagu 2.24.0 tests; in a browser on a running demo project (counter, inbox, decision recorded, people page); and on a generated project with a real bot, which answered a question from its conversation in 12 s and continued there after the decision. Not verified: a bot creating its own request in a generated Codex project (blocked), the browser and gateway test scripts written for the previous page, installers, and a non-technical user. [Proposal](human-requests-proposal.md) · [contract §9](extensions-contract.md#page-counters-panel-api-2) |
+
+| 2026-11-14 | **Codex bots do not see the project's MCP servers (OpenMausBot 0.1.141, Codex CLI 0.169.0).** On a generated project, a standard Codex bot with `mcp:dagu:*` and a bot with a natively registered server both saw the host user's personal Codex MCP servers, including other projects' Dagu, and none of the project's. OpenMausBot launches Codex with the right overrides; this Codex does not apply them (cause not proven; a long-lived app-server daemon is the hypothesis). The same bot on a Claude model saw its server at once and completed the whole human-request loop, creating its own request. It affects every Codex bot and is an isolation problem; no decision taken. The scope guard (D60) now accepts plain run labels and refuses `workspace`. [Findings](../artifacts/delivery-evidence/human-requests/generated-codex-blocker.md) |

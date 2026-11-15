@@ -11,10 +11,24 @@ const BY_NAME = {
   step_log: ['dagRunId', 'subRunId', 'stepName', 'item', 'bodyStepName', 'query'],
   foreach_items: ['dagRunId', 'subRunId', 'stepName', 'query'], foreach_item: ['dagRunId', 'subRunId', 'stepName', 'item'],
 };
-const EXECUTE = ['action', 'name', 'dagRunId', 'params', 'wait', 'singleton', 'stepName', 'includeDownstream', 'subDAGRunId', 'inputs', 'reason', 'attemptId'];
+const EXECUTE = ['action', 'name', 'dagRunId', 'params', 'wait', 'singleton', 'stepName', 'includeDownstream', 'subDAGRunId', 'inputs', 'reason', 'attemptId', 'labels'];
+// Run labels carry data a workflow reads (a recipient, a deadline). `workspace=` is the one
+// label that decides what a scope may see, so a scoped caller can never set it on a run.
+const RUN_LABEL = /^[A-Za-z0-9][A-Za-z0-9_.\/=-]{0,8191}$/;
+const runLabels = labels => {
+  if (!Array.isArray(labels) || labels.length > 16 || !labels.every(label => typeof label === 'string' && RUN_LABEL.test(label))) deny('labels must be at most 16 plain run labels in a workflow scope');
+  if (labels.some(label => /^workspace(=|$)/i.test(label))) deny('a workspace label is not available in a workflow scope');
+};
 const QUERY = /^(?:(?:tail|head|offset|limit|stream|parent|status|page|perPage)=[\w.-]{1,40})(?:&(?:tail|head|offset|limit|stream|parent|status|page|perPage)=[\w.-]{1,40})*$/;
 const deny = message => { throw Error(message); };
 const only = (args, keys, what) => { for (const key of Object.keys(args)) if (!keys.includes(key)) deny(`${key} is not available for ${what} in a workflow scope`); };
+
+// Pi's MCP bridge consumes text blocks but discards structuredContent. Keep the
+// native content and mirror the same authorized result as text for such clients.
+function textCompatible(result) {
+  if (result?.isError || !result?.structuredContent || typeof result.structuredContent !== 'object') return result;
+  return {...result, content: [...(Array.isArray(result.content) ? result.content : []), {type: 'text', text: JSON.stringify(result.structuredContent, null, 2)}]};
+}
 
 // `resolve` returns the scope's workflows (name → {name, class, description}); tests replace it.
 function guard(root, scope, system, resolve = () => scopes.allowed(root, scope, system)) {
@@ -25,11 +39,17 @@ function guard(root, scope, system, resolve = () => scopes.allowed(root, scope, 
   return {
     scope,
     names,
-    tools: list => list.filter(tool => TOOLS.includes(tool.name)),
+    tools: list => list.filter(tool => TOOLS.includes(tool.name)).map(tool => {
+      if (tool.name !== 'dagu_execute' || !tool.inputSchema?.properties) return tool;
+      const schema = tool.inputSchema;
+      return {...tool, inputSchema: {...schema, properties: Object.fromEntries(Object.entries(schema.properties).filter(([key]) => EXECUTE.includes(key))),
+        ...(Array.isArray(schema.required) && {required: schema.required.filter(key => EXECUTE.includes(key))})}};
+    }),
     /** Returns a result to answer locally, or undefined to forward the call unchanged. Throws when refused. */
     check(tool, args = {}) {
       if (tool === 'dagu_execute') {
         only(args, EXECUTE, 'dagu_execute');
+        if (args.labels !== undefined) runLabels(args.labels);
         return void inScope(args.name);
       }
       if (tool !== 'dagu_read') deny(`${tool} is not available in a workflow scope: this bot reads and runs workflows, it does not change them`);
@@ -63,7 +83,8 @@ function guard(root, scope, system, resolve = () => scopes.allowed(root, scope, 
     },
     /** A run list must hold only the requested workflow; anything else is dropped, and an unknown shape is refused. */
     shape(tool, args, result) {
-      if (tool !== 'dagu_read' || args.target !== 'runs' || result?.isError) return result;
+      if (result?.isError) return result;
+      if (tool !== 'dagu_read' || args.target !== 'runs') return textCompatible(result);
       const items = result?.structuredContent?.data?.items;
       if (!Array.isArray(items)) deny('unexpected run list from Dagu; refused in a workflow scope');
       const data = {...result.structuredContent.data, items: items.filter(item => item?.name === args.name)};
@@ -72,4 +93,4 @@ function guard(root, scope, system, resolve = () => scopes.allowed(root, scope, 
   };
 }
 
-module.exports = {guard, TOOLS};
+module.exports = {guard, TOOLS, textCompatible};

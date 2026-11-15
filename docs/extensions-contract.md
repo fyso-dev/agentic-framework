@@ -260,13 +260,39 @@ The file stem is its page ID and follows the extension ID naming rule. The entry
 
 The host derives navigation entries from installed registrations and serves `#/extensions/<ext>/<page>`. It embeds the declared page with a standard same-origin iframe, passing `lang`, `theme` and `page` query parameters. Multiple extensions/pages require no core changes. Removing the extension removes its entries on the next configuration reload. Opening an uninstalled page displays a generic unavailable state. Caddy permits GET/HEAD on public page assets; other extension paths return 404. No new backend or plugin evaluator is involved.
 
-### Optional panel SDK v1
+### Page counters (panel API 2)
+
+A page may declare a counter. The panel shows it beside the page's entry in the side and bottom navigation, on every screen:
+
+```yaml
+# extensions/example/pages/inbox.yaml
+name: {es: Pendientes, en: Pending}
+icon: checklist
+url: /extensions/example/panel/index.html
+badge:
+  dagu_runs: {status: waiting, labels: [human-request]}
+  warn_labels: [blocking=true]   # optional
+  attention: true                # optional
+```
+
+| Field | Meaning |
+|---|---|
+| `dagu_runs.status` | The run state to count. Only `waiting` is accepted |
+| `dagu_runs.labels` | 1 to 5 labels a run must carry, all of them |
+| `warn_labels` | 1 to 5 labels; when a counted run carries all of them, the counter uses the warning color |
+| `attention` | `true` adds a notice to the top bar, "<page name>: <count>", linking to the page while the count is above zero |
+
+The declaration is data. The panel runs the query itself against Dagu's run list through the existing gateway (`/api/dagu/dag-runs?status=7&labels=<first label>`, the remaining labels matched on each run), every 30 seconds while the tab is visible and when the person changes screen, at most 500 runs. No extension code is evaluated by the host, and a counter that cannot be read is not shown. A count is for the project, not for a person: a shared login does not tell the panel who is looking. Labels match `[A-Za-z0-9][A-Za-z0-9_.=-]{0,63}`; anything else fails configuration generation, as an invalid page does.
+
+A page that changes the runs it counts calls the SDK's `refreshBadges()` so the menu does not wait for the next poll. Old inventories without `badge` show no counter.
+
+### Optional panel SDK
 
 Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
 
-Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `1`.
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `2`; version 2 added page counters and `refreshBadges`, and removed nothing.
 
-The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External` and `RelTime`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
+The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External`, `RelTime` and `refreshBadges`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 
 This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.
 

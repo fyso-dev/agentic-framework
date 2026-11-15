@@ -49,7 +49,8 @@
     "toDark": "Cambiar a tema oscuro",
     "more": "Más opciones: idioma y tema",
     "openOmb": "Abrir OpenMausBot",
-    "ombShort": "OpenMausBot"
+    "ombShort": "OpenMausBot",
+    "attention": "{{name}}: {{count}}"
   },
   "nav": {
     "label": "Secciones",
@@ -229,7 +230,9 @@
     "skillsExt": "Vienen de las extensiones instaladas y de las skills de terceros confirmadas. Se aplican junto con los demás cambios del agente.",
     "skillThirdParty": "de terceros · {{src}}",
     "skillPending": "por revisar",
-    "skillsNeedRoot": "Necesitan las herramientas del proyecto: activa «Usa workflows» para poder usarlas."
+    "skillsNeedRoot": "Necesitan las herramientas del proyecto: activa «Usa workflows» para poder usarlas.",
+    "piHumanRequestContext": "Para retomar pedidos en esta conversación, Pi puede leer la lista de conversaciones de este agente y las que abrió con otros agentes.",
+    "piHumanRequestBlocked": "La lectura de conversaciones está bloqueada. Pi podrá crear pedidos, pero no recibir repreguntas ni volver a esta conversación hasta habilitarla."
   },
   "preview": {
     "deleteHistoryWarning": "Eliminar un bot de OpenMausBot borra definitivamente su historial de conversaciones. La copia de la configuración no incluye ese historial.",

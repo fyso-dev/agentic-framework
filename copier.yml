@@ -104,9 +104,10 @@ auth_upstream:
 engine:
   type: str
   help: >-
-    Coding engine this host is signed in to. Bots and fyso-dev-task use it by
-    default; the other engine stays optional (PLAN D30).
+    Bot engine this host is signed in to. Pi uses the ChatGPT login; the Builder
+    keeps Codex as its separate coding harness.
   choices:
     Claude Code (claude login): claude
     Codex (codex login): codex
+    Pi with ChatGPT (pi auth login openai-codex): pi
   default: claude

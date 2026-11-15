@@ -29,6 +29,17 @@ function workflows(id) {
   const longer = installed().filter(o => o !== id && o.startsWith(`${id}-`));
   return glob(`project/workflows/ext-${id}-*.yaml`).filter(f => !longer.some(o => f.startsWith(`project/workflows/ext-${o}-`)));
 }
+// A page may declare a counter: Dagu runs in one state carrying every listed
+// label. The panel runs the query; nothing from the extension is evaluated.
+const badgeLabel = value => typeof value==='string' && /^[A-Za-z0-9][A-Za-z0-9_.=-]{0,63}$/.test(value);
+function badge(file, data) {
+  const runs=data?.dagu_runs, extra=data && Object.keys(data).filter(key=>!['dagu_runs','warn_labels','attention'].includes(key));
+  if(!data || typeof data!=='object' || Array.isArray(data) || extra.length || !runs || typeof runs!=='object' || Array.isArray(runs) || Object.keys(runs).some(key=>!['status','labels'].includes(key)) || runs.status!=='waiting' ||
+    !Array.isArray(runs.labels) || !runs.labels.length || runs.labels.length>5 || !runs.labels.every(badgeLabel) ||
+    (data.warn_labels!==undefined && (!Array.isArray(data.warn_labels) || !data.warn_labels.length || data.warn_labels.length>5 || !data.warn_labels.every(badgeLabel))) ||
+    (data.attention!==undefined && typeof data.attention!=='boolean'))throw new Error(`${file}: invalid page badge`);
+  return {dagu_runs:{status:'waiting',labels:runs.labels},...(data.warn_labels&&{warn_labels:data.warn_labels}),...(data.attention===true&&{attention:true})};
+}
 function pages(id) {
   return glob(`extensions/${id}/pages/*.yaml`).map(file=>{
     const pageId=file.split('/').pop().slice(0,-5),data=read(file);
@@ -36,7 +47,7 @@ function pages(id) {
     if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
     if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
     const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
-    return {id:pageId,...name,url:data.url,icon:data.icon||'apps'};
+    return {id:pageId,...name,url:data.url,icon:data.icon||'apps',...(data.badge!==undefined&&{badge:badge(file,data.badge)})};
   });
 }
 /** Optional Setup step an extension adds (D51): `extensions/<ext>/setup.yaml` with a title and description. */

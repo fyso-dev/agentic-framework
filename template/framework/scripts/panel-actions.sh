@@ -54,9 +54,10 @@ case "${1:-}" in
     node -e 'const fs=require("fs"),cp=require("child_process"),r=JSON.parse(fs.readFileSync(process.argv[1])); console.log(JSON.stringify({created:r.created,changed:r.changed,deleted:r.deleted+JSON.parse(fs.readFileSync(process.argv[2])).length,commit:cp.execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()}))' "$tmp/apply.json" "$tmp/removals.json"
     ;;
   check)
-    export FYSO_CLAUDE_OK=false FYSO_CODEX_OK=false FYSO_DAGU_OK=false
+    export FYSO_CLAUDE_OK=false FYSO_CODEX_OK=false FYSO_PI_OK=false FYSO_DAGU_OK=false
     if command -v claude >/dev/null && claude auth status >/dev/null 2>&1; then FYSO_CLAUDE_OK=true; fi
     if command -v codex >/dev/null && codex login status >/dev/null 2>&1; then FYSO_CODEX_OK=true; fi
+    if command -v pi >/dev/null && pi auth check --provider openai-codex --no-refresh >/dev/null 2>&1; then FYSO_PI_OK=true; fi
     if framework/scripts/health.sh dagu >/dev/null 2>&1; then FYSO_DAGU_OK=true; fi
     omb models --json > "$tmp/models.json"
     # A team OMB rejects (e.g. a model the engine no longer offers) is a check result,

@@ -30,7 +30,7 @@ fi
 if [ ! -f secrets.enc.yaml ]; then
   # The legacy ADMIN password is now a technical Dagu credential, not a human login.
   password=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
-  tmp=$(mktemp)
+  tmp=$(mktemp "${TMPDIR:-/tmp}/fyso-setup.XXXXXXXX")
   trap 'rm -f "$tmp"' EXIT
   q="'"; printf "FYSO_ADMIN_PASSWORD: '%s'\n" "${password//$q/$q$q}" > "$tmp"   # YAML single-quoted
   SOPS_AGE_KEY_FILE="$key_file" sops encrypt --filename-override secrets.enc.yaml \

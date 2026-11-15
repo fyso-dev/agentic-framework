@@ -78,6 +78,7 @@ if 'dagu' in args and 'start' in args:
  (dest/'.copier-answers.yml').write_text('project_slug: '+p['SLUG']+'\\nport_base: '+p['PORT']+'\\n')
  if os.environ.get('FAIL_STEP')=='dagu':sys.exit(1)
 if 'doctor' in args and os.environ.get('FAIL_STEP')=='doctor':sys.exit(1)
+if 'auth' in args and 'check' in args and os.environ.get('PI_SIGNED_OUT'):sys.exit(1)
 ''');mise.chmod(0o755)
         self.env={**os.environ,'PATH':str(self.bin)+os.pathsep+os.environ['PATH'],
                   'XDG_STATE_HOME':str(self.root/'state'),'HOME':str(self.root/'home'),
@@ -112,6 +113,21 @@ if 'doctor' in args and os.environ.get('FAIL_STEP')=='doctor':sys.exit(1)
         self.assertFalse(Path((self.root/'secret-path').read_text()).exists())
         self.assertIn('doctor',commands)
         self.assertIn('test-project',(self.root/'state/fyso/projects.txt').read_text())
+
+    def test_pi_engine_is_passed_to_generated_project(self):
+        self.request['engine'] = 'pi'
+        self.run_install()
+        self.assertIn('ENGINE=pi',(self.root/'commands').read_text())
+
+    def test_signed_out_pi_shows_a_project_specific_login_command(self):
+        import contextlib
+        import io
+        self.request['engine'] = 'pi'; self.env['PI_SIGNED_OUT'] = '1'
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output): self.run_install()
+        self.assertIn('pi auth login openai-codex', output.getvalue())
+        self.assertIn('test-project', output.getvalue())
+        self.assertNotIn(self.request['password'], output.getvalue())
 
     def test_failed_dagu_removes_password_and_does_not_claim_success(self):
         with self.assertRaises(subprocess.CalledProcessError):self.run_install('dagu')

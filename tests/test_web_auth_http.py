@@ -56,6 +56,8 @@ class WebAuthHTTP(unittest.TestCase):
         public.mkdir(parents=True)
         (public / 'index.html').write_text('<!doctype html><title>Extension</title>')
         (public / 'client.js').write_text('/* extension-owned asset */')
+        (public / 'locales').mkdir()
+        (public / 'locales/es.json').write_text('{"title":"Pending"}')
         (public.parent / 'secrets.yaml').write_text('names: []')
         shutil.copy(Path(os.environ.get('FYSO_TEST_GATEWAY_CONFIG', ROOT / 'template/Caddyfile')), cls.root / 'Caddyfile')
         config = (ROOT / 'template/project/auth/tinyauth.yaml.jinja').read_text().replace('{{ admin_user }}', 'admin')
@@ -228,12 +230,24 @@ class WebAuthHTTP(unittest.TestCase):
         page = '/extensions/example-pages/panel/index.html'
         self.assertEqual(self.request('panel', page)[0], 401)
         cookie = self.login()
-        for path in [page, '/extensions/example-pages/panel/client.js']:
+        for path in [page, '/extensions/example-pages/panel/client.js', '/extensions/example-pages/panel/locales/es.json']:
             self.assertEqual(self.request('panel', path, cookie=cookie)[0], 200)
         self.assertEqual(self.request('panel', '/extensions/example-pages/secrets.yaml', cookie=cookie)[0], 404)
         self.assertEqual(self.request('panel', page, 'POST', {}, cookie=cookie,
             Origin=self.origin('panel'))[0], 405)
         self.assertEqual(self.request('panel', page, cookie=self.login('viewer'))[0], 403)
+
+    @unittest.skipUnless((ROOT / 'template/framework/extensions/human-requests/extensions/human-requests/panel').is_dir(), 'requires human-requests extension')
+    def test_human_requests_page_assets_use_the_existing_gateway(self):
+        source = ROOT / 'template/framework/extensions/human-requests/extensions/human-requests/panel'
+        target = self.root / 'extensions/human-requests/panel'
+        shutil.copytree(source, target)
+        cookie = self.login()
+        for asset in ['index.html', 'pending.js', 'pending.css', 'locales/es.json', 'locales/en.json']:
+            path = '/extensions/human-requests/panel/' + asset
+            self.assertEqual(self.request('panel', path)[0], 401, path)
+            self.assertEqual(self.request('panel', path, cookie=cookie)[0], 200, path)
+        self.assertEqual(self.request('panel', '/extensions/human-requests/skills/human-requests/SKILL.md', cookie=cookie)[0], 404)
 
     def test_02_basic_auth_and_forged_identity_do_not_bypass_sessions(self):
         status, _, _ = self.request('panel', '/config/project.json', Authorization=self.dagu_auth,

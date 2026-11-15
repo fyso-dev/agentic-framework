@@ -49,13 +49,14 @@ function forwarder(env = process.env) {
     }
   }
   return {
-    /** Dagu's tool definitions. The last good list is kept, so a client that starts while Dagu is down still sees them. */
-    async tools() {
+    /** Dagu's tool definitions. General clients may use the last good list while Dagu is down. */
+    async tools({allowCache = true} = {}) {
       try {
         const tools = (await request('tools/list', undefined, 10000)).tools.filter(tool => tool.name.startsWith('dagu_'));
         try { fs.mkdirSync(path.dirname(cache), {recursive: true}); fs.writeFileSync(cache, JSON.stringify(tools)); } catch {}
         return tools;
       } catch {
+        if (!allowCache) return [];
         try { return JSON.parse(fs.readFileSync(cache, 'utf8')); } catch { return []; }
       }
     },

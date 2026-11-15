@@ -1005,3 +1005,6 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
 .sk-chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; }
 .sk-facts dd { min-width: 0; }
 .modal-foot:has(.sk-read) { flex-wrap: wrap; }
+
+.attention-pill { text-decoration: none; }
+.attention-pill:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

@@ -24,6 +24,7 @@
   "github_failed": "GitHub sign-in was not completed.",
   "github_code": "Open https://github.com/login/device and enter code {code}. Complete sign-in, then press OK.",
   "engine_login": "First install {engine} and sign in using {command}. Then reopen the installer.",
+  "pi_login_help": "Pi needs your ChatGPT sign-in. In a terminal, run {command}, complete sign-in, then run {doctor_command}.",
   "done": "Project verified.\nFolder: {folder}\nPanel: {url}\nUser: {admin}",
   "log": "Technical log: {path}",
   "linux_folder": "Choose a directory in the Linux filesystem, outside /mnt.",

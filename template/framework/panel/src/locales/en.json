@@ -49,7 +49,8 @@
     "toDark": "Switch to dark theme",
     "more": "More options: language and theme",
     "openOmb": "Open OpenMausBot",
-    "ombShort": "OpenMausBot"
+    "ombShort": "OpenMausBot",
+    "attention": "{{name}}: {{count}}"
   },
   "nav": {
     "label": "Sections",
@@ -229,7 +230,9 @@
     "skillsExt": "They come from the installed extensions and from confirmed third-party skills. They are applied with the agent’s other changes.",
     "skillThirdParty": "third-party · {{src}}",
     "skillPending": "to review",
-    "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them."
+    "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them.",
+    "piHumanRequestContext": "To resume requests in this conversation, Pi can read this agent's conversations and those it opened with other agents.",
+    "piHumanRequestBlocked": "Conversation listing is blocked. Pi can create requests, but cannot receive questions or return to this conversation until it is enabled."
   },
   "preview": {
     "deleteHistoryWarning": "Deleting a bot from OpenMausBot permanently removes its conversation history. The configuration snapshot does not contain that history.",

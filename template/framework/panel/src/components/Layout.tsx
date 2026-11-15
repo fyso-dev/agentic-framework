@@ -6,6 +6,7 @@ import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
+import { useExtensionBadges } from "../lib/extensionBadges";
 import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
@@ -105,6 +106,30 @@ function MoreMenu(props: ThemeProps) {
   );
 }
 
+/** What extension pages marked as needing attention are counting, e.g. "Pendientes: 3". */
+function Attention() {
+  const { t, i18n } = useTranslation();
+  const s = useStore();
+  const extensions = s.extensions.data ?? [];
+  const badges = useExtensionBadges(extensions, !s.mock);
+  return (
+    <>
+      {extensions.flatMap((ext) =>
+        (ext.pages ?? []).filter((page) => page.badge?.attention).map((page) => {
+          const badge = badges[`extension:${ext.id}:${page.id}`];
+          if (!badge || badge.count === 0) return null;
+          return (
+            <a key={`${ext.id}:${page.id}`} href={href.extension(ext.id, page.id)} role="status" className={`state-pill pill-${badge.warn ? "warn" : "unk"} attention-pill`}>
+              <span aria-hidden="true" className="glyph">!</span>
+              {t("top.attention", { name: localized(i18n.language, page.name, page.name_i18n), count: badge.count })}
+            </a>
+          );
+        }),
+      )}
+    </>
+  );
+}
+
 export function TopBar(props: ThemeProps) {
   const { t } = useTranslation();
   const { project } = useStore();
@@ -118,6 +143,7 @@ export function TopBar(props: ThemeProps) {
       </a>
       {p && <span className="env-badge only-desktop">{t(`top.env.${p.env}`, { defaultValue: p.env })}</span>}
       <span className="grow only-desktop" />
+      <Attention />
       <GlobalState className="only-desktop" />
       <span className="only-desktop">
         <LangSwitch />
@@ -159,8 +185,10 @@ export function SideNav({ route }: { route: Route }) {
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
   const down = downApps(s);
+  const badges = useExtensionBadges(s.extensions.data ?? [], !s.mock);
   const counts: Record<NavItem["id"], ReactNode> = {
-
+    ...Object.fromEntries(Object.entries(badges).filter(([, badge]) => badge.count > 0).map(([id, badge]) => [id,
+      <span key={id} className="nav-count" style={{ color: badge.warn ? "var(--fy-warn)" : undefined, fontWeight: 700 }}>{badge.count}</span>])),
     connectors: null,
     observability: null,
     setup: loadingSteps(s) ? null : (
@@ -193,8 +221,9 @@ export function BottomNav({ route }: { route: Route }) {
   const s = useStore();
   const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
+  const extensionBadges = useExtensionBadges(s.extensions.data ?? [], !s.mock);
   const badges: Record<NavItem["id"], [number, string]> = {
-    connectors: [0, "badge"],
+    ...Object.fromEntries(Object.entries(extensionBadges).map(([id, badge]) => [id, [badge.count, badge.warn ? "badge badge-warn" : "badge"] as [number, string]])),    connectors: [0, "badge"],
     observability: [0, "badge"],
     setup: [open, s.anyFailed ? "badge" : "badge badge-warn"],
     bots: [unappliedCount(s), "badge badge-warn"],

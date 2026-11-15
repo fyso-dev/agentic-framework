@@ -12,7 +12,7 @@ import {
 } from "../components/Icons";
 import { Avatar, Modal, Switch } from "../components/ui";
 import { botActivity } from "../lib/bot-activity";
-import { accessFor, selectServer, type ToolScope } from "../lib/connector-access";
+import { accessFor, ensurePiHumanRequestOrigin, piHumanRequestOriginBlocked, selectServer, type ToolScope } from "../lib/connector-access";
 import { go, href, type BotTab } from "../lib/router";
 import {
   byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
@@ -77,8 +77,8 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   // skill needs the project's MCP servers, which a bot only loads from the project root.
   const extSkills = useMemo(
     () => [
-      ...(s.extensions.data ?? []).flatMap((e) => e.skills.map((k) => ({ from: t("form.skillFrom", { ext: e.id }), name: k, file: extensionSkillFile(e.id, k), servers: e.mcpServers, needsRoot: true, ready: true }))),
-      ...(s.skills.data ?? []).map((k) => ({ from: t("form.skillThirdParty", { src: k.src }), name: k.name, file: thirdPartySkillFile(k.name), servers: [] as string[], needsRoot: false, ready: k.state === "ready" })),
+      ...(s.extensions.data ?? []).flatMap((e) => e.skills.map((k) => ({ from: t("form.skillFrom", { ext: e.id }), ext: e.id as string | null, name: k, file: extensionSkillFile(e.id, k), servers: e.mcpServers, needsRoot: true, ready: true }))),
+      ...(s.skills.data ?? []).map((k) => ({ from: t("form.skillThirdParty", { src: k.src }), ext: null as string | null, name: k.name, file: thirdPartySkillFile(k.name), servers: [] as string[], needsRoot: false, ready: k.state === "ready" })),
     ],
     [s.extensions.data, s.skills.data, t],
   );
@@ -100,7 +100,15 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
       if (on && accessFor(next, name) === "none") next = selectServer(next, name, true);
       else if (!on && next?.allow?.includes(`mcp:${name}:*`)) next = { ...next, allow: next.allow.filter((x) => x !== `mcp:${name}:*`) };
     }
+    if (on && engine === "pi" && k.ext === "human-requests" && k.name === "human-requests") next = ensurePiHumanRequestOrigin(next);
     if (next !== scope) { setScope(next); setScopeChanged(true); }
+  };
+  const piHumanRequestSelected = uses && extSkills.some((k) => k.ext === "human-requests" && k.name === "human-requests" && skillOn(k.file));
+  const pickUses = (value: boolean) => {
+    setUses(value);
+    if (value && engine === "pi" && extSkills.some((k) => k.ext === "human-requests" && k.name === "human-requests" && skillOn(k.file))) {
+      const next = ensurePiHumanRequestOrigin(scope); if (next !== scope) { setScope(next); setScopeChanged(true); }
+    }
   };
 
   const [errors, setErrors] = useState<Errors>({});
@@ -136,6 +144,9 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
 
   const pickEngine = (e: Engine) => {
     setEngine(e.id);
+    if (e.id === "pi" && piHumanRequestSelected) {
+      const next = ensurePiHumanRequestOrigin(scope); if (next !== scope) { setScope(next); setScopeChanged(true); }
+    }
     if (!e.models.includes(model)) setModel(e.models[0] ?? "");
   };
 
@@ -309,6 +320,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
                   </div>
                 ))}
                 <p id={`${id}-skills-ext`} className="hint" style={{ paddingTop: 6 }}>{t(uses || extSkills.every((k) => !k.needsRoot) ? "form.skillsExt" : "form.skillsNeedRoot")}</p>
+                {engine === "pi" && piHumanRequestSelected && <p className="hint">{t(piHumanRequestOriginBlocked(scope) ? "form.piHumanRequestBlocked" : "form.piHumanRequestContext")}</p>}
               </div>
             )}
 
@@ -351,7 +363,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         {current === "conectores" && (
           <BotAccess
             scope={scope} onScope={(next) => { setScope(next); setScopeChanged(true); }}
-            uses={uses} onUses={setUses} usesLocked={!!bot?.usesWorkflows}
+            uses={uses} onUses={pickUses} usesLocked={!!bot?.usesWorkflows}
             runtime={runtime} botExists={!!bot} mcp={mcp} apps={apps}
             appChanges={appChanges}
             onAppChange={(slug, level) => setAppChanges((prev) => {

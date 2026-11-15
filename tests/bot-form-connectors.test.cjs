@@ -1,4 +1,21 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
+test('Pi human requests receive only the necessary conversation context selection',async()=>{
+  const {ensurePiHumanRequestOrigin,piHumanRequestOriginBlocked}=await import('../template/framework/panel/src/lib/connector-access.ts');
+  const original={allow:['native:*','mcp:dagu:*'],deny:['mcp:other:*']};
+  const next=ensurePiHumanRequestOrigin(original);
+  assert.deepEqual(next,{allow:['native:*','mcp:dagu:*','mcp:agents:list_threads'],deny:['mcp:other:*']});
+  assert.deepEqual(original,{allow:['native:*','mcp:dagu:*'],deny:['mcp:other:*']});
+  assert.strictEqual(ensurePiHumanRequestOrigin(next),next);
+  assert.strictEqual(ensurePiHumanRequestOrigin(undefined),undefined);
+  const denied={allow:['native:*'],deny:['mcp:agents:*']};
+  assert.strictEqual(ensurePiHumanRequestOrigin(denied),denied);
+  assert.equal(piHumanRequestOriginBlocked(denied),true);
+  assert.equal(piHumanRequestOriginBlocked(next),false);
+  assert.equal(piHumanRequestOriginBlocked({deny:['mcp:agents:list_threads']}),true);
+  const full={allow:Array.from({length:256},(_,i)=>`mcp:service:tool${i}`)};
+  assert.strictEqual(ensurePiHumanRequestOrigin(full),full,'do not exceed OMB selector limit');
+  assert.equal(piHumanRequestOriginBlocked(full),true);
+});
 test('the bot form versions one connector selection and preserves other profiles and fields',async()=>{
   const {parseTeam,readBots,upsertBot,serializeTeam}=await import('../template/framework/panel/src/lib/team.ts');
   const text='# project comment\nversion: 1\ndefaults:\n  cwd: ${FYSO_ROOT}\n  tools:\n    allow: ["native:*", "mcp:dagu:*"]\nbots:\n  - name: One\n    model: codex/model\n    approval: ask\n    soul: { file: ${FYSO_ROOT}/project/one.md }\n  - name: Two\n    model: claude/model\n    tools: { allow: ["native:*", "mcp:other:read"] }\n';

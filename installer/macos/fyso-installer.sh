@@ -107,7 +107,7 @@ else
       --textfield "$F_ADMIN,name=admin,value=$ADMIN,required" \
       --textfield "$F_PASSWORD,name=password,secure,value=$PASSWORD,required,regex=^.{12}.*$,regexerror=$F_PASSWORD_ERR" \
       --textfield "$F_PORT,name=port,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=$F_PORT_ERR" \
-      --selecttitle "$F_ENGINE" --selectvalues "Claude Code,Codex" --selectdefault "$CHOICE" \
+      --selecttitle "$F_ENGINE" --selectvalues "Claude Code,Codex,Pi (ChatGPT)" --selectdefault "$CHOICE" \
       --infobuttontext "$B_CHANGE_FOLDER" --button1text "$B_INSTALL" --button2text "$B_CANCEL" \
       "${SIZE[@]}" --ontop --moveable)
     rc=$?
@@ -132,7 +132,7 @@ fi
 case $FOLDER in "~"*) FOLDER="$HOME${FOLDER#\~}" ;; esac
 case $ADMIN in *[!A-Za-z0-9._-]*|"") ADMIN=admin ;; esac
 mkdir -p "$FOLDER" || { "$DIALOG" "${STYLE[@]}" --title none --message "$(t "$L_BAD_FOLDER" "$FOLDER")" --button1text "$B_CLOSE"; exit 1; }
-ENGINE=claude; [ "$CHOICE" = "Codex" ] && ENGINE=codex
+case "$CHOICE" in Codex|codex) ENGINE=codex ;; "Pi (ChatGPT)"|pi) ENGINE=pi ;; *) ENGINE=claude ;; esac
 SLUG=$(printf '%s' "$NAME" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\{1,\}/-/g; s/^-*//; s/-*$//' | cut -c1-31)
 case $SLUG in [a-z]?*) ;; *) SLUG="fyso-$SLUG"; SLUG=${SLUG%-} ;; esac
 # The slug names the project everywhere (FYSO_PROJECT, sockets, the fyso-<slug> MCP entry in
@@ -152,7 +152,8 @@ done
 echo "name=$NAME slug=$SLUG dir=$DIR port=$PORT engine=$ENGINE"
 
 # ---------------------------------------------------------------- 2. Fill the progress window
-TITLES[$ENGINE_ITEM]=$(t "$T_ENGINE" "$( [ $ENGINE = codex ] && echo Codex || echo 'Claude Code')")
+case "$ENGINE" in codex) engine_title=Codex ;; pi) engine_title='Pi (ChatGPT)' ;; *) engine_title='Claude Code' ;; esac
+TITLES[$ENGINE_ITEM]=$(t "$T_ENGINE" "$engine_title")
 ui "message: $(t "$L_INSTALLING" "$NAME" "$(short "$DIR")")"
 for t in "${TITLES[@]}"; do ui "listitem: add, title: $t, status: pending"; done
 ui "activate:"
@@ -253,9 +254,15 @@ fi
 
 # ---------------------------------------------------------------- 4. Coding engine session (optional)
 item $ENGINE_ITEM wait "$S_CHECKING"
-if [ $ENGINE = codex ]; then check="codex login status"; else check="claude auth status"; fi
-if command -v "${check%% *}" >/dev/null 2>&1 && $check >/dev/null 2>&1; then item $ENGINE_ITEM success; step_done
-else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
+if [ "$ENGINE" = pi ]; then
+  check="mise exec -- pi auth login openai-codex"
+  if (cd "$DIR" && mise exec -- pi auth check --provider openai-codex --no-refresh >/dev/null 2>&1); then item $ENGINE_ITEM success; step_done
+  else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
+else
+  if [ "$ENGINE" = codex ]; then check="codex login status"; else check="claude auth status"; fi
+  if command -v "${check%% *}" >/dev/null 2>&1 && $check >/dev/null 2>&1; then item $ENGINE_ITEM success; step_done
+  else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
+fi
 
 mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"

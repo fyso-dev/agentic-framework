@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -101,7 +102,7 @@ def install(request):
     folder = Path(request.get('folder') or '~/Fyso').expanduser()
     if (not name or not 12 <= len(password.encode('utf-8')) <= 72
             or any(c in name + str(folder) + password for c in '\r\n\x00')
-            or not re.fullmatch('[A-Za-z0-9._-]+', admin) or engine not in ['claude', 'codex']):
+            or not re.fullmatch('[A-Za-z0-9._-]+', admin) or engine not in ['claude', 'codex', 'pi']):
         raise ValueError(msg('invalid'))
     # Never put a WSL project on a Windows drive; Unix permissions and keys live in Linux.
     folder = folder.resolve()
@@ -158,6 +159,13 @@ def install(request):
         # Record even if doctor fails, so a partially configured project retains its identity.
         with registry.open('a') as out:
             out.write(str(target) + '\n')
+        if engine == 'pi':
+            status = subprocess.run([mise, '-C', target, 'exec', '--', 'pi', 'auth', 'check', '--provider', 'openai-codex', '--no-refresh'],
+                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if status.returncode:
+                command = shlex.join(['mise', '-C', str(target), 'exec', '--', 'pi', 'auth', 'login', 'openai-codex'])
+                doctor_command = shlex.join(['mise', '-C', str(target), 'run', 'doctor'])
+                print(msg('pi_login_help', command=command, doctor_command=doctor_command), flush=True)
         print(msg('checking'), flush=True)
         run([mise, '-C', target, 'run', 'doctor'], env=env)
         print(msg('done', folder=target, url=f'http://panel.{slug}-{port}.localhost:{port}', admin=admin), flush=True)

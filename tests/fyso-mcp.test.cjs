@@ -423,3 +423,71 @@ test('the scope server gives a bot Dagu read and execute for its scope only, wit
     assert.deepEqual(runs.structuredContent.data.items,[{name:'orders',dagRunId:'r1'}]);   // Dagu also returned orders-secret
   } finally {child.stdin.end();srv.close();fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a workflow scope lets a run carry plain labels but never a workspace label',()=>{
+  const names=new Map([['orders',{name:'orders',class:'project'}]]);
+  const g=guard('/nowhere','ventas',[],()=>names);
+  const start=labels=>g.check('dagu_execute',{action:'start',name:'orders',labels});
+  assert.doesNotThrow(()=>start(['assignee=team','blocking=true','deadline=1794932355','choices-hex='+'ab'.repeat(900)]));
+  for(const labels of [['workspace=ops'],['assignee=team','Workspace=ops'],['workspace'],'assignee=team',[42],['a b'],['=x'],['ok=ñ'],Array(17).fill('a=b')])
+    assert.throws(()=>start(labels),/workspace label is not available|plain run labels/,JSON.stringify(labels).slice(0,60));
+  assert.throws(()=>g.check('dagu_execute',{action:'start',name:'other',labels:['a=b']}),/not in scope/);
+});
+
+test('scoped execute advertises only arguments that its guard accepts',()=>{
+  const g=require('../template/framework/scripts/dagu-scope.cjs').guard('/tmp','test',[],()=>new Map());
+  const [tool]=g.tools([{name:'dagu_execute',inputSchema:{type:'object',properties:{action:{type:'string'},name:{type:'string'},targetType:{type:'string'},waitTimeoutSeconds:{type:'number'}},required:['action','name']}}]);
+  assert.deepEqual(Object.keys(tool.inputSchema.properties),['action','name']);
+  assert.deepEqual(tool.inputSchema.required,['action','name']);
+  assert.throws(()=>g.check('dagu_execute',{action:'start',name:'x',targetType:'dag'}),/not available/);
+});
+
+test('scoped Dagu results expose structured run details to text-only MCP clients',()=>{
+  const names=new Map([['orders',{name:'orders',class:'project'}]]);
+  const g=guard('/nowhere','ventas',[],()=>names);
+  const input={content:[{type:'text',text:'Dagu read completed.'},{type:'resource_link',uri:'dagu://runs/orders/r1',name:'run'}],structuredContent:{target:'run',data:{name:'orders',dagRunId:'r1',status:'waiting'}}};
+  const result=g.shape('dagu_read',{target:'run',name:'orders',dagRunId:'r1'},input);
+  assert.deepEqual(result.structuredContent,input.structuredContent);
+  assert.ok(result.content.some(item=>item.type==='text'&&item.text.includes('waiting')));
+  assert.ok(result.content.some(item=>item.type==='resource_link'));
+  const failed={isError:true,content:[{type:'text',text:'failed'}]};
+  assert.deepEqual(g.shape('dagu_read',{target:'run',name:'orders'},failed),failed);
+});
+
+test('Dagu-only project server exposes native Dagu tools without platform tools',async()=>{
+  const data=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dagu-only-'));
+  const {srv,port}=await fakeDagu({},DAGU_TOOLS);const c=mcp(port,{FYSO_DATA:data},['--dagu-only']);
+  try {
+    const init=(await c.call('initialize',{protocolVersion:'2025-06-18'})).result;
+    assert.equal(init.serverInfo.name,'fyso-dagu');
+    assert.deepEqual((await c.call('tools/list')).result.tools.map(t=>t.name),['dagu_read','dagu_execute','dagu_change']);
+    assert.equal((await c.call('tools/call',{name:'fyso_bot_apply',arguments:{}})).error.code,-32602);
+    const result=(await c.call('tools/call',{name:'dagu_read',arguments:{target:'run',name:'orders',dagRunId:'r1'}})).result;
+    assert.equal(result.structuredContent.echo.name,'dagu_read');
+    assert.ok(result.content.some(item=>item.type==='text' && item.text.includes('orders')));
+  } finally {c.close();srv.close();fs.rmSync(data,{recursive:true,force:true});}
+});
+
+test('Dagu-only discovery does not report cached tools when its Dagu is down',async()=>{
+  const data=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dagu-only-offline-'));
+  const {srv,port}=await fakeDagu({},DAGU_TOOLS);const live=mcp(port,{FYSO_DATA:data},['--dagu-only']);
+  try {
+    assert.ok((await live.call('tools/list')).result.tools.some(t=>t.name==='dagu_read'));
+    live.close();await new Promise(resolve=>srv.close(resolve));
+    const offline=mcp(1,{FYSO_DATA:data},['--dagu-only']);
+    try {assert.deepEqual((await offline.call('tools/list')).result.tools,[]);} finally {offline.close();}
+  } finally {live.close();srv.close();fs.rmSync(data,{recursive:true,force:true});}
+});
+
+test('the remote MCP removes its socket when stopped with SIGTERM', async () => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mcp-sock-')), sock=path.join(dir,'mcp.sock');
+  const child=spawn(process.execPath,[path.join(__dirname,'../template/framework/scripts/fyso-mcp.cjs'),'--http',sock],
+    {env:{PATH:process.env.PATH,FYSO_HTTP_PORT:'0'},stdio:['ignore','ignore','pipe']});
+  try {
+    await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(new Error('not ready')),5000);
+      child.stderr.on('data',()=>{if(fs.existsSync(sock)){clearTimeout(t);resolve();}});});
+    const code=await new Promise(resolve=>{child.once('exit',(c,s)=>resolve(c??s));child.kill('SIGTERM');});
+    assert.equal(code,0);
+    assert.equal(fs.existsSync(sock),false,'socket file left behind');
+  } finally { child.kill('SIGKILL'); fs.rmSync(dir,{recursive:true,force:true}); }
+});

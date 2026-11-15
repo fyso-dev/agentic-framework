@@ -80,3 +80,16 @@ bots:
     assert.equal(fs.existsSync(path.join(dir,'out/create.yaml')),false);assert.doesNotMatch(m,/soul|cwd/);
   } finally {srv.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('Pi model repair never silently changes a bot to another provider',()=>{
+  const {repair}=require(script);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-pi-model-'));
+  try {
+    const file=path.join(dir,'team.yaml');
+    const original='version: 1\nbots:\n  - name: Test\n    model: pi/openai-codex/retired\n';
+    fs.writeFileSync(file,original);
+    const engines=new Map([['pi',{default:'github-copilot/default',ids:new Set(['github-copilot/default','openai-codex/gpt-6-luna'])}]]);
+    assert.deepEqual(repair(file,engines),[]);
+    assert.equal(fs.readFileSync(file,'utf8'),original);
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});

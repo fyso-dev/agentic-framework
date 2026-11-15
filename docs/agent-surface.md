@@ -64,6 +64,10 @@ A desktop app cannot use the `dagu` entry of `.mcp.json`: it needs the project l
 - **Dagu down:** the last good tool list is kept in `.data/panel/dagu-mcp-tools.json`, because desktop apps list tools once at start. A call then fails with "Dagu is not reachable" and how the stack is started. With no list ever fetched the three tools are absent.
 - **Trust:** `dagu_execute` accepts inline specs, so it runs commands on the host as the project user. The remote project token grants the same access (D74). The tools retain Dagu's annotations; client approval behavior depends on the client.
 
+### Native Dagu connection for Pi bots (D77, beta in progress)
+
+A newly generated Pi project declares an enabled `dagu` server in project-owned `project/omb-mcp.json`. It runs the framework MCP in `--dagu-only` mode, exposing Dagu's native tools without Fyso's separate administrative tools. The definition contains no credentials; OpenMausBot supplies the project Dagu header from its isolated environment. The existing managed-MCP restore probes and enables it before the bot team is applied. Existing project-owned connector configuration is never replaced by template updates. Scoped servers remain separately selectable for narrower access.
+
 ### Workflow scopes (D60)
 
 A scope is a named subset of workflows that a group of bots may read and run, and nothing else in Dagu.
@@ -82,8 +86,10 @@ What the scope server allows (operator level, everything else refused):
 | `dagu_read target=runs` | requires `name`; sent to Dagu as that exact filter and filtered again on return |
 | `dagu_read uri=…` | only `dagu://dags/<name>…`, `dagu://runs/<name>…` in the scope, and `dagu://reference/…` |
 | `dagu_read` `reference(s)` | yes |
-| `dagu_execute` any action | only with a `name` in the scope; no `spec`, `targetType`, `queue`, `labels` |
+| `dagu_execute` any action | only with a `name` in the scope; no `spec`, `targetType` or `queue`; plain run labels are allowed except `workspace` |
 | `dagu_change`, searches, wiki, workbooks, profiles, any other target or argument | refused |
+
+Scoped replies retain Dagu's native content and structured result. When a structured result is present, it is also added as text so clients that ignore structured content can read it; run lists are filtered before that conversion.
 
 Arguments and targets are allow-listed, so something a later Dagu adds stays closed until reviewed. Unlimited scopes, no license, Dagu stays on basic auth (D19).
 
