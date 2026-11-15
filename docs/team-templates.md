@@ -29,7 +29,8 @@ Acceptance checklist:
 
 - `team` is the text `openmausbot team export --team <name>` writes, normalized so it is portable: exactly one entry in `teams:`, the bots whose `team:` is that department, and the rooms of that department. `cwd` and every machine path are removed; a bot that needs the project root gets it from the receiving project's `defaults`. Engine keys and secrets are never included (OMB already writes placeholders). `chief` and `manages` are dropped: bot-management powers are granted by a person in the receiving project (D81).
 - Skill entries in `team` use relative paths `skills/<bot-slug>/<skill>/SKILL.md`; each has one `skills[]` element with the same `path`.
-- The package digest is the SHA-256 of its canonical JSON (keys sorted, `skills` sorted by `path`). It identifies a version's content.
+- **Canonical form.** Every package is reduced to one form before it is digested, proposed or written: bots and rooms sorted by name; keys in OMB's export order (`name`, `team`, `title`, `description`, `soul`, `model`, `approval`, `computer`, `tools`, `skills`; any other key after them, sorted); soul and brief without trailing whitespace (OMB writes them with `|-`); each bot's skills at `skills/<bot-slug>/<skill-slug>/SKILL.md` (a skill shared by two bots is carried once per bot; files no bot references are dropped); a missing `approval` or `computer` stated as `ask` and `off`, because OMB exports both for every bot and would otherwise fill them from the receiving project's `defaults` or its own default (`approval: full`). `model` is required.
+- The package digest is the SHA-256 of the canonical JSON (keys sorted) of the canonical form. It identifies a version's content in any project: a department exported after package P was imported and applied normalizes back to exactly the canonical form of P, so both digests are equal (verified on OMB 0.1.141 with a real export and with a hand-written package).
 - Size: at most 512 KB in total, at most 64 skills.
 
 ## Where packages live
@@ -50,13 +51,24 @@ Acceptance checklist:
 
 The extension never writes `project/bots/team.yaml`; adding a department is a person's action.
 
+Module API (`require(path.join(FYSO_ROOT, 'framework/scripts/team-template.cjs'))`, used by fyso-ext-biz):
+
+| Function | Result |
+|---|---|
+| `departments(root)` | department names `project/bots/team.yaml` declares in `teams:` or its bots and rooms use, in file order, once each |
+| `exportDepartment(name, {root})` | Promise of `{package, digest}`; uses `FYSO_OMB_PORT` (never discovers OMB) and rejects `omb_export_failed` when the department does not exist |
+| `validate(pkg)` | throws on an invalid package |
+| `digest(pkg)` | hex SHA-256 of the canonical form |
+| `canonicalize(pkg)` | the canonical form |
+| `importPackage(pkg, {root, source, slug})` | Promise of `{proposedTeamYaml, currentTeamYaml, commit, slug, departamento, digest}`; writes and commits the skill files (gitleaks scan) and never applies `team.yaml`. `pkg` may be `null` with `source: "extension:<ext>/<slug>"` |
+
 Workflow parameters and output (`RESULT`, JSON):
 
 | `OP` | Parameters | Output |
 |---|---|---|
 | `team-templates` | — | `{templates: [{source: "extension:<ext>/<slug>", extension, slug, departamento, brief?, bots: [{name, title?}], rooms: [name], skills: <count>, digest}]}`; an invalid template has `{source, extension, slug, error}` instead |
 | `team-export` | `DEPARTMENT` | `{package, digest}` |
-| `team-import` | `PACKAGE_B64` (base64 of the package JSON) **or** `SOURCE=extension:<ext>/<slug>`; optional `SLUG` (default: the extension directory, else the slug of the department name) | `{proposedTeamYaml, commit, slug, departamento, digest, source?}`; `commit` is `null` when the skill files were already committed |
+| `team-import` | `PACKAGE_B64` (base64 of the package JSON) **or** `SOURCE=extension:<ext>/<slug>`; optional `SLUG` (default: the extension directory, else the slug of the department name) | `{proposedTeamYaml, currentTeamYaml, commit, slug, departamento, digest, source?}`; `commit` is `null` when the skill files were already committed |
 
 Errors are the run's failure message: `unsupported_format`, `invalid_package: <detail>`, `too_large`, `too_many_skills`, `unsafe_path: <path>`, `name_taken: <bot or room>`, `uncommitted_changes: <dir>`, `omb_export_failed: <OMB error>`, `secret_detected`. The import proposes before writing, so a rejected package changes nothing; it scans the written files with gitleaks before committing. The proposed `team.yaml` inlines souls and the department brief as the package carries them; skill entries point at `${FYSO_ROOT}/project/bots/teams/<slug>/skills/…`; department bots have no `cwd` and inherit the project's `defaults.cwd`. Bots of the department that the package no longer has are removed from the proposal, so the plan shows them as deletions for the person to accept or discard.
 

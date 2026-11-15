@@ -91,6 +91,12 @@ test('validate checks format, size, skill count, one department and safe paths',
   assert.throws(()=>t.validate({...pkg,skills:pkg.skills.slice(1)}),/unsafe_path/,'every referenced skill file travels');
   const cwd=yaml.parse(pkg.team);cwd.bots[0].cwd='${FYSO_ROOT}';
   assert.throws(()=>t.validate({...pkg,team:yaml.stringify(cwd)}),e=>/cwd/.test(e.detail));
+  const nomodel=yaml.parse(pkg.team);delete nomodel.bots[0].model;
+  assert.throws(()=>t.validate({...pkg,team:yaml.stringify(nomodel)}),e=>/model/.test(e.detail));
+  // OMB fills a missing approval (full) or computer from the receiving project: the package states them.
+  const bare=yaml.parse(pkg.team);delete bare.bots[0].approval;delete bare.bots[0].computer;
+  const filled=yaml.parse(t.canonicalize({...pkg,team:yaml.stringify(bare)}).team).bots[0];
+  assert.equal(filled.approval,'ask');assert.equal(filled.computer,'off');
   const host=yaml.parse(pkg.team);host.bots[0].soul=`See ${home}/notes`;
   assert.throws(()=>t.validate({...pkg,team:yaml.stringify(host)}),e=>e.detail==='host path');
 });
@@ -177,7 +183,7 @@ test('writeFiles replaces the department skills and commits only that directory'
   } finally {fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('extension templates are listed and imported from the teams slot',()=>{
+test('extension templates are listed and imported from the teams slot',async()=>{
   const {root,git}=repo();
   try {
     const pkg=sample(),dir=path.join(root,'extensions/demo/teams/ventas');
@@ -189,10 +195,93 @@ test('extension templates are listed and imported from the teams slot',()=>{
     assert.deepEqual({...ventas,brief:undefined},{source:'extension:demo/ventas',extension:'demo',slug:'ventas',departamento:'Ventas',brief:undefined,
       bots:[{name:'Jefa'},{name:'Vendedor'}],rooms:['Mesa de ventas'],skills:3,digest:t.digest(pkg)});
     assert.equal(broken.slug,'broken');assert.match(broken.error,/invalid_package/);
-    const result=t.importPackage({source:'extension:demo/ventas',root});
+    const result=await t.importPackage(null,{source:'extension:demo/ventas',root,scan:false});
+    assert.equal(result.currentTeamYaml,CURRENT);
     assert.equal(result.slug,'ventas');assert.equal(result.digest,t.digest(pkg));assert.match(result.commit,/^[a-f0-9]{40}$/);
     assert.match(result.proposedTeamYaml,/teams\/ventas\/skills\/jefa\/tono\/SKILL\.md/);
     assert.equal(fs.readFileSync(path.join(root,'project/bots/team.yaml'),'utf8'),CURRENT,'the team file is only proposed');
-    assert.throws(()=>t.importPackage({source:'extension:demo/../x',root}),/invalid_source/);
+    await assert.rejects(t.importPackage(null,{source:'extension:demo/../x',root}),/invalid_source/);
   } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('departments lists the names team.yaml declares or uses, once each',()=>{
+  const {root}=repo();
+  try {assert.deepEqual(t.departments(root),['Ventas']);
+    fs.writeFileSync(path.join(root,'project/bots/team.yaml'),'version: 1\nteams:\n  - name: Ventas\nbots:\n  - name: A\n    team: soporte\n  - name: B\n    team: VENTAS\nrooms:\n  - name: R\n    team: Mesa\n');
+    assert.deepEqual(t.departments(root),['Ventas','soporte','Mesa']);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('exportDepartment always passes the explicit port and rejects an unknown department',async()=>{
+  const dir=exportDir(),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'omb-tmp-')),calls=[];
+  const run=args=>{calls.push(args);const out=args[args.indexOf('--out')+1];
+    if(args[args.indexOf('--team')+1]!=='Ventas')throw Object.assign(Error('x'),{stderr:'error: no team named "nope"'});
+    fs.cpSync(dir,path.dirname(out),{recursive:true});fs.writeFileSync(out,EXPORT);};
+  try {
+    const result=await t.exportDepartment('Ventas',{port:'34704',tmp,run});
+    assert.equal(result.digest,t.digest(sample()));
+    assert.deepEqual(calls[0].slice(-2),['--port','34704']);
+    await assert.rejects(t.exportDepartment('nope',{port:'34704',tmp,run}),e=>e.message==='omb_export_failed'&&/no team named/.test(e.detail));
+    await assert.rejects(t.exportDepartment('Ventas',{port:'',tmp,run}),/omb_port_required/);
+    assert.deepEqual(fs.readdirSync(path.join(tmp,'team-template')),[],'the export directory is removed');
+  } finally {fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(tmp,{recursive:true,force:true});}
+});
+
+// What OMB writes after the proposal is applied: its own key order and bot order, `|-`
+// text, each bot's skills copied beside the file under OMB's bot slug, the absolute cwd
+// the project's defaults gave it and a dated comment.
+function ombExport(teamYaml,department,root,out) {
+  const doc=yaml.parse(teamYaml.replaceAll('${FYSO_ROOT}',root));
+  const strip=v=>typeof v==='string'?v.replace(/\n+$/,''):v;
+  const bots=doc.bots.filter(b=>b.team===department).reverse().map(b=>{
+    const {name,team,title,soul,model,approval,computer,tools,skills,...rest}=b;
+    return {name,team,...(title&&{title}),soul:strip(soul),model,approval,computer,cwd:root,...(tools&&{tools}),...rest,
+      ...(skills&&{skills:skills.map(e=>{const rel=`skills/${name.toLowerCase().replace(/ /g,'-')}/${path.basename(path.dirname(e.file))}/SKILL.md`;
+        fs.mkdirSync(path.dirname(path.join(out,rel)),{recursive:true});fs.copyFileSync(e.file,path.join(out,rel));return {...e,file:rel};})})};
+  });
+  const teams=doc.teams.filter(x=>x.name===department).map(x=>({...x,brief:strip(x.brief)}));
+  const text=`# Written by openmausbot team export on 2027-01-01.\n${yaml.stringify({version:1,teams,bots,rooms:(doc.rooms||[]).filter(r=>r.team===department)})}`;
+  fs.writeFileSync(path.join(out,'team.yaml'),text);return text;
+}
+
+test('round trip: a package imported, applied and exported again has the same digest',async()=>{
+  // Hand-written like an extension's: its own key order, trailing newlines, a shared skill path.
+  const P={formato:'omb-team/1',departamento:'Ventas',skills:[{path:'skills/shared/tono/SKILL.md',contenido:'---\nname: tono\n---\nCercano.\n'}],
+    team:`version: 1
+rooms:
+  - members: [Vendedor, Jefa]
+    name: Mesa de ventas
+    team: Ventas
+teams:
+  - brief: |
+      Vendemos juntos.
+    name: Ventas
+bots:
+  - model: claude/a
+    name: Vendedor
+    team: Ventas
+    soul: |
+      Vende.
+    skills:
+      - file: skills/shared/tono/SKILL.md
+  - name: Jefa
+    team: Ventas
+    approval: ask
+    model: claude/a
+    soul: Lidera.
+    skills:
+      - file: skills/shared/tono/SKILL.md
+`};
+  const {root}=repo(),out=fs.mkdtempSync(path.join(os.tmpdir(),'omb-roundtrip-'));
+  try {
+    const imported=await t.importPackage(P,{root,scan:false});
+    assert.equal(imported.digest,t.digest(P));
+    fs.writeFileSync(path.join(root,'project/bots/team.yaml'),imported.proposedTeamYaml);
+    const text=ombExport(imported.proposedTeamYaml,'Ventas',root,out);
+    const again=t.normalize(text,'Ventas',{dir:out});
+    assert.equal(t.digest(again),t.digest(P));
+    assert.deepEqual(again,t.canonicalize(P),'the export normalizes to exactly the canonical package');
+    assert.deepEqual(t.canonicalize(again),again,'canonical form is a fixed point');
+    assert.doesNotMatch(again.team,new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  } finally {fs.rmSync(root,{recursive:true,force:true});fs.rmSync(out,{recursive:true,force:true});}
 });

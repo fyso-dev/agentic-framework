@@ -62,7 +62,7 @@ async function main(env=process.env) {
   const op=env.OP||'list';
   if(op==='connections')return require('./connections.cjs').inventory(env);
   if(op==='import')return require('./import-bot.cjs').importBot(env);
-  if(op.startsWith('team-'))return teamTemplate(op,env,{root,base,port});
+  if(op.startsWith('team-'))return teamTemplate(op,env,{root,base,port}).catch(error=>{throw new Error(error.detail?`${error.message}: ${error.detail}`:error.message);});
   if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,team:b.section||'',title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
   if(op==='read') {
     const current=await state(),bot=current.live.find(b=>b.id===env.BOT_ID);
@@ -167,10 +167,10 @@ async function main(env=process.env) {
 }
 
 // Department templates (D82): list extension packages, export one department, import one.
-function teamTemplate(op,env,{root,base,port}) {
+async function teamTemplate(op,env,{root,base,port}) {
   const templates=require('./team-template.cjs');
   if(op==='team-templates')return {templates:templates.templates({root})};
-  if(op==='team-export')return templates.exportDepartment(env.DEPARTMENT||'',{port,tmp:base});
+  if(op==='team-export')return templates.exportDepartment(env.DEPARTMENT||'',{root,port,tmp:base});
   if(op!=='team-import')throw new Error('OP must be team-templates, team-export or team-import');
   if(!!env.PACKAGE_B64===!!env.SOURCE)throw new Error('team-import needs PACKAGE_B64 or SOURCE');
   if(env.SLUG && !/^[a-z0-9][a-z0-9-]{0,59}$/.test(env.SLUG))throw new Error('invalid SLUG');
@@ -181,10 +181,8 @@ function teamTemplate(op,env,{root,base,port}) {
   }
   const lock=path.join(base,'.lock');fs.mkdirSync(lock);
   try {
-    const scan=dir=>execFileSync('gitleaks',['dir',dir,'--no-banner','--redact'],{stdio:['ignore','ignore','pipe']});
-    return templates.importPackage({pkg,source:env.SOURCE||undefined,teamSlug:env.SLUG||undefined,root,scan});
-  } catch(error) {throw new Error(error.detail?`${error.message}: ${error.detail}`:error.message);}
-  finally {fs.rmdirSync(lock);}
+    return await templates.importPackage(pkg||null,{source:env.SOURCE||undefined,slug:env.SLUG||undefined,root});
+  } finally {fs.rmdirSync(lock);}
 }
 
 async function submit(params,env=process.env) {

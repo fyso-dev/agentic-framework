@@ -29,23 +29,86 @@ function yamlModule() {
   return yamlLib;
 }
 
-/** Canonical JSON: keys sorted at every level, skills sorted by path. */
+/** Canonical JSON: keys sorted at every level. */
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
   return JSON.stringify(value);
 }
-function digest(pkg) {
-  const skills = [...(pkg.skills || [])].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return crypto.createHash('sha256').update(canonical({...pkg, skills})).digest('hex');
-}
 
 const list = value => Array.isArray(value) ? value : [];
 const skillFiles = bot => list(bot?.skills).filter(entry => entry && typeof entry === 'object' && typeof entry.file === 'string');
+const byPath = (a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+const byName = (a, b) => { const x = String(a?.name ?? '').toLowerCase(), y = String(b?.name ?? '').toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; };
+// A path a package may carry before canonicalization; the canonical one is SKILL_PATH.
+const RAW_SKILL_PATH = /^skills\/(?:(?!\.\.?\/)[^/\0]+\/)+SKILL\.md$/;
+/** Known keys first, in OMB's export order; any other key after them, sorted. */
+function ordered(value, first) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const keys = [...first.filter(key => key in value), ...Object.keys(value).filter(key => !first.includes(key)).sort()];
+  return Object.fromEntries(keys.filter(key => value[key] !== undefined).map(key => [key, value[key]]));
+}
+// OMB writes text with `|-`: trailing newlines are formatting, not content.
+const text = value => typeof value === 'string' ? value.replace(/\s+$/, '') : value;
 
 /**
- * `openmausbot team export --team <name>` text → package. `readSkill(file)` returns the
- * text of a skill file as the export wrote it (relative to the export file).
+ * The one form of a package: bots and rooms sorted by name, keys in a fixed order, soul and
+ * brief without trailing newlines, each bot's skills at `skills/<bot-slug>/<skill>/SKILL.md`.
+ * A department exported after this package was applied normalizes back to the same form, so
+ * equal configurations have equal digests in any project.
+ */
+function canonicalize(pkg) {
+  const yaml = yamlModule();
+  if (!pkg || typeof pkg !== 'object' || pkg.formato !== FORMAT) fail('unsupported_format');
+  if (typeof pkg.team !== 'string' || !Array.isArray(pkg.skills)) fail('invalid_package');
+  if (Buffer.byteLength(JSON.stringify(pkg)) > MAX_BYTES) fail('too_large');
+  if (pkg.skills.length > MAX_SKILLS) fail('too_many_skills');
+  // Skill files no bot references are left out of the canonical package.
+  const contents = new Map();
+  for (const skill of pkg.skills) {
+    if (!skill || typeof skill.path !== 'string' || typeof skill.contenido !== 'string' || !RAW_SKILL_PATH.test(skill.path)) fail('unsafe_path', skill?.path);
+    if (contents.has(skill.path)) fail('invalid_package', `duplicate ${skill.path}`);
+    contents.set(skill.path, skill.contenido);
+  }
+  let team;
+  try { team = yaml.parse(pkg.team); } catch { fail('invalid_package', 'team'); }
+  if (!team || typeof team !== 'object' || Array.isArray(team)) fail('invalid_package', 'team');
+  const skills = new Map();
+  const bots = list(team.bots).map(source => {
+    if (!source || typeof source !== 'object') fail('invalid_package', 'bot');
+    // OMB exports approval and computer for every bot, filling a missing one from the
+    // receiving project's defaults or its own (approval full). State them, the safe way.
+    const bot = {...source, soul: text(source.soul), approval: source.approval ?? 'ask', computer: source.computer ?? 'off'};
+    if (Array.isArray(bot.skills)) {
+      const botSlug = slug(bot.name);
+      bot.skills = bot.skills.map(entry => {
+        if (!entry || typeof entry !== 'object' || typeof entry.file !== 'string') return entry;
+        const file = `skills/${botSlug}/${slug(path.posix.basename(path.posix.dirname(entry.file)))}/SKILL.md`;
+        if (!contents.has(entry.file) || !SKILL_PATH.test(file)) fail('unsafe_path', entry.file);
+        if (skills.has(file) && skills.get(file) !== contents.get(entry.file)) fail('invalid_package', `two skills at ${file}`);
+        skills.set(file, contents.get(entry.file));
+        const {file: _, enabled, ...rest} = entry;
+        return ordered({file, ...(enabled === false && {enabled}), ...rest}, ['file', 'enabled']);
+      });
+    }
+    return ordered(bot, ['name', 'team', 'title', 'description', 'soul', 'model', 'approval', 'computer', 'cwd', 'tools', 'skills']);
+  }).sort(byName);
+  const teams = list(team.teams).map(entry => ordered(entry && typeof entry === 'object' ? {...entry, brief: text(entry.brief)} : entry, ['name', 'brief']));
+  const rooms = list(team.rooms).map(room => ordered(room, ['name', 'team', 'members', 'responder'])).sort(byName);
+  const rest = ordered(team, ['version']);
+  for (const key of ['teams', 'bots', 'rooms']) delete rest[key];
+  const body = {...rest, version: team.version ?? 1, teams, bots, ...(rooms.length && {rooms})};
+  return {formato: FORMAT, departamento: pkg.departamento, team: yaml.stringify(ordered(body, ['version', 'teams', 'bots', 'rooms'])),
+    skills: [...skills].map(([file, contenido]) => ({path: file, contenido})).sort(byPath)};
+}
+
+function digest(pkg) {
+  return crypto.createHash('sha256').update(canonical(canonicalize(pkg))).digest('hex');
+}
+
+/**
+ * `openmausbot team export --team <name>` text → canonical package. `readSkill(file)` returns
+ * the text of a skill file as the export wrote it (relative to the export file).
  */
 function normalize(exportText, department, {readSkill, dir} = {}) {
   const yaml = yamlModule();
@@ -59,66 +122,52 @@ function normalize(exportText, department, {readSkill, dir} = {}) {
   const teams = list(exported.teams).filter(team => same(team?.name, department));
   if (teams.length !== 1) fail('department_not_found', department);
   const name = String(teams[0].name).trim();
-  const team = {...teams[0]};
-  if (team.brief && typeof team.brief === 'object') fail('unsafe_path', 'brief');
-  const skills = [], seen = new Map();
+  const skills = new Map();
   const bots = list(exported.bots).filter(bot => same(bot?.team, name)).map(source => {
     const bot = {...source, team: name};
     for (const key of DROPPED) delete bot[key];
-    if (bot.soul && typeof bot.soul === 'object') fail('unsafe_path', `${bot.name}: soul`);
-    if (Array.isArray(bot.skills)) {
-      const botSlug = slug(bot.name);
-      if (!botSlug) fail('invalid_export', `bot ${bot.name}`);
-      bot.skills = bot.skills.map(entry => {
-        if (!entry || typeof entry !== 'object' || typeof entry.file !== 'string') return entry;
-        const skill = slug(path.basename(path.dirname(entry.file)));
-        const file = `skills/${botSlug}/${skill}/SKILL.md`;
-        if (!skill || !SKILL_PATH.test(file)) fail('unsafe_path', entry.file);
-        if (!seen.has(file)) { const contenido = read(entry.file); seen.set(file, contenido); skills.push({path: file, contenido}); }
-        return {...entry, file};
-      });
+    for (const entry of skillFiles(bot)) {
+      if (!RAW_SKILL_PATH.test(entry.file)) fail('unsafe_path', entry.file);
+      if (!skills.has(entry.file)) skills.set(entry.file, read(entry.file));
     }
     return bot;
   });
   const rooms = list(exported.rooms).filter(room => same(room?.team, name)).map(room => ({...room, team: name}));
-  // Rebuilt without the export's dated comment, so the same department gives the same digest.
-  const text = yaml.stringify({version: exported.version ?? 1, teams: [team], bots, ...(rooms.length && {rooms})});
-  const pkg = {formato: FORMAT, departamento: name, team: text, skills: skills.sort((a, b) => a.path < b.path ? -1 : 1)};
-  validate(pkg);
+  // Rebuilt without the export's dated comment, so the same department gives the same package.
+  const raw = {formato: FORMAT, departamento: name, team: yaml.stringify({version: exported.version ?? 1, teams: [{...teams[0], name}], bots, rooms}),
+    skills: [...skills].map(([file, contenido]) => ({path: file, contenido}))};
+  const pkg = canonicalize(raw);
+  check(pkg);
   return pkg;
 }
 
-/** Structure, size and portability of a package; returns the parsed team file. */
+/** Structure, size and portability of a package; throws on an invalid one. Returns its canonical team file. */
 function validate(pkg) {
+  return check(canonicalize(pkg));
+}
+
+function check(pkg) {
   const yaml = yamlModule();
-  if (!pkg || typeof pkg !== 'object' || pkg.formato !== FORMAT) fail('unsupported_format');
   if (Buffer.byteLength(JSON.stringify(pkg)) > MAX_BYTES) fail('too_large');
   const name = pkg.departamento;
   if (typeof name !== 'string' || !/^[^\r\n]{1,60}$/u.test(name) || name !== name.trim() || same(name, 'general')) fail('invalid_package', 'departamento');
-  if (typeof pkg.team !== 'string' || !Array.isArray(pkg.skills)) fail('invalid_package');
   if (pkg.skills.length > MAX_SKILLS) fail('too_many_skills');
-  const files = new Map();
-  for (const skill of pkg.skills) {
-    if (!skill || typeof skill.path !== 'string' || typeof skill.contenido !== 'string' || !SKILL_PATH.test(skill.path)) fail('unsafe_path', skill?.path);
-    if (files.has(skill.path)) fail('invalid_package', `duplicate ${skill.path}`);
-    files.set(skill.path, skill.contenido);
-  }
-  let team;
-  try { team = yaml.parse(pkg.team); } catch { fail('invalid_package', 'team'); }
-  if (!team || typeof team !== 'object' || Array.isArray(team)) fail('invalid_package', 'team');
+  const files = new Set(pkg.skills.map(skill => skill.path));
+  const team = yaml.parse(pkg.team);
   const teams = list(team.teams);
-  if (teams.length !== 1 || team.teams.length !== 1 || teams[0]?.name !== name) fail('invalid_package', 'one department');
+  if (teams.length !== 1 || teams[0]?.name !== name) fail('invalid_package', 'one department');
   if (teams[0].brief !== undefined && typeof teams[0].brief !== 'string') fail('unsafe_path', 'brief');
   if (!Array.isArray(team.bots) || !team.bots.length) fail('invalid_package', 'bots');
   if (team.defaults !== undefined) fail('invalid_package', 'defaults');
   const names = new Set();
   for (const bot of team.bots) {
-    if (!bot || typeof bot.name !== 'string' || !/^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,79}$/u.test(bot.name)) fail('invalid_package', 'bot name');
+    if (typeof bot.name !== 'string' || !/^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,79}$/u.test(bot.name)) fail('invalid_package', 'bot name');
     if (names.has(bot.name.toLowerCase())) fail('invalid_package', `duplicate bot ${bot.name}`);
     names.add(bot.name.toLowerCase());
     if (bot.team !== name) fail('invalid_package', `${bot.name}: department`);
     for (const key of DROPPED) if (bot[key] !== undefined) fail('invalid_package', `${bot.name}: ${key}`);
     if (bot.soul !== undefined && typeof bot.soul !== 'string') fail('unsafe_path', `${bot.name}: soul`);
+    if (typeof bot.model !== 'string' || !/^[\w.-]+\/[\w./:_-]+$/.test(bot.model)) fail('invalid_package', `${bot.name}: model`);
     for (const entry of skillFiles(bot)) if (!files.has(entry.file)) fail('unsafe_path', entry.file);
   }
   for (const room of list(team.rooms)) {
@@ -136,7 +185,8 @@ function validate(pkg) {
 function propose(current, pkg, teamSlug) {
   const yaml = yamlModule();
   if (!SLUG.test(teamSlug || '')) fail('invalid_slug');
-  const team = validate(pkg), name = pkg.departamento;
+  pkg = canonicalize(pkg);
+  const team = check(pkg), name = pkg.departamento;
   if (current.includes(MARKER)) fail('invalid_team_file');
   const doc = yaml.parseDocument(current.replaceAll(ROOT_VAR, MARKER));
   if (doc.errors.length || !yaml.isMap(doc.contents)) fail('invalid_team_file');
@@ -187,7 +237,8 @@ function propose(current, pkg, teamSlug) {
 
 /** Replace the department's skill files and commit that directory on its own. */
 function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}), scan} = {}) {
-  validate(pkg);
+  pkg = canonicalize(pkg);
+  check(pkg);
   if (!SLUG.test(teamSlug || '')) fail('invalid_slug');
   const dir = `project/bots/teams/${teamSlug}`, skillsDir = path.join(root, dir, 'skills');
   if (git('status', '--porcelain', '--', dir).trim()) fail('uncommitted_changes', dir);
@@ -211,8 +262,17 @@ function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => exe
   }
 }
 
-/** Export one department from this project's OMB, always on its explicit port. */
-function exportDepartment(name, {port = process.env.FYSO_OMB_PORT, tmp = process.env.FYSO_DATA, run} = {}) {
+/** Department names `project/bots/team.yaml` declares or its bots and rooms use, in file order. */
+function departments(root = process.cwd()) {
+  const team = yamlModule().parse(fs.readFileSync(path.join(root, 'project/bots/team.yaml'), 'utf8').replaceAll(ROOT_VAR, MARKER)) || {};
+  const names = [];
+  const add = value => { const name = String(value ?? '').trim(); if (name && !names.some(other => same(other, name))) names.push(name); };
+  for (const key of ['teams', 'bots', 'rooms']) for (const item of list(team[key])) add(key === 'teams' ? item?.name : item?.team);
+  return names;
+}
+
+/** Export one department from this project's OMB, always on its explicit port. Resolves to `{package, digest}`. */
+async function exportDepartment(name, {root = process.env.FYSO_ROOT || process.cwd(), port = process.env.FYSO_OMB_PORT, tmp = process.env.FYSO_DATA || path.join(root, '.data'), run} = {}) {
   if (!/^[0-9]+$/.test(String(port || ''))) fail('omb_port_required');
   if (typeof name !== 'string' || !/^[^\r\n]{1,60}$/u.test(name.trim())) fail('invalid_department');
   const base = path.join(tmp || require('node:os').tmpdir(), 'team-template');
@@ -278,32 +338,39 @@ function templates({root = process.cwd()} = {}) {
   return found;
 }
 
-/** Import: commit the skill files, then return the proposed team.yaml for the person to review. */
-function importPackage({pkg, source, teamSlug, root = process.cwd(), scan, git} = {}) {
+const gitleaks = dir => execFileSync('gitleaks', ['dir', dir, '--no-banner', '--redact'], {stdio: ['ignore', 'ignore', 'pipe']});
+
+/**
+ * Import: commit the department's skill files, then resolve to the proposed team.yaml for the
+ * person to review and apply. `pkg` may be null with `source: "extension:<ext>/<slug>"`.
+ * `scan` defaults to gitleaks over the written files; `false` skips it.
+ */
+async function importPackage(pkg, {root = process.env.FYSO_ROOT || process.cwd(), source, slug: teamSlug, scan = gitleaks, git} = {}) {
   if (!pkg) {
     const match = /^extension:([a-z][a-z0-9-]{1,30})\/([a-z0-9][a-z0-9-]{0,59})$/.exec(source || '');
     if (!match) fail('invalid_source');
     pkg = extensionPackage(match[1], match[2], {root});
     teamSlug = teamSlug || match[2];
   }
-  validate(pkg);
+  pkg = canonicalize(pkg);
+  check(pkg);
   teamSlug = teamSlug || slug(pkg.departamento);
-  const current = fs.readFileSync(path.join(root, 'project/bots/team.yaml'), 'utf8');
+  const currentTeamYaml = fs.readFileSync(path.join(root, 'project/bots/team.yaml'), 'utf8');
   // Propose first: a rejected package writes nothing.
-  const proposedTeamYaml = propose(current, pkg, teamSlug);
-  const commit = writeFiles(pkg, teamSlug, {root, scan, ...(git && {git})});
-  return {proposedTeamYaml, commit, slug: teamSlug, departamento: pkg.departamento, digest: digest(pkg), ...(source && {source})};
+  const proposedTeamYaml = propose(currentTeamYaml, pkg, teamSlug);
+  const commit = writeFiles(pkg, teamSlug, {root, scan: scan || undefined, ...(git && {git})});
+  return {proposedTeamYaml, currentTeamYaml, commit, slug: teamSlug, departamento: pkg.departamento, digest: digest(pkg), ...(source && {source})};
 }
 
-module.exports = {FORMAT, MAX_BYTES, MAX_SKILLS, canonical, digest, normalize, validate, propose, writeFiles, exportDepartment, extensionPackage, templates, importPackage, slug};
+module.exports = {FORMAT, MAX_BYTES, MAX_SKILLS, canonical, canonicalize, digest, normalize, validate, propose, departments, writeFiles, exportDepartment, extensionPackage, templates, importPackage, slug};
 
 if (require.main === module) {
   const [op, arg] = process.argv.slice(2);
-  try {
-    const result = op === 'export' ? exportDepartment(arg)
-      : op === 'list' ? {templates: templates()}
-      : op === 'validate' ? (pkg => ({digest: (validate(pkg), digest(pkg))}))(JSON.parse(fs.readFileSync(arg, 'utf8')))
-      : fail('usage: team-template.cjs export <department> | list | validate <package.json>');
-    console.log(JSON.stringify(result));
-  } catch (error) { console.error(error.detail ? `${error.message}: ${error.detail}` : error.message); process.exitCode = 1; }
+  (async () => op === 'export' ? exportDepartment(arg)
+    : op === 'list' ? {templates: templates()}
+    : op === 'departments' ? {departments: departments()}
+    : op === 'validate' ? (pkg => ({digest: (validate(pkg), digest(pkg))}))(JSON.parse(fs.readFileSync(arg, 'utf8')))
+    : fail('usage: team-template.cjs export <department> | departments | list | validate <package.json>'))()
+    .then(result => console.log(JSON.stringify(result)))
+    .catch(error => { console.error(error.detail ? `${error.message}: ${error.detail}` : error.message); process.exitCode = 1; });
 }
