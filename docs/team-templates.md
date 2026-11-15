@@ -10,11 +10,19 @@ A **department template** is one OpenMausBot department (team) with its bots, ro
 
 Acceptance checklist:
 
-- [ ] Installing the demo extension offers its two departments; adding one writes and commits its files and proposes the `team.yaml` change that the person reviews and applies.
-- [ ] Publishing a department from project A creates a Biz team whose export returns the same package.
-- [ ] Project B lists that team and pulls it; after apply, its bots have the same soul, model, approval, skills, department instructions and rooms.
-- [ ] A change in A publishes a new version and B pulls it; a change in B publishes and A pulls; a change on both sides reports a conflict and changes nothing until the person chooses.
-- [ ] Framework regressions, the Biz extension tests, fyso-business tests and `mise run doctor` on both projects pass.
+- [x] Installing the demo extension offers its two departments; adding one writes and commits its files and proposes the `team.yaml` change that the person reviews and applies.
+- [x] Publishing a department from project A creates a Biz team whose export returns the same package.
+- [x] Project B lists that team and pulls it; after apply, its bots have the same soul, model, approval, skills, department instructions and rooms.
+- [x] A change in A publishes a new version and B pulls it; a change in B publishes and A pulls; a change on both sides reports a conflict and changes nothing until the person chooses.
+- [ ] Framework regressions, the Biz extension tests, fyso-business tests and `mise run doctor` on both projects pass. Framework, extension and doctor pass; the fyso-business results come with its PR.
+
+Checkpoint 2026-11-15, two projects generated from this branch and the local Biz. Every step ran through the Dagu workflows the panel calls (`fyso-bot-architect`, `fyso-bots-plan`, `fyso-bots-apply`, `ext-biz-team`); the panel screens themselves were not driven in a browser for this run.
+
+- Project B (port block 34800) installed `teams-demo` and imported *Ventas* and *Marketing*: each plan created the department, two bots and the room. The OMB export then returned the extension package's digest.
+- B published both to Biz as version 1. Project A (34700) pulled them; its export returned the same digests.
+- A change in A (a bot title) became version 2 and B pulled it. A change in B (a skill file, applied) became version 3 and A pulled it. Each plan showed only the changed field.
+- With both sides changed, B showed `conflict`; publishing returned `version_conflict`, pulling returned `conflict`, and git stayed clean. *Publish mine* made version 5, which A pulled. In a second conflict, *pull from Biz* replaced B's edit with version 6.
+- Results: 118 framework CI tests, 52 Biz extension tests, `check-paths` and `mise run doctor` on both projects pass.
 
 ## The package (`omb-team/1`)
 

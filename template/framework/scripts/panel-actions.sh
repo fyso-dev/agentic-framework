@@ -41,7 +41,12 @@ case "${1:-}" in
     cp "$team" "$tmp/bots/team.yaml"
     gitleaks dir "$tmp/bots" --no-banner --redact >&2
     cmp -s "$tmp/current.yaml" project/bots/team.yaml || fail 'team declaration changed; open a fresh preview'
-    omb team apply "$tmp/rendered.yaml" --json > "$tmp/apply.json"
+    # OMB writes its error as the last JSON object on stdout, after any warning lines. It
+    # applies section by section, so a failure can leave part of the change applied: the
+    # next preview shows what is still pending.
+    if ! omb team apply "$tmp/rendered.yaml" --json > "$tmp/apply.json"; then
+      fail "OpenMausBot did not apply the change; open a fresh preview: $(node -e 'try { const t = require("fs").readFileSync(process.argv[1], "utf8").trim(), i = t.lastIndexOf("\n{"); const r = JSON.parse(i < 0 ? t : t.slice(i + 1)); console.log(String(r.error || "no details").slice(0, 300)); } catch { console.log("no details"); }' "$tmp/apply.json")"
+    fi
     cmp -s "$tmp/current.yaml" project/bots/team.yaml || fail 'team declaration changed; open a fresh preview'
     node framework/scripts/panel-bot-removal.cjs delete "$tmp/removals.json"
     cmp -s "$tmp/current.yaml" project/bots/team.yaml || fail 'team declaration changed; open a fresh preview'
