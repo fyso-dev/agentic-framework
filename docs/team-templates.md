@@ -14,7 +14,7 @@ Acceptance checklist:
 - [x] Publishing a department from project A creates a Biz team whose export returns the same package.
 - [x] Project B lists that team and pulls it; after apply, its bots have the same soul, model, approval, skills, department instructions and rooms.
 - [x] A change in A publishes a new version and B pulls it; a change in B publishes and A pulls; a change on both sides reports a conflict and changes nothing until the person chooses.
-- [ ] Framework regressions, the Biz extension tests, fyso-business tests and `mise run doctor` on both projects pass. Framework, extension and doctor pass; the fyso-business results come with its PR.
+- [x] Framework regressions, the Biz extension tests, fyso-business tests and `mise run doctor` on both projects pass. fyso-business (`feat/mcp-publicar-equipo`): typecheck, lint and 6957 tests pass. Its committed verify flow still has to run on a Branch Preview before its PR.
 
 Checkpoint 2026-11-15, two projects generated from this branch and the local Biz. Every step ran through the Dagu workflows the panel calls (`fyso-bot-architect`, `fyso-bots-plan`, `fyso-bots-apply`, `ext-biz-team`); the panel screens themselves were not driven in a browser for this run.
 
