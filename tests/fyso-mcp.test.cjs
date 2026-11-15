@@ -20,7 +20,7 @@ function fakeDagu(outputs,mcpTools) {
         if(msg.method==='initialize'){const id=`s${++state.opened}`;state.sessions.add(id);res.setHeader('Mcp-Session-Id',id);return send({jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'dagu',version:'t'}}});}
         if(!state.sessions.has(sid)){res.statusCode=404;return res.end('session not found');}
         if(msg.id===undefined){res.statusCode=202;return res.end();}
-        const result=msg.method==='tools/list'?{tools:mcpTools}:msg.params?.arguments?.target==='runs'?{content:[{type:'text',text:'Dagu read completed.'}],structuredContent:{data:{items:[{name:'orders',dagRunId:'r1'},{name:'orders-secret',dagRunId:'r2'}]},target:'runs'}}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
+        const result=msg.method==='tools/list'?{tools:mcpTools}:msg.params?.arguments?.type==='upsert_wiki_page'?{content:[{type:'text',text:'saved'}],structuredContent:{applied:true}}:msg.params?.arguments?.target==='runs'?{content:[{type:'text',text:'Dagu read completed.'}],structuredContent:{data:{items:[{name:'orders',dagRunId:'r1'},{name:'orders-secret',dagRunId:'r2'}]},target:'runs'}}:{content:[{type:'text',text:'Dagu done.'},{type:'resource_link',uri:'dagu://runs/x/1',name:'dag_run'}],structuredContent:{echo:msg.params}};
         if(msg.method==='tools/call')mcpCalls.push({...msg.params,session:sid});
         if(state.sse){res.setHeader('Content-Type','text/event-stream');return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc:'2.0',method:'notifications/progress',params:{}})}\n\nevent: message\ndata: ${JSON.stringify({jsonrpc:'2.0',id:msg.id,result})}\n\n`);}
         return send({jsonrpc:'2.0',id:msg.id,result});
@@ -70,10 +70,26 @@ test('connection discovery uses the same native architect workflow as the panel'
   } finally {c.close();srv.close();}
 });
 
+test('feedback records separate project wiki pages through Dagu, even with --no-dagu',async()=>{
+  const {srv,mcpCalls,port}=await fakeDagu({},DAGU_TOOLS);const c=mcp(port,{},['--no-dagu']);
+  try {
+    const submit=()=>c.call('tools/call',{name:'fyso_feedback',arguments:{title:'Broken workflow',description:'Expected success; got an error.',component:'Dagu'}});
+    const first=(await submit()).result.structuredContent, second=(await submit()).result.structuredContent;
+    assert.notEqual(first.id,second.id);assert.equal(first.status,'saved');assert.equal(first.notification,'none');
+    const sent=mcpCalls[0];assert.equal(sent.name,'dagu_change');assert.equal(sent.arguments.type,'upsert_wiki_page');assert.equal(sent.arguments.mode,'apply');assert.equal(sent.arguments.path,`feedback/${first.id}`);
+    assert.match(sent.arguments.content,/Broken workflow/);assert.match(sent.arguments.content,/Expected success/);
+    assert.equal((await c.call('tools/call',{name:'fyso_feedback',arguments:{title:' ',description:'x'}})).result.isError,true);
+    assert.equal((await c.call('tools/call',{name:'fyso_feedback',arguments:{title:'x',description:'x'.repeat(16001)}})).result.isError,true);
+    assert.equal(mcpCalls.length,2);
+  } finally {c.close();srv.close();}
+});
+
 test('tools run the panel workflows with their params and return parsed outputs',async()=>{
   const {srv,calls,port}=await fakeDagu({
     'fyso-ext-install':{result:JSON.stringify({id:'sample',mode:'add',version:'v1.0.0',commit:'abc1234'})},
     'fyso-bot-architect':{result:JSON.stringify({planId:'p1',action:'create',preview:['create Support']})},
+    'fyso-skills-catalog':{catalog:JSON.stringify({preview:{name:'pdf',skillMd:'text'}})},
+    'fyso-skills-install':{result:JSON.stringify({op:'add',name:'pdf',commit:'abc1234',skill:{name:'pdf',state:'review'}})},
     'fyso-ext-catalog':{catalog:JSON.stringify({catalogs:[{name:'Fyso'}],extensions:[{id:'sample',name:'Sample',description:'demo',tags:['demo']},{id:'netbird',name:'NetBird',description:'network',tags:[]}]})},
   });
   const c=mcp(port);
@@ -87,6 +103,19 @@ test('tools run the panel workflows with their params and return parsed outputs'
     assert.deepEqual(JSON.parse(Buffer.from(sent.BOT_B64,'base64').toString()),{name:'Support',model:'claude/claude-sonnet-5'});
     const search=(await c.call('tools/call',{name:'fyso_ext_search',arguments:{query:'network'}})).result.structuredContent;
     assert.deepEqual(search.extensions.map(e=>e.id),['netbird']);
+    // Third-party skills (D64): search and install only; confirming stays with a person in the panel.
+    const skills=(await c.call('tools/call',{name:'fyso_skill_search',arguments:{source:'anthropics/skills',skill:'pdf'}})).result;
+    assert.equal(skills.structuredContent.preview.name,'pdf');
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-catalog',params:{QUERY:'',SRC:'anthropics/skills',SKILL:'pdf',COMMIT:''}});
+    const planned=(await c.call('tools/call',{name:'fyso_skill_plan',arguments:{mode:'add',source:'anthropics/skills',skill:'pdf'}})).result;
+    assert.equal(planned.isError,undefined);
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-catalog',params:{OP:'add',SRC:'anthropics/skills',SKILL:'pdf',NAME:'',COMMIT:''}});
+    const added=(await c.call('tools/call',{name:'fyso_skill_install',arguments:{planId:'abc'}})).result;
+    assert.equal(added.structuredContent.skill.state,'review');
+    assert.deepEqual(calls.at(-1),{dag:'fyso-skills-install',params:{OP:'apply-plan',PLAN_ID:'abc'}});
+    const refused=(await c.call('tools/call',{name:'fyso_skill_install',arguments:{source:'anthropics/skills'}})).result;
+    assert.equal(refused.isError,true);
+    assert.ok(!(await c.call('tools/list')).result.tools.some(t=>/skill.*(confirm|enable|remove)/.test(t.name)));
   } finally {c.close();srv.close();}
 });
 
@@ -375,7 +404,9 @@ test('the scope server gives a bot Dagu read and execute for its scope only, wit
   const call=(method,params)=>new Promise(r=>{const id=++seq;waiting.set(id,r);child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
   const tool=async(name,args)=>(await call('tools/call',{name,arguments:args})).result;
   try {
-    const init=(await call('initialize',{protocolVersion:'2025-06-18'})).result;
+    const handshake=await call('initialize',{protocolVersion:'2025-06-18'});
+    assert.equal(handshake.error,undefined,JSON.stringify(handshake.error));
+    const init=handshake.result;
     assert.equal(init.serverInfo.name,'fyso-dagu-ventas');
     assert.deepEqual((await call('tools/list')).result.tools.map(t=>t.name),['dagu_read','dagu_execute']);
     assert.equal((await call('tools/call',{name:'fyso_status',arguments:{}})).error.code,-32602);

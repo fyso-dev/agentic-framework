@@ -21,6 +21,8 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 | `fyso_check` | setup checklist | `fyso-setup-check` |
 | `fyso_doctor` | `mise run doctor` output and result | `doctor.sh` (read-only) |
 | `fyso_bots_list`, `fyso_bot_read` | native bots, one profile + revision | `fyso-bot-architect` `OP=list\|read` |
+| `fyso_feedback` | record a problem for review as a new project wiki page | Dagu's native `dagu_change` wiki operation |
+| `fyso_bot_run` | send a message to a bot and wait for its reply; optionally continue a task | native `openmausbot run` on the explicit project port |
 | `fyso_bot_plan` | preview create/update/delete of one bot → `planId` | `fyso-bot-architect` `OP=plan` |
 | `fyso_bot_apply` | apply a plan by `planId` (snapshot, apply, commit) | `fyso-bot-architect` `OP=apply` |
 | `fyso_bot_import` | version a native-only bot | `fyso-bot-architect` `OP=import` |
@@ -30,11 +32,14 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 | `fyso_workflow_scope_save`, `fyso_workflow_scope_delete` | create, replace or remove a scope: labels, `dagu-<scope>` entry, commit | `fyso-workflow-scopes` `OP=save\|delete` |
 | `fyso_logs` | processes of the stack; last lines of one (at most 500) | `pc.sh process list\|logs` (read-only) |
 | `fyso_ext_search` | catalog entries, latest version, install state | `fyso-ext-catalog` |
+| `fyso_skill_search`, `fyso_skill_plan`, `fyso_skill_install` | discover/read untrusted text, preview an immutable add/update, apply exact planId after explicit authorization; never confirm or enable | `fyso-skills-catalog` / `fyso-skills-install` ([D73](third-party-skills.md)) |
 | `fyso_ext_install` | install (`add`) or upgrade (`update`) one extension | `fyso-ext-install` |
 | `fyso_snapshot` | save bots and memory to git | `fyso-snapshot` |
 | `fyso_observability` | conversations, execution, AI consumption | `fyso-observability` |
 
 **Not exposed, on purpose** (terminal tasks for a person): secret values (`mise run secrets`), removing extensions (`mise run ext:remove`), starting/stopping the stack (`mise run up/down`), web login users, engine logins and application OAuth. The server's `instructions` tell agents to plan before applying bots and never to ask for secret values.
+
+**Problem feedback (D75).** `fyso_feedback` accepts a title, description and optional component and creates a separate UUID-named page in `project/wiki/feedback/` through Dagu's native wiki operation. It returns the page path after Dagu confirms the write. This records feedback for human review; it does not send a notification or create an external issue. Agents must omit secrets and personal data. Dagu must be reachable. New default bots with explicit allow-lists include `mcp:fyso:fyso_feedback`; existing project-owned bot configurations are preserved and need that selector added explicitly if they do not already allow `mcp:fyso:*`.
 
 ### Understanding the project (D57)
 
@@ -57,7 +62,7 @@ A desktop app cannot use the `dagu` entry of `.mcp.json`: it needs the project l
 
 - **Where:** on by default, so entries already registered by `agent:connect` gain the tools after `copier update` and a new conversation. `framework/mcp.json` passes `--no-dagu`: inside the project folder, and for bots, Dagu is already its own server and nothing is listed twice.
 - **Dagu down:** the last good tool list is kept in `.data/panel/dagu-mcp-tools.json`, because desktop apps list tools once at start. A call then fails with "Dagu is not reachable" and how the stack is started. With no list ever fetched the three tools are absent.
-- **Trust:** `dagu_execute` accepts inline specs, so it runs commands on the host as the project user. That is what the `dagu` server already gives agents opened in the project folder and what a locally registered stdio server can do anyway; the tools keep Dagu's `destructiveHint`, so desktop apps ask before calling them. **The remote HTTP MCP planned in D52 must not forward these tools as they are**; it needs its own scoping decision.
+- **Trust:** `dagu_execute` accepts inline specs, so it runs commands on the host as the project user. The remote project token grants the same access (D74). The tools retain Dagu's annotations; client approval behavior depends on the client.
 
 ### Native Dagu connection for Pi bots (D77, beta in progress)
 
@@ -174,10 +179,12 @@ codex mcp add fyso-<slug> --url https://panel.<web_domain>/mcp --bearer-token-en
 | Credential | `FYSO_MCP_TOKEN` (random, 32 bytes) in `secrets.enc.yaml`; compared in constant time by the endpoint; printed only by the terminal task (`raw = true`, because mise redacts secrets in task output) |
 | Refused | no or wrong token (401), any request with `Origin` (403), methods other than POST (405), bodies over 1 MB (413) |
 | Off (404 with the reason) | public scheme is not `https`, or the token is missing |
-| Tools | the platform tools; never Dagu's forwarded tools (D57) |
+| Tools | platform tools, `fyso_bot_run`, and Dagu's forwarded tools (D74) |
 
-One token per project: whoever holds it has the project's platform tools, so it is a
-password.
+One token per project: whoever holds it can manage the project, invoke its agents and run
+commands on the host through Dagu. Treat it as a password with that authority. A bot run
+starts a new conversation unless `task` is supplied. On timeout or interruption the job
+may continue; inspect the reported progress before retrying.
 
 **From the panel (D65).** `#/mcp`, opened from another machine over HTTPS, offers *Run*
 next to the copyable task. It enqueues `fyso-agent-connect` with `MODE=remote`

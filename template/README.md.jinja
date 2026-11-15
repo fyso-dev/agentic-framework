@@ -63,6 +63,8 @@ An extension is a Copier template that adds a tool or service (processes, routes
 The panel's **Apps → Marketplace** lists the extensions of the catalogs in `project/marketplaces.yaml` and installs or upgrades them without a restart (each change is one commit). From the terminal:
 
 ```bash
+mise run skills:search pdf                             # third-party skills: project sources + skills.sh
+mise run skills:add anthropics/skills brand-guidelines # pinned to a commit; off until confirmed in the panel
 mise run ext:search                                    # catalog entries, latest versions
 mise run ext:add foo                                   # by catalog id, latest tag
 mise run ext:add gh:org/fyso-ext-foo -- --vcs-ref v1   # or any Copier source

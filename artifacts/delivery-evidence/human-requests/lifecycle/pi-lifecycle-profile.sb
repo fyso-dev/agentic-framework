@@ -35,7 +35,7 @@
 ;; advance, so this allows only the framework/extension DAG name prefixes.
 ;; Safety relies on controller.py: no other Dagu process may exist on the host
 ;; before or during the run (checked at start and every poll; it aborts otherwise).
-(allow file-write* (regex #"^/private/tmp/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+(allow file-write* (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
 
 (deny network*)
 ;; DNS through the system resolver socket only (no direct UDP), and HTTPS for
@@ -49,13 +49,13 @@
   (local unix-socket (literal (param "PC_SOCKET")))
   (local unix-socket (literal (param "CONNECTORS_SOCKET")))
   (local unix-socket (literal (param "MCP_SOCKET")))
-  (local unix-socket (regex #"^/private/tmp/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+  (local unix-socket (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
   (local unix-socket (subpath (param "FIXTURE"))))
 (allow network-outbound
   (remote unix-socket (literal (param "PC_SOCKET")))
   (remote unix-socket (literal (param "CONNECTORS_SOCKET")))
   (remote unix-socket (literal (param "MCP_SOCKET")))
-  (remote unix-socket (regex #"^/private/tmp/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+  (remote unix-socket (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
   (remote unix-socket (subpath (param "FIXTURE"))))
 ;; Loopback TCP: exactly the fixture's port block (rendered below).
 (allow network-bind (local tcp "localhost:34100"))

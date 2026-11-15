@@ -68,8 +68,16 @@ connector_setup_socket() { printf '/tmp/fyso-connectors-%s.sock\n' "$FYSO_HTTP_P
 mcp_socket() { printf '/tmp/fyso-mcp-%s.sock\n' "$FYSO_HTTP_PORT"; }
 
 # Web login this project trusts (D61): its own Tinyauth, or a shared one on this host.
-auth_upstream() { printf '%s' "${FYSO_AUTH_UPSTREAM:-127.0.0.1:$FYSO_AUTH_PORT}"; }
-shared_login() { [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; }
+# Process-compose retains its startup environment across process restarts. Read
+# the current config so adopting/changing the hub does not keep a local authority.
+configured_auth_upstream() {
+  mise exec -- printenv FYSO_AUTH_UPSTREAM 2>/dev/null || printf '%s' "${FYSO_AUTH_UPSTREAM:-}"
+}
+auth_upstream() {
+  local upstream; upstream=$(configured_auth_upstream)
+  printf '%s' "${upstream:-127.0.0.1:$FYSO_AUTH_PORT}"
+}
+shared_login() { [ -n "$(configured_auth_upstream)" ]; }
 
 # Public web addresses (D62). The gateway always listens on loopback HTTP; an HTTPS
 # provider extension sets FYSO_WEB_SCHEME=https in its conf.d file, read fresh because

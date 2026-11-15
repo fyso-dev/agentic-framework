@@ -1,0 +1,4 @@
+# No extra tool: skills, one workflow and a small script on the project's Node.
+[tasks."knowledge-skills:check"]
+description = "List broken links, old pages and unlinked pages of the wiki (no AI, writes nothing)"
+run = "framework/scripts/run-ext.sh knowledge-skills -- node extensions/knowledge-skills/garden.cjs check"

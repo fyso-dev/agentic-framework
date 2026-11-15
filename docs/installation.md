@@ -142,6 +142,7 @@ To hand a configured project to someone else and keep sending improvements (conf
 | Symptom | Check |
 |---|---|
 | Private repository cannot be cloned | Repository membership and `gh auth status`; configure Git credentials with `gh auth setup-git` |
+| Updates or the marketplace cannot read a private GitHub repository from the project | `mise run github:check [gh:owner/repo]`. If the host account has no access, add a read-only `FYSO_GITHUB_TOKEN` with `mise run secrets`, or set `FYSO_GITHUB_AUTH=gh` to use the host's `gh` login. Copier and catalog reads then use the `gh` credential helper for github.com only; the token never appears in arguments, URLs or Git config |
 | `mise` or `uvx` not found | Install the prerequisites and reopen a shell with their binaries on `PATH` |
 | SOPS cannot decrypt secrets | The age private key must match an authorized recipient; preserve the existing encrypted file |
 | Ports already in use | Choose another block for a new project; do not stop unrelated OMB or Dagu instances |

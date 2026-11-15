@@ -1,0 +1,13 @@
+{
+  "title": "Entregables",
+  "filter": "Buscar por nombre",
+  "refresh": "Actualizar",
+  "name": "Archivo",
+  "date": "Fecha",
+  "size": "Tamaño",
+  "download": "Descargar",
+  "loading": "Cargando…",
+  "empty": "Todavía no hay archivos. Pídele a un bot un documento y aparecerá aquí.",
+  "noMatch": "Ningún archivo coincide con la búsqueda.",
+  "error": "No se pudo cargar la lista. Vuelve a intentarlo."
+}

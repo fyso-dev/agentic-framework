@@ -11,6 +11,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
+| Product growth: extensibility first, opt-in use-case functionality | [Placement and promotion criteria](extensions-contract.md#core-versus-extension-placement) |
 | Principle: orchestrate existing software, never reinvent, always feel simple | [PLAN §0](PLAN.md#0-principle) |
 | Goal and tool map (need → existing software) | [PLAN §1](PLAN.md#1-goal) |
 | Brand: Fyso (working name: Fyso Agentic Framework) | [PLAN header](PLAN.md) |
@@ -20,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D65, D76–D77; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D78; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -44,6 +45,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
+| Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
 | Shared-access people directory, a page of the human-requests extension, without login accounts (D76) | [people-directory.md](people-directory.md) |
 | Human requests: bundled experimental extension with inbox, structured requests, questions to the agent and a menu counter (D76; not yet accepted) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
 | Human requests: generated Codex integration blocker | [Failed end-to-end prerequisite](../artifacts/delivery-evidence/human-requests/generated-codex-blocker.md) |
@@ -65,8 +67,10 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
+| Third-party skills: catalog discovery, pinned git copies, native scan and human review (D73) | [third-party-skills.md](third-party-skills.md) · [spike](adr/spikes/skills-registry.md) |
 | Extensions contract: slots, lifecycle tasks, generated `.mcp.json`, panel data, guided secret setup, Setup steps, marketplace, extension-owned tabs/pages and optional panel SDK (D30, D31, D41, D50, D51) | [extensions-contract.md](extensions-contract.md) |
 | SilverBullet knowledge extension: published [v0.1.0](https://github.com/fyso-dev/fyso-ext-silverbullet/releases/tag/v0.1.0), official marketplace, shared wiki files, panel-aligned theme, official filesystem MCP, per-bot skill, panel Knowledge page, AI import of a folder or zip, install and verification (D53, D54, D58, D59) | [silverbullet-extension.md](silverbullet-extension.md) |
+| Business-owner opt-in extensions: office documents, deliverables, knowledge skills, operations, owner loop and accounting sample (D66–D72) | [owner-extensions.md](owner-extensions.md) |
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
@@ -75,6 +79,8 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 ## Layer 4 — Execution
 *What is being built, in what order, and where it stands.*
+
+Development workflow: [Bounded delivery](bounded-delivery.md) — critical integration first, investigation checkpoints, finite acceptance criteria and resumable handoffs. Start from the [delivery brief](templates/delivery-brief.md) only when a non-trivial task has no existing record.
 
 | Phase | Goal | Status |
 |---|---|---|
@@ -98,10 +104,27 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
+
+2026-11-14: Recorded extension-first product growth in AGENTS, PLAN and the extension contract: a simple default experience, optional use-case capabilities, minimal generic slots and explicit criteria for promotion to core. No runtime migration is implied.
+
+2026-11-14: Added mandatory bounded-delivery guidance to `AGENTS.md`, with a workflow and brief template. Human-requests development exposed late integration discovery, scope rework and disposable-fixture recovery. The guidance requires early real-path proof and explicit beta/release acceptance, while preserving required isolation and doctor checks. See [bounded delivery](bounded-delivery.md).
+
+2026-11-12: Live VM inspection found restarted gateways retaining the original
+process-compose authentication environment despite updated shared-login config.
+A regression test reproduced the local-authority fallback; auth helpers now read
+the current mise configuration. Cloudflare OAuth can read the zone but DNS and
+certificate requests return 403; issuance and authenticated HTTPS acceptance remain
+unverified at that stage. The administrator subsequently supplied the token:
+private DNS/HTTPS and three live MCP connections now pass, as do all four doctors;
+deployed shared-session/browser acceptance remains pending. Issuance temporarily
+stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-extension.md).
 
 | Date | Entry |
 |---|---|
+| 2026-11-12 | **Third-party skills (D73).** skills.sh anonymous CLI endpoint verified; documented v1 requires Vercel identity. Native OMB 0.1.141 disabled import scans SKILL.md and omits supporting files. Git copies retain full provenance/license and require human confirmation; panel/MCP apply immutable previews. [Spike](adr/spikes/skills-registry.md) · [contract and verification](third-party-skills.md). |
 | 2026-11-14 | **Pi doctor, stack stopped.** A generated fixture passed `mise run doctor` with only its connector-setup component; a deliberately occupied fixture port was detected. The running-stack branch and full lifecycle remain pending independent review. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |
 | 2026-11-14 | **Pi request skill in the agent form.** Enabling the skill adds only the native conversation-list selection to a restricted Pi bot; explicit denials remain untouched and are explained. Mock-browser fixtures checked the review draft and denied case. [Engine selection](engine-selection.md#pi-beta-integration-in-progress) |
 | 2026-11-14 | **Pi sandbox boundary probe.** A disposable macOS probe checked selected file and port allowances, denial of unrelated IPv4/IPv6 loopback, and DNS through the system resolver socket. Independent review and full lifecycle remain outstanding. [Findings](adr/spikes/clean-exec-xdg.md#pi-beta-isolation-follow-up) |
@@ -240,6 +263,19 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 | 2026-11-11 | **Recoverable web passwords (D64).** `mise run web-auth:password` shows a user's password and `-- --new` sets a readable generated one, with the project running and without a terminal prompt. Passwords are kept encrypted next to their hashes. Verified with real sops, age and Caddy bcrypt (`tests/web-auth-password.test.cjs`). [Contract](web-auth.md#configuration-and-ownership) |
 
 | 2026-11-11 | **Run the remote MCP setup from the panel (D65).** `#/mcp` over HTTPS gets a *Run* button: Dagu makes sure the token exists (`fyso-agent-connect`, `MODE=remote`) and the private setup adapter returns the command for Claude Code, Codex, OpenCode, Gemini CLI and a generic JSON entry. The token never passes through Dagu. First recorded exception to "the panel never shows secret values". [Agent surface](agent-surface.md#remote-clients-d63) |
+| 2026-11-11 | **Owner extensions handoff review (D66–D72).** Six independent bundles use native slots and per-bot opt-in. Corrected PPTX verification guidance, Typst font selection, attachment headers for directory-index cases, resolved symlink inputs, and stale/missing spend checks. Native document/XLSX/gardener tests, generated-stack doctor, authenticated file HTTP checks and Dagu human wait/resume passed; AI and browser acceptance remain separate. Upstream document licenses allow redistribution; thin original skills avoid their extra dependencies. See [sources, verification and open spikes](owner-extensions.md). |
+
+| 2026-11-12 | **Owner extensions final integration acceptance.** Corrected the ops doctor synthetic freshness contract and added its executable regression. Reverified complete-stack doctor, authenticated downloads and private slots, Dagu human wait/resume and real rendered deliverables. [Evidence](../artifacts/delivery-evidence/owner-extensions/README.md). |
+
+| 2026-11-12 | **Skills integration acceptance (D73).** Merged current main, regenerated panel assets, removed duplicate native workflow parameters and added PR build/regression checks. Disposable-stack doctor and real authenticated browser installation/scan/confirmation passed. See [evidence](../artifacts/delivery-evidence/third-party-skills/README.md) for final per-agent acceptance and remaining limits. |
+
+| 2026-11-12 | **Native skill scan compatibility (D73).** Combined-stack testing caught the native name/frontmatter equality requirement. Scan now keeps original text/name and binds cleanup to unique source metadata plus hash/state/timestamp; fake protocol checks enforce the same constraint. [Contract](third-party-skills.md#native-name-and-cleanup-contract). |
+
+| 2026-11-12 | **Remote agent and Dagu access (D74).** The existing project token grants Dagu's native tools and `fyso_bot_run`, which uses the native OMB CLI on the project port. Remote transport tests use simulated Dagu and OMB; real remote agent execution remains to be verified. [Contract](agent-surface.md#remote-clients-d63) |
+
+| 2026-11-11 | SilverBullet import entry: the panel routes `ext-silverbullet-import` to the Knowledge page instead of enqueuing it without an upload batch. Verified in the GrupoAuditor VM. [ADR](adr/silverbullet-import-entry.md) |
+
+| 2026-11-12 | **Project feedback (D75).** `fyso_feedback` records a new review page through Dagu's native wiki operation. An isolated Dagu 2.24.0 server confirmed the MCP call creates the expected page. No notification or external issue is sent; existing bots need the tool explicitly selected. [Contract](agent-surface.md) |
 
 | 2026-11-14 | **Human requests: person-facing experience and page counters (D76).** The extension contract gains declared page counters (panel API 2): the panel shows "Pending" with a count in its menu and top bar on every screen, with no request-specific code in the core; the People screen moved out of the core into the extension. Requests are structured cards validated at creation, and a person can ask the agent a question before deciding through Dagu's native push-back. Verified: 59 unit and real-Dagu 2.24.0 tests; in a browser on a running demo project (counter, inbox, decision recorded, people page); and on a generated project with a real bot, which answered a question from its conversation in 12 s and continued there after the decision. Not verified: a bot creating its own request in a generated Codex project (blocked), the browser and gateway test scripts written for the previous page, installers, and a non-technical user. [Proposal](human-requests-proposal.md) · [contract §9](extensions-contract.md#page-counters-panel-api-2) |
 

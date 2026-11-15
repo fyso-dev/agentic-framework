@@ -2,7 +2,7 @@
 // two long-lived actions (setup check and snapshot).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LoadedBackend } from "./api";
-import { DAGS, type App, type Backend, type Extension, type Health, type Project, type RuntimeBot, type BotVersioning, type SetupCheck } from "./api/types";
+import { DAGS, type App, type Backend, type Extension, type ThirdPartySkill, type Health, type Project, type RuntimeBot, type BotVersioning, type SetupCheck } from "./api/types";
 import { diffBots, listedBots, parseTeam, readBots, type Bot, type BotRow } from "./lib/team";
 import { useDaguAction, type Action } from "./lib/useDaguAction";
 
@@ -20,6 +20,8 @@ export type Store = {
   botVersioning: Loadable<BotVersioning>;
   apps: Loadable<App[]>;
   extensions: Loadable<Extension[]>;
+  /** Installed third-party skills (D64). */
+  skills: Loadable<ThirdPartySkill[]>;
   health: Record<string, Health>;
   reload(): void;
   /** Local, unapplied edits of team.yaml (null when there are none). */
@@ -77,6 +79,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const [runtimeBots, setRuntimeBots] = useState<Loadable<RuntimeBot[]>>({ status: "loading" });
   const [apps, setApps] = useState<Loadable<App[]>>({ status: "loading" });
   const [extensions, setExtensions] = useState<Loadable<Extension[]>>({ status: "loading" });
+  const [skills, setSkills] = useState<Loadable<ThirdPartySkill[]>>({ status: "loading" });
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [savedDraft, setDraftState] = useState<{ base: string; draft: string } | null>(null);
   const draft = savedDraft?.draft ?? null;
@@ -129,6 +132,10 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
     backend.getExtensions().then(
       (data) => setExtensions({ status: "ok", data }),
       (e) => setExtensions({ status: "error", error: message(e) }),
+    );
+    backend.getSkills().then(
+      (data) => setSkills({ status: "ok", data }),
+      (e) => setSkills({ status: "error", error: message(e) }),
     );
   }, [backend, refreshRoster]);
 
@@ -251,7 +258,7 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
 
 
   const store: Store = {
-    backend, mock, project, team, runtimeBots, botVersioning, apps, extensions, health, reload: load,
+    backend, mock, project, team, runtimeBots, botVersioning, apps, extensions, skills, health, reload: load,
     draft, draftBase, draftConflict, draftReady, setDraft, workingText,
  baseBots, workingBots, rows, draftChanges,
     check, snapshot, checkData, steps, extSteps, stepsDone, stepsTotal, anyFailed, noData, afterApply,

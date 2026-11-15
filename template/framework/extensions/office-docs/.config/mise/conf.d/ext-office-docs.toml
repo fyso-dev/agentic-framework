@@ -1,0 +1,8 @@
+# Document tools, pinned. Excel files come from Dagu's own xlsx actions (no extra tool).
+[tools]
+"github:jgm/pandoc" = "3.13"
+"aqua:typst/typst" = "0.15.1"
+
+[tasks."office-docs:doctor"]
+description = "Check the document tools with a real conversion"
+run = "framework/scripts/run-ext.sh office-docs -- bash extensions/office-docs/doctor.sh"

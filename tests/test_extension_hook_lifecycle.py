@@ -27,7 +27,9 @@ class HookLifecycle(unittest.TestCase):
             (project / '.data').mkdir()
             (project / 'README.md').write_text('keep this project file\n')
             (project / '.gitignore').write_text('.data/\nbin/\n')
-            (project / 'process-compose.yaml').write_text('version: "0.5"\nprocesses:\n  caddy:\n    command: sleep 300\n')
+            # D58 activation restarts the login authority as well as Caddy. Keep both
+            # native process names in this fixture; no auth server is needed here.
+            (project / 'process-compose.yaml').write_text('version: "0.5"\nprocesses:\n  caddy:\n    command: sleep 300\n  web-auth:\n    command: sleep 300\n')
             toolbin = project / 'bin'
             toolbin.mkdir()
             (toolbin / 'yaml').symlink_to(ROOT / 'template/framework/panel/node_modules/yaml/bin.mjs')

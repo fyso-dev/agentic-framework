@@ -27,6 +27,7 @@ BOT = 'Pi Lifecycle Beta'
 MODEL = 'pi/openai-codex/gpt-6-luna'
 SLUG = 'pi-life'
 PI_DIR = Path.home() / '.pi' / 'agent'
+TMP = Path('/tmp').resolve()  # Dagu and lib.sh hard-code /tmp; macOS resolves it
 DAGU_SOCKET = re.compile(r'^@dagu_(fyso|ext)-[A-Za-z0-9_.-]+_[0-9a-f]{6}\.sock$')
 
 
@@ -155,7 +156,7 @@ def global_state():
                 ({'sha256': digest(p)} if p.is_file() else {'mtime': st.st_mtime})
     state['.pi/agent'] = pi
     state['.gitconfig'] = digest(home / '.gitconfig')
-    state['tmp'] = sorted(n for n in os.listdir('/private/tmp') if n.startswith(('@dagu_', 'fyso-')))
+    state['tmp'] = sorted(n for n in os.listdir(TMP) if n.startswith(('@dagu_', 'fyso-')))
     return state
 
 
@@ -212,13 +213,13 @@ class Run:
         if busy: raise Abort(f'Fixture ports in use: {busy}')
         self.base = base
         self.sockets = {
-            'PC_SOCKET': Path(f'/private/tmp/fyso-{SLUG}-{base}.sock'),
-            'CONNECTORS_SOCKET': Path(f'/private/tmp/fyso-connectors-{base}.sock'),
-            'MCP_SOCKET': Path(f'/private/tmp/fyso-mcp-{base}.sock'),
+            'PC_SOCKET': Path(f'{TMP}/fyso-{SLUG}-{base}.sock'),
+            'CONNECTORS_SOCKET': Path(f'{TMP}/fyso-connectors-{base}.sock'),
+            'MCP_SOCKET': Path(f'{TMP}/fyso-mcp-{base}.sock'),
         }
         for path in self.sockets.values():
             if os.path.lexists(path): raise Abort(f'Fixed socket path already exists: {path}')
-        self.stale_sockets = {n for n in os.listdir('/private/tmp') if DAGU_SOCKET.match(n)}
+        self.stale_sockets = {n for n in os.listdir(TMP) if DAGU_SOCKET.match(n)}
         self.result['checks']['preexistingDaguSockets'] = len(self.stale_sockets)
         self.before = global_state()
         self.log('preflight', portBase=base, foreignDagu=0)
@@ -239,7 +240,7 @@ class Run:
             f'(allow {op} ({d} tcp "localhost:{p}"))'
             for p in self.ports for op, d in
             [('network-bind', 'local'), ('network-inbound', 'local'), ('network-outbound', 'remote')])
-        text = (HERE / 'profile.sb.in').read_text().replace('@PORT_RULES@', rules)
+        text = (HERE / 'profile.sb.in').read_text().replace('@PORT_RULES@', rules).replace('@TMP_ROOT@', str(TMP))
         self.profile = self.evidence / 'profile.sb'
         self.profile.write_text(text)
         params = {'FIXTURE': self.fixture,
@@ -441,7 +442,7 @@ class Run:
             'foreignDagu': sorted(dagu_pids(table)),
             'portsListening': [p for p in getattr(self, 'ports', []) if listeners(p)],
             'fixedSockets': [str(p) for p in getattr(self, 'sockets', {}).values() if os.path.lexists(p)],
-            'daguSockets': sorted(n for n in os.listdir('/private/tmp')
+            'daguSockets': sorted(n for n in os.listdir(TMP)
                                   if DAGU_SOCKET.match(n) and n not in getattr(self, 'stale_sockets', set())),
         }
         if hasattr(self, 'before'):

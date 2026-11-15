@@ -15,7 +15,7 @@ import { botActivity } from "../lib/bot-activity";
 import { accessFor, ensurePiHumanRequestOrigin, piHumanRequestOriginBlocked, selectServer, type ToolScope } from "../lib/connector-access";
 import { go, href, type BotTab } from "../lib/router";
 import {
-  byteLength, extensionSkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
+  byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
   SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
@@ -72,11 +72,15 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const [approval, setApproval] = useState<Approval>(initial.approval);
   const [soul, setSoul] = useState(initial.soul);
   const [uses, setUses] = useState(initial.uses);
-  // Skills shipped by installed extensions are switched per bot (D54); other skills
-  // of the team file stay read-only.
+  // Skills shipped by installed extensions (D54) and third-party skills a person confirmed
+  // (D73) are switched per bot; other skills of the team file stay read-only. An extension
+  // skill needs the project's MCP servers, which a bot only loads from the project root.
   const extSkills = useMemo(
-    () => (s.extensions.data ?? []).flatMap((e) => e.skills.map((k) => ({ ext: e.id, name: k, file: extensionSkillFile(e.id, k), servers: e.mcpServers }))),
-    [s.extensions.data],
+    () => [
+      ...(s.extensions.data ?? []).flatMap((e) => e.skills.map((k) => ({ from: t("form.skillFrom", { ext: e.id }), ext: e.id as string | null, name: k, file: extensionSkillFile(e.id, k), servers: e.mcpServers, needsRoot: true, ready: true }))),
+      ...(s.skills.data ?? []).map((k) => ({ from: t("form.skillThirdParty", { src: k.src }), ext: null as string | null, name: k.name, file: thirdPartySkillFile(k.name), servers: [] as string[], needsRoot: false, ready: k.state === "ready" })),
+    ],
+    [s.extensions.data, s.skills.data, t],
   );
   const [skillsOn, setSkillsOn] = useState<Record<string, boolean>>({});
   const hasSkill = (file: string) => !!bot?.skillFiles.includes(file);
@@ -172,8 +176,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         soulText: soulChanged ? soul : null,
         usesWorkflows: uses,
         ...(scopeChanged ? { tools: scope || {} } : {}),
-        // A skill needs the project's MCP servers, which a bot only loads from the root.
-        skills: extSkills.map((k) => ({ file: k.file, on: uses && skillOn(k.file) })),
+        skills: extSkills.map((k) => ({ file: k.file, on: (uses || !k.needsRoot) && skillOn(k.file) })),
       }, declaredName);
       if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
       s.setDraft(serializeTeam(doc));
@@ -309,13 +312,14 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
                 {extSkills.map((k) => (
                   <div key={k.file} className="toggle-row">
                     <p className="grow" style={{ fontSize: 13 }}>
-                      <span className="mono">{k.name}</span> <span className="mute">· {t("form.skillFrom", { ext: k.ext })}</span>
+                      <span className="mono">{k.name}</span> <span className="mute">· {k.from}{!k.ready && ` · ${t("form.skillPending")}`}</span>
                     </p>
-                    <Switch checked={uses && skillOn(k.file)} onChange={(v) => toggleSkill(k, v)}
-                      label={k.name} disabled={!uses} describedBy={`${id}-skills-ext`} />
+                    {/* A skill waiting for review cannot be switched on, only off. */}
+                    <Switch checked={(uses || !k.needsRoot) && skillOn(k.file)} onChange={(v) => toggleSkill(k, v)}
+                      label={k.name} disabled={(k.needsRoot && !uses) || (!k.ready && !skillOn(k.file))} describedBy={`${id}-skills-ext`} />
                   </div>
                 ))}
-                <p id={`${id}-skills-ext`} className="hint" style={{ paddingTop: 6 }}>{t(uses ? "form.skillsExt" : "form.skillsNeedRoot")}</p>
+                <p id={`${id}-skills-ext`} className="hint" style={{ paddingTop: 6 }}>{t(uses || extSkills.every((k) => !k.needsRoot) ? "form.skillsExt" : "form.skillsNeedRoot")}</p>
                 {engine === "pi" && piHumanRequestSelected && <p className="hint">{t(piHumanRequestOriginBlocked(scope) ? "form.piHumanRequestBlocked" : "form.piHumanRequestContext")}</p>}
               </div>
             )}

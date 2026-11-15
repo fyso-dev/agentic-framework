@@ -120,7 +120,7 @@ run = "framework/scripts/tray-install.sh"
 
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
-run = "sops edit secrets.enc.yaml"
+run = 'SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}" sops edit secrets.enc.yaml'
 
 [tasks."bots:architect"]
 description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
@@ -183,6 +183,42 @@ run = "framework/scripts/dist.sh key"
 description = "Search the extension catalogs: mise run ext:search [text]"
 run = "framework/scripts/ext.sh search"
 
+[tasks."skills:search"]
+description = "Search third-party skills in the sources of project/skill-sources.yaml: mise run skills:search [text]"
+run = "node framework/scripts/skills.cjs search"
+
+[tasks."skills:show"]
+description = "Read a third-party skill before installing it: mise run skills:show <source> [skill] [commit]"
+run = "node framework/scripts/skills.cjs show"
+
+[tasks."skills:add"]
+description = "Install a third-party skill pinned to a commit, pending review: mise run skills:add <source> [skill] [commit]"
+run = "node framework/scripts/skills.cjs add"
+
+[tasks."skills:update"]
+description = "Move an installed third-party skill to its source's latest commit (or a given one): mise run skills:update <name> [commit]"
+run = "node framework/scripts/skills.cjs update"
+
+[tasks."skills:scan"]
+description = "Run OpenMausBot's scan on an installed third-party skill: mise run skills:scan <name>"
+run = "node framework/scripts/skills.cjs scan"
+
+[tasks."skills:confirm"]
+description = "Confirm, after reading it, that bots may use a third-party skill: mise run skills:confirm <name>"
+run = "node framework/scripts/skills.cjs confirm"
+
+[tasks."skills:list"]
+description = "List installed third-party skills with their state, source and pinned commit"
+run = "node framework/scripts/skills.cjs list"
+
+[tasks."skills:remove"]
+description = "Remove a third-party skill no agent uses: mise run skills:remove <name>"
+run = "node framework/scripts/skills.cjs remove"
+
 [tasks."ext:remove"]
 description = "Remove project extensions"
 run = "framework/scripts/ext.sh remove"
+
+[tasks."github:check"]
+description = "Check noninteractive GitHub read access for this project (optional repository argument)"
+run = "node framework/scripts/github-auth.cjs check"

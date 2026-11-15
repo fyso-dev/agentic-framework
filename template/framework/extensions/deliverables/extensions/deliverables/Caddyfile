@@ -1,0 +1,35 @@
+# Files produced by bots, served by Caddy's own file_server behind the web login.
+# The framework login snippet owns authentication and the cross-site guard; people who
+# may open the panel may open this site (D58).
+http://files.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	import fyso_login
+	# Read-only: files arrive through the deliver tool, never through the browser.
+	@write not method GET HEAD
+	handle @write {
+		respond 405
+	}
+	handle_path /.ui/vendor/* {
+		root * {$FYSO_ROOT}/extensions/deliverables/panel/vendor
+		file_server
+	}
+	# The localized list (static page of this extension, same origin as the files).
+	handle_path /.ui/* {
+		root * {$FYSO_ROOT}/extensions/deliverables/ui
+		header Cache-Control no-cache
+		file_server
+	}
+	handle {
+		root * {$FYSO_DATA}/ext/deliverables/files
+		# Always a download: a delivered HTML or SVG file must not run in this origin.
+		header Content-Disposition attachment
+		header Content-Security-Policy "sandbox"
+		header X-Content-Type-Options nosniff
+		file_server {
+			browse
+			# A hidden, reserved index name keeps delivered index.html in the listing.
+			index .fyso-no-index
+			# Full path on purpose: a bare `.*` would also match `.data` in the root and hide everything.
+			hide {$FYSO_DATA}/ext/deliverables/files/.*
+		}
+	}
+}
