@@ -238,3 +238,5 @@ The owner extension review fixes and focused verification are recorded in [busin
 | 2026-11-12 | **Native skill scan compatibility (D73).** Combined-stack testing caught the native name/frontmatter equality requirement. Scan now keeps original text/name and binds cleanup to unique source metadata plus hash/state/timestamp; fake protocol checks enforce the same constraint. [Contract](third-party-skills.md#native-name-and-cleanup-contract). |
 
 | 2026-11-12 | **Remote agent and Dagu access (D74).** The existing project token grants Dagu's native tools and `fyso_bot_run`, which uses the native OMB CLI on the project port. Remote transport tests use simulated Dagu and OMB; real remote agent execution remains to be verified. [Contract](agent-surface.md#remote-clients-d63) |
+
+| 2026-11-11 | SilverBullet import entry: the panel routes `ext-silverbullet-import` to the Knowledge page instead of enqueuing it without an upload batch. Verified in the GrupoAuditor VM. [ADR](adr/silverbullet-import-entry.md) |

@@ -440,7 +440,9 @@
       "example": "Eso parece un ejemplo, no tu clave ({{names}}). Crea una clave nueva en la página de Langfuse y copia el bloque que aparece en la ventana de la clave: ahí se ve completa una sola vez."
     },
     "run": "Ejecutar",
-    "running": "Ejecutando…"
+    "running": "Ejecutando…",
+    "importOpen": "Importar documentos",
+    "importHint": "La importación se inicia desde Conocimiento, después de subir y seleccionar los documentos."
   },
   "skills": {
     "installedTitle": "Skills de terceros instaladas",
