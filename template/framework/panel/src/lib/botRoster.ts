@@ -58,7 +58,8 @@ export function groupByTeam(rows: RosterRow[], declared: string[] = []): TeamGro
   const known = (team: string) => order.find(t => t.toLowerCase() === team.toLowerCase());
   for (const team of [...declared, ...rows.map(r => r.team || "")]) if (known(team) === undefined) order.push(team);
   const groups = order.map(team => ({ team, rows: rows.filter(r => known(r.team || "") === team) }));
-  return groups.filter(g => g.rows.length > 0);
+  // A declared department stays visible while empty, so it can be filled (D81).
+  return groups.filter(g => g.rows.length > 0 || (!!g.team && declared.some(d => d.toLowerCase() === g.team.toLowerCase())));
 }
 
 export function versionStatus(row: RosterRow, inventory: import('../api/types').BotVersioning | undefined): 'project' | 'snapshot' | 'native' | 'unknown' {

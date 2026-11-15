@@ -186,8 +186,20 @@
     "editAction": "Editar",
     "team": {
       "none": "General",
-      "brief": "Instrucciones del equipo",
-      "briefFile": "Archivo de instrucciones del equipo"
+      "brief": "Instrucciones compartidas",
+      "briefFile": "Archivo de instrucciones compartidas",
+      "create": "Crear departamento",
+      "createSave": "Crear",
+      "save": "Guardar",
+      "name": "Nombre del departamento",
+      "edit": "Editar las instrucciones compartidas de {{name}}",
+      "editTitle": "Instrucciones compartidas de {{name}}",
+      "briefHint": "Cada agente del departamento las recibe en su prompt. Se aplican al revisar y aplicar los cambios.",
+      "createHint": "Se crea vacío en OpenMausBot al aplicar. Después mueve agentes con el campo Departamento de cada uno. El nombre y la eliminación se gestionan en OpenMausBot.",
+      "nameRequired": "Escribe un nombre.",
+      "nameLong": "Usa como máximo {{max}} caracteres.",
+      "nameTaken": "Ya existe un departamento con ese nombre.",
+      "briefLong": "Las instrucciones compartidas superan los 24.000 bytes que admite OpenMausBot."
     }
   },
   "form": {
@@ -238,10 +250,10 @@
     "skillsNeedRoot": "Necesitan las herramientas del proyecto: activa «Usa workflows» para poder usarlas.",
     "piHumanRequestContext": "Para retomar pedidos en esta conversación, Pi puede leer la lista de conversaciones de este agente y las que abrió con otros agentes.",
     "piHumanRequestBlocked": "La lectura de conversaciones está bloqueada. Pi podrá crear pedidos, pero no recibir repreguntas ni volver a esta conversación hasta habilitarla.",
-    "team": "Equipo",
-    "teamHint": "Opcional. Elige un equipo o escribe uno nuevo. Al mover un agente, vuelve a guardar sus permisos de aplicaciones para el nuevo equipo.",
-    "teamLeave": "Elige un equipo: OpenMausBot no mueve al agente a General cuando se deja este campo vacío.",
-    "teamChief": "Este agente es el jefe de su equipo y puede administrar a sus agentes."
+    "team": "Departamento",
+    "teamHint": "Opcional. Elige un departamento o escribe uno nuevo. Al mover un agente, vuelve a guardar sus permisos de aplicaciones para el nuevo departamento.",
+    "teamLeave": "Elige un departamento: OpenMausBot no mueve al agente a General cuando se deja este campo vacío.",
+    "teamChief": "Este agente es el jefe de gabinete de su departamento y puede administrar a sus agentes."
   },
   "preview": {
     "deleteHistoryWarning": "Eliminar un bot de OpenMausBot borra definitivamente su historial de conversaciones. La copia de la configuración no incluye ese historial.",

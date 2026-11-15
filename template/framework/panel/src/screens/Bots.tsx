@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BotTab } from "../lib/router";
 import { useTranslation } from "react-i18next";
 import { DAGS, type Engine } from "../api/types";
-import { IconBack, IconBot, IconChat, IconInfo, IconPlus, IconUndo } from "../components/Icons";
+import { IconBack, IconBot, IconChat, IconInfo, IconPencil, IconPlus, IconUndo, IconUsers } from "../components/Icons";
 import { ConnectorLogo } from "../components/ConnectorLogo";
 import { useObservation } from "../lib/bot-activity";
 import { BotDetail } from "./BotForm";
@@ -11,7 +11,7 @@ import { unappliedCount } from "../components/Layout";
 import { Avatar, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import { accessFor } from "../lib/connector-access";
-import { parseTeam, readTeams, soulFileLabel, splitModel, type BotState, type Team } from "../lib/team";
+import { byteLength, parseTeam, readTeams, serializeTeam, soulFileLabel, splitModel, teamNames, upsertTeam, TEAM_BRIEF_MAX_BYTES, TEAM_NAME_MAX, type BotState, type Team } from "../lib/team";
 import { botRoster, groupByTeam, unmatchedVersion } from "../lib/botRoster";
 import { useDaguAction } from "../lib/useDaguAction";
 import { ActionStatus, ActionError } from "../components/Action";
@@ -74,6 +74,8 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   const synchronized = s.team.status === "ok" && s.runtimeBots.status === "ok" && !s.draftConflict;
   const omb = s.project.data?.urls.omb;
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // The department dialog: `null` creates one, a name edits that one's shared instructions.
+  const [department, setDepartment] = useState<{ name: string | null } | undefined>();
   const unapplied = unappliedCount(s);
   const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
   const engineName = useEngineName();
@@ -107,6 +109,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
           <h1>{t("bots.title")}</h1>
           <span className="bd-ib" tabIndex={0} aria-label={t("bots.subtitle")} data-tip={t("bots.subtitle")}><IconInfo size={16} /></span>
           <span className="grow" />
+          <button type="button" className="bd-ib tip-r" aria-label={t("bots.team.create")} data-tip={t("bots.team.create")} disabled={s.team.status !== "ok"} onClick={() => setDepartment({ name: null })}><IconUsers size={18} /></button>
           <a href={href.newBot} className="bd-ib accent-solid tip-r" aria-label={t("bots.add")} data-tip={t("bots.add")}><IconPlus size={18} /></a>
         </div>
 
@@ -153,7 +156,8 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
         ) : (
           groups.map((group) => (
           <section key={group.team || "-"} className="bots-team" aria-label={grouped ? group.team || t("bots.team.none") : undefined}>
-          {grouped && <TeamHeading name={group.team} team={teams.find((x) => x.name.toLowerCase() === group.team.toLowerCase())} count={group.rows.length} />}
+          {grouped && <TeamHeading name={group.team} team={teams.find((x) => x.name.toLowerCase() === group.team.toLowerCase())} count={group.rows.length}
+            onEdit={group.team && s.team.status === "ok" ? () => setDepartment({ name: group.team }) : undefined} />}
           <ul className="bots-picks">
             {group.rows.map((row) => {
               const state = row.configuration?.state ?? "applied";
@@ -212,6 +216,9 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
 
       <Preview open={review} onClose={() => go(href.bots)} />
 
+      {department && <DepartmentDialog name={department.name} team={teams.find((x) => x.name.toLowerCase() === department.name?.toLowerCase())}
+        runtimeSections={(runtime ?? []).map((b) => b.section ?? "")} onClose={() => setDepartment(undefined)} />}
+
       <Modal open={confirmDiscard} onClose={() => setConfirmDiscard(false)} labelledBy="discard-t" className="small" role="alertdialog">
         <div className="modal-head"><h2 id="discard-t">{t("bots.discardTitle")}</h2></div>
         <div className="modal-body"><p className="mute">{t("bots.discardBody")}</p></div>
@@ -225,12 +232,13 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
 }
 
 /** A team's heading in the list: its name and, read-only, its shared brief (D81). */
-function TeamHeading({ name, team, count }: { name: string; team?: Team; count: number }) {
+function TeamHeading({ name, team, count, onEdit }: { name: string; team?: Team; count: number; onEdit?: () => void }) {
   const { t } = useTranslation();
   const brief = team?.brief;
   return (
     <div className="bots-team-head">
-      <p className="bots-team-name"><span className="ellipsis">{name || t("bots.team.none")}</span><span className="mute">{count}</span></p>
+      <p className="bots-team-name"><span className="ellipsis">{name || t("bots.team.none")}</span><span className="mute">{count}</span>
+        {onEdit && <><span className="grow" /><button type="button" className="bd-ib bots-team-edit" aria-label={t("bots.team.edit", { name })} data-tip={t("bots.team.brief")} onClick={onEdit}><IconPencil size={14} /></button></>}</p>
       {brief?.kind === "file" && <p className="hint ellipsis" title={soulFileLabel(brief.file)}>{t("bots.team.briefFile")}: <span className="mono">{soulFileLabel(brief.file)}</span></p>}
       {brief?.kind === "inline" && (
         <details className="bots-team-brief">
@@ -239,6 +247,62 @@ function TeamHeading({ name, team, count }: { name: string; team?: Team; count: 
         </details>
       )}
     </div>
+  );
+}
+
+/**
+ * Create a department or edit its shared instructions in the draft (D81). OpenMausBot
+ * applies it with the bots; it never renames or deletes a department from the file.
+ */
+function DepartmentDialog({ name, team, runtimeSections, onClose }: { name: string | null; team?: Team; runtimeSections: string[]; onClose: () => void }) {
+  const { t } = useTranslation();
+  const s = useStore();
+  const creating = name === null;
+  const fromFile = team?.brief.kind === "file" ? team.brief.file : undefined;
+  const [value, setValue] = useState("");
+  const [brief, setBrief] = useState(team?.brief.kind === "inline" ? team.brief.text.replace(/\n$/, "") : "");
+  const [error, setError] = useState<string>();
+  const taken = (candidate: string) => {
+    const key = candidate.trim().toLowerCase();
+    let names: string[] = [];
+    try { names = teamNames(parseTeam(s.workingText ?? "version: 1\n")); } catch { /* unreadable draft: the save reports it */ }
+    return key === "general" || [...names, ...runtimeSections].some((n) => n.trim().toLowerCase() === key);
+  };
+  const save = () => {
+    const next = value.trim();
+    if (creating && !next) return setError(t("bots.team.nameRequired"));
+    if (creating && next.length > TEAM_NAME_MAX) return setError(t("bots.team.nameLong", { max: TEAM_NAME_MAX }));
+    if (creating && taken(next)) return setError(t("bots.team.nameTaken"));
+    if (byteLength(brief) > TEAM_BRIEF_MAX_BYTES) return setError(t("bots.team.briefLong"));
+    try {
+      const doc = parseTeam(s.workingText ?? "version: 1\nbots: []\n");
+      upsertTeam(doc, name, { name: next, brief: fromFile ? null : brief });
+      s.setDraft(serializeTeam(doc));
+      onClose();
+    } catch (e) { setError(String((e as Error).message ?? e)); }
+  };
+  return (
+    <Modal open onClose={onClose} labelledBy="department-t">
+      <form onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <div className="modal-head"><h2 id="department-t">{creating ? t("bots.team.create") : t("bots.team.editTitle", { name })}</h2></div>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {creating && <label className="field">{t("bots.team.name")}
+            <input className="input" autoFocus value={value} maxLength={TEAM_NAME_MAX} aria-invalid={!!error}
+              onChange={(e) => { setValue(e.target.value.replace(/\n/g, " ")); setError(undefined); }} /></label>}
+          {fromFile
+            ? <p className="hint">{t("bots.team.briefFile")}: <span className="mono">{soulFileLabel(fromFile)}</span></p>
+            : <label className="field">{t("bots.team.brief")}
+                <textarea className="input" rows={8} value={brief} autoFocus={!creating} onChange={(e) => { setBrief(e.target.value); setError(undefined); }} />
+                <span className="hint">{t("bots.team.briefHint")}</span></label>}
+          {creating && <p className="hint">{t("bots.team.createHint")}</p>}
+          {error && <p className="field-err" role="alert">× {error}</p>}
+        </div>
+        <div className="modal-foot" style={{ justifyContent: "flex-end", borderTop: 0, paddingTop: 0 }}>
+          <button type="button" className="btn btn-soft" onClick={onClose}>{t("common.cancel")}</button>
+          <button type="submit" className="btn btn-pri" disabled={!!fromFile && !creating}>{t(creating ? "bots.team.createSave" : "bots.team.save")}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

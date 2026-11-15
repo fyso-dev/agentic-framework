@@ -186,8 +186,20 @@
     "editAction": "Edit",
     "team": {
       "none": "General",
-      "brief": "Team brief",
-      "briefFile": "Team brief file"
+      "brief": "Shared instructions",
+      "briefFile": "Shared instructions file",
+      "create": "Create department",
+      "createSave": "Create",
+      "save": "Save",
+      "name": "Department name",
+      "edit": "Edit the shared instructions of {{name}}",
+      "editTitle": "Shared instructions of {{name}}",
+      "briefHint": "Every agent in the department gets them in its prompt. They apply when you review and apply the changes.",
+      "createHint": "OpenMausBot creates it empty on apply. Then move agents with each one's Department field. Renaming and deleting are managed in OpenMausBot.",
+      "nameRequired": "Enter a name.",
+      "nameLong": "Use at most {{max}} characters.",
+      "nameTaken": "A department with that name already exists.",
+      "briefLong": "The shared instructions exceed the 24,000 bytes OpenMausBot accepts."
     }
   },
   "form": {
@@ -238,10 +250,10 @@
     "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them.",
     "piHumanRequestContext": "To resume requests in this conversation, Pi can read this agent's conversations and those it opened with other agents.",
     "piHumanRequestBlocked": "Conversation listing is blocked. Pi can create requests, but cannot receive questions or return to this conversation until it is enabled.",
-    "team": "Team",
-    "teamHint": "Optional. Choose a team or type a new one. After moving an agent, save its application permissions again for the new team.",
-    "teamLeave": "Choose a team: OpenMausBot does not move the agent to General when this field is empty.",
-    "teamChief": "This agent is the chief of its team and can manage the team's agents."
+    "team": "Department",
+    "teamHint": "Optional. Choose a department or type a new one. After moving an agent, save its application permissions again for the new department.",
+    "teamLeave": "Choose a department: OpenMausBot does not move the agent to General when this field is empty.",
+    "teamChief": "This agent is its department's chief of staff and can manage the department's agents."
   },
   "preview": {
     "deleteHistoryWarning": "Deleting a bot from OpenMausBot permanently removes its conversation history. The configuration snapshot does not contain that history.",

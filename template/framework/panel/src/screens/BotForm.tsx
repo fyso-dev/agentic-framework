@@ -71,7 +71,13 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const [team, setTeam] = useState(initial.team);
   const appliedTeam = appliedTeamForRemoval(bot, s.runtimeBots.status === 'ok' ? s.runtimeBots.data ?? [] : null, s.baseBots);
   // Teams the file declares or already uses (D81); a new name creates the team on apply.
-  const teams = useMemo(() => { try { return teamNames(parseTeam(s.workingText ?? "version: 1\n")); } catch { return []; } }, [s.workingText]);
+  // Departments created in OpenMausBot itself are offered too: one concept, two editors.
+  const teams = useMemo(() => {
+    let names: string[] = [];
+    try { names = teamNames(parseTeam(s.workingText ?? "version: 1\n")); } catch { /* the draft error is shown elsewhere */ }
+    for (const section of (s.runtimeBots.data ?? []).map((b) => b.section?.trim() ?? "")) if (section && !names.some((n) => n.toLowerCase() === section.toLowerCase())) names.push(section);
+    return names;
+  }, [s.workingText, s.runtimeBots.data]);
   const [engine, setEngine] = useState(initial.engine);
   const [model, setModel] = useState(initial.model);
   const [approval, setApproval] = useState<Approval>(initial.approval);

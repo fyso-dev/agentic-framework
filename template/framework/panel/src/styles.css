@@ -702,6 +702,7 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 .bots-team + .bots-team { margin-top: 8px; }
 .bots-team-head { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px; min-width: 0; }
 .bots-team-name { display: flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--fy-mute); min-width: 0; }
+.bots-team-edit { width: 24px; height: 24px; margin: -4px 0; text-transform: none; }
 .bots-team-brief summary { cursor: pointer; }
 .bots-team-brief p { max-height: 160px; overflow: auto; padding-top: 4px; }
 .bots-pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--fy-radius-lg); color: var(--fy-text); text-decoration: none; transition: background var(--fy-dur-hover, 160ms); }

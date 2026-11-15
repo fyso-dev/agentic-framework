@@ -94,3 +94,23 @@ test('the roster groups bots by team, General first, then the file order',async(
   const twins=botRoster([row('A','x'),row('A','y','applied',1)],[native('1','A','x'),native('2','A','y')]);
   assert.ok(twins.every(r=>r.ambiguous));
 });
+test('the panel declares a department and edits its shared instructions in the native file',async()=>{
+  const {parseTeam,readTeams,upsertTeam,serializeTeam}=await team();
+  const doc=parseTeam('version: 1\nbots:\n  - name: Builder\n    model: claude/a\n');
+  upsertTeam(doc,null,{name:' Ventas ',brief:'Sean breves.'});
+  const text=serializeTeam(doc);
+  assert.ok(text.indexOf('teams:')<text.indexOf('bots:'),text);
+  assert.deepEqual(readTeams(parseTeam(text)),[{name:'Ventas',brief:{kind:'inline',text:'Sean breves.\n'}}]);
+  // Editing keeps the name, even if another one is passed; an empty brief removes it.
+  upsertTeam(doc,'ventas',{name:'Otro',brief:''});
+  assert.deepEqual(readTeams(doc),[{name:'Ventas',brief:{kind:'none'}}]);
+  // A brief kept in a file is never replaced from the panel.
+  const file=parseTeam(TEAM);
+  upsertTeam(file,'Equipo comercial',{name:'',brief:null});
+  assert.deepEqual(readTeams(file)[0].brief,{kind:'file',file:'${FYSO_ROOT}/project/bots/brief.md'});
+});
+test('a declared department without agents is still listed',async()=>{
+  const {groupByTeam}=await roster();
+  assert.deepEqual(groupByTeam([{key:'b',name:'Builder',title:'',model:''}],['Ventas']).map(g=>[g.team,g.rows.length]),[['',1],['Ventas',0]]);
+  assert.deepEqual(groupByTeam([],[]),[]);
+});

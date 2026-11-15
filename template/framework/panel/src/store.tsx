@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LoadedBackend } from "./api";
 import { DAGS, type App, type Backend, type Extension, type ThirdPartySkill, type Health, type Project, type RuntimeBot, type BotVersioning, type SetupCheck } from "./api/types";
-import { diffBots, listedBots, parseTeam, readBots, type Bot, type BotRow } from "./lib/team";
+import { changedTeams, diffBots, listedBots, parseTeam, readBots, readTeams, type Bot, type BotRow, type Team } from "./lib/team";
 import { useDaguAction, type Action } from "./lib/useDaguAction";
 
 type Loadable<T> = { status: "loading" | "ok" | "error"; data?: T; error?: string };
@@ -61,6 +61,15 @@ export function useStore(): Store {
 
 const draftKey = (slug: string) => `fyso.panel.${slug}.draft`;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+function safeTeams(text: string | null | undefined): Team[] {
+  if (!text) return [];
+  try {
+    return readTeams(parseTeam(text));
+  } catch {
+    return [];
+  }
+}
 
 function safeBots(text: string | null | undefined): Bot[] {
   if (!text) return [];
@@ -210,7 +219,9 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const baseBots = useMemo(() => safeBots(draftBase ?? team.data), [draftBase, team.data]);
   const workingBots = useMemo(() => safeBots(workingText), [workingText]);
   const rows = useMemo(() => diffBots(baseBots, workingBots), [baseBots, workingBots]);
-  const draftChanges = draft ? rows.filter((r) => r.state !== "applied").length : 0;
+  // Departments (D81) count too: a draft may only declare one or change its instructions.
+  const teamChanges = useMemo(() => draft ? changedTeams(safeTeams(draftBase ?? team.data), safeTeams(draft)).length : 0, [draft, draftBase, team.data]);
+  const draftChanges = draft ? rows.filter((r) => r.state !== "applied").length + teamChanges : 0;
 
   const checkData = check.output;
   const steps = useMemo((): Record<StepId, StepState> => {
