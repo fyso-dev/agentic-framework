@@ -1,3 +1,4 @@
+name: fyso-ext-install
 description: Panel ext-install (install or upgrade one extension from the marketplace, D31)
 labels:
   - fyso=system

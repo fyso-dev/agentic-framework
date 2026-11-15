@@ -1,3 +1,4 @@
+name: fyso-agent-connect
 description: Status, connect, disconnect or open the project MCP in the desktop and CLI agents of the Dagu host
 labels:
   - fyso=system

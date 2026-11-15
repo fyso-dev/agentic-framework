@@ -1,3 +1,4 @@
+name: fyso-skills-install
 description: Panel skills-install (install, update, scan, confirm or remove one third-party skill, D73)
 labels:
   - fyso=system

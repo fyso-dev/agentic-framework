@@ -18,7 +18,8 @@ function write() {
       }
     }
   }
-  const temporary = '.mcp.json.tmp';
+  // Per process: overlapping setup checks (D80) must not share a temporary file.
+  const temporary = `.mcp.json.${process.pid}.tmp`;
   try {
     fs.writeFileSync(temporary,JSON.stringify({mcpServers:servers},null,2)+'\n',{mode:0o600});
     fs.renameSync(temporary,'.mcp.json');

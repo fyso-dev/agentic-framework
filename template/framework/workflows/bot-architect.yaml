@@ -1,3 +1,4 @@
+name: fyso-bot-architect
 description: Native bot CRUD and existing-profile import with exact IDs and Git evidence
 labels:
   - fyso=system

@@ -42,7 +42,7 @@ Caddy proxies `/api/dagu/*` on the panel origin to Dagu (`/api/v1/*`), so there 
 
 | Call | Use |
 |---|---|
-| `POST /api/dagu/dags/{name}/enqueue` with body `{ "params": "<JSON object as string>" }` | Start an action. Returns `{ "dagRunId": "…" }`. **Always `enqueue`, never `start`**: `start` fails while another run is active (Phase 3 finding) |
+| `POST /api/dagu/dags/{name}/start` or `…/enqueue` with body `{ "params": "<JSON object as string>" }` | Start an action. Returns `{ "dagRunId": "…" }`. A workflow that declares `max_active_runs` other than 1 is **started** at once; every other one is **enqueued** (D80). `start` does not enforce `max_active_runs` in Dagu 2.24.0, so a workflow that must not overlap keeps `max_active_runs: 1` and waits in Dagu's queue (up to 3 s). `GET /api/dagu/dags/{name}` gives `dag.maxActiveRuns`; the panel reads it once per workflow and page load |
 | `GET /api/dagu/dag-runs/{name}/{dagRunId}` | Poll the status: `.dagRunDetails.statusLabel` |
 | `GET /api/dagu/dag-runs/{name}/{dagRunId}/outputs` | Results: `.outputs.<key>` (keys are lowercase) |
 | `GET /api/dagu/dags/{name}/dag-runs?limit=1` | Last run of an action (e.g. the last snapshot) |

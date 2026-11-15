@@ -32,7 +32,7 @@ npm run preview     # serves dist/ on port 8449
 ## Layout
 
 - `src/api/` — contract types, the HTTP backend and the mock backend (its own lazy chunk).
-- `src/lib/useDaguAction.ts` — one action = one Dagu workflow: always `enqueue`, then poll.
+- `src/lib/useDaguAction.ts` — one action = one Dagu workflow: `start` when it may overlap, otherwise `enqueue` (D80), then poll.
 - `src/components/Action.tsx` — the action component (never · idle · running · ok · failed).
 - `src/lib/team.ts` — reads and edits `team.yaml` with the `yaml` Document API (comments kept).
 - `src/locales/<lang>.json` — every UI string. Adding a language is adding one file.
