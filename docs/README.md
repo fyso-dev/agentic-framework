@@ -107,6 +107,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-15: Biz Work panel candidate creates project-agent requests and configures dispatch to a native bot. An authenticated gateway-to-Dagu-to-bot test reached Biz `done` with progress; browser acceptance and evidence storage remain open. [Checkpoint](teams-biz-delivery.md#checkpoint).
+
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
 
