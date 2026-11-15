@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BotTab } from "../lib/router";
 import { useTranslation } from "react-i18next";
 import { DAGS, type Engine } from "../api/types";
-import { IconBack, IconBot, IconChat, IconInfo, IconPencil, IconPlus, IconUndo, IconUsers } from "../components/Icons";
+import { IconBack, IconBot, IconChat, IconInfo, IconLayers, IconPencil, IconPlus, IconUndo, IconUsers } from "../components/Icons";
 import { ConnectorLogo } from "../components/ConnectorLogo";
 import { useObservation } from "../lib/bot-activity";
 import { BotDetail } from "./BotForm";
@@ -76,6 +76,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // The department dialog: `null` creates one, a name edits that one's shared instructions.
   const [department, setDepartment] = useState<{ name: string | null } | undefined>();
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const unapplied = unappliedCount(s);
   const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
   const engineName = useEngineName();
@@ -109,6 +110,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
           <h1>{t("bots.title")}</h1>
           <span className="bd-ib" tabIndex={0} aria-label={t("bots.subtitle")} data-tip={t("bots.subtitle")}><IconInfo size={16} /></span>
           <span className="grow" />
+          <button type="button" className="bd-ib tip-r" aria-label={t("bots.templates.add")} data-tip={t("bots.templates.add")} disabled={s.team.status !== "ok"} onClick={() => setTemplatesOpen(true)}><IconLayers size={18} /></button>
           <button type="button" className="bd-ib tip-r" aria-label={t("bots.team.create")} data-tip={t("bots.team.create")} disabled={s.team.status !== "ok"} onClick={() => setDepartment({ name: null })}><IconUsers size={18} /></button>
           <a href={href.newBot} className="bd-ib accent-solid tip-r" aria-label={t("bots.add")} data-tip={t("bots.add")}><IconPlus size={18} /></a>
         </div>
@@ -219,6 +221,8 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
       {department && <DepartmentDialog name={department.name} team={teams.find((x) => x.name.toLowerCase() === department.name?.toLowerCase())}
         runtimeSections={(runtime ?? []).map((b) => b.section ?? "")} onClose={() => setDepartment(undefined)} />}
 
+      {templatesOpen && <TemplatesDialog teams={teams} onClose={() => setTemplatesOpen(false)} />}
+
       <Modal open={confirmDiscard} onClose={() => setConfirmDiscard(false)} labelledBy="discard-t" className="small" role="alertdialog">
         <div className="modal-head"><h2 id="discard-t">{t("bots.discardTitle")}</h2></div>
         <div className="modal-body"><p className="mute">{t("bots.discardBody")}</p></div>
@@ -302,6 +306,70 @@ function DepartmentDialog({ name, team, runtimeSections, onClose }: { name: stri
           <button type="submit" className="btn btn-pri" disabled={!!fromFile && !creating}>{t(creating ? "bots.team.createSave" : "bots.team.save")}</button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+type DepartmentTemplate = { source: string; extension: string; slug: string; departamento?: string; brief?: string;
+  bots?: { name: string; title?: string }[]; rooms?: string[]; skills?: number; error?: string };
+
+/**
+ * Add a department an installed extension ships (D82). The import commits its skill
+ * files and returns the proposed team.yaml, which opens as the draft: the person
+ * reviews and applies it like any other change.
+ */
+function TemplatesDialog({ teams, onClose }: { teams: Team[]; onClose: () => void }) {
+  const { t, i18n } = useTranslation();
+  const s = useStore();
+  const list = new Intl.ListFormat(i18n.language, { type: "conjunction" });
+  const listing = useDaguAction<{ templates: DepartmentTemplate[] }>(s.backend, DAGS.botArchitect, "RESULT");
+  const importing = useDaguAction<{ proposedTeamYaml: string; commit: string | null; slug: string }>(s.backend, DAGS.botArchitect, "RESULT");
+  const [chosen, setChosen] = useState<string>();
+  useEffect(() => { void listing.start({ OP: "team-templates" }); }, []);
+  const blocked = !!s.draft || !s.draftReady;
+  const add = async (source: string) => {
+    if (blocked || importing.phase === "running") return;
+    setChosen(source);
+    const result = await importing.start({ OP: "team-import", SOURCE: source });
+    if (result?.proposedTeamYaml) { s.setDraft(result.proposedTeamYaml); onClose(); }
+  };
+  const templates = listing.output?.templates ?? [];
+  return (
+    <Modal open onClose={onClose} labelledBy="templates-t">
+      <div className="modal-head"><h2 id="templates-t">{t("bots.templates.title")}</h2></div>
+      <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p className="mute">{t("bots.templates.body")}</p>
+        {blocked && <p className="note">{t("bots.templates.draftHint")}</p>}
+        {listing.phase === "running" || listing.phase === "loading" ? <p className="hint" aria-busy="true">{t("bots.templates.loading")}</p>
+          : listing.phase === "failed" ? <ActionError action={listing} />
+          : templates.length === 0 ? <p className="hint">{t("bots.templates.empty")}</p>
+          : <ul className="bots-picks" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {templates.map((item) => {
+                const exists = !!item.departamento && teams.some((x) => x.name.toLowerCase() === item.departamento!.toLowerCase());
+                return (
+                  <li key={item.source} className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <p style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <strong className="grow ellipsis">{item.departamento || item.slug}</strong>
+                      <span className="pill pill-outline">{t("bots.templates.from", { ext: item.extension })}</span>
+                    </p>
+                    {item.error ? <p className="field-err">{t("bots.templates.invalid", { error: item.error })}</p> : <>
+                      {item.brief && <p className="hint" style={{ whiteSpace: "pre-wrap" }}>{item.brief}</p>}
+                      <p className="hint">{t("bots.templates.bots", { list: list.format((item.bots ?? []).map((b) => b.name)) })}</p>
+                      {(item.rooms ?? []).length > 0 && <p className="hint">{t("bots.templates.rooms", { list: list.format(item.rooms ?? []) })}</p>}
+                      {!!item.skills && <p className="hint">{t("bots.templates.skills", { count: item.skills })}</p>}
+                      {exists && <p className="note">{t("bots.templates.replaces")}</p>}
+                      {chosen === item.source && importing.phase !== "never" && <div><ActionStatus action={importing} /><ActionError action={importing} /></div>}
+                      <button type="button" className="btn btn-sm btn-pri" style={{ alignSelf: "flex-start" }} disabled={blocked || importing.phase === "running"}
+                        aria-label={t("bots.templates.chooseNamed", { name: item.departamento })} onClick={() => void add(item.source)}>{t("bots.templates.choose")}</button>
+                    </>}
+                  </li>
+                );
+              })}
+            </ul>}
+      </div>
+      <div className="modal-foot" style={{ justifyContent: "flex-end", borderTop: 0, paddingTop: 0 }}>
+        <button type="button" className="btn btn-soft" onClick={onClose}>{t("common.close")}</button>
+      </div>
     </Modal>
   );
 }

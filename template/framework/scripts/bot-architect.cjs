@@ -62,6 +62,7 @@ async function main(env=process.env) {
   const op=env.OP||'list';
   if(op==='connections')return require('./connections.cjs').inventory(env);
   if(op==='import')return require('./import-bot.cjs').importBot(env);
+  if(op.startsWith('team-'))return teamTemplate(op,env,{root,base,port});
   if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,team:b.section||'',title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
   if(op==='read') {
     const current=await state(),bot=current.live.find(b=>b.id===env.BOT_ID);
@@ -163,6 +164,27 @@ async function main(env=process.env) {
     const result={action:plan.action,planId:env.PLAN_ID,botId:plan.action==='delete'?plan.targetId:live.find(b=>key(b.name)===key(name))?.id,name,beforeCommit:before,commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),native};
     fs.writeFileSync(receipt,canonical(result),{mode:0o600});return result;
   } finally {fs.rmdirSync(lock);}
+}
+
+// Department templates (D82): list extension packages, export one department, import one.
+function teamTemplate(op,env,{root,base,port}) {
+  const templates=require('./team-template.cjs');
+  if(op==='team-templates')return {templates:templates.templates({root})};
+  if(op==='team-export')return templates.exportDepartment(env.DEPARTMENT||'',{port,tmp:base});
+  if(op!=='team-import')throw new Error('OP must be team-templates, team-export or team-import');
+  if(!!env.PACKAGE_B64===!!env.SOURCE)throw new Error('team-import needs PACKAGE_B64 or SOURCE');
+  if(env.SLUG && !/^[a-z0-9][a-z0-9-]{0,59}$/.test(env.SLUG))throw new Error('invalid SLUG');
+  let pkg;
+  if(env.PACKAGE_B64) {
+    if(env.PACKAGE_B64.length>Math.ceil(templates.MAX_BYTES*4/3)+8)throw new Error('too_large');
+    try{pkg=JSON.parse(Buffer.from(env.PACKAGE_B64,'base64').toString('utf8'));}catch{throw new Error('PACKAGE_B64 must encode one omb-team/1 package');}
+  }
+  const lock=path.join(base,'.lock');fs.mkdirSync(lock);
+  try {
+    const scan=dir=>execFileSync('gitleaks',['dir',dir,'--no-banner','--redact'],{stdio:['ignore','ignore','pipe']});
+    return templates.importPackage({pkg,source:env.SOURCE||undefined,teamSlug:env.SLUG||undefined,root,scan});
+  } catch(error) {throw new Error(error.detail?`${error.message}: ${error.detail}`:error.message);}
+  finally {fs.rmdirSync(lock);}
 }
 
 async function submit(params,env=process.env) {

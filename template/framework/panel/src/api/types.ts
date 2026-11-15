@@ -49,6 +49,8 @@ export type Extension = {
   mcpServers: string[];
   workflows: string[];
   skills: string[];
+  /** Department templates it ships (`extensions/<ext>/teams/<slug>/`, D82). */
+  teams?: string[];
   pages?: ExtensionPageRegistration[];
   /** Setup step the extension adds (`extensions/<ext>/setup.yaml`, D51). */
   setup?: { title: string; title_i18n?: Record<string, string>; description?: string; description_i18n?: Record<string, string> };

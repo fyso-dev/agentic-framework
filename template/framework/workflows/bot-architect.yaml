@@ -1,5 +1,5 @@
 name: fyso-bot-architect
-description: Native bot CRUD and existing-profile import with exact IDs and Git evidence
+description: Native bot CRUD, existing-profile import and department templates with exact IDs and Git evidence
 labels:
   - fyso=system
 type: graph
@@ -10,6 +10,10 @@ params:
   - BOT_ID: ""
   - BOT_B64: ""
   - PLAN_ID: ""
+  - DEPARTMENT: ""
+  - PACKAGE_B64: ""
+  - SOURCE: ""
+  - SLUG: ""
 working_dir: ${FYSO_ROOT}
 steps:
   - id: operate
