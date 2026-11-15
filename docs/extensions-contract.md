@@ -68,6 +68,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Setup step (optional) | `extensions/<ext>/setup.yaml` | Panel Setup checklist, `fyso-setup-check` (D51) |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
 | Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person enables them on a bot: the panel's bot detail has one toggle per extension skill (D54), or list them in `team.yaml` by hand (not automatic, see §6) |
+| Department templates | `extensions/<ext>/teams/<slug>/team.yaml` and `extensions/<ext>/teams/<slug>/skills/**` | `fyso-bot-architect` `OP=team-templates`, listed by the panel's *Add department*; added only when a person chooses one and applies the proposed change (D82, see below) |
 | Workflows | `project/workflows/ext-<ext>-*.yaml` | Dagu (flat file; see §6 for subdirectories). Files matching a longer installed id (`ext-<ext>-other-*` when `<ext>-other` is installed) belong to that extension |
 | Ignore rules | `extensions/<ext>/.gitignore` | git (nested ignore files) |
 | Runtime data | `.data/ext/<ext>/` | the extension's own process (never committed) |
@@ -81,6 +82,10 @@ An extension writes **only** these paths. It never edits a file that another tem
   url: https://example.com/settings/tokens   # optional, HTTPS: where the value is obtained (D50)
   required: true
 ```
+
+### `teams/<slug>/` (D82)
+
+One department template per directory, in OpenMausBot's own team file format: `team.yaml` declares exactly one `teams:` entry, the bots whose `team:` is that department and its rooms, with no `cwd`, machine path, `chief` or `manages`. Skill entries are relative, `skills/<bot-slug>/<skill>/SKILL.md`, and each file lives beside `team.yaml`. Limits: 512 KB and 64 skills ([department templates](team-templates.md)). `extensions.json` lists the slugs as `teams`; `OP=team-templates` lists an invalid template with its error, and it cannot be added. The extension never writes `project/bots/team.yaml`: adding a department is the person's action (`OP=team-import SOURCE=extension:<ext>/<slug>`), which copies the skills to `project/bots/teams/<slug>/` and opens the proposed `team.yaml` as a draft.
 
 ### `app.yaml`
 

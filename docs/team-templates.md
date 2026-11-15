@@ -50,6 +50,16 @@ Acceptance checklist:
 
 The extension never writes `project/bots/team.yaml`; adding a department is a person's action.
 
+Workflow parameters and output (`RESULT`, JSON):
+
+| `OP` | Parameters | Output |
+|---|---|---|
+| `team-templates` | — | `{templates: [{source: "extension:<ext>/<slug>", extension, slug, departamento, brief?, bots: [{name, title?}], rooms: [name], skills: <count>, digest}]}`; an invalid template has `{source, extension, slug, error}` instead |
+| `team-export` | `DEPARTMENT` | `{package, digest}` |
+| `team-import` | `PACKAGE_B64` (base64 of the package JSON) **or** `SOURCE=extension:<ext>/<slug>`; optional `SLUG` (default: the extension directory, else the slug of the department name) | `{proposedTeamYaml, commit, slug, departamento, digest, source?}`; `commit` is `null` when the skill files were already committed |
+
+Errors are the run's failure message: `unsupported_format`, `invalid_package: <detail>`, `too_large`, `too_many_skills`, `unsafe_path: <path>`, `name_taken: <bot or room>`, `uncommitted_changes: <dir>`, `omb_export_failed: <OMB error>`, `secret_detected`. The import proposes before writing, so a rejected package changes nothing; it scans the written files with gitleaks before committing. The proposed `team.yaml` inlines souls and the department brief as the package carries them; skill entries point at `${FYSO_ROOT}/project/bots/teams/<slug>/skills/…`; department bots have no `cwd` and inherit the project's `defaults.cwd`. Bots of the department that the package no longer has are removed from the proposal, so the plan shows them as deletions for the person to accept or discard.
+
 ## Fyso Business (fyso-business)
 
 - `publicar_equipo({paquete, equipo_id?, version_base?, departamento_id?})`: without `equipo_id` creates a team from the package (its name, and its shared instructions as the team prompt) at version 1; with it, publishes a new version only when `version_base` equals the current version, else returns `version_conflict` with the current version. Same write authorization as the team catalog; the package is validated (format, size, one department).
