@@ -183,7 +183,12 @@
     "versionUnavailable": "No se pudo verificar el estado en Git. La importación está deshabilitada.",
     "versionHint": "“En el proyecto” y “En snapshot” indican una definición guardada en el último commit; los cambios posteriores del agente pueden no estar guardados.",
     "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Haz commit de ellos o descártalos antes de importar.",
-    "editAction": "Editar"
+    "editAction": "Editar",
+    "team": {
+      "none": "General",
+      "brief": "Instrucciones del equipo",
+      "briefFile": "Archivo de instrucciones del equipo"
+    }
   },
   "form": {
     "back": "Agentes",
@@ -232,7 +237,11 @@
     "skillPending": "por revisar",
     "skillsNeedRoot": "Necesitan las herramientas del proyecto: activa «Usa workflows» para poder usarlas.",
     "piHumanRequestContext": "Para retomar pedidos en esta conversación, Pi puede leer la lista de conversaciones de este agente y las que abrió con otros agentes.",
-    "piHumanRequestBlocked": "La lectura de conversaciones está bloqueada. Pi podrá crear pedidos, pero no recibir repreguntas ni volver a esta conversación hasta habilitarla."
+    "piHumanRequestBlocked": "La lectura de conversaciones está bloqueada. Pi podrá crear pedidos, pero no recibir repreguntas ni volver a esta conversación hasta habilitarla.",
+    "team": "Equipo",
+    "teamHint": "Opcional. Elige un equipo o escribe uno nuevo. Al mover un agente, vuelve a guardar sus permisos de aplicaciones para el nuevo equipo.",
+    "teamLeave": "Elige un equipo: OpenMausBot no mueve al agente a General cuando se deja este campo vacío.",
+    "teamChief": "Este agente es el jefe de su equipo y puede administrar a sus agentes."
   },
   "preview": {
     "deleteHistoryWarning": "Eliminar un bot de OpenMausBot borra definitivamente su historial de conversaciones. La copia de la configuración no incluye ese historial.",

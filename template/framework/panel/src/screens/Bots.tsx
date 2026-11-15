@@ -1,5 +1,5 @@
 // Bots: the list over team.yaml (draft vs file on disk) and the review/apply dialog.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BotTab } from "../lib/router";
 import { useTranslation } from "react-i18next";
 import { DAGS, type Engine } from "../api/types";
@@ -11,8 +11,8 @@ import { unappliedCount } from "../components/Layout";
 import { Avatar, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import { accessFor } from "../lib/connector-access";
-import { splitModel, type BotState } from "../lib/team";
-import { botRoster, unmatchedVersion } from "../lib/botRoster";
+import { parseTeam, readTeams, soulFileLabel, splitModel, type BotState, type Team } from "../lib/team";
+import { botRoster, groupByTeam, unmatchedVersion } from "../lib/botRoster";
 import { useDaguAction } from "../lib/useDaguAction";
 import { ActionStatus, ActionError } from "../components/Action";
 import { useStore } from "../store";
@@ -67,6 +67,9 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   const runtime = s.runtimeBots.data ?? null;
   const runtimeError = s.runtimeBots.status === "error";
   const rows = botRoster(s.rows, s.mock ? null : runtime);
+  const teams = useMemo((): Team[] => { try { return s.workingText ? readTeams(parseTeam(s.workingText)) : []; } catch { return []; } }, [s.workingText]);
+  const groups = groupByTeam(rows, teams.map((x) => x.name));
+  const grouped = groups.some((g) => g.team);
   const inventory = s.botVersioning.status === "ok" ? s.botVersioning.data : undefined;
   const synchronized = s.team.status === "ok" && s.runtimeBots.status === "ok" && !s.draftConflict;
   const omb = s.project.data?.urls.omb;
@@ -148,8 +151,11 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
             <a href={href.newBot} className="btn btn-lg btn-pri" style={{ marginTop: 4 }}>+ {t("bots.add")}</a>
           </div>
         ) : (
+          groups.map((group) => (
+          <section key={group.team || "-"} className="bots-team" aria-label={grouped ? group.team || t("bots.team.none") : undefined}>
+          {grouped && <TeamHeading name={group.team} team={teams.find((x) => x.name.toLowerCase() === group.team.toLowerCase())} count={group.rows.length} />}
           <ul className="bots-picks">
-            {rows.map((row) => {
+            {group.rows.map((row) => {
               const state = row.configuration?.state ?? "applied";
               const target = state === "deleted" || row.ambiguous ? undefined
                 : row.nativeId ? href.nativeBot(row.nativeId)
@@ -181,6 +187,8 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
               );
             })}
           </ul>
+          </section>
+          ))
         )}
 
         <p className="note bots-engines">
@@ -213,6 +221,24 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
         </div>
       </Modal>
     </main>
+  );
+}
+
+/** A team's heading in the list: its name and, read-only, its shared brief (D81). */
+function TeamHeading({ name, team, count }: { name: string; team?: Team; count: number }) {
+  const { t } = useTranslation();
+  const brief = team?.brief;
+  return (
+    <div className="bots-team-head">
+      <p className="bots-team-name"><span className="ellipsis">{name || t("bots.team.none")}</span><span className="mute">{count}</span></p>
+      {brief?.kind === "file" && <p className="hint ellipsis" title={soulFileLabel(brief.file)}>{t("bots.team.briefFile")}: <span className="mono">{soulFileLabel(brief.file)}</span></p>}
+      {brief?.kind === "inline" && (
+        <details className="bots-team-brief">
+          <summary className="hint">{t("bots.team.brief")}</summary>
+          <p className="hint" style={{ whiteSpace: "pre-wrap" }}>{brief.text}</p>
+        </details>
+      )}
+    </div>
   );
 }
 

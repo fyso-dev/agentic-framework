@@ -32,6 +32,9 @@ async function importBot(env=process.env) {
     const entries=(exported.bots||[]).filter(bot=>bot.name===target.name);
     if(entries.length!==1)throw new Error('native export did not resolve the selected identity');
     const entry=entries[0];
+    // The team travels with the bot; bot-management powers do not: a person grants
+    // `chief`/`manages` explicitly in team.yaml (D81). Omitted, OMB leaves them as they are.
+    delete entry.chief;delete entry.manages;
     // Address the selected native bundle by immutable native ID. Refuse
     // collisions rather than overwriting any existing project-owned files.
     const relative=`imported/${id}`,destination=path.join(root,'project/bots',relative);

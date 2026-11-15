@@ -39,3 +39,33 @@ test('native app plans are stale-safe, exact-target, verified and restored by st
   const dirty=await operate('read',{botId:'restored-one'},env,request,()=>{});await assert.rejects(operate('plan',{botId:'restored-one',revision:dirty.revision,changes:{gmail:'write'}},env,request,()=>{}),/existing app permission edits/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+test('orphaned app access is never assigned to a same-named bot in another team',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-app-access-team-')),env={FYSO_ROOT:root,FYSO_DATA:path.join(root,'.data'),FYSO_OMB_PORT:'19445'};
+ const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:'pipe'}).trim();
+ git(['init','-q']);git(['config','user.name','App fixture']);git(['config','user.email','fixture@example.invalid']);git(['commit','--allow-empty','-qm','fixture']);
+ let bots=[{id:'one',name:'Redactor',connectorScopes:{apps:{gmail:'write'}}},{id:'two',name:'Other',section:'Ventas'}];
+ const request=async(url,options)=>{
+  if(url.endsWith('bots?messages=0'))return {ok:true,json:async()=>({bots:structuredClone(bots)})};
+  if(url.endsWith('connectors/connected'))return {ok:true,json:async()=>({configured:true,inventoryComplete:true,services:{gmail:{connected:true}}})};
+  const id=url.split('/').pop(),patch=JSON.parse(options.body),bot=bots.find(bot=>bot.id===id);
+  for(const [key,value] of Object.entries(patch)){if(value===null)delete bot[key];else bot[key]=value;}
+  return {ok:true,json:async()=>({bot})};
+ };
+ const folder=path.join(root,'project/bots/app-access'),files=()=>fs.readdirSync(folder).map(name=>JSON.parse(fs.readFileSync(path.join(folder,name),'utf8')));
+ try{
+  let read=await operate('read',{botId:'one'},env,request,()=>{});
+  await operate('apply',await operate('plan',{botId:'one',revision:read.revision,changes:{gmail:'read'}},env,request,()=>{}),env,request,()=>{});
+  assert.deepEqual(files().map(f=>[f.name,f.section]),[['Redactor','']]);
+  // A move and a replacement cannot be distinguished from name and section alone.
+  bots[0]={id:'restored',name:'Redactor',section:'Equipo comercial',connectorScopes:{apps:{}}};
+  assert.equal((await operate('restore',{},env,request,()=>{})).restored,0);assert.equal(access(bots[0],'gmail'),'off');
+  // An explicit new grant is recorded for that team; the orphan is preserved.
+  read=await operate('read',{botId:'restored'},env,request,()=>{});
+  await operate('apply',await operate('plan',{botId:'restored',revision:read.revision,changes:{gmail:'write'}},env,request,()=>{}),env,request,()=>{});
+  assert.deepEqual(files().map(f=>[f.name,f.section,f.connectorScopes.apps.gmail]).sort((a,b)=>a[1].localeCompare(b[1])),[['Redactor','','read'],['Redactor','Equipo comercial','write']]);
+  assert.equal(git(['status','--porcelain','--','project']),'');
+  // A same-named bot elsewhere makes the identity ambiguous: nothing is guessed.
+  bots[0].section='Ventas';bots.push({id:'twin',name:'Redactor',section:'Soporte'});
+  assert.equal((await operate('restore',{},env,request,()=>{})).restored,0);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

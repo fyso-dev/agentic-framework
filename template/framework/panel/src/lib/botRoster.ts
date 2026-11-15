@@ -17,12 +17,15 @@ export type RosterRow = {
 export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null): RosterRow[] {
   const fromConfig = (row: BotRow): RosterRow => ({
     key: `config-${row.bot.index}-${row.bot.name}-${row.state}`,
-    name: row.bot.name, title: row.bot.title, model: row.bot.model, configuration: row,
+    team: row.bot.team, name: row.bot.name, title: row.bot.title, model: row.bot.model, configuration: row,
   });
   if (runtime === null) return configuration.map(fromConfig);
   const matched = new Set<BotRow>();
   const rows = runtime.map(bot => {
-    const candidates = configuration.filter(row => row.bot.name === bot.name);
+    const named = configuration.filter(row => row.bot.name === bot.name);
+    // OMB matches by name and prefers the bot in the same team (D81).
+    const sameTeam = named.filter(row => row.bot.team === (bot.section || ""));
+    const candidates = named.length > 1 && sameTeam.length ? sameTeam : named;
     const unique = runtime.filter(other => other.name === bot.name).length === 1;
     const config = unique && candidates.length === 1 ? candidates[0] : undefined;
     if (config) matched.add(config);
@@ -30,7 +33,7 @@ export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null)
     return {
       key: bot.id,
       nativeId: bot.id,
-      team: bot.section || "",
+      team: pending ? config.bot.team : bot.section || "",
       appearance: bot,
       ambiguous: !unique,
       name: pending ? config.bot.name : bot.name,
@@ -42,6 +45,20 @@ export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null)
   // Unapplied drafts remain visible. An unchanged declaration must not resurrect
   // a bot removed in the native UI, or duplicate an ambiguous live identity.
   return [...rows, ...configuration.filter(row => !matched.has(row) && row.state !== "applied").map(fromConfig)];
+}
+
+export type TeamGroup = { team: string; rows: RosterRow[] };
+
+/**
+ * Group the roster by OMB team, in the file's team order, then any other team the
+ * bots name; bots without a team come first, under OMB's default "General" (D81).
+ */
+export function groupByTeam(rows: RosterRow[], declared: string[] = []): TeamGroup[] {
+  const order: string[] = [""];
+  const known = (team: string) => order.find(t => t.toLowerCase() === team.toLowerCase());
+  for (const team of [...declared, ...rows.map(r => r.team || "")]) if (known(team) === undefined) order.push(team);
+  const groups = order.map(team => ({ team, rows: rows.filter(r => known(r.team || "") === team) }));
+  return groups.filter(g => g.rows.length > 0);
 }
 
 export function versionStatus(row: RosterRow, inventory: import('../api/types').BotVersioning | undefined): 'project' | 'snapshot' | 'native' | 'unknown' {

@@ -30,6 +30,8 @@ export type Bot = {
   engine: string;
   modelId: string;
   chief: boolean;
+  /** OMB team (sidebar section) the bot belongs to; "" when it has none (OMB's "General"). */
+  team: string;
   /** OMB approval mode: ask before acting, or act without asking. */
   approval: Approval;
   soul: Soul;
@@ -51,6 +53,8 @@ export type BotInput = {
   usesWorkflows: boolean;
   /** Omit to keep the current value. */
   approval?: Approval;
+  /** OMB team name; "" removes the key; omit to keep the current value. */
+  team?: string;
   /** Omit to preserve the existing native selection. */
   tools?: ToolScope;
   /** Extension and third-party skills to switch on or off, by team file path. Others stay untouched. */
@@ -151,6 +155,7 @@ export function readBots(doc: Document): Bot[] {
 
       ...splitModel(model),
       chief: item.get("chief") === true,
+      team: decodeEnv(str(item.get("team"))).trim(),
       approval: (item.has("approval") ? str(item.get("approval")) : str(doc.getIn(["defaults", "approval"]))) === "full" ? "full" : "ask",
       soul: readSoul(item.get("soul", true)),
       skills: readSkills(item.get("skills", true)),
@@ -162,8 +167,38 @@ export function readBots(doc: Document): Bot[] {
   });
 }
 
-/** Bots the panel lists: the chief bot (OpenMausBot's default MausBot) is not managed here. */
-export const listedBots = (bots: Bot[]) => bots.filter((b) => !b.chief);
+/** The framework's own chief: OpenMausBot's default MausBot, the chief without a team. */
+export const isDefaultChief = (b: Pick<Bot, "chief" | "team">) => b.chief && !b.team;
+
+/** OMB ignores an omitted team on existing bots; don't present that as a move. */
+export const invalidTeamRemoval = (previous: string, next: string) => !!previous.trim() && !next.trim();
+
+/** Bots the panel lists: the default MausBot is not managed here; a team's chief is (D81). */
+export const listedBots = (bots: Bot[]) => bots.filter((b) => !isDefaultChief(b));
+
+/** A team declared in the file's native `teams:` list (D81). Its brief is shared instructions. */
+export type Team = { name: string; brief: Soul };
+
+export function readTeams(doc: Document): Team[] {
+  const seq = doc.get("teams", true);
+  if (!isSeq(seq)) return [];
+  return seq.items.flatMap((item) => {
+    if (!isMap(item)) return [];
+    const name = decodeEnv(str(item.get("name"))).trim();
+    return name ? [{ name, brief: readSoul(item.get("brief", true)) }] : [];
+  });
+}
+
+/** Team names a bot can join: the declared teams plus those bots and rooms already name. */
+export function teamNames(doc: Document): string[] {
+  const names: string[] = [];
+  const add = (name: string) => { if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) names.push(name); };
+  readTeams(doc).forEach((t) => add(t.name));
+  readBots(doc).forEach((b) => add(b.team));
+  const rooms = doc.get("rooms", true);
+  if (isSeq(rooms)) rooms.items.forEach((r) => { if (isMap(r)) add(decodeEnv(str(r.get("team"))).trim()); });
+  return names;
+}
 
 function soulNode(doc: Document, text: string): Scalar {
   const node = doc.createNode(encodeEnv(text.endsWith("\n") ? text : `${text}\n`)) as Scalar;
@@ -178,6 +213,10 @@ function applyInput(doc: Document, map: YAMLMap, input: BotInput) {
   else map.delete("title");
   map.set("model", input.model);
   if (input.approval !== undefined) map.set("approval", input.approval);
+  if (input.team !== undefined) {
+    if (input.team.trim()) map.set("team", input.team.trim());
+    else map.delete("team");
+  }
   if (input.soulText !== null) {
     if (input.soulText.trim()) map.set("soul", soulNode(doc, input.soulText));
     else map.delete("soul");
@@ -239,14 +278,27 @@ export type BotState = "applied" | "pending" | "new" | "deleted";
 
 export type BotRow = { bot: Bot; state: BotState };
 
-/** Compare the draft with the team file on disk, by bot name (OMB matches bots by name). */
+/**
+ * Compare the draft with the team file on disk. OMB identifies a bot by name, preferring
+ * the one in the same team, so a bot is matched by name and team first and then by name
+ * alone: moving it to another team is a change of that bot, not a delete plus a create.
+ */
 export function diffBots(base: Bot[], draft: Bot[]): BotRow[] {
-  const byName = new Map(base.map((b) => [b.name, b]));
+  const pending = new Set(base);
+  const take = (match: (b: Bot) => boolean) => {
+    const found = [...pending].find(match);
+    if (found) pending.delete(found);
+    return found;
+  };
+  const exact = new Map<Bot, Bot>();
+  for (const bot of draft) {
+    const old = take((b) => b.name === bot.name && b.team === bot.team);
+    if (old) exact.set(bot, old);
+  }
   const rows: BotRow[] = draft.map((bot) => {
-    const old = byName.get(bot.name);
+    const old = exact.get(bot) ?? take((b) => b.name === bot.name);
     return { bot, state: !old ? "new" : old.fingerprint === bot.fingerprint ? "applied" : "pending" };
   });
-  const names = new Set(draft.map((b) => b.name));
-  for (const bot of base) if (!names.has(bot.name)) rows.push({ bot, state: "deleted" });
+  for (const bot of pending) rows.push({ bot, state: "deleted" });
   return rows;
 }

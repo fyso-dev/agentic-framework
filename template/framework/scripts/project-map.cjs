@@ -46,7 +46,7 @@ function map(root, env = process.env) {
   return {
     project: {name: env.FYSO_PROJECT_NAME || path.basename(root), slug: env.FYSO_PROJECT || path.basename(root)},
     bots: {source: 'project/bots/team.yaml (declared; live roster: fyso_bots_list)',
-      declared: (team.bots || []).map(b => ({name: b.name, ...(b.title && {title: b.title}), model: b.model || team.defaults?.model || null, ...(b.chief && {chief: true})}))},
+      declared: (team.bots || []).map(b => ({name: b.name, ...(b.title && {title: b.title}), model: b.model || team.defaults?.model || null, ...(b.team && {team: b.team}), ...(b.chief && {chief: true})}))},
     workflows,
     apps: glob('project/apps/*/app.yaml').map(file => { const app = parse(file); return {id: app.id || file.split('/')[2], name: text(app.name) || null, file}; }),
     extensions,

@@ -33,14 +33,18 @@ async function operate(op,input={},env=process.env,request=fetch,verify) {
     return response.json();
   }
   const fileFor=bot=>path.join(folder,hash(canonical({name:bot.name,section:bot.section||''}))+'.json');
+  const savedPatches=()=>fs.existsSync(folder)?fs.readdirSync(folder).filter(name=>/^[a-f0-9]{64}\.json$/.test(name)).map(name=>{
+    const file=path.join(folder,name),saved=JSON.parse(fs.readFileSync(file,'utf8'));
+    if(Object.keys(saved).some(key=>!['name','section','composio','connectorScopes','connectorTools'].includes(key)))throw Error('invalid saved app patch');
+    return {file,saved};
+  }):[];
+  const sameTeam=(a,b)=>(a.section||'')===(b.section||'');
   const clean=file=>{if(git(['status','--porcelain','--',path.relative(root,file)]))throw Error('commit existing app permission edits first');};
   if(op==='restore') {
-    if(!fs.existsSync(folder))return {restored:0};
+    const patches=savedPatches();if(!patches.length)return {restored:0};
     const bots=(await api('bots?messages=0')).bots;let restored=0;
-    for(const filename of fs.readdirSync(folder).filter(name=>/^[a-f0-9]{64}\.json$/.test(name))) {
-      const saved=JSON.parse(fs.readFileSync(path.join(folder,filename),'utf8'));
-      if(Object.keys(saved).some(key=>!['name','section','composio','connectorScopes','connectorTools'].includes(key)))throw Error('invalid saved app patch');
-      const matches=bots.filter(bot=>bot.name===saved.name&&(bot.section||'')===(saved.section||''));
+    for(const {saved} of patches) {
+      const matches=bots.filter(bot=>bot.name===saved.name&&sameTeam(bot,saved));
       if(matches.length>1)throw Error('ambiguous app permission target');
       if(!matches.length)continue;
       await api(`bots/${encodeURIComponent(matches[0].id)}`,'PATCH',permissions(saved));

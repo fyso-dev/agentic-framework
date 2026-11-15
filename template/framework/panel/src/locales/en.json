@@ -183,7 +183,12 @@
     "versionUnavailable": "Git status could not be verified. Import is disabled.",
     "versionHint": "“In project” and “In snapshot” indicate a definition saved in the latest commit; later native edits may not be saved.",
     "importDirtyHint": "Project configuration has uncommitted changes. Commit or discard them before importing.",
-    "editAction": "Edit"
+    "editAction": "Edit",
+    "team": {
+      "none": "General",
+      "brief": "Team brief",
+      "briefFile": "Team brief file"
+    }
   },
   "form": {
     "back": "Agents",
@@ -232,7 +237,11 @@
     "skillPending": "to review",
     "skillsNeedRoot": "They need the project’s tools: turn on “Uses workflows” to use them.",
     "piHumanRequestContext": "To resume requests in this conversation, Pi can read this agent's conversations and those it opened with other agents.",
-    "piHumanRequestBlocked": "Conversation listing is blocked. Pi can create requests, but cannot receive questions or return to this conversation until it is enabled."
+    "piHumanRequestBlocked": "Conversation listing is blocked. Pi can create requests, but cannot receive questions or return to this conversation until it is enabled.",
+    "team": "Team",
+    "teamHint": "Optional. Choose a team or type a new one. After moving an agent, save its application permissions again for the new team.",
+    "teamLeave": "Choose a team: OpenMausBot does not move the agent to General when this field is empty.",
+    "teamChief": "This agent is the chief of its team and can manage the team's agents."
   },
   "preview": {
     "deleteHistoryWarning": "Deleting a bot from OpenMausBot permanently removes its conversation history. The configuration snapshot does not contain that history.",
