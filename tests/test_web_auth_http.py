@@ -84,6 +84,7 @@ class WebAuthHTTP(unittest.TestCase):
                     'groups': self.headers.get('Remote-Groups'),
                     'nativeCookiePreserved': 'native-app=preserved' in self.headers.get('Cookie', ''),
                     'webCookieLeaked': 'tinyauth-session-' in self.headers.get('Cookie', ''),
+                    'authorization': self.headers.get('Authorization') is not None,
                 }).encode()
                 self.send_response(200); self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
@@ -97,7 +98,9 @@ class WebAuthHTTP(unittest.TestCase):
             threading.Thread(target=server.serve_forever, daemon=True).start()
         cls.setup_socket = Path('/tmp') / f'fyso-auth-setup-{cls.port}.sock'
         cls.mcp_socket = Path('/tmp') / f'fyso-auth-mcp-{cls.port}.sock'
-        for socket_path in [cls.setup_socket, cls.mcp_socket]:
+        cls.ext_socket = Path('/tmp') / f'fyso-ext-sockext-{cls.port}.sock'
+        cls.addClassCleanup(lambda: cls.ext_socket.unlink(missing_ok=True))
+        for socket_path in [cls.setup_socket, cls.mcp_socket, cls.ext_socket]:
             socket_path.unlink(missing_ok=True)
             server = ThreadingUnixStreamServer(str(socket_path), Echo)
             cls.servers.append(server)
@@ -205,6 +208,27 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertTrue(json.loads(body)['daguCredential']); self.assertFalse(json.loads(body)['webCookieLeaked'])
         self.assertEqual(self.request('panel', '/api/agent/remote', 'POST', {}, Cookie=cookie, Origin='https://foreign.invalid')[0], 403)
         self.assertEqual(self.request('panel', '/api/agent/other', 'POST', {}, Cookie=cookie, Origin=origin)[0], 404)
+
+    def test_extension_api_reaches_only_its_socket_behind_the_web_session(self):
+        # D79: /api/ext/<id>/<path> → /tmp/fyso-ext-<id>-<port>.sock with the session's identity only.
+        route = '/api/ext/sockext/teams?fresh=1'
+        self.assertEqual(self.request('panel', route)[0], 401)
+        cookie = self.login()
+        status, _, body = self.request('panel', route, cookie=cookie, Authorization='Bearer forged', **{'Remote-User': 'forged'})
+        self.assertEqual(status, 200)
+        seen = json.loads(body)
+        self.assertEqual(seen['path'], '/teams?fresh=1')
+        self.assertEqual(seen['user'], 'admin')
+        self.assertFalse(seen['authorization']); self.assertFalse(seen['webCookieLeaked'])
+        origin = self.origin('panel')
+        self.assertEqual(self.request('panel', '/api/ext/sockext/logout', 'POST', {}, cookie=cookie, Origin=origin)[0], 200)
+        self.assertEqual(self.request('panel', '/api/ext/sockext/logout', 'POST', {}, cookie=cookie, Origin='https://foreign.invalid')[0], 403)
+        for path in ['/api/ext/Bad_Id/x', '/api/ext/sockext']:
+            self.assertEqual(self.request('panel', path, cookie=cookie)[0], 404, path)
+        self.assertEqual(self.request('panel', '/api/ext/missing/x', cookie=cookie)[0], 502)
+        self.assertEqual(self.request('panel', route, cookie=self.login('viewer'))[0], 403)
+        for app in ['dagu', 'omb']:
+            self.assertNotEqual(json.loads(self.request(app, route, cookie=cookie)[2] or '{}').get('path'), '/teams?fresh=1', app)
 
     def test_00_remote_mcp_route_skips_the_login_and_only_exists_on_the_panel(self):
         # D63: the endpoint authenticates its own bearer token; the gateway must hand it over untouched.

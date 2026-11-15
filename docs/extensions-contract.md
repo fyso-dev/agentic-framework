@@ -298,6 +298,21 @@ This is a rendering boundary, **not a sandbox for hostile code**. Extensions are
 
 The SDK version is also declared in `framework/panel/extension-api.json` (the source of `PANEL_API_VERSION`). Copier extensions may use native `_external_data` to validate this capability before writing files. This makes compatibility explicit without coupling an extension to a framework repository layout or branch.
 
+### Same-origin extension API (D79)
+
+A page that needs fast reads, or an action that does not need a Dagu run, can call its own service through the panel origin instead of a workflow:
+
+| Piece | Value |
+|---|---|
+| Route | `/api/ext/<id>/<path>` on the panel origin, behind `fyso_login` |
+| Upstream | Unix socket `$FYSO_EXT_SOCKET` = `/tmp/fyso-ext-<id>-<FYSO_HTTP_PORT>.sock`, set by `run-ext.sh` when the port is known |
+| What arrives | `/<path>` with its query string, the session's `Remote-User`/`Remote-Groups`/`Remote-Email`; never cookies or `Authorization` |
+| Rules | Same as the panel's own APIs: viewers may not use it, writes need the panel `Origin`; ids follow `^[a-z][a-z0-9-]{1,30}$`; anything else under `/api/ext/` is 404 |
+
+The extension's process creates the socket with mode 0600 and removes a stale one before listening. The short `/tmp` path follows the framework's other sockets because macOS limits socket paths to 104 bytes. When nothing listens, the gateway answers 502, so a page can fall back to its Dagu workflow on an older framework or a stopped process.
+
+Use it for reads and small, idempotent actions. Keep changes that people review, that need run history or that write to the repository on Dagu workflows. The socket is private to the project user. Trust the identity headers only on this socket, never on a TCP port.
+
 ## 10. HTTPS provider (D62)
 
 An extension that terminates TLS for the project declares it in its conf.d file

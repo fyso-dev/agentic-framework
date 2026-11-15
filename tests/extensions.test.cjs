@@ -44,6 +44,15 @@ test('run-ext filters ambient variables and preserves declared multiline secrets
   assert.equal(result.status,0,result.stderr);const data=JSON.parse(result.stdout);
   assert.equal(data.env.SAMPLE_TOKEN,'private\nvalue');assert.equal(data.env.AMBIENT_SECRET,undefined);assert.equal(data.env.FYSO_AUTH_USERS,undefined);assert.equal(data.env.FYSO_AUTH_FUTURE_SECRET,undefined);
   assert.equal(data.env.USER,undefined);assert.equal(data.env.FYSO_EXT_SAMPLE_PORT,'19410');assert.deepEqual(data.args,['a b']);
+  // D79: the private socket behind /api/ext/sample/, derived like the framework's other sockets.
+  assert.equal(data.env.FYSO_EXT_SOCKET,'/tmp/fyso-ext-sample-19400.sock');
+}));
+test('extension sockets accept only valid ids and numeric ports',()=>fixture(({run})=>{
+  const script=`const {extensionSocket}=require("./framework/scripts/extensions.cjs");
+    const bad=[["Bad_Id","1"],["../x","1"],["biz",""],["biz","1;x"]].filter(([i,p])=>{try{extensionSocket(i,p);return true;}catch{return false;}});
+    console.log(JSON.stringify({ok:extensionSocket("biz","34700"),bad}))`;
+  const result=run(['node','-e',script]);assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout),{ok:'/tmp/fyso-ext-biz-34700.sock',bad:[]});
 }));
 test('run-ext refuses missing required secrets before executing a command',()=>fixture(({root,put,run})=>{
   put('extensions/sample/secrets.yaml','- name: SAMPLE_TOKEN\n  required: true\n');
