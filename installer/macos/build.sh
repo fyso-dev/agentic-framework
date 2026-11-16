@@ -3,6 +3,8 @@
 # `fyso` CLI (app/Fyso.swift, compiled with swiftc; no Xcode project) with the installer that
 # creates instances bundled inside. EDITION=biz builds "Fyso Biz.app" / Fyso-Biz.dmg.
 # Everything the app downloads at runtime is pinned here or in the template.
+# With SIGN_IDENTITY (and NOTARY_PROFILE) set, app and dmg are signed, notarized and stapled
+# through sign.sh; without them the build is unsigned (local use, right-click → Open).
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$(cd ../.. && pwd)
@@ -67,7 +69,7 @@ iconutil -c icns "$iconset" -o "$R/Fyso.icns"; rm -rf "$tmp"
 sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/Resources/fyso-installer.sh"
 chmod 755 "$APP/Contents/Resources/fyso-installer.sh"
 # The executable: menu bar app without arguments, `fyso` CLI with them. Universal, macOS 15+
-# (the floor swiftDialog 3.x already sets). A native Mach-O is also what signing needs (PR #65).
+# (the floor swiftDialog 3.x already sets). A native Mach-O is what signing with the hardened runtime needs.
 bin=$(mktemp -d)
 for arch in arm64 x86_64; do
   swiftc -swift-version 5 -O -target "$arch-apple-macos15.0" app/Fyso.swift -o "$bin/fyso-$arch"
@@ -92,6 +94,10 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 
+# Signing (Developer ID, hardened runtime) and notarization happen before the dmg so the
+# app inside it carries its staple; the dmg is then signed and notarized on its own.
+[ -z "${SIGN_IDENTITY:-}" ] || ./sign.sh "$APP"
+
 # Drag-to-Applications disk image.
 stage=$(mktemp -d); cp -R "$APP" "$stage/"; ln -s /Applications "$stage/Applications"
 # The mounted volume shows the logo, not the generic grey disk: .VolumeIcon.icns plus the
@@ -105,4 +111,5 @@ xattr -wx com.apple.FinderInfo "000000000000000004000000000000000000000000000000
 hdiutil detach -quiet "$mnt"
 hdiutil convert -quiet "$rw" -format UDZO -ov -o "$DIST/$DMG"; rm -rf "$(dirname "$rw")"
 rm -rf "$stage"
+[ -z "${SIGN_IDENTITY:-}" ] || ./sign.sh "$DIST/$DMG"
 du -sh "$APP" "$DIST/$DMG"

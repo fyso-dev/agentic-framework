@@ -12,7 +12,7 @@ The current macOS prototype provides an end-user installer: a disk image with **
 | Steps | `Resources/fyso-install.yaml`, **generated at build time** from `template/mise.toml.jinja`: one step per pinned tool (parallel; npm tools after Node), plus generate (Copier 9.19.1 via `uvx`), trust, git, setup, start | template pins |
 | GitHub login | Only when plain `git ls-remote` cannot read the source (a private repository): `gh auth login --web` (device code shown in the window) + `gh auth setup-git`. A public source shows "not needed" and never installs GitHub CLI | GitHub CLI 2.95.0 |
 
-The installer is a bash script (`fyso-installer.sh`, macOS bash 3.2) bundled as `Fyso.app/Contents/Resources/fyso-installer.sh`, with swiftDialog in `Contents/Helpers`; `build.sh` assembles the app and the `.dmg` with `hdiutil`.
+The installer is a bash script (`fyso-installer.sh`, macOS bash 3.2) bundled as `Fyso.app/Contents/Resources/fyso-installer.sh`, with swiftDialog in `Contents/Helpers` as sealed nested code; the app's executable is the native `fyso` binary (D85), so no separate launcher is needed. `build.sh` assembles the app and the `.dmg` with `hdiutil`; `sign.sh` signs, notarizes and staples both (below).
 
 ## Flow
 
@@ -31,9 +31,25 @@ The project's own stack keeps running after the installer's Dagu exits (verified
 ## Build and test
 
 ```sh
-installer/macos/build.sh             # → installer/macos/dist/Fyso.app and Fyso.dmg
+installer/macos/build.sh             # → installer/macos/dist/Fyso.app and Fyso.dmg (unsigned)
 EDITION=biz installer/macos/build.sh # → Fyso Biz.app and Fyso-Biz.dmg
+SIGN_IDENTITY="Developer ID Application: <name> (<TEAMID>)" NOTARY_PROFILE=fyso-notary installer/macos/build.sh   # signed, notarized, stapled
 ```
+
+### Signing and notarization
+
+A downloaded copy opens without warnings only when the app is signed with a **Developer ID Application** certificate, notarized by Apple and stapled. `build.sh` does all of it when `SIGN_IDENTITY` is set, through `installer/macos/sign.sh`:
+
+1. `codesign --options runtime --timestamp` on the app (hardened runtime, carried by the `fyso` Mach-O). swiftDialog's own signature (team `PWA5E9TQ59`) is checked and sealed as a helper, never re-signed: no `--deep`.
+2. The app is zipped and submitted with `notarytool submit --wait`; on rejection the service log is printed. The ticket is stapled to the app before the dmg is built, so the app inside the image carries it.
+3. The dmg is signed, notarized and stapled on its own; `spctl --assess` confirms both verdicts.
+
+One-time setup on the build Mac:
+
+- A **Developer ID Application** certificate from the Apple Developer Program account of the organisation (only the Account Holder can create it: Certificates, Identifiers & Profiles → Certificates → `+` → Developer ID Application, uploading a CSR made on the build Mac). Import the downloaded `.cer` next to its private key in the login keychain; `security find-identity -v -p codesigning` must then list it. Its name is the `SIGN_IDENTITY` value.
+- Notarization credentials saved once as a keychain profile, either an App Store Connect API key (Users and Access → Integrations → App Store Connect API, role Developer): `xcrun notarytool store-credentials fyso-notary --key AuthKey_<id>.p8 --key-id <id> --issuer <issuer>`, or an Apple ID with an app-specific password: `xcrun notarytool store-credentials fyso-notary --apple-id <id> --team-id <TEAMID> --password <app-specific>`. The profile name is `NOTARY_PROFILE`.
+
+`SIGN_IDENTITY=-` signs ad hoc (no timestamp, no notarization) and is enough to check the bundle layout locally; Gatekeeper still blocks such a copy when downloaded. Xcode is not needed: the Command Line Tools provide `swiftc`, `codesign`, `notarytool` and `stapler`.
 
 Unattended run for tests (no form; the window closes by itself): `FYSO_AUTO=1 FYSO_NAME=… FYSO_FOLDER=… [FYSO_PORT=… FYSO_SOURCE=… FYSO_REF=… FYSO_HOME=…] "dist/Fyso.app/Contents/MacOS/fyso" create`. `FYSO_HOME` moves the registry and installer data out of `~/Library/Application Support/Fyso`.
 
@@ -61,7 +77,7 @@ UI copy and workflow step titles are bundled from `installer/macos/locales/{es,e
 
 ## Open items
 
-- **Signing and notarization.** The app is not signed yet. A downloaded copy needs right-click → Open until it is signed with a Developer ID and notarized (`codesign`, `notarytool`). Signing must keep swiftDialog's own signature intact (no `--deep` re-sign).
+- **Signing and notarization.** Done (2026-11-16): `sign.sh` signs with Developer ID, notarizes and staples app and dmg; Apple accepted both and `spctl` reports *Notarized Developer ID*. Still open: a CI job that does it on GitHub (certificate and API key as secrets).
 - **macOS 13–14.** swiftDialog 3.x needs macOS 15; the 2.5 line supports older systems.
 - **Private template.** The GitHub step disappears if `fyso-dev/agentic-framework` becomes public.
 - **Linux and Windows delivery.** Follow D38 below. The Linux Zenity experiment was exploratory and has been archived outside the checkout; it is not the selected delivery or proof that Qt installation works.
