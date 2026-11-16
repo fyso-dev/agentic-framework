@@ -351,6 +351,7 @@
     "partial": "Cobertura parcial. Las fuentes faltantes no equivalen a consumo cero.",
     "truncated": "Historial reciente limitado; los totales de consumo corresponden al mes UTC.",
     "bot": "Agente",
+    "botOrWorkflow": "Agente / flujo",
     "model": "Modelo / motor",
     "all": "Todos",
     "filterScope": "Los filtros afectan el consumo y el filtro por agente afecta las conversaciones. Las ejecuciones y los avisos muestran todo el proyecto.",
@@ -369,7 +370,7 @@
     "alerts": "Avisos del proyecto",
     "noAlerts": "Sin umbrales superados entre los datos disponibles.",
     "alertNote": "Avisos locales; no detienen agentes ni envían mensajes. Configuración: project/observability.json. El umbral monetario usa solo API reportada y puede tener cobertura incompleta.",
-    "usage": "Consumo por agente y modelo",
+    "usage": "Consumo por agente o flujo y modelo",
     "source": "Fuente",
     "empty": "No hay registros para esta selección.",
     "conversations": "Conversaciones y delegaciones",
@@ -391,7 +392,7 @@
       "ledger": "Consumo OMB",
       "traces": "Trazas OMB",
       "runs": "Dagu",
-      "harness": "Agente de Dagu"
+      "harness": "Flujo de Dagu"
     },
     "sourceState": {
       "ok": "Disponible",
@@ -402,6 +403,7 @@
       "invalidSettings": "Configuración inválida; se usaron valores predeterminados.",
       "invalidLedgerRows": "Hay registros de consumo ilegibles.",
       "invalidArtifacts": "Hay artefactos ilegibles.",
+      "invalidUsageRows": "Hay registros de consumo de flujos ilegibles.",
       "runDetailsUnavailable": "No se pudieron leer los detalles de algunas ejecuciones."
     },
     "alert": {

@@ -72,7 +72,7 @@ export function Observability() {
       {partial && <div className="banner banner-down" role="alert">{t("observ.partial")} {data.warnings.map(w => t(`observ.warning.${w}`)).join(" · ")}</div>}
       {(data.coverage.runsTruncated || data.coverage.tracesTruncated) && <p role="status" className="pill pill-warn">{t("observ.truncated")}</p>}
       <div className="observ-filters">
-        <label>{t("observ.bot")} <select className="select" value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.bot))].map(b=><option key={b}>{b}</option>)}</select></label>
+        <label>{t("observ.botOrWorkflow")} <select className="select" value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.bot))].map(b=><option key={b}>{b}</option>)}</select></label>
         <label>{t("observ.model")} <select className="select" value={model} onChange={e => setModel(e.target.value)}><option value="">{t("observ.all")}</option>{[...new Set(data.usage.groups.map(g=>g.model))].map(m=><option key={m} value={m}>{m === "unknown" ? t("observ.unknown") : m}</option>)}</select></label>
         <span className="mute">{t("observ.filterScope")}</span>
       </div>
@@ -85,7 +85,7 @@ export function Observability() {
       <section className="observ-section"><h2 className="section-title">{t("observ.alerts")}</h2><div className="card">
         {!data.alerts.length ? <p className="observ-empty">{t("observ.noAlerts")}</p> : <ul className="list">{data.alerts.map((a,i)=><li key={i} className="row"><span className="grow">{t(`observ.alert.${a.kind}`, {value:number(a.value), limit:number(a.limit)})}</span>{a.dag && <External href={dagUrl(a.dag)}>{t("common.logs")}</External>}{a.traceId && <External href={traceUrl(a.traceId)}>{t("observ.details")}</External>}</li>)}</ul>}
       </div><p className="mute">{t("observ.alertNote")}</p></section>
-      <section className="observ-section"><h2 className="section-title">{t("observ.usage")}</h2><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["bot","model","source","turns","input","output","costs"].map(k=><th key={k} scope="col">{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
+      <section className="observ-section"><h2 className="section-title">{t("observ.usage")}</h2><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["botOrWorkflow","model","source","turns","input","output","costs"].map(k=><th key={k} scope="col">{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
         {groups.map((g,i)=><tr key={i}><td>{g.bot}</td><td>{g.model === "unknown" ? t("observ.unknown") : g.model}</td><td>{t(`observ.sources.${g.source === "omb" ? "ledger" : "harness"}`)}</td><td>{number(g.turns)}</td><td>{number(g.input)}</td><td>{number(g.output)}</td><td>{costDetail(g)}</td></tr>)}
       </tbody></table>{!groups.length && <p className="observ-empty">{t("observ.empty")}</p>}</div></section>
       <section className="observ-section"><h2 className="section-title">{t("observ.conversations")}</h2>{model && <p className="mute">{t("observ.conversationModel")}</p>}<div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["bot","started","duration","tools","errors","input","output","costs","details"].map(k=><th key={k}>{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
