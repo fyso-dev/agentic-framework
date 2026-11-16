@@ -8,7 +8,7 @@
 set -u
 
 RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
-DIALOG="$RES/Dialog.app/Contents/MacOS/Dialog"
+DIALOG="$(dirname "$RES")/Helpers/Dialog.app/Contents/MacOS/Dialog"
 WORK="$HOME/Library/Application Support/Fyso/installer"
 LOG="$WORK/installer.log"
 CMD="$WORK/dialog.cmd"
@@ -38,7 +38,7 @@ mkdir -p "$WORK"
 # crashed run is taken over.
 LOCK="$WORK/running.pid"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
-  "$RES/Dialog.app/Contents/MacOS/Dialog" --title none --message "$(t "$L_BUSY")" --button1text "$B_OK" --width 480 --height 200
+  "$DIALOG" --title none --message "$(t "$L_BUSY")" --button1text "$B_OK" --width 480 --height 200
   exit 0
 fi
 echo $$ > "$LOCK"

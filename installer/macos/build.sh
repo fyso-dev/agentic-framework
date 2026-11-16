@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build "Fyso Installer.app" and Fyso-Installer.dmg (D35) into installer/macos/dist/.
 # Everything the app downloads at runtime is pinned here or in the template.
+# With SIGN_IDENTITY (and NOTARY_PROFILE) set, both are signed, notarized and stapled
+# through sign.sh; without them the build is unsigned (local use, right-click → Open).
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$(cd ../.. && pwd)
@@ -14,14 +16,14 @@ DIALOG_DMG=swiftDialog-3.1.1-5000.dmg
 DIALOG_SHA256=ace4b56ef3d7faefa260e1f95194499a20d7066cad3a57d4f8a7013558f36760
 
 command -v mise >/dev/null || { echo "mise is required to build" >&2; exit 1; }
-rm -rf "$DIST"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" .cache
+rm -rf "$DIST"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers" .cache
 
 # swiftDialog, verified, copied out of its notarized dmg (no pkg, no admin rights).
 cache=".cache/$DIALOG_DMG"
 [ -f "$cache" ] || curl -fsSL -o "$cache" "https://github.com/swiftDialog/swiftDialog/releases/download/v$DIALOG_VERSION/$DIALOG_DMG"
 echo "$DIALOG_SHA256  $cache" | shasum -a 256 -c - >/dev/null
 mnt=$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$cache" >/dev/null
-cp -R "$mnt/Dialog.app" "$APP/Contents/Resources/"; hdiutil detach -quiet "$mnt"
+cp -R "$mnt/Dialog.app" "$APP/Contents/Helpers/"; hdiutil detach -quiet "$mnt"
 
 # Pinned mise bootstrap, the workflow and the window's step titles.
 mise generate install-script -V "$MISE_VERSION" > "$APP/Contents/Resources/mise-bootstrap.sh"
@@ -54,8 +56,11 @@ done
 iconutil -c icns "$iconset" -o "$R/Fyso.icns"; rm -rf "$tmp"
 
 # Template ref the app installs from (default main; e.g. INSTALLER_REF=my-branch to test a branch).
-sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/MacOS/fyso-installer"
-chmod 755 "$APP/Contents/MacOS/fyso-installer"
+sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/Resources/fyso-installer.sh"
+chmod 755 "$APP/Contents/Resources/fyso-installer.sh"
+# The executable is a small universal Mach-O launcher (signable, hardened runtime) that
+# runs the script above; a script in Contents/MacOS would count as unsigned nested code.
+clang -O2 -Wall -arch arm64 -arch x86_64 -mmacosx-version-min=15.0 -o "$APP/Contents/MacOS/fyso-installer" launcher.c
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -73,8 +78,13 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 
+# Signing (Developer ID, hardened runtime) and notarization happen before the dmg so the
+# app inside it carries its staple; the dmg is then signed and notarized on its own.
+[ -z "${SIGN_IDENTITY:-}" ] || ./sign.sh "$APP"
+
 # Drag-to-Applications disk image.
 stage=$(mktemp -d); cp -R "$APP" "$stage/"; ln -s /Applications "$stage/Applications"
 hdiutil create -quiet -volname "Fyso" -srcfolder "$stage" -ov -format UDZO "$DIST/Fyso-Installer.dmg"
 rm -rf "$stage"
+[ -z "${SIGN_IDENTITY:-}" ] || ./sign.sh "$DIST/Fyso-Installer.dmg"
 du -sh "$APP" "$DIST/Fyso-Installer.dmg"

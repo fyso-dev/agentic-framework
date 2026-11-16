@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Sign, notarize and staple the macOS installer (D35). Called by build.sh when
+# SIGN_IDENTITY is set; also usable on its own:
+#   SIGN_IDENTITY="Developer ID Application: Fyso (TEAMID)" NOTARY_PROFILE=fyso-notary \
+#     installer/macos/sign.sh "installer/macos/dist/Fyso Installer.app"
+#   … same for installer/macos/dist/Fyso-Installer.dmg (after the dmg is built from the stapled app).
+#
+# SIGN_IDENTITY   name (or SHA-1) of a "Developer ID Application" identity in the keychain,
+#                 see `security find-identity -v -p codesigning`. "-" signs ad hoc, for local
+#                 checks only: Gatekeeper still blocks a downloaded copy.
+# NOTARY_PROFILE  keychain profile saved with `xcrun notarytool store-credentials`.
+#                 Unset: sign only (no notarization, no staple).
+set -euo pipefail
+target=${1:?usage: sign.sh "<Fyso Installer.app>" | <Fyso-Installer.dmg>}
+identity=${SIGN_IDENTITY:?set SIGN_IDENTITY (see installer/macos/sign.sh)}
+flags=(--force --sign "$identity")
+[ "$identity" = - ] || flags+=(--timestamp)
+
+case $target in
+  *.app)
+    # swiftDialog keeps its author's Developer ID signature: it is sealed as a helper,
+    # never re-signed (no --deep).
+    codesign --verify --strict "$target/Contents/Helpers/Dialog.app"
+    codesign "${flags[@]}" --options runtime "$target"
+    codesign --verify --strict --verbose=2 "$target"
+    ;;
+  *.dmg)
+    codesign "${flags[@]}" "$target"
+    codesign --verify --verbose=2 "$target"
+    ;;
+  *) echo "sign.sh: expected a .app or .dmg, got $target" >&2; exit 2 ;;
+esac
+
+if [ "$identity" = - ] || [ -z "${NOTARY_PROFILE:-}" ]; then
+  echo "signed (not notarized): $target"; exit 0
+fi
+
+# Notarization uploads a zip of the app (or the dmg itself) and waits for Apple's verdict;
+# on failure the service's log names the offending file.
+upload=$target; tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+case $target in *.app) upload="$tmp/upload.zip"; ditto -c -k --keepParent "$target" "$upload" ;; esac
+xcrun notarytool submit "$upload" --keychain-profile "$NOTARY_PROFILE" --wait | tee "$tmp/notary.txt"
+id=$(sed -n 's/^ *id: //p' "$tmp/notary.txt" | head -1)
+if ! grep -q 'status: Accepted' "$tmp/notary.txt"; then
+  xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" || true
+  exit 1
+fi
+xcrun stapler staple "$target"
+xcrun stapler validate "$target"
+case $target in
+  *.app) spctl --assess --type execute --verbose=2 "$target" ;;
+  *.dmg) spctl --assess --type open --context context:primary-signature --verbose=2 "$target" ;;
+esac
+echo "signed, notarized and stapled: $target"
