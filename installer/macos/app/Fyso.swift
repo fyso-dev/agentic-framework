@@ -1,4 +1,4 @@
-// Fyso.app (D83, docs/adr/0003-menu-bar-app.md): the menu bar app and the `fyso` CLI in one
+// Fyso.app (D85, docs/adr/0003-menu-bar-app.md): the menu bar app and the `fyso` CLI in one
 // native binary. Without arguments it is the menu bar app (SwiftUI MenuBarExtra, no window,
 // no Dock icon); with arguments it is the CLI. Both call the same functions below.
 //

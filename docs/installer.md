@@ -1,6 +1,6 @@
 # Installer app — D35, D38
 
-The current macOS prototype provides an end-user installer: a disk image with **Fyso.app** to drag to Applications. Since D83 the app is the menu bar app and `fyso` CLI ([below](#menu-bar-app-and-cli--d83)); its *Create instance* action runs the installer described here, which shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". The selected Linux direction and proposed Windows architecture are documented below; neither has completed acceptance testing.
+The current macOS prototype provides an end-user installer: a disk image with **Fyso.app** to drag to Applications. Since D85 the app is the menu bar app and `fyso` CLI ([below](#menu-bar-app-and-cli--d83)); its *Create instance* action runs the installer described here, which shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". The selected Linux direction and proposed Windows architecture are documented below; neither has completed acceptance testing.
 
 ## Pieces (reused, not built)
 
@@ -67,7 +67,7 @@ UI copy and workflow step titles are bundled from `installer/macos/locales/{es,e
 - **Linux and Windows delivery.** Follow D38 below. The Linux Zenity experiment was exploratory and has been archived outside the checkout; it is not the selected delivery or proof that Qt installation works.
 
 
-## Menu bar app and CLI — D83
+## Menu bar app and CLI — D85
 
 One native app replaces the separate installer app and the SwiftBar plugin (D34). Decision and options: [ADR 0003](adr/0003-menu-bar-app.md).
 

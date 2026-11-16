@@ -1,4 +1,4 @@
-# ADR 0003 — One native menu bar app and CLI for every instance (D83)
+# ADR 0003 — One native menu bar app and CLI for every instance (D85)
 
 Date: 2026-11-16 · Status: accepted (testable beta) · Supersedes D34 (SwiftBar plugin) · Extends D35 (macOS installer)
 

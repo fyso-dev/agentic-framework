@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fyso Installer for macOS (D35). Bundled in Fyso.app (D83) as Resources/fyso-installer.sh;
+# Fyso Installer for macOS (D35). Bundled in Fyso.app (D85) as Resources/fyso-installer.sh;
 # the menu bar app and `fyso create` run it to create an instance.
 #
 # A friendly window (swiftDialog, bundled) shows each dependency installing. The work

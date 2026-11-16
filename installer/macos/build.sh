@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build "Fyso.app" and Fyso.dmg (D35, D83) into installer/macos/dist/: the menu bar app and
+# Build "Fyso.app" and Fyso.dmg (D35, D85) into installer/macos/dist/: the menu bar app and
 # `fyso` CLI (app/Fyso.swift, compiled with swiftc; no Xcode project) with the installer that
 # creates instances bundled inside. EDITION=biz builds "Fyso Biz.app" / Fyso-Biz.dmg.
 # Everything the app downloads at runtime is pinned here or in the template.
