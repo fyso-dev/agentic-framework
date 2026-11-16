@@ -26,7 +26,7 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
   await modal.getByText(/is installed and off for every agent/).waitFor();
   await modal.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByRole('button',{name:'Review and confirm',exact:true}).click();
-  await modal.getByText('The agents app scan found no warnings',{exact:true}).waitFor();
+  await modal.getByText('The Agents scan found no warnings',{exact:true}).waitFor();
   assert.equal(await modal.getByRole('button',{name:'Confirm',exact:true}).isDisabled(),true);
   const evidence=path.resolve(__dirname,'../artifacts/delivery-evidence/third-party-skills');fs.mkdirSync(evidence,{recursive:true});
   await page.screenshot({path:path.join(evidence,'awaiting-review.png')});

@@ -14,7 +14,7 @@ bots:
     approval: full
 
   - name: Workflow Architect
-    title: Designs and fixes Dagu workflows
+    title: Designs and fixes automations
     model: claude/claude-sonnet-5
     approval: full             # writes workflows through the Dagu MCP without asking
     soul: { file: \${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }

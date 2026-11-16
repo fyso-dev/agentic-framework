@@ -17,7 +17,7 @@ It extends the [product vocabulary](panel-spec.md#product-vocabulary) (project a
 
 | Internal concept | Spanish (es, default) | English (en) | Notes |
 |---|---|---|---|
-| OpenMausBot (OMB) app | **Agentes** (tile); "la app de agentes" in sentences | **Agents** (tile); "the agents app" in sentences | Open button: "Abrir agentes" / "Open agents". |
+| OpenMausBot (OMB) app | **Agentes**, everywhere (tile and sentences: "en Agentes") | **Agents**, everywhere ("in Agents") | Open button: "Abrir agentes" / "Open agents". |
 | OMB native roster | Agentes en funcionamiento | Running agents | |
 | OMB usage ledger / traces | Consumo de agentes / Trazas de agentes | Agent usage / Agent traces | Observability sources. |
 | Dagu app | **Automatizaciones** | **Automations** | Open button: "Abrir automatizaciones" / "Open automations". |
@@ -40,5 +40,5 @@ It extends the [product vocabulary](panel-spec.md#product-vocabulary) (project a
 
 - The Observability page lists recent Dagu runs (workflow IDs, run IDs, links to Dagu). The labels follow this glossary, but the section itself is a technical run log; its redesign is a separate task.
 - The macOS installer still lists build tools without a business equivalent (Node.js, YAML, GitHub CLI, Go, pnpm/Tinyauth) as install steps.
-- The default Workflow Architect bot title in `project/bots/team.yaml` ("Designs and fixes Dagu workflows") is project data and keeps the technical name.
+- Existing projects keep their Workflow Architect title ("Designs and fixes Dagu workflows") in `project/bots/team.yaml`; new projects get "Designs and fixes automations".
 - External extension repositories (for example `fyso-ext-human-requests`, `fyso-ext-silverbullet`) must apply the same terms in their own releases; the bundled copies here are updated.

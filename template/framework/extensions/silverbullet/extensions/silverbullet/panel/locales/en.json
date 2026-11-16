@@ -20,7 +20,7 @@
       "review": "Review and apply the changes",
       "giveTip": "Opens the agent's profile: switch the project-knowledge skill on and apply the changes.",
       "import": "Import first",
-      "importTip": "This agent was created in the agents app and is not in the team file. Import it on Agents, then give it access."
+      "importTip": "This agent was created in Agents and is not in the team file. Import it on Agents, then give it access."
     },
     "files": {
       "title": "Bring what you already have",

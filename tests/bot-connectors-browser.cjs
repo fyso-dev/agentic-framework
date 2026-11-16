@@ -36,7 +36,7 @@ async function main(){
   assert.deepEqual((await native('bots')).bots.find(b=>b.id===id).toolScope,{allow:['native:*']});
   await page.getByRole('link',{name:'Revisar y aplicar',exact:true}).click();
   const apply=page.getByRole('button',{name:'Aplicar cambios',exact:true});await apply.waitFor({timeout:60000});await apply.click();
-  await page.getByText('Aplicado. Ya puedes usarlos en la app de agentes.',{exact:true}).waitFor({timeout:120000});
+  await page.getByText('Aplicado. Ya puedes usarlos en Agentes.',{exact:true}).waitFor({timeout:120000});
   const after=(await native('bots')).bots;assert.deepEqual(after.find(b=>b.id===id).toolScope,{allow:['native:*',`mcp:${server}:*`]});assert.deepEqual(projection(after),before);
   await page.screenshot({path:path.join(folder,'bot-connectors-list.png'),fullPage:true});
   assert.deepEqual(errors,[]);console.log(JSON.stringify({botEntry:true,connectorSelection:true,draftDoesNotMutateRuntime:true,nativePreviewApply:true,unrelatedProfilesPreserved:true,mobileOverflow:false,pageErrors:0,screenshots:3}));
