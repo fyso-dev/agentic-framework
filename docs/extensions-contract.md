@@ -44,7 +44,7 @@ Multiple extensions sharing a need justifies evaluating a shared primitive; it d
 | Upgrade | `mise run ext:update [<ext>]` | `copier update --trust --answers-file <f>` for one extension or each `.copier-answers.ext-*.yml`. Copier refuses a dirty tree, so when one upgrade changes files the task stops and asks for a commit before the next |
 | List | `mise run ext:list` | id, source, version (`_commit`) from each answers file |
 | Search | `mise run ext:search [text]` | catalog entries with their latest tag and install state (§8) |
-| Remove | `mise run ext:remove <ext>` | deletes the slot files of §2 and the answers file. Copier has no uninstall |
+| Remove | `mise run ext:remove <ext>`, or the panel's Uninstall (`fyso-ext-remove`, §8, D83) | deletes the slot files of §2 and the answers file. Copier has no uninstall |
 
 - Each extension's `copier.yml` sets `_answers_file: .copier-answers.ext-<ext>.yml`. The answers files **are** the list of installed extensions, versioned in git. There is no registry.
 - `src` is anything Copier accepts: `gh:org/fyso-ext-foo`, a git URL, or a local path. Pin with `--vcs-ref <tag>`. Copier saves it in the answers file, which `check-paths` scans before every snapshot: a path inside the project is stored relative, and an absolute path outside it is refused by the panel and warned about by `ext:add` (publish the extension to git instead).
@@ -141,9 +141,9 @@ type Extension = {
 }
 ```
 
-`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing, upgrading and uninstalling go through the marketplace workflows (§8), with no agent or model involved; `mise run ext:remove` stays available (§1).
 
-The panel re-reads `project.json`, `apps.json`, `extensions.json` and `skills.json` with the bot roster: every five seconds and on window focus, plus right after a panel install. An extension added or removed outside the page (terminal, an agent's `fyso_ext_install`, another tab, or a panel install the person navigated away from) appears without a manual refresh. An unchanged file keeps the shown state, and a failed background read keeps the last good data.
+The panel re-reads `project.json`, `apps.json`, `extensions.json` and `skills.json` with the bot roster: every five seconds and on window focus, plus right after a panel install or uninstall. An extension added or removed outside the page (terminal, an agent's `fyso_ext_install`, another tab, or a panel install the person navigated away from) appears without a manual refresh. An unchanged file keeps the shown state, and a failed background read keeps the last good data.
 
 ### Guided setup (D50)
 
@@ -167,7 +167,7 @@ The step shows the description and the guided form above, and counts toward the 
 - **Skills are not enabled automatically.** `team.yaml` belongs to the project. A person enables an extension's skill per bot in the panel's bot detail (D54), or the Bot Architect adds it. The toggle writes the native entry `- file: ${FYSO_ROOT}/extensions/<ext>/skills/<name>/SKILL.md`; for a bot with a tool allow-list it also selects `mcp:<server>:*` for the extension's MCP servers, and removes that selector when switched off. Off keeps the skill entry with `enabled: false`, because OMB's team apply does not uninstall a skill that the file omits. It is available only for bots that run in the project root.
 - **Dagu subdirectories:** supported in 2.24.0 when `DAGU_DAG_DISCOVERY_RECURSIVE=true`; discovery is flat by default. Verified against [store.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store.go) and `TestRecursiveDiscoverySupportsNestedDAGOperations` / the default root-only test in [store_test.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store_test.go). Keep flat prefixed workflow slots in v1.
 - **Hot install reaches OpenMausBot on the next start.** OMB keeps the environment it started with: MCP servers and `BOT_*` secrets of an extension installed from the panel reach bots after `mise run up`. Processes, routes, workflows and panel data load right away.
-- **Removal is manual-ish:** `ext:remove` deletes the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
+- **Removal keeps data:** `ext:remove` and the panel's Uninstall delete the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
 
 ## 7. Test fixture and template
 
@@ -232,6 +232,12 @@ The panel takes `installed`/`version`/`update` from `extensions.json` (always cu
 - Then `mise install`, and when the stack runs: `process-compose project update` with every fragment and a Caddy restart (`run-caddy.sh` reads extension ports fresh from mise). The panel tolerates the short gateway restart.
 
 Output: `{ id, mode, version: string | null, commit: string }`.
+
+### `fyso-ext-remove` (param `ID`) → output `result` (D83)
+
+The panel's Uninstall button on an installed card opens an in-page confirmation, then runs `ext.sh apply` with `MODE=remove`: the same removal as `ext:remove`, panel and `.mcp.json` regeneration, one commit of **only** that extension's tracked slots (`ext: remove <id> <version>`), then the same activation as an install (`mise install`; with the stack running, `process-compose project update` drops the extension's processes, and web-auth and Caddy restart). Data in `.data/ext/<ext>/` and secrets in `secrets.enc.yaml` are kept. Skills of the extension switched on in `project/bots/team.yaml` are not edited; switch them off first. One lifecycle change runs at a time in the panel.
+
+Output: `{ id, mode: "remove", version: string | null, commit: string }` (`version` is the removed one).
 
 ## 9. Extension-owned tabs and pages
 

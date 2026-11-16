@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D82; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D83; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -111,6 +111,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
+
+2026-11-16: Panel extensions (D83). The panel read `apps.json`/`extensions.json`/`skills.json` only on page load, so an extension added or removed from the terminal, by an agent or by a panel install the person navigated away from stayed hidden until a browser reload; it now re-reads them with the five-second roster poll. Install was already direct (Dagu + Copier, no model). Uninstall is now a panel action through `fyso-ext-remove` with an in-page confirmation. Verified in a generated project on its own ports. [extensions-contract §8](extensions-contract.md#fyso-ext-remove-param-id--output-result-d83)
 
 2026-11-14: Recorded extension-first product growth in AGENTS, PLAN and the extension contract: a simple default experience, optional use-case capabilities, minimal generic slots and explicit criteria for promotion to core. No runtime migration is implied.
 

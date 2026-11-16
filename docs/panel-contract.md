@@ -123,9 +123,9 @@ absent can still be removed from the declaration after review.
 
 Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
 
-### `fyso-ext-catalog` and `fyso-ext-install` — marketplace (D31)
+### `fyso-ext-catalog`, `fyso-ext-install` and `fyso-ext-remove` — marketplace (D31, D83)
 
-Read the extension catalogs (output `catalog`) and install or upgrade one extension (params `ID`, `MODE`; output `result`). Shapes and behavior: [extensions-contract.md §8](extensions-contract.md#8-marketplace-d31).
+Read the extension catalogs (output `catalog`), install or upgrade one extension (params `ID`, `MODE`; output `result`) and uninstall one after an in-page confirmation (param `ID`; output `result`). Shapes and behavior: [extensions-contract.md §8](extensions-contract.md#8-marketplace-d31).
 
 ### `fyso-snapshot` — save now (exists)
 
