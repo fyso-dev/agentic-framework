@@ -107,6 +107,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-16: Large department imports can stage validated JSON in private project data and pass a SHA-256 reference to Dagu, avoiding per-variable environment limits. [Panel contract](panel-contract.md).
+
 2026-11-16: Department imports store each package’s skills under its content digest. The currently applied declaration keeps its exact skill files while a replacement is reviewed or discarded.
 
 2026-11-15: Biz Work panel candidate creates project-agent requests and configures dispatch to a native bot. An authenticated gateway-to-Dagu-to-bot test reached Biz `done` with progress; browser acceptance and evidence storage remain open. [Checkpoint](teams-biz-delivery.md#checkpoint).
