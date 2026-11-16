@@ -40,6 +40,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 |---|---|
 | Install from the private GitHub repository: prerequisites, startup, updates and recovery | [installation.md](installation.md) |
 | End-user installer: verified macOS swiftDialog prototype (D35); selected Linux Qt Installer Framework direction and proposed Windows/WSL2 architecture (D38) | [installer.md](installer.md) |
+| macOS menu bar app and `fyso` CLI: one native app lists, opens, creates, switches, starts and stops instances; Biz edition (D83) | [ADR 0003](adr/0003-menu-bar-app.md) · [installer.md](installer.md#menu-bar-app-and-cli--d83) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
@@ -99,7 +100,7 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 | 7 | Extensions: slots, `_template`, sample (NetBird documented, not built) | ✅ done · [contract](extensions-contract.md) |
 | 7.1 | Marketplace (git catalogs, panel install) and integrations: Activepieces extension, MCP Registry in the panel | 🟡 marketplace done · Biz and generic extension pages verified locally; next: `fyso-ext-activepieces`, MCP Registry search · [PLAN](PLAN.md#phase-71--marketplace-and-integrations-d31) |
 | 7.2 | Agent surface: `fyso` MCP + Dagu MCP and skill for coding agents; project understanding and 93% action coverage for desktop agents (D57); workflow scopes (D60); native Pi Dagu connection (D77) | ✅ verified locally · [contract](agent-surface.md) |
-| 7.3 | Menu bar app: SwiftBar plugin listing every running project (D34) | ✅ verified locally (SwiftBar 2.1.1 on Test 1) |
+| 7.3 | Menu bar app: native `Fyso.app` + `fyso` CLI over the installer's registry, Biz edition (D83, supersedes the SwiftBar plugin D34) | 🟡 testable beta · [ADR 0003](adr/0003-menu-bar-app.md) |
 | 7.4 | Linux/Windows installers: Qt wizard + shared Dagu workflow (D38) | 🟡 implementation and Linux runtime routes verified; real engine and Windows-host acceptance pending |
 | 8 | Multi-host: execution hosts over SSH (Dagu workers, OMB computers) | ⬜ not started |
 

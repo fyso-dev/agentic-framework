@@ -1,5 +1,6 @@
 #!/bin/bash
-# Fyso Installer for macOS (D35). The .app's executable.
+# Fyso Installer for macOS (D35). Bundled in Fyso.app (D83) as Resources/fyso-installer.sh;
+# the menu bar app and `fyso create` run it to create an instance.
 #
 # A friendly window (swiftDialog, bundled) shows each dependency installing. The work
 # itself is a Dagu workflow (Resources/fyso-install.yaml) run with the Dagu CLI; this
@@ -8,8 +9,9 @@
 set -u
 
 RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
-DIALOG="$RES/Dialog.app/Contents/MacOS/Dialog"
-WORK="$HOME/Library/Application Support/Fyso/installer"
+DIALOG="$(dirname "$RES")/Helpers/Dialog.app/Contents/MacOS/Dialog"
+FYSO_HOME="${FYSO_HOME:-$HOME/Library/Application Support/Fyso}"   # shared with Fyso.app; tests override it
+WORK="$FYSO_HOME/installer"
 LOG="$WORK/installer.log"
 CMD="$WORK/dialog.cmd"
 SOURCE="${FYSO_SOURCE:-gh:fyso-dev/agentic-framework}"   # overridable for tests
@@ -38,14 +40,14 @@ mkdir -p "$WORK"
 # crashed run is taken over.
 LOCK="$WORK/running.pid"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
-  "$RES/Dialog.app/Contents/MacOS/Dialog" --title none --message "$(t "$L_BUSY")" --button1text "$B_OK" --width 480 --height 200
+  "$DIALOG" --title none --message "$(t "$L_BUSY")" --button1text "$B_OK" --width 480 --height 200
   exit 0
 fi
 echo $$ > "$LOCK"
 cleanup() { rm -f "$LOCK" "${PASSWORD_FILE:-}"; [ -n "${DIALOG_PID:-}" ] && kill "$DIALOG_PID" 2>/dev/null; [ -n "${CONNECT_PID:-}" ] && kill "$CONNECT_PID" 2>/dev/null; true; }
 trap cleanup EXIT
 exec >>"$LOG" 2>&1
-echo "=== $(date) Fyso Installer, source $SOURCE@$REF"
+echo "=== $(date) Fyso Installer, source $SOURCE@$REF, edition ${FYSO_EDITION:-core}"
 
 ui() { printf '%s\n' "$*" >> "$CMD"; }
 item() { ui "listitem: index: $1, status: $2${3:+, statustext: $3}"; }   # wait|success|fail|error|pending
@@ -76,7 +78,7 @@ sleep 1
 # ---------------------------------------------------------------- 1. Welcome form
 default_name=$DEFAULT_NAME
 # FYSO_AUTO=1 (tests): skip the form, take FYSO_NAME / FYSO_FOLDER / FYSO_ENGINE, close at the end.
-REGISTRY="$HOME/Library/Application Support/Fyso/projects.tsv"   # port<TAB>folder of installed projects
+REGISTRY="$FYSO_HOME/projects.tsv"   # port<TAB>folder of installed projects
 # swiftDialog splits field modifiers on commas: the port regex must not contain any.
 # Port bases already taken, even by stopped projects: the registry, Fyso projects next to
 # the chosen folder (installed by hand), and running stacks' sockets.

@@ -1,6 +1,6 @@
 # Installer app — D35, D38
 
-The current macOS prototype provides an end-user installer: a disk image with **Fyso Installer.app** to drag to Applications. Opening it shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". The selected Linux direction and proposed Windows architecture are documented below; neither has completed acceptance testing.
+The current macOS prototype provides an end-user installer: a disk image with **Fyso.app** to drag to Applications. Since D83 the app is the menu bar app and `fyso` CLI ([below](#menu-bar-app-and-cli--d83)); its *Create instance* action runs the installer described here, which shows a friendly window that lists each dependency with its state (waiting, installing, done, failed) and ends with "Abrir panel". The selected Linux direction and proposed Windows architecture are documented below; neither has completed acceptance testing.
 
 ## Pieces (reused, not built)
 
@@ -12,7 +12,7 @@ The current macOS prototype provides an end-user installer: a disk image with **
 | Steps | `Resources/fyso-install.yaml`, **generated at build time** from `template/mise.toml.jinja`: one step per pinned tool (parallel; npm tools after Node), plus generate (Copier 9.19.1 via `uvx`), trust, git, setup, start | template pins |
 | GitHub login | `gh auth login --web` (device code shown in the window) + `gh auth setup-git`, only while the template repository is private | GitHub CLI 2.95.0 |
 
-The app itself is a folder with an `Info.plist` and a bash script (`fyso-installer.sh`, macOS bash 3.2); `build.sh` assembles it and the `.dmg` with `hdiutil`.
+The installer is a bash script (`fyso-installer.sh`, macOS bash 3.2) bundled as `Fyso.app/Contents/Resources/fyso-installer.sh`, with swiftDialog in `Contents/Helpers`; `build.sh` assembles the app and the `.dmg` with `hdiutil`.
 
 ## Flow
 
@@ -31,10 +31,11 @@ The project's own stack keeps running after the installer's Dagu exits (verified
 ## Build and test
 
 ```sh
-installer/macos/build.sh          # → installer/macos/dist/Fyso Installer.app and Fyso-Installer.dmg
+installer/macos/build.sh             # → installer/macos/dist/Fyso.app and Fyso.dmg
+EDITION=biz installer/macos/build.sh # → Fyso Biz.app and Fyso-Biz.dmg
 ```
 
-Unattended run for tests (no form; the window closes by itself): `FYSO_AUTO=1 FYSO_NAME=… FYSO_FOLDER=… [FYSO_SOURCE=… FYSO_REF=…] "dist/Fyso Installer.app/Contents/MacOS/fyso-installer"`.
+Unattended run for tests (no form; the window closes by itself): `FYSO_AUTO=1 FYSO_NAME=… FYSO_FOLDER=… [FYSO_PORT=… FYSO_SOURCE=… FYSO_REF=… FYSO_HOME=…] "dist/Fyso.app/Contents/MacOS/fyso" create`. `FYSO_HOME` moves the registry and installer data out of `~/Library/Application Support/Fyso`.
 
 Verified 2026-11-06 on macOS (arm64): from `gh:fyso-dev/agentic-framework@main`, all 15 steps succeeded, the stack answered (panel 200, Dagu/OMB/Caddy ready) and the initial commit used the person's git identity; with an unreachable template, the window marked "Proyecto" failed, its dependants "no se ejecutó", and the installer exited 1. Sizes: app 34 MB, dmg 21 MB (swiftDialog is most of it). Also verified: a custom user and a password with quotes log in (200) while `admin/admin` is refused (401), the password appears nowhere in the installer's Dagu data, and a second project got the next free block (8410) while the first used 8400.
 
@@ -65,6 +66,17 @@ UI copy and workflow step titles are bundled from `installer/macos/locales/{es,e
 - **Private template.** The GitHub step disappears if `fyso-dev/agentic-framework` becomes public.
 - **Linux and Windows delivery.** Follow D38 below. The Linux Zenity experiment was exploratory and has been archived outside the checkout; it is not the selected delivery or proof that Qt installation works.
 
+
+## Menu bar app and CLI — D83
+
+One native app replaces the separate installer app and the SwiftBar plugin (D34). Decision and options: [ADR 0003](adr/0003-menu-bar-app.md).
+
+- **`Fyso.app`** (`installer/macos/app/Fyso.swift`, compiled with `swiftc` by `build.sh`, universal, macOS 15+). Without arguments it is a SwiftUI `MenuBarExtra` (`LSUIElement`: no window, no Dock icon) that registers itself as a login item on first launch (toggle *Abrir al iniciar sesión*). With arguments it is the CLI; on launch it links `~/.local/bin/fyso` to itself.
+- **Instances** are the installer's registry `projects.tsv` (`port<TAB>folder`); name, slug and panel URL come from each project. State: *en marcha* / *con problemas* / *detenida* / *no responde*, from the stack's process-compose socket. The menu bar icon is filled while the current instance runs.
+- **Menu**: the current instance and its state; per instance *Abrir panel*, *Usar como actual*, *Iniciar*/*Detener* (`mise run up/down`, login-shell `PATH`, log in `.data/logs/tray.log`, notification at the end), *Abrir carpeta*, *Ver registro*; then *Crear instancia…* (the installer form above; the new instance becomes current), *Abrir al iniciar sesión*, *Salir*. First launch with no instance opens the create form.
+- **CLI**: `fyso list [--json] | status | open | switch | start | stop [<instance>] | create | add <folder> | biz-login`; an instance is named by name, slug or folder, default the current one. `fyso status` exits 0 only when the instance runs.
+- **Biz edition** (`EDITION=biz`, `Fyso Biz.app`, bundle id `dev.fyso.biz`): the menu starts with *Iniciar sesión en Fyso Biz*, opened on first launch (`FYSO_BIZ_LOGIN_URL`, default `https://fyso.biz/login`); `create` passes `FYSO_EDITION=biz` to the installer, which records it. The session hand-back and installing the Biz extension during *create* are not built yet.
+- **Migration**: the template no longer ships the SwiftBar plugin; `mise run tray:install` lists a hand-made project in the registry (through `fyso add` when the CLI exists). On first launch the app imports the old plugin's remembered projects and removes SwiftBar's link to `framework/tray/fyso.10s.py` (only that link). `FYSO_TEST=1` skips these first-launch effects and the login item.
 
 ## Cross-platform installer direction — D38
 

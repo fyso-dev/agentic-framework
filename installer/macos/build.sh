@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Build "Fyso Installer.app" and Fyso-Installer.dmg (D35) into installer/macos/dist/.
+# Build "Fyso.app" and Fyso.dmg (D35, D83) into installer/macos/dist/: the menu bar app and
+# `fyso` CLI (app/Fyso.swift, compiled with swiftc; no Xcode project) with the installer that
+# creates instances bundled inside. EDITION=biz builds "Fyso Biz.app" / Fyso-Biz.dmg.
 # Everything the app downloads at runtime is pinned here or in the template.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$(cd ../.. && pwd)
 DIST=dist
-APP="$DIST/Fyso Installer.app"
+EDITION=${EDITION:-core}
+case $EDITION in
+  core) APP_NAME=Fyso; BUNDLE_ID=dev.fyso.app; DMG=Fyso.dmg ;;
+  biz) APP_NAME="Fyso Biz"; BUNDLE_ID=dev.fyso.biz; DMG=Fyso-Biz.dmg ;;
+  *) echo "EDITION must be core or biz" >&2; exit 1 ;;
+esac
+APP="$DIST/$APP_NAME.app"
 
 # Pins. Change deliberately (AGENTS.md: never "latest").
 MISE_VERSION=2026.11.2
@@ -14,20 +22,22 @@ DIALOG_DMG=swiftDialog-3.1.1-5000.dmg
 DIALOG_SHA256=ace4b56ef3d7faefa260e1f95194499a20d7066cad3a57d4f8a7013558f36760
 
 command -v mise >/dev/null || { echo "mise is required to build" >&2; exit 1; }
-rm -rf "$DIST"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" .cache
+command -v swiftc >/dev/null || { echo "swiftc is required to build (xcode-select --install)" >&2; exit 1; }
+rm -rf "$APP" "$DIST/$DMG"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers" .cache
 
 # swiftDialog, verified, copied out of its notarized dmg (no pkg, no admin rights).
 cache=".cache/$DIALOG_DMG"
 [ -f "$cache" ] || curl -fsSL -o "$cache" "https://github.com/swiftDialog/swiftDialog/releases/download/v$DIALOG_VERSION/$DIALOG_DMG"
 echo "$DIALOG_SHA256  $cache" | shasum -a 256 -c - >/dev/null
 mnt=$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$cache" >/dev/null
-cp -R "$mnt/Dialog.app" "$APP/Contents/Resources/"; hdiutil detach -quiet "$mnt"
+cp -R "$mnt/Dialog.app" "$APP/Contents/Helpers/"; hdiutil detach -quiet "$mnt"
 
 # Pinned mise bootstrap, the workflow and the window's step titles.
 mise generate install-script -V "$MISE_VERSION" > "$APP/Contents/Resources/mise-bootstrap.sh"
 ids=$(python3 make-dag.py "$ROOT/template/mise.toml.jinja" "$APP/Contents/Resources/fyso-install.yaml")
 # Keep copy in the same locale resources used by the runtime window.
 cp -R locales "$APP/Contents/Resources/"
+cp app/locales/*.json "$APP/Contents/Resources/locales/"   # menu bar app and CLI copy
 for lang in es en; do
   (
     . "locales/$lang.sh"
@@ -54,16 +64,25 @@ done
 iconutil -c icns "$iconset" -o "$R/Fyso.icns"; rm -rf "$tmp"
 
 # Template ref the app installs from (default main; e.g. INSTALLER_REF=my-branch to test a branch).
-sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/MacOS/fyso-installer"
-chmod 755 "$APP/Contents/MacOS/fyso-installer"
+sed "s|^REF=\"\${FYSO_REF:-main}\"|REF=\"\${FYSO_REF:-${INSTALLER_REF:-main}}\"|" fyso-installer.sh > "$APP/Contents/Resources/fyso-installer.sh"
+chmod 755 "$APP/Contents/Resources/fyso-installer.sh"
+# The executable: menu bar app without arguments, `fyso` CLI with them. Universal, macOS 15+
+# (the floor swiftDialog 3.x already sets). A native Mach-O is also what signing needs (PR #65).
+bin=$(mktemp -d)
+for arch in arm64 x86_64; do
+  swiftc -swift-version 5 -O -target "$arch-apple-macos15.0" app/Fyso.swift -o "$bin/fyso-$arch"
+done
+lipo -create "$bin/fyso-arm64" "$bin/fyso-x86_64" -output "$APP/Contents/MacOS/fyso"; rm -rf "$bin"
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleName</key><string>Fyso Installer</string>
-  <key>CFBundleDisplayName</key><string>Fyso Installer</string>
-  <key>CFBundleIdentifier</key><string>dev.fyso.installer</string>
-  <key>CFBundleExecutable</key><string>fyso-installer</string>
+  <key>CFBundleName</key><string>$APP_NAME</string>
+  <key>CFBundleDisplayName</key><string>$APP_NAME</string>
+  <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
+  <key>CFBundleExecutable</key><string>fyso</string>
+  <key>LSUIElement</key><true/>
+  <key>FysoEdition</key><string>$EDITION</string>
   <key>CFBundleIconFile</key><string>Fyso</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
@@ -84,6 +103,6 @@ hdiutil create -quiet -volname "Fyso" -srcfolder "$stage" -ov -format UDRW "$rw"
 hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"
 xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$mnt"
 hdiutil detach -quiet "$mnt"
-hdiutil convert -quiet "$rw" -format UDZO -ov -o "$DIST/Fyso-Installer.dmg"; rm -rf "$(dirname "$rw")"
+hdiutil convert -quiet "$rw" -format UDZO -ov -o "$DIST/$DMG"; rm -rf "$(dirname "$rw")"
 rm -rf "$stage"
-du -sh "$APP" "$DIST/Fyso-Installer.dmg"
+du -sh "$APP" "$DIST/$DMG"
