@@ -8,7 +8,8 @@ external telemetry service, or copy of conversation bodies is introduced.
 - OMB 0.1.140: native monthly `usage/*.jsonl` records and `/api/usage/traces`.
   The ledger is authoritative for settled OMB turns, not trace-root aggregate costs.
 - Dagu 2.24.0: native `/api/v1/dag-runs` for recent run state and artifacts for
-  structured Claude/Codex harness usage. One artifact attempt is counted once.
+  structured harness usage: `usage/<step>.jsonl` from any workflow, or Claude/Codex
+  `agent.txt` output. One artifact attempt (or usage line) is counted once.
 - `fyso-observability` runs every two minutes and on startup/manual refresh. It
   exports `.data/panel/observability.json` atomically. The file is ignored by git;
   it contains no message bodies, prompts, user emails, credentials or raw logs.
@@ -19,6 +20,53 @@ external telemetry service, or copy of conversation bodies is introduced.
 - Runtime history survives process restarts in project data directories. It is
   not part of the memory snapshot. Deleting `.data` deletes observability history;
   backup/retention policy belongs to deployment, not git snapshots.
+
+## Workflow usage artifacts
+
+Any Dagu workflow step that calls a model may report what it consumed, so the
+panel counts it under the workflow's name. The step appends to
+`usage/<step>.jsonl` inside its run's artifacts directory
+(`${context.paths.artifacts_dir}/usage/<step>.jsonl`, the directory the attempt's
+`.meta` file describes). One JSON object per line, one line per model call:
+
+```json
+{"v":1,"step":"<step id>","provider":"claude|codex|opencode|<other>","model":"<model id or null>","input":<int|null>,"output":<int|null>,"cachedInput":<int|null>,"costUsd":<number|null>}
+```
+
+- `v` is `1`; `step` and `provider` are non-empty strings.
+- `input` is total input tokens **including** cached reads (and, for Claude,
+  cache writes), the same convention as harness parsing. `cachedInput` is the
+  subset of `input` read from cache. `output` is output tokens.
+- `costUsd` is the amount the engine reported for that call. Unknown values are
+  `null` (or omitted), never guessed or zero-filled.
+- `model` falls back to `provider` in the panel when null.
+- The billing kind comes from `provider` through the built-in engine kinds and
+  `billingKinds` in `project/observability.json` (`claude`/`codex` are
+  subscription engines; `opencode` and any other provider stay unclassified
+  unless mapped there).
+- Only these fields are read. Never write prompts, responses or transcripts to
+  these files.
+
+The collector scans the attempts of every workflow started in the current UTC
+month. A line that is not valid JSON or breaks the rules above is skipped and
+reported as the `invalidUsageRows` warning. Records use the source `harness`, the
+run ID, and the identity `harness:<dag>/<run>/<attempt>/<file>:<line>`; the
+group name is the workflow name (`Builder` for `fyso-dev-task`, see below).
+Only regular `*.jsonl` files directly inside `usage/` are read; the directory
+is derived from the `.meta` file location, never from its `dir` field.
+
+When an attempt has no `usage/*.jsonl` file, the collector falls back to the
+`agent.txt` artifact written by `harness.run` (Claude JSON or Codex JSONL), for
+any workflow whose `agent.txt` contains those structured events. For
+`fyso-dev-task` this keeps the original behaviour: its usage is grouped under
+`Builder`, and dev-task runs without any usage stay explicitly uncovered. If an
+attempt has both, `usage/` wins, so a call is never counted twice.
+
+The recent-runs list is bounded (`/api/v1/dag-runs?limit=100`, dominated by the
+two-minute `fyso-observability` schedule). Runs that have usage this month but
+fall outside that list are fetched individually, newest first, up to 50 per
+collection; beyond that the list is marked as capped. Monthly totals do not
+depend on the run list.
 
 ## Cost semantics
 

@@ -351,6 +351,7 @@
     "partial": "Partial coverage. Missing sources do not mean zero usage.",
     "truncated": "Recent history is capped; usage totals cover the UTC month.",
     "bot": "Agent",
+    "botOrWorkflow": "Agent / workflow",
     "model": "Model / engine",
     "all": "All",
     "filterScope": "Filters affect usage; the agent filter also affects conversations. Runs and alerts cover the whole project.",
@@ -369,7 +370,7 @@
     "alerts": "Project advisories",
     "noAlerts": "No thresholds exceeded in available data.",
     "alertNote": "Local advisories; no agents are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage.",
-    "usage": "Usage by agent and model",
+    "usage": "Usage by agent or workflow and model",
     "source": "Source",
     "empty": "No records for this selection.",
     "conversations": "Conversations and delegations",
@@ -391,7 +392,7 @@
       "ledger": "OMB usage",
       "traces": "OMB traces",
       "runs": "Dagu",
-      "harness": "Dagu agent"
+      "harness": "Dagu workflow"
     },
     "sourceState": {
       "ok": "Available",
@@ -402,6 +403,7 @@
       "invalidSettings": "Invalid settings; defaults were used.",
       "invalidLedgerRows": "Some usage records could not be read.",
       "invalidArtifacts": "Some artifacts could not be read.",
+      "invalidUsageRows": "Some workflow usage records could not be read.",
       "runDetailsUnavailable": "Some run details could not be read."
     },
     "alert": {

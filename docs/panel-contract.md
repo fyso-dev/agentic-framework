@@ -180,6 +180,9 @@ captured as the run's `ORIGIN` JSON output, independently of agent success.
 `harness.run` publishes Claude JSON or Codex JSONL as `agent.txt`; the exporter
 reads only whitelisted usage numbers and never serves that raw artifact. Legacy
 artifacts without structured data retain unknown consumption.
+Any workflow can also write `usage/<step>.jsonl` to its artifacts directory
+([contract](observability.md#workflow-usage-artifacts)); its usage is grouped
+under the workflow name, and the usage table labels that column agent/workflow.
 
 ## Bot versioning metadata and import
 
