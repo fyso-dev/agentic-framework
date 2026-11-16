@@ -186,11 +186,13 @@ item 2 wait "$S_DOWNLOADING"; cancelled
 "$MISE" install "$DAGU_TOOL" || fail 2 "$S_ERROR" "$E_DAGU"
 item 2 success; step_done
 
-# 2.4 GitHub account: the framework repository is private
+# 2.4 GitHub account: only when plain Git cannot read the source (a private repository).
+# A public source needs no account, no GitHub CLI and no login.
 item 3 wait "$S_CHECKING"; cancelled
 gh() { "$MISE" exec "$GH_TOOL" -- gh "$@"; }
+public_source() { GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git ls-remote --heads "https://github.com/${SOURCE#gh:}.git" >/dev/null 2>&1; }
 case $SOURCE in
-  gh:*)
+  gh:*) if public_source; then item 3 success "$S_NOT_NEEDED"; else
     "$MISE" install "$GH_TOOL" || fail 3 "$S_ERROR" "$E_GH"
     if ! gh auth status -h github.com >/dev/null 2>&1; then
       out="$WORK/gh-login.out"; : > "$out"
@@ -205,7 +207,7 @@ case $SOURCE in
     gh auth setup-git -h github.com
     repo=${SOURCE#gh:}
     gh repo view "$repo" --json name >/dev/null 2>&1 || fail 3 "$S_NO_ACCESS" "$(t "$E_NO_ACCESS" "$repo")"
-    item 3 success ;;
+    item 3 success; fi ;;
   *) item 3 success "$S_NOT_NEEDED" ;;
 esac
 step_done
