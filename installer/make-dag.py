@@ -43,7 +43,9 @@ lines = [
     "steps:",
     "  - id: generate",
     "    run: >-",
-    "      \"$MISE\" exec aqua:astral-sh/uv@0.5.1 -- uvx --from copier==9.19.1 copier copy --trust --defaults",
+    # Copier 9.19.1 needs Python >= 3.10; a fresh Mac only has the Command Line Tools' 3.9,
+    # so uv uses a newer Python if one is installed and otherwise downloads its own.
+    "      \"$MISE\" exec aqua:astral-sh/uv@0.5.1 -- uvx --python \">=3.10\" --from copier==9.19.1 copier copy --trust --defaults",
     "      --vcs-ref \"$REF\" --data project_name=\"$NAME\" --data project_slug=\"$SLUG\"",
     "      --data port_base=\"$PORT\" --data engine=\"$ENGINE\" --data admin_user=\"$ADMIN\" \"$SOURCE\" \"$DIR\"",
     "  - id: trust",
