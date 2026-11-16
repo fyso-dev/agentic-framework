@@ -12,6 +12,7 @@ params:
   - PLAN_ID: ""
   - DEPARTMENT: ""
   - PACKAGE_B64: ""
+  - PACKAGE_REF: ""
   - SOURCE: ""
   - SLUG: ""
 working_dir: ${FYSO_ROOT}
