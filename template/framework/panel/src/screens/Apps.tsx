@@ -192,10 +192,9 @@ function useMarket(): Market {
   const onInstall = async (entry: MarketplaceEntry, where: Where) => {
     setTarget({ id: entry.id, where });
     const result = await install.start({ ID: entry.id, MODE: entry.installed ? "update" : "add" });
-    if (result) {
-      s.reload();
-      void catalog.start();
-    }
+    // Re-read the installed list whatever the outcome: a run can change files and still fail later.
+    s.reload();
+    if (result) void catalog.start();
   };
   return { catalog, install, target, entries, onInstall: (e, where) => void onInstall(e, where) };
 }

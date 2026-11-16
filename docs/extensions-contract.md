@@ -143,6 +143,8 @@ type Extension = {
 
 `set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
 
+The panel re-reads `project.json`, `apps.json`, `extensions.json` and `skills.json` with the bot roster: every five seconds and on window focus, plus right after a panel install. An extension added or removed outside the page (terminal, an agent's `fyso_ext_install`, another tab, or a panel install the person navigated away from) appears without a manual refresh. An unchanged file keeps the shown state, and a failed background read keeps the last good data.
+
 ### Guided setup (D50)
 
 Each installed extension with a `secrets.yaml` shows a form in the panel, open by itself while a required value is missing. Secrets with a `url` get a button that opens that page (deep-link the provider's key page). With several secrets, one field takes the block the provider shows (`NAME="value"` lines, optional `export`, quotes and comments; undeclared names are ignored) and the individual fields stay as a fallback. A blank field keeps the current value. `POST /api/extensions/<ext>/secrets` with `{"values": {"NAME": "value"}}` goes through the web-session gateway to the private connector-setup socket (D45), never through Dagu. The adapter accepts only names declared by that installed extension, writes each value with `sops set --value-stdin`, commits only `secrets.enc.yaml` (`extensions: configure <ext>`), and restores the file on any failure. It shares the connector-settings lock and refuses to write while `secrets.enc.yaml` has uncommitted changes.
