@@ -200,6 +200,23 @@
       "nameLong": "Use at most {{max}} characters.",
       "nameTaken": "A department with that name already exists.",
       "briefLong": "The shared instructions exceed the 24,000 bytes OpenMausBot accepts."
+    },
+    "templates": {
+      "add": "Add department",
+      "title": "Add a department",
+      "body": "Ready-made departments from the installed extensions: their agents, shared instructions, skills and group chats. Choosing one saves its skills in the project and opens the change as a draft for you to review and apply.",
+      "loading": "Looking for departments…",
+      "empty": "No installed extension ships departments.",
+      "draftHint": "Apply or discard the pending changes before adding a department.",
+      "from": "Extension {{ext}}",
+      "bots": "Agents: {{list}}",
+      "rooms": "Group chats: {{list}}",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "replaces": "This department already exists: the draft replaces its agents and group chats.",
+      "invalid": "Cannot be used: {{error}}",
+      "choose": "Add",
+      "chooseNamed": "Add the {{name}} department"
     }
   },
   "form": {

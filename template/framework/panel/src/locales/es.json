@@ -200,6 +200,23 @@
       "nameLong": "Usa como máximo {{max}} caracteres.",
       "nameTaken": "Ya existe un departamento con ese nombre.",
       "briefLong": "Las instrucciones compartidas superan los 24.000 bytes que admite OpenMausBot."
+    },
+    "templates": {
+      "add": "Agregar departamento",
+      "title": "Agregar un departamento",
+      "body": "Departamentos listos que traen las extensiones instaladas: sus agentes, instrucciones compartidas, skills y chats grupales. Al elegir uno se guardan sus skills en el proyecto y el cambio se abre como borrador para que lo revises y apliques.",
+      "loading": "Buscando departamentos…",
+      "empty": "Ninguna extensión instalada trae departamentos.",
+      "draftHint": "Aplica o descarta los cambios pendientes antes de agregar un departamento.",
+      "from": "Extensión {{ext}}",
+      "bots": "Agentes: {{list}}",
+      "rooms": "Chats grupales: {{list}}",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "replaces": "Este departamento ya existe: el borrador reemplaza sus agentes y chats grupales.",
+      "invalid": "No se puede usar: {{error}}",
+      "choose": "Agregar",
+      "chooseNamed": "Agregar el departamento {{name}}"
     }
   },
   "form": {

@@ -79,6 +79,8 @@ function inventory(apps, env = process.env) {
       mcpServers:fs.existsSync(`${base}/mcp.json`) ? Object.keys(JSON.parse(fs.readFileSync(`${base}/mcp.json`)).mcpServers || {}) : [],
       workflows:workflows(id).map(f => f.split('/').pop().slice(0,-5)),
       skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2)),
+      // Department templates (D82): adding one is the person's action through fyso-bot-architect OP=team-import.
+      teams:glob(`${base}/teams/*/team.yaml`).map(f => f.split('/').at(-2)),
       ...(setup(id) && {setup:setup(id)})};
   });
 }
