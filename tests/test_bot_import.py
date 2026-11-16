@@ -28,12 +28,14 @@ import json,os,sys
 from pathlib import Path
 assert '--port' in sys.argv
 if sys.argv[1]=='bots':
- print(json.dumps({'bots':[{'id':'native-id','name':'Imported'}]}));sys.exit(0)
+ print(json.dumps({'bots':[{'id':'native-id','name':'Imported',**({'section':'Equipo comercial'} if os.environ.get('TEST_CHIEF')=='1' else {})}]}));sys.exit(0)
 assert sys.argv[1:3]==['team','export'], 'runtime mutations are forbidden'
 out=Path(sys.argv[sys.argv.index('--out')+1]);out.parent.mkdir(parents=True,exist_ok=True)
 bot={'name':'Imported','title':'Preserve native profile','model':'codex/gpt-test','soul':'Preserve these instructions','approval':'ask','computer':'off','cwd':os.environ['FYSO_ROOT']}
 if os.environ.get('TEST_DEFAULT_FOLDER')=='1':
  bot.pop('cwd');bot.pop('computer')
+if os.environ.get('TEST_CHIEF')=='1':
+ bot.update(team='Equipo comercial',chief=True,manages=['Soporte'])
 if os.environ.get('TEST_SKILL')=='1':
  bot['skills']=[{'file':'skills/imported/helper/SKILL.md'}]
  skill=out.parent/'skills/imported/helper/SKILL.md';skill.parent.mkdir(parents=True);skill.write_text('A portable imported skill')
@@ -41,7 +43,7 @@ out.write_text(json.dumps({'version':1,'bots':[bot]}))
 ''')
         omb.chmod(0o755)
         preload = self.root / "native.cjs"
-        preload.write_text("global.fetch=async(url,opts={})=>{if(opts.method && opts.method!=='GET')throw Error('runtime mutation forbidden');return {ok:true,json:async()=>url.endsWith('/skills')?{skills:[{name:'helper',origin:'imported'}]}:{bots:[{id:'native-id',name:'Imported'}]}}};")
+        preload.write_text("global.fetch=async(url,opts={})=>{if(opts.method && opts.method!=='GET')throw Error('runtime mutation forbidden');return {ok:true,json:async()=>url.endsWith('/skills')?{skills:[{name:'helper',origin:'imported'}]}:{bots:[{id:'native-id',name:'Imported',section:process.env.TEST_CHIEF==='1'?'Equipo comercial':undefined}]}}};")
         self.env = dict(os.environ, FYSO_ROOT=str(self.root), FYSO_DATA=str(self.root / ".data"), FYSO_OMB_PORT="19284", BOT_ID="native-id", PATH=str(tools)+os.pathsep+os.environ["PATH"], NODE_OPTIONS="--require "+str(preload), GIT_AUTHOR_NAME="Test", GIT_AUTHOR_EMAIL="test@example.invalid", GIT_COMMITTER_NAME="Test", GIT_COMMITTER_EMAIL="test@example.invalid")
         self.git("init", "-q")
         self.git("add", "project")
@@ -67,6 +69,14 @@ out.write_text(json.dumps({'version':1,'bots':[bot]}))
         self.assertEqual(self.git("diff", "--name-only", self.before).strip(), "project/bots/team.yaml")
         self.assertTrue(json.loads(self.invoke().stdout)["replayed"])
         self.assertEqual(self.git("rev-parse", "HEAD").strip(), data["commit"])
+
+    def test_import_keeps_the_team_but_never_grants_chief_powers(self):
+        result = self.invoke(TEST_CHIEF="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = self.project.read_text()
+        self.assertIn("team: Equipo comercial", text)
+        self.assertNotIn("chief", text)
+        self.assertNotIn("manages", text)
 
     def test_selected_imported_skills_are_copied_and_committed(self):
         result = self.invoke(TEST_SKILL="1")

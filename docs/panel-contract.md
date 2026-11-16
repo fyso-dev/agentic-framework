@@ -147,6 +147,9 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `model` (`<engine>/<model>`)
 - `soul` (base instructions), written inline only if the person edited it; a `{ file: … }` soul stays a file reference otherwise
 - `tools`
+- `team` (OMB department, D81): chosen from the file's `teams:`, the departments bots and rooms already name and those the runtime reports, or typed; empty removes the key. OMB keeps a bot in its team when `team:` is removed, so the form says so.
+
+The Bots list groups bots by team: bots without a team first, under OMB's "General", then the file's `teams:` order and any other team the runtime reports. A department declared in `teams:` stays listed while empty. The list's department button declares a new one (name up to 60 characters, unique without case, never "General"; optional inline shared instructions up to 24,000 bytes), and each department heading edits its inline shared instructions; a brief kept in a file shows its path read-only. Both write the local draft, count as pending changes and apply through the native plan (`team "X": create · brief set`). Drafts are matched with the file and with live bots by name and team first, then by name, so moving a bot shows as a pending change of that bot. Only the team-less chief (the default MausBot) is hidden; a team's chief is listed. `chief`, `manages`, brief files and `rooms:` are edited in `team.yaml` only; renaming and deleting a department happen in OMB.
 
 Skills are listed read-only, except confirmed third-party skills (`skills.json`, D73) and the skills of installed extensions (`extensions.json`), which are toggles in the bot detail (D54, extensions-contract §6). "Uses workflows" maps to the bot `cwd` being the project root, `${FYSO_ROOT}`.
 

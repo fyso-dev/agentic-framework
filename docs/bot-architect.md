@@ -21,7 +21,10 @@ receipt when retried. Dagu serializes this workflow. A concurrent manual OMB/pan
 change can invalidate a plan and requires a new preview.
 
 Only profile fields supported by this first version are accepted: name, title,
-description, model, soul (inline), approval, computer (off), cwd (project root), tools (native allow/deny lists).
+description, model, soul (inline), approval, computer (off), cwd (project root), tools (native allow/deny lists),
+team (an existing native OMB team, [D81](PLAN.md#2-decisions-log)). `chief`, `manages` and rooms are rejected:
+creating a team, writing its brief or granting bot-management powers is a person's decision in `team.yaml`.
+The list operation returns each bot's team, and apply verifies the bot landed in the planned team.
 Engine keys, chief assignments, connected-app account grants and remote computers are outside this CRUD
 surface. New bots default to ask/off and this project's cwd; models remain native
 OMB identifiers. Protected framework bots cannot be deleted, and the Architect
@@ -72,6 +75,8 @@ The `Import and version` action submits `OP=import` with the exact native `BOT_I
 The operation creates a local configuration commit. Unlike the scheduled snapshot, import itself does not push; configure project replication deliberately. Names remain OMB's native team matching key; do not treat them as globally stable IDs.
 
 Import preserves effective native settings when the export omits native defaults. If shared project defaults would be inherited, it materializes those defaults on existing declarations and removes the shared defaults before appending the imported profile. Existing effective bot definitions remain unchanged; only the native YAML representation changes.
+
+Import keeps the bot's native `team:` and drops `chief` and `manages` (D81): bot-management powers are written in `team.yaml` only when a person accepts them. OMB leaves an omitted `chief` as it is, so importing a team's chief does not demote it.
 
 ## Native connectors (D43)
 

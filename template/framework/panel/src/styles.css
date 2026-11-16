@@ -698,6 +698,13 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 .bots-list-head { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; }
 .bots-list-head h1 { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; margin-right: 2px; }
 .bots-picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.bots-team { display: flex; flex-direction: column; gap: 2px; }
+.bots-team + .bots-team { margin-top: 8px; }
+.bots-team-head { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px; min-width: 0; }
+.bots-team-name { display: flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--fy-mute); min-width: 0; }
+.bots-team-edit { width: 24px; height: 24px; margin: -4px 0; text-transform: none; }
+.bots-team-brief summary { cursor: pointer; }
+.bots-team-brief p { max-height: 160px; overflow: auto; padding-top: 4px; }
 .bots-pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--fy-radius-lg); color: var(--fy-text); text-decoration: none; transition: background var(--fy-dur-hover, 160ms); }
 a.bots-pick:hover { background: color-mix(in srgb, var(--fy-accent) 6%, transparent); color: var(--fy-text); }
 .bots-pick[aria-current="true"] { background: var(--fy-surface); box-shadow: var(--fy-shadow-card), inset 0 0 0 1px var(--fy-edge); }

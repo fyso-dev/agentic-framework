@@ -16,12 +16,12 @@ import { accessFor, ensurePiHumanRequestOrigin, piHumanRequestOriginBlocked, sel
 import { go, href, type BotTab } from "../lib/router";
 import {
   byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
-  SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, upsertBot, type Approval, type Bot,
+  SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, teamNames, invalidTeamRemoval, appliedTeamForRemoval, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
 import { BotStatePill } from "./Bots";
 
-type Errors = { name?: string; soul?: string; model?: string };
+type Errors = { name?: string; soul?: string; model?: string; team?: string };
 
 /** Engines from the last check; without one, the engines the team file already uses. */
 function useEngines(bots: Bot[]): { list: Engine[]; checked: boolean } {
@@ -51,6 +51,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const initial = useMemo(() => ({
     name: bot?.name ?? "",
     title: bot?.title ?? "",
+    team: bot?.team ?? "",
     engine: bot?.engine || firstOk?.id || "",
     model: bot?.modelId || firstOk?.models[0] || "",
     approval: (bot?.approval ?? "ask") as Approval,
@@ -67,6 +68,16 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
 
   const [name, setName] = useState(initial.name);
   const [title, setTitle] = useState(initial.title);
+  const [team, setTeam] = useState(initial.team);
+  const appliedTeam = appliedTeamForRemoval(bot, s.runtimeBots.status === 'ok' ? s.runtimeBots.data ?? [] : null, s.baseBots);
+  // Teams the file declares or already uses (D81); a new name creates the team on apply.
+  // Departments created in OpenMausBot itself are offered too: one concept, two editors.
+  const teams = useMemo(() => {
+    let names: string[] = [];
+    try { names = teamNames(parseTeam(s.workingText ?? "version: 1\n")); } catch { /* the draft error is shown elsewhere */ }
+    for (const section of (s.runtimeBots.data ?? []).map((b) => b.section?.trim() ?? "")) if (section && !names.some((n) => n.toLowerCase() === section.toLowerCase())) names.push(section);
+    return names;
+  }, [s.workingText, s.runtimeBots.data]);
   const [engine, setEngine] = useState(initial.engine);
   const [model, setModel] = useState(initial.model);
   const [approval, setApproval] = useState<Approval>(initial.approval);
@@ -128,7 +139,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   const bytes = byteLength(soul);
   const num = new Intl.NumberFormat(i18n.language);
 
-  const teamDirty = !bot || name !== initial.name || title !== initial.title || engine !== initial.engine || model !== initial.model
+  const teamDirty = !bot || name !== initial.name || title !== initial.title || team.trim() !== initial.team || engine !== initial.engine || model !== initial.model
     || approval !== initial.approval || soul !== initial.soul || uses !== initial.uses || scopeChanged || skillsChanged;
   const appsDirty = Object.keys(appChanges).length > 0;
   const dirty = teamDirty || appsDirty;
@@ -151,16 +162,16 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
   };
 
   const discard = () => {
-    setName(initial.name); setTitle(initial.title); setEngine(initial.engine); setModel(initial.model);
+    setName(initial.name); setTitle(initial.title); setTeam(initial.team); setEngine(initial.engine); setModel(initial.model);
     setApproval(initial.approval); setSoul(initial.soul); setUses(initial.uses);
     setScope(runtime ? runtime.toolScope : bot?.tools); setScopeChanged(false); setAppChanges({}); setSkillsOn({});
     setErrors({}); setSaveFailed(false);
   };
 
   const save = async () => {
-    const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel") };
+    const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel"), team: invalidTeamRemoval(appliedTeam, team) ? t("form.teamLeave") : undefined };
     setErrors(next);
-    if (next.name || next.model) { pickTab("perfil"); return; }
+    if (next.name || next.model || next.team) { pickTab("perfil"); return; }
     if (next.soul) { pickTab("instrucciones"); requestAnimationFrame(() => soulRef.current?.focus()); return; }
     setSaving(true); setSaveFailed(false);
     let index = bot?.index ?? null;
@@ -171,7 +182,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
       const declaredName = s.baseBots.find((entry) => entry.name === bot?.name)?.name
         ?? s.baseBots.find((entry) => entry.name === previousName)?.name;
       upsertBot(doc, index, {
-        name, title, approval,
+        name, title, approval, team,
         model: engine ? `${engine}/${model}` : model,
         soulText: soulChanged ? soul : null,
         usesWorkflows: uses,
@@ -246,7 +257,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
           <button key={key} type="button" role="tab" id={`${id}-tab-${key}`} aria-controls={`${id}-panel`} aria-selected={current === key} onClick={() => pickTab(key)}>
             <Icon size={16} />{t(`detail.tab.${key}`)}
             {key === "conectores" && <span className="bd-cnt">{connCount}</span>}
-            {key === "perfil" && (errors.name || errors.model) && <span className="bd-errdot" aria-label={t("detail.hasErrors")} />}
+            {key === "perfil" && (errors.name || errors.model || errors.team) && <span className="bd-errdot" aria-label={t("detail.hasErrors")} />}
             {key === "instrucciones" && (errors.soul || soulOver) && <span className="bd-errdot" aria-label={t("detail.hasErrors")} />}
           </button>
         ))}
@@ -267,6 +278,13 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
               <div className="field">
                 <label className="label" htmlFor={`${id}-role`}>{t("form.role")}</label>
                 <input id={`${id}-role`} className="input" value={title} autoComplete="off" onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))} />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor={`${id}-team`}>{t("form.team")}</label>
+                <input id={`${id}-team`} className="input" value={team} maxLength={60} autoComplete="off" list={`${id}-teams`}
+                  placeholder={t("bots.team.none")} aria-invalid={!!errors.team} aria-describedby={`${id}-team-hint`} onChange={(e) => { setTeam(e.target.value.replace(/\n/g, " ")); setErrors((current) => ({ ...current, team: undefined })); }} />
+                <datalist id={`${id}-teams`}>{teams.map((n) => <option key={n} value={n} />)}</datalist>
+                <p id={`${id}-team-hint`} className={errors.team ? "field-err" : "hint"}>{t(invalidTeamRemoval(appliedTeam, team) ? "form.teamLeave" : bot?.chief ? "form.teamChief" : "form.teamHint")}</p>
               </div>
             </div>
 

@@ -15,3 +15,7 @@ test('the architect cannot change itself and core identity cannot be renamed',()
   assert.throws(()=>guardTarget({name:'Builder'},'update',{name:'Different'}));
   assert.doesNotThrow(()=>guardTarget({name:'Builder'},'update',{model:'codex/gpt-6.1-sol'}));
 });
+test('a bot can be placed in a team, never made a chief or manager (D81)',()=>{
+  assert.equal(validatePatch({team:'  Equipo comercial '},'/project').team,'Equipo comercial');
+  for(const bad of [{team:''},{team:'x'.repeat(61)},{team:'two\nlines'},{team:3},{manages:['Ventas']},{rooms:[]},{chief:true}])assert.throws(()=>validatePatch(bad,'/project'));
+});

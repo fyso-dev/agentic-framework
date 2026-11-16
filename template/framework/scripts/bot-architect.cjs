@@ -6,7 +6,9 @@ const protectedNames=new Set(['mausbot','workflow architect','run operator','bui
 const key=name=>String(name).trim().toLowerCase();
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value);
-const allowed=new Set(['name','title','description','model','soul','approval','computer','cwd','tools']);
+// `team` places the bot in an existing OMB team (D81); `chief`, `manages` and rooms stay out:
+// bot-management powers need a person's explicit decision in team.yaml.
+const allowed=new Set(['name','title','description','model','soul','approval','computer','cwd','tools','team']);
 function validatePatch(input,root) {
   if (!input || typeof input!=='object' || Array.isArray(input)) throw new Error('expected one native bot entry');
   for(const field of Object.keys(input)) if(!allowed.has(field)) throw new Error(`unsupported profile field: ${field}`);
@@ -14,6 +16,10 @@ function validatePatch(input,root) {
   for(const [field,text] of Object.entries(value)) if(field!=='tools' && typeof text!=='string') throw new Error(`${field} must be text`);
   if(value.tools!==undefined) value.tools=require('./connections.cjs').validateTools(value.tools);
   if(value.name!==undefined && !/^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,79}$/u.test(value.name)) throw new Error('invalid bot name');
+  if(value.team!==undefined) {
+    value.team=value.team.trim();
+    if(!/^[^\r\n]{1,60}$/u.test(value.team)) throw new Error('team must be one line of at most 60 characters');
+  }
   if(value.approval!==undefined && !['ask','full'].includes(value.approval)) throw new Error('approval must be ask or full');
   if(value.computer!==undefined && value.computer!=='off') throw new Error('this surface supports computer off only');
   if(value.cwd!==undefined && !['${FYSO_ROOT}',root].includes(value.cwd)) throw new Error('cwd must be the project root');
@@ -44,6 +50,7 @@ async function main(env=process.env) {
       throw new Error(typeof detail==='string'?`OpenMausBot: ${detail}`:'OpenMausBot command failed; inspect the native run logs');
     }
   };
+  async function sections() {const res=await fetch(`http://127.0.0.1:${port}/api/sidebar-sections`,{signal:AbortSignal.timeout(10000)});if(!res.ok)throw new Error('native team list unavailable');return (await res.json()).sections??[];}
   async function bots() {const res=await fetch(`http://127.0.0.1:${port}/api/bots`,{signal:AbortSignal.timeout(10000)});if(!res.ok)throw new Error('native bot list unavailable');return (await res.json()).bots;}
   async function state() {
     const live=await bots();
@@ -55,7 +62,7 @@ async function main(env=process.env) {
   const op=env.OP||'list';
   if(op==='connections')return require('./connections.cjs').inventory(env);
   if(op==='import')return require('./import-bot.cjs').importBot(env);
-  if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
+  if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,team:b.section||'',title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
   if(op==='read') {
     const current=await state(),bot=current.live.find(b=>b.id===env.BOT_ID);
     if(!bot)throw new Error('exact bot ID was not found');
@@ -79,6 +86,12 @@ async function main(env=process.env) {
       patch={approval:'ask',computer:'off',cwd:'${FYSO_ROOT}',...patch};
     } else guardTarget(target,action,patch);
     if(action==='update' && patch.name && current.live.some(b=>b.id!==target.id && key(b.name)===key(patch.name)))throw new Error('bot name already exists');
+    if(patch.team!==undefined) {
+      // Only an existing team: creating one (and its brief) is a team.yaml decision.
+      const team=(await sections()).find(name=>key(name)===key(patch.team));
+      if(!team)throw new Error('team does not exist; declare it in project/bots/team.yaml first');
+      patch.team=team;
+    }
     let connectionsRevision;
     if(patch.tools) connectionsRevision=await require('./connections.cjs').checkSelection(patch.tools,env,target);
     const plan={...(connectionsRevision ? {connectionsRevision} : {}),action,targetId:target?.id||null,targetName:target?.name||null,patch,base:current.digest};
@@ -138,6 +151,7 @@ async function main(env=process.env) {
     if(plan.action==='delete' && verified.some(b=>b.id===plan.targetId))throw new Error('native deletion did not remove the target');
     if(plan.action==='create' && (!found || native.created!==1))throw new Error('native creation result did not match the plan');
     if(plan.action==='update' && (!found || found.id!==plan.targetId || native.created))throw new Error('native update changed target identity');
+    if(plan.patch.team!==undefined && key(found?.section||'')!==key(plan.patch.team))throw new Error('native team did not match the plan');
     if(plan.patch.tools && canonical(require('./connections.cjs').validateTools(found?.toolScope||{}))!==canonical(plan.patch.tools))throw new Error('native tool selection did not match the plan');
     fs.writeFileSync(projectFile,projectText);
     execFileSync('git',['add','--','project/bots/team.yaml']);
