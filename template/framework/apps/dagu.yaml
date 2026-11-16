@@ -1,4 +1,4 @@
 id: dagu
-name: Dagu
+name: {es: Automatizaciones, en: Automations}
 description: {es: Flujos de trabajo y ejecuciones, en: Workflows and runs}
 icon: workflow

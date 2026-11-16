@@ -20,7 +20,7 @@
       "review": "Revisar y aplicar los cambios",
       "giveTip": "Abre el perfil del agente: activa la skill project-knowledge y aplica los cambios.",
       "import": "Importar primero",
-      "importTip": "Este agente se creó en OpenMausBot y no está en el archivo del equipo. Impórtalo en Agentes y luego dale acceso."
+      "importTip": "Este agente se creó en la app de agentes y no está en el archivo del equipo. Impórtalo en Agentes y luego dale acceso."
     },
     "files": {
       "title": "Trae lo que ya tienes",

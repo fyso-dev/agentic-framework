@@ -46,7 +46,7 @@ async function main() {
     await page.getByRole('heading',{name:'Vista previa de permisos',exact:true}).waitFor({timeout:60000});
     await page.screenshot({path:path.join(folder,'connector-bot-preview.png'),fullPage:true});
     await page.getByRole('button',{name:'Aplicar permisos',exact:true}).click();
-    await page.getByText('Permisos guardados y verificados en OpenMausBot.',{exact:true}).waitFor({timeout:90000});
+    await page.getByText('Permisos guardados y verificados en la app de agentes.',{exact:true}).waitFor({timeout:90000});
     const bot=(await native('bots')).bots.find(b=>b.id===botId);assert.deepEqual(bot.toolScope,{allow:['native:*',`mcp:${name}:*`]});
     await page.setViewportSize({width:390,height:844});await card.scrollIntoViewIfNeeded();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.screenshot({path:path.join(folder,'connectors-mobile.png')});

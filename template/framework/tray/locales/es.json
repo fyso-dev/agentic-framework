@@ -6,9 +6,9 @@
   "folder": "Abrir carpeta",
   "terminal": "Abrir terminal aquí",
   "stop": "Detener…",
-  "stop_confirm": "Detener {{name}} (mise run down)",
+  "stop_confirm": "Detener {{name}}",
   "restart": "Reiniciar…",
-  "restart_confirm": "Reiniciar {{name}} (down + up)",
+  "restart_confirm": "Reiniciar {{name}}",
   "stopped": "Detenidos",
   "start": "Iniciar",
   "no_answer": "no responde",
@@ -21,7 +21,7 @@
   "done_start": "{{name}} está corriendo",
   "done_stop": "{{name}} se detuvo",
   "done_restart": "{{name}} se reinició",
-  "failed": "{{name}}: falló mise run {{task}}",
+  "failed": "{{name}}: falló la acción {{task}}",
   "last_failed": "el último intento falló",
   "log": "Ver registro"
 }

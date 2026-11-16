@@ -64,7 +64,8 @@ def load_locale(lang):
     return texts
 
 
-TEXTS = load_locale(language())
+LANG = language()
+TEXTS = load_locale(LANG)
 
 
 def t(key, **values):
@@ -305,7 +306,8 @@ def render(items):
         lines.append(f"--{t('panel')} | href={panel} sfimage=rectangle.grid.2x2")
         for app in p["apps"]:
             if app.get('enabled', True) and app.get('url'):
-                lines.append(f"--{esc(app.get('name', app.get('id')))} | href={app['url']} sfimage=arrow.up.right.square")
+                name = (app.get('name_i18n') or {}).get(LANG) or app.get('name', app.get('id'))
+                lines.append(f"--{esc(name)} | href={app['url']} sfimage=arrow.up.right.square")
         lines.append("-----")
         lines.append(f"--{t('processes')} | color=gray size=12")
         for proc in sorted(p["procs"], key=lambda x: x.get('name', "")):

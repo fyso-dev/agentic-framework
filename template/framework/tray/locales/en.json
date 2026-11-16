@@ -6,9 +6,9 @@
   "folder": "Open folder",
   "terminal": "Open terminal here",
   "stop": "Stop…",
-  "stop_confirm": "Stop {{name}} (mise run down)",
+  "stop_confirm": "Stop {{name}}",
   "restart": "Restart…",
-  "restart_confirm": "Restart {{name}} (down + up)",
+  "restart_confirm": "Restart {{name}}",
   "stopped": "Stopped",
   "start": "Start",
   "no_answer": "not answering",
@@ -21,7 +21,7 @@
   "done_start": "{{name}} is running",
   "done_stop": "{{name}} stopped",
   "done_restart": "{{name}} restarted",
-  "failed": "{{name}}: mise run {{task}} failed",
+  "failed": "{{name}}: the {{task}} action failed",
   "last_failed": "the last attempt failed",
   "log": "Show log"
 }
