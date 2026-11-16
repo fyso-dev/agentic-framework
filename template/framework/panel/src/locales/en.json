@@ -61,7 +61,7 @@
     "unapplied_other": "{{count}} unapplied",
     "appsDown_one": "{{count}} app is not responding",
     "appsDown_other": "{{count}} apps are not responding",
-    "observability": "Observability",
+    "observability": "AI usage",
     "connectors": "Connectors"
   },
   "setup": {
@@ -339,8 +339,8 @@
     "addCopied": "Command copied"
   },
   "observ": {
-    "title": "Observability",
-    "subtitle": "Project conversations, executions and AI usage.",
+    "title": "AI usage",
+    "subtitle": "How much the project's agents use AI: tokens, cost and your subscription usage.",
     "refresh": "Refresh data",
     "mock": "This view requires the real stack; no invented consumption is displayed.",
     "loadError": "The summary could not be loaded. Refresh it and, if it fails, check the log in Automations.",
@@ -349,17 +349,15 @@
     "collected": "Updated",
     "stale": "Stale data",
     "partial": "Partial coverage. Missing sources do not mean zero usage.",
-    "truncated": "Recent history is capped; usage totals cover the UTC month.",
     "bot": "Agent",
-    "model": "Model / engine",
+    "model": "Model",
     "all": "All",
-    "filterScope": "Filters affect usage; the agent filter also affects conversations. Runs and alerts cover the whole project.",
     "costs": "Amounts by category",
     "apiReportedUsd": "API · reported",
-    "subscriptionEquivalentUsd": "Subscription · equivalent",
+    "subscriptionEquivalentUsd": "Subscription · estimated equivalent",
     "estimatedApiUsd": "API · estimated",
     "unclassifiedUsd": "Unclassified",
-    "costNote": "USD reported by the engine, not reconciled against invoices. Subscription equivalents are not extra charges and exclude fixed fees. Cached input is included in total input.",
+    "costNote": "USD reported by the engine, not reconciled with invoices. The subscription equivalent is an estimate at list price: it is not your bill or your quota, and it excludes the fixed fee.",
     "turns": "Turns / attempts",
     "input": "Input tokens",
     "output": "Output tokens",
@@ -369,29 +367,21 @@
     "alerts": "Project advisories",
     "noAlerts": "No thresholds exceeded in available data.",
     "alertNote": "Local advisories; no agents are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage.",
-    "usage": "Usage by agent and model",
-    "source": "Source",
+    "usage": "Usage by agent, model and engine",
     "empty": "No records for this selection.",
     "conversations": "Conversations and delegations",
-    "conversationModel": "Conversations can include delegations across models and are filtered by agent only.",
+    "conversationModel": "Conversations group delegations across models and engines; they are filtered by agent and period only.",
     "started": "Started",
     "duration": "Duration",
     "tools": "Tools",
     "errors": "Errors",
     "details": "Native details",
     "running": "Running",
-    "runs": "Recent executions",
-    "workflow": "Workflow",
-    "status": "Status",
-    "retries": "Retries",
-    "conversation": "Source conversation",
-    "unlinked": "No recorded link",
-    "threadOnly": "Conversation known; turn unknown",
     "sources": {
       "ledger": "Agent usage",
       "traces": "Agent traces",
-      "runs": "Automations",
-      "harness": "Agent in a workflow"
+      "harness": "Agent in a workflow",
+      "subscription": "Subscription usage"
     },
     "sourceState": {
       "ok": "Available",
@@ -410,18 +400,36 @@
       "longRun": "Run active for {{value}} s · threshold {{limit}} s",
       "longConversation": "Conversation active for {{value}} s · threshold {{limit}} s"
     },
-    "statuses": {
-      "succeeded": "Succeeded",
-      "failed": "Failed",
-      "aborted": "Aborted",
-      "rejected": "Rejected",
-      "running": "Running",
-      "waiting": "Waiting",
-      "queued": "Queued",
-      "not_started": "Not started",
-      "partially_succeeded": "Partially succeeded",
-      "cancelled": "Cancelled",
-      "skipped": "Skipped"
+    "tokenNote": "New input + cached input = total input. Reasoning is included in output.",
+    "tokens": "Tokens",
+    "freshInput": "New input",
+    "reasoning": "Reasoning",
+    "engine": "Engine",
+    "period": "Period",
+    "periods": {
+      "month": "This month (UTC)",
+      "week": "Last 7 days of the month",
+      "today": "Today (UTC)"
+    },
+    "chart": "Usage per day",
+    "chartLabel": "Stacked bar chart per day: {{metric}}",
+    "metric": "Measure",
+    "metrics": {
+      "tokens": "Tokens",
+      "cost": "Cost (USD)"
+    },
+    "plan": {
+      "title": "Your subscription usage",
+      "note": "Based on your subscription usage as reported by the provider. It belongs to the account, not the project: it includes what you use from other projects, other computers and the provider's own app.",
+      "unavailable": "No subscription data right now. Agents keep working; it is checked again on the next refresh.",
+      "none": "No agent uses a subscription engine, or the provider does not report usage.",
+      "fiveHour": "5-hour window",
+      "weekly": "Weekly",
+      "resets": "Resets {{when}}",
+      "noReset": "No reset time",
+      "checked": "Checked {{when}}",
+      "unknownNote": "\"Unknown\" is normal: some plans lack one of the windows, or the provider did not answer.",
+      "unknownAccounts": "No data for now: {{engines}}."
     }
   },
   "ext": {

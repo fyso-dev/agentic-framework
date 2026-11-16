@@ -78,3 +78,28 @@ ports and data directories. No remote PR or external telemetry service was used.
   and are included. No conversation bodies or arbitrary raw logs are exported.
 - History survives restart, not deletion of `.data`. Retention/backup belongs to
   deployment; runtime history is deliberately excluded from git snapshots.
+
+## AI usage view (D84)
+
+2026-11-16, generated project on port block 35560 (OpenMausBot 0.1.141, Codex engine).
+Real data: one Run Operator turn through `openmausbot run --port <project>` and the
+project OMB's own `/api/plan-usage` report (no fixture was needed). The refresh button
+ran the exporter through Dagu. Percentages belong to the signed-in accounts, not the
+project. Codex reports tokens without USD, so every cost category is *unknown*.
+
+| Check | Result |
+|---|---|
+| `node --test tests/*.test.cjs` | 287 passed, 13 skipped, 0 failed (14 in `observability.test.cjs`, 4 new for plan usage) |
+| `npm --prefix template/framework/panel run build` (tsc + Vite) | Passed |
+| `scripts/check-paths.sh` | No machine-specific paths |
+| Browser (headless Chromium), es and en | Subscription windows, chart, filters; no run list; no console errors |
+| Generated project `mise run doctor` | All observability checks green; one unrelated failure: the Composio connector-setup service exited at startup |
+
+<details>
+<summary>Uso de IA (es)</summary>
+<p align="center"><img src="./ai-usage-es.png" alt="AI usage view in Spanish with subscription windows and daily chart" width="70%"></p>
+</details>
+<details>
+<summary>AI usage (en)</summary>
+<p align="center"><img src="./ai-usage-en.png" alt="AI usage view in English with subscription windows and daily chart" width="70%"></p>
+</details>

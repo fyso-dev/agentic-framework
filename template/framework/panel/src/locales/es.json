@@ -61,7 +61,7 @@
     "unapplied_other": "{{count}} sin aplicar",
     "appsDown_one": "{{count}} app no responde",
     "appsDown_other": "{{count}} apps no responden",
-    "observability": "Observabilidad",
+    "observability": "Uso de IA",
     "connectors": "Conectores"
   },
   "setup": {
@@ -339,8 +339,8 @@
     "addCopied": "Comando copiado"
   },
   "observ": {
-    "title": "Observabilidad",
-    "subtitle": "Conversaciones, ejecuciones y consumo de IA del proyecto.",
+    "title": "Uso de IA",
+    "subtitle": "Cuánto usan la IA los agentes del proyecto: tokens, costo y el uso de tu suscripción.",
     "refresh": "Actualizar datos",
     "mock": "Esta vista requiere datos de la pila real; no presenta consumo ficticio.",
     "loadError": "No se pudo leer el resumen. Actualiza los datos; si falla, revisa el registro en Automatizaciones.",
@@ -349,17 +349,15 @@
     "collected": "Actualizado",
     "stale": "Datos desactualizados",
     "partial": "Cobertura parcial. Las fuentes faltantes no equivalen a consumo cero.",
-    "truncated": "Historial reciente limitado; los totales de consumo corresponden al mes UTC.",
     "bot": "Agente",
-    "model": "Modelo / motor",
+    "model": "Modelo",
     "all": "Todos",
-    "filterScope": "Los filtros afectan el consumo y el filtro por agente afecta las conversaciones. Las ejecuciones y los avisos muestran todo el proyecto.",
     "costs": "Importes por categoría",
     "apiReportedUsd": "API · reportado",
-    "subscriptionEquivalentUsd": "Suscripción · equivalente",
+    "subscriptionEquivalentUsd": "Suscripción · equivalente estimado",
     "estimatedApiUsd": "API · estimado",
     "unclassifiedUsd": "Sin clasificar",
-    "costNote": "USD reportados por el motor, no conciliados con facturas. El equivalente de suscripción no es un cargo adicional ni incluye la cuota fija. Caché está incluida en la entrada.",
+    "costNote": "USD reportados por el motor, no conciliados con facturas. El equivalente de suscripción es una estimación a precio de lista: no es tu factura ni tu cupo, y no incluye la cuota fija.",
     "turns": "Turnos / intentos",
     "input": "Tokens entrada",
     "output": "Tokens salida",
@@ -369,29 +367,21 @@
     "alerts": "Avisos del proyecto",
     "noAlerts": "Sin umbrales superados entre los datos disponibles.",
     "alertNote": "Avisos locales; no detienen agentes ni envían mensajes. Configuración: project/observability.json. El umbral monetario usa solo API reportada y puede tener cobertura incompleta.",
-    "usage": "Consumo por agente y modelo",
-    "source": "Fuente",
+    "usage": "Consumo por agente, modelo y motor",
     "empty": "No hay registros para esta selección.",
     "conversations": "Conversaciones y delegaciones",
-    "conversationModel": "Las conversaciones agrupan delegaciones de varios modelos; se filtran solo por agente.",
+    "conversationModel": "Las conversaciones agrupan delegaciones de varios modelos y motores; se filtran solo por agente y período.",
     "started": "Inicio",
     "duration": "Duración",
     "tools": "Herramientas",
     "errors": "Errores",
     "details": "Ver detalle nativo",
     "running": "En curso",
-    "runs": "Ejecuciones recientes",
-    "workflow": "Flujo",
-    "status": "Estado",
-    "retries": "Reintentos",
-    "conversation": "Conversación de origen",
-    "unlinked": "Sin vínculo registrado",
-    "threadOnly": "Conversación identificada; turno desconocido",
     "sources": {
       "ledger": "Consumo de agentes",
       "traces": "Trazas de agentes",
-      "runs": "Automatizaciones",
-      "harness": "Agente en un flujo"
+      "harness": "Agente en un flujo",
+      "subscription": "Uso de la suscripción"
     },
     "sourceState": {
       "ok": "Disponible",
@@ -410,18 +400,36 @@
       "longRun": "Ejecución activa de {{value}} s · umbral {{limit}} s",
       "longConversation": "Conversación activa de {{value}} s · umbral {{limit}} s"
     },
-    "statuses": {
-      "succeeded": "Completada",
-      "failed": "Fallida",
-      "aborted": "Interrumpida",
-      "rejected": "Rechazada",
-      "running": "En ejecución",
-      "waiting": "Esperando",
-      "queued": "En cola",
-      "not_started": "Sin iniciar",
-      "partially_succeeded": "Completada parcialmente",
-      "cancelled": "Cancelada",
-      "skipped": "Omitida"
+    "tokenNote": "Entrada nueva + entrada en caché = entrada total. El razonamiento está incluido en la salida.",
+    "tokens": "Tokens",
+    "freshInput": "Entrada nueva",
+    "reasoning": "Razonamiento",
+    "engine": "Motor",
+    "period": "Período",
+    "periods": {
+      "month": "Este mes (UTC)",
+      "week": "Últimos 7 días del mes",
+      "today": "Hoy (UTC)"
+    },
+    "chart": "Uso por día",
+    "chartLabel": "Gráfico de barras apiladas por día: {{metric}}",
+    "metric": "Medida",
+    "metrics": {
+      "tokens": "Tokens",
+      "cost": "Costo (USD)"
+    },
+    "plan": {
+      "title": "Uso de tu suscripción",
+      "note": "Basado en el uso de tu suscripción que informa el proveedor. Es de la cuenta, no del proyecto: incluye lo que usas desde otros proyectos, otras computadoras y la app del proveedor.",
+      "unavailable": "Sin dato de la suscripción por ahora. Los agentes siguen funcionando; se vuelve a consultar en la próxima actualización.",
+      "none": "Ningún agente usa un motor con suscripción, o el proveedor no informa el uso.",
+      "fiveHour": "Ventana de 5 horas",
+      "weekly": "Semanal",
+      "resets": "Se reinicia {{when}}",
+      "noReset": "Sin fecha de reinicio",
+      "checked": "Consultado {{when}}",
+      "unknownNote": "\"Sin dato\" es normal: algunos planes no tienen una de las ventanas, o el proveedor no respondió.",
+      "unknownAccounts": "Sin dato por ahora: {{engines}}."
     }
   },
   "ext": {

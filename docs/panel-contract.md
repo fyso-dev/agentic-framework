@@ -171,9 +171,11 @@ The screen uses the existing Dagu enqueue/poll flow to refresh the exporter and
 polls the summary every 15 seconds. A summary older than five minutes is stale.
 A 404 is an actionable no-summary state, not zero consumption. Failed source
 reads are explicit; collection does not overwrite previous data on fatal errors.
-Bot/model selectors filter usage, and bot selects conversation roots containing
-that bot. Conversation aggregates retain the entire delegation tree; filtering
-does not allocate shared work by guesswork. Run/alert lists remain project-wide.
+Period/agent/model/engine selectors filter the chart, totals and usage table from
+the `daily` rows; agent and period select conversation roots containing that agent.
+Conversation aggregates retain the entire delegation tree; filtering does not
+allocate shared work by guesswork. Alerts remain project-wide. Subscription
+windows (`subscription`, D84) are per engine account and never filtered.
 
 Optional native identifiers `SOURCE_THREAD`/`SOURCE_TURN` on `fyso-dev-task` are
 captured as the run's `ORIGIN` JSON output, independently of agent success.

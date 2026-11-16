@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D82; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D82, D84; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -64,7 +64,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Panel connectors and per-bot selection | [connectors.md](connectors.md) |
 | Historical Composio CLI trial (withdrawn; automatic setup failed) | [CLI spike](adr/spikes/composio-cli.md) |
 | Connector source recovery and validation limits | [connectors-recovery.md](connectors-recovery.md) |
-| Bot observability: sources, accounting, correlation and advisory alerts | [observability.md](observability.md) |
+| Bot observability: sources, accounting, correlation, advisory alerts; AI usage view and subscription percentage (D84) | [observability.md](observability.md) |
 | Panel ↔ framework contract (files, Dagu API, action workflows) | [panel-contract.md](panel-contract.md) |
 | Extensibility: tools/services as Copier extensions; bot tools (MCP) and skills; NetBird as reference example | [PLAN §12](PLAN.md#12-extensibility-d17) |
 | Composio connector execution and agent guidance (D42) | [composio.md](../template/framework/docs/composio.md) |
@@ -93,7 +93,7 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 | 3 | Snapshot and replicate | ✅ done |
 | 4 | Panel: customization layer (checklist, bots, apps), i18n | ✅ done |
 | 5 | Builder (dogfooding) with Dagu `harness.run` | ✅ local delivery complete; remote Builder acceptance pending |
-| 5.5 | Bot observability: conversations, execution and AI consumption | ✅ verified locally · [contract](observability.md) |
+| 5.5 | Bot observability: conversations, execution and AI consumption; AI usage view with subscription windows (D84) | ✅ verified locally · [contract](observability.md) |
 | 5.6 | Conversational Bot Architect: native bot CRUD and versioning | ✅ verified locally · [contract](bot-architect.md) |
 | 5.7 | Local users and shared web sessions (D40) | ✅ verified locally: native security matrix, generated-stack doctor and real browser SSO · [evidence](../artifacts/delivery-evidence/web-auth/README.md) |
 | 6 | Deploy and template lifecycle | ⬜ not started |
@@ -295,3 +295,4 @@ stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-exten
 | 2026-11-15 | **Departments from the panel (D81).** OMB's UI calls a team a *departamento*/*department* with *instrucciones compartidas*/*shared instructions*; the panel now uses the same words, declares a department and edits its inline shared instructions in the draft, and lists a declared empty one. OMB 0.1.141's plan creates it empty (`team "Soporte": create · brief set`) and never renames or deletes one from the file, so those stay in OMB. A draft that only changes departments now counts as a pending change. | [PLAN D81](PLAN.md#2-decisions-log) |
 | 2026-11-15 | **Department templates (D82).** `openmausbot team export --team <name> --port <project>` already writes one department with its bots, rooms and skills (`skills/<bot>/<skill>/SKILL.md` beside the file, engine keys as placeholders) but also each bot's absolute `cwd` and a dated comment; normalizing rebuilds the text without both, so exporting the same department twice gives the same digest. The fixture's *Equipo comercial* exported as a valid package and, renamed, imported into a `team.yaml` that `fyso-bots-plan` accepted. On a scratch OMB, applying an imported package and exporting it again first differed only where OMB fills `approval` (default `full`) and `computer` (from the project's `defaults`); the canonical form now states both, and the round trip gives the same digest for a real export and a hand-written package. [team-templates.md](team-templates.md) |
 | 2026-11-15 | **Department templates end to end (D82).** Two generated projects synchronized *Ventas* and *Marketing* through the local Biz in both directions and through two conflicts. Each pull reproduced the publisher's package digest. Findings: (1) Editing a skill file changes the department only once it is applied. The export reads OpenMausBot, as the plan's `skill … replace` line shows. (2) A pull marked as waiting for apply stayed marked after the apply, so a later local change read as a pull. Status now records the apply. (3) `publicar_equipo` answers `{equipo, creado}`. (4) `omb team apply` writes its error as JSON on stdout and applies section by section, so a failed panel apply showed only `exit status 1` and could leave part of the change applied. The panel now reports OMB's error and asks for a fresh preview. (5) Biz's team list counts its own agents, so a published team shows 0 agents. [team-templates.md](team-templates.md) |
+| 2026-11-16 | **AI usage view (D84).** OMB 0.1.141 already serves `GET /api/plan-usage` (5-hour and weekly windows per engine account, 45 s cache); the exporter reads it on loopback without credentials, drops API-key instances (OMB also lists `claudeApi`, with the Claude account's numbers), keeps only percentage, reset and check time, and reuses a check younger than 5 minutes. A generated project (port block 35560) showed real values: Claude 5 h and weekly, Codex weekly only (*prolite* has no 5-hour window, shown as unknown), Grok unknown (not signed in). The Observability screen became *Uso de IA / AI usage*: subscription windows, a daily stacked chart (uPlot 1.6.32), period/agent/model/engine filters and reasoning tokens; the Dagu run list left this view. Codex still reports no USD, so cost stays unknown. [Contract](observability.md) · [evidence](../artifacts/delivery-evidence/observability/README.md#ai-usage-view-d84) |

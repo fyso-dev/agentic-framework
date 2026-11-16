@@ -7,7 +7,7 @@ import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { useExtensionBadges } from "../lib/extensionBadges";
-import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
+import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconUsage } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
 
@@ -167,7 +167,7 @@ type NavItem = { id:string; href:string; icon:(p:{size?:number})=>ReactNode; lab
 const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
-  { id: "observability", href: href.observability, icon: IconWorkflow },
+  { id: "observability", href: href.observability, icon: IconUsage },
   { id: "connectors", href: href.connectors, icon: IconApps },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
