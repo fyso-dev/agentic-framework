@@ -235,6 +235,14 @@ function propose(current, pkg, teamSlug) {
   return doc.toString().replaceAll(MARKER, ROOT_VAR);
 }
 
+/** The department whose bots use skills under `project/bots/teams/<slug>/`, or null. */
+function ownerOf(current, teamSlug) {
+  const team = yamlModule().parse(current.replaceAll(ROOT_VAR, MARKER)) || {};
+  const prefix = `${MARKER}/project/bots/teams/${teamSlug}/`;
+  const bot = list(team.bots).find(item => skillFiles(item).some(entry => entry.file.startsWith(prefix)));
+  return bot ? String(bot.team ?? '') : null;
+}
+
 /** Replace the department's skill files and commit that directory on its own. */
 function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}), scan} = {}) {
   pkg = canonicalize(pkg);
@@ -248,6 +256,8 @@ function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => exe
     fs.mkdirSync(path.dirname(file), {recursive: true});
     fs.writeFileSync(file, skill.contenido);
   }
+  // A department without skills that never had files here has nothing to commit.
+  if (!fs.existsSync(path.join(root, dir)) && !git('ls-files', '--', dir).trim()) return null;
   try { scan?.(path.join(root, dir)); } catch (error) {
     // Restore the committed version of this directory only.
     fs.rmSync(skillsDir, {recursive: true, force: true});
@@ -356,6 +366,9 @@ async function importPackage(pkg, {root = process.env.FYSO_ROOT || process.cwd()
   check(pkg);
   teamSlug = teamSlug || slug(pkg.departamento);
   const currentTeamYaml = fs.readFileSync(path.join(root, 'project/bots/team.yaml'), 'utf8');
+  // The skill directory must not belong to another department: importing replaces it.
+  const owner = ownerOf(currentTeamYaml, teamSlug);
+  if (owner !== null && !same(owner, pkg.departamento)) fail('slug_taken', `${teamSlug} (${owner})`);
   // Propose first: a rejected package writes nothing.
   const proposedTeamYaml = propose(currentTeamYaml, pkg, teamSlug);
   const commit = writeFiles(pkg, teamSlug, {root, scan: scan || undefined, ...(git && {git})});

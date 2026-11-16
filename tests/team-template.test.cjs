@@ -285,3 +285,22 @@ bots:
     assert.doesNotMatch(again.team,new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
   } finally {fs.rmSync(root,{recursive:true,force:true});fs.rmSync(out,{recursive:true,force:true});}
 });
+
+test('a department without skills imports without a commit; a skill directory of another department is refused',async()=>{
+  const {root,git}=repo();
+  try {
+    const plain={formato:'omb-team/1',departamento:'Soporte',skills:[],
+      team:'version: 1\nteams:\n  - name: Soporte\nbots:\n  - name: Soportista\n    team: Soporte\n    model: claude/a\n'};
+    const empty=await t.importPackage(plain,{root,scan:false});
+    assert.equal(empty.commit,null);assert.equal(empty.slug,'soporte');
+    assert.match(empty.proposedTeamYaml,/name: Soportista/);
+    // Ventas is applied with its skills under teams/ventas; another department may not take that directory.
+    const ventas=await t.importPackage(sample(),{root,scan:false});
+    fs.writeFileSync(path.join(root,'project/bots/team.yaml'),ventas.proposedTeamYaml);git('commit','-qam','apply');
+    const other={...plain,departamento:'Ventas.',team:plain.team.replaceAll('Soporte','Ventas.').replace('Soportista','Otro')};
+    await assert.rejects(t.importPackage(other,{root,scan:false,slug:'ventas'}),err=>err.message==='slug_taken'&&/Ventas/.test(err.detail));
+    assert.ok(fs.existsSync(path.join(root,'project/bots/teams/ventas/skills/jefa/tono/SKILL.md')),'the other department keeps its skills');
+    // The same department may replace its own files.
+    assert.equal((await t.importPackage(sample(),{root,scan:false})).commit,null);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
