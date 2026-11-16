@@ -113,4 +113,6 @@ test('a declared department without agents is still listed',async()=>{
   const {groupByTeam}=await roster();
   assert.deepEqual(groupByTeam([{key:'b',name:'Builder',title:'',model:''}],['Ventas']).map(g=>[g.team,g.rows.length]),[['',1],['Ventas',0]]);
   assert.deepEqual(groupByTeam([],[]),[]);
+  // With no agents at all, a declared department still has a group, so the screen shows it instead of the empty state.
+  assert.deepEqual(groupByTeam([],['Ventas']).map(g=>[g.team,g.rows.length]),[['Ventas',0]]);
 });
