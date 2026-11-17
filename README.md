@@ -41,3 +41,11 @@ bash scripts/check-paths.sh
 ```
 
 HTTP and mutating integration checks require explicit isolated-stack environment settings; without them those cases skip. The [delivery evidence](artifacts/delivery-evidence/) distinguishes local tests, real runtime checks and manual browser verification.
+
+## License
+
+Copyright (C) 2026 Fyso.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3 (`AGPL-3.0-only`). It is distributed WITHOUT ANY WARRANTY; see [LICENSE](LICENSE) for the full text.
+
+Projects generated from this template are owned by whoever generates them; the license applies to the framework itself.
