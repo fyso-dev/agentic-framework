@@ -32,7 +32,7 @@ bots:
     approval: full
 
   - name: Workflow Architect
-    title: Designs and fixes Dagu workflows
+    title: Designs and fixes automations
     model: claude/claude-sonnet-5
     approval: full             # writes workflows through the Dagu MCP without asking
     soul: { file: \${FYSO_ROOT}/framework/bots/souls/workflow-architect.md }
@@ -162,12 +162,13 @@ function marketplace(installed: Set<string>, versions: Map<string, string>): Mar
 function apps(scenario: Scenario): App[] {
   const framework: App[] = [
     {
-      id: "dagu", name: "Dagu", name_i18n: { es: "Dagu", en: "Dagu" },
-      description: "Workflows y ejecuciones", description_i18n: { en: "Workflows and runs" },
+      id: "dagu", name: "Automatizaciones", name_i18n: { es: "Automatizaciones", en: "Automations" },
+      description: "Flujos de trabajo y ejecuciones", description_i18n: { en: "Workflows and runs" },
       icon: "workflow", url: PROJECT.urls.dagu, group: "framework", enabled: true,
     },
     {
-      id: "omb", name: "OpenMausBot", description: "Bots y aprobaciones", description_i18n: { en: "Bots and approvals" },
+      id: "omb", name: "Agentes", name_i18n: { es: "Agentes", en: "Agents" },
+      description: "Conversaciones con los agentes", description_i18n: { en: "Conversations with the agents" },
       icon: "bot", url: PROJECT.urls.omb, group: "framework", enabled: true,
       accessNote: "Login del proyecto; no requiere código de emparejamiento",
       accessNote_i18n: { en: "Project login; no pairing code required" },
@@ -349,7 +350,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const extra = [...installed].filter((id) => !base.some((e) => e.id === id)).map((id): Extension => ({
         id, src: `gh:fyso/fyso-ext-${id}`, version: versions.get(id) ?? null, apps: [], secrets: [], mcpServers: [], workflows: [], skills: [],
       }));
-      return [...base.map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
+      return [...base.filter((e) => installed.has(e.id)).map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
     },
 
     async getSkills() {
@@ -409,6 +410,15 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
               installed.add(ext);
               if (latest) versions.set(ext, latest);
             },
+          });
+          break;
+        }
+        case DAGS.extRemove: {
+          const ext = params?.ID ?? "";
+          add({
+            dag, id, createdAt, duration: 2600, outcome: "succeeded",
+            outputs: () => ({ result: JSON.stringify({ id: ext, mode: "remove", version: versions.get(ext) ?? null, commit: "7b2d9e4" }) }),
+            onDone: () => installed.delete(ext),
           });
           break;
         }

@@ -30,7 +30,7 @@ bots:
     approval: full
 
   - name: Workflow Architect
-    title: Designs and fixes Dagu workflows
+    title: Designs and fixes automations
     model: {{ strong }}
     approval: full             # writes workflows through the Dagu MCP without asking
     tools: { allow: ["native:*", "mcp:dagu:*", "mcp:fyso:fyso_feedback"{% if engine == 'pi' %}, "mcp:agents:list_threads"{% endif %}] }
