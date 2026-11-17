@@ -56,19 +56,19 @@ lines = [
 ]
 node = next((step_id(t) for t, _ in tools if t == "core:node"), None)
 ids = []
-# Tools install into mise's own folders, not the project: everything except npm packages
-# (which need Node and the project's npm setting) starts at once, while the project is
-# still being generated. Commands run with mise's automatic installs off, so a task waits
-# only for the tools its own step depends on (D87).
+# Tools install into mise's own folders, not the project, so they all start at once while
+# the project is still being generated; npm packages only wait for Node. npm's package
+# manager is the project's own setting (mise.toml), given here as mise's environment
+# variable. Commands run with mise's automatic installs off, so a task waits only for the
+# tools its own step depends on (D87).
 for tool, version in tools:
     sid = step_id(tool)
     ids.append(sid)
     if tool.startswith("npm:"):
         lines += [
             f"  - id: {sid}",
-            f"    run: cd \"$DIR\" && \"$MISE\" install \"{tool}@{version}\"",
-            f"    depends: [{', '.join(['trust'] + ([node] if node else []))}]",
-        ]
+            f"    run: cd / && MISE_NPM_PACKAGE_MANAGER=npm \"$MISE\" install \"{tool}@{version}\"",
+        ] + ([f"    depends: [{node}]"] if node else [])
     else:
         lines += [
             f"  - id: {sid}",

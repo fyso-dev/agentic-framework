@@ -27,8 +27,8 @@ class InstallerDag(unittest.TestCase):
         # The web login is never built at install time: no Go or pnpm step (D87).
         self.assertNotIn('core:go', text)
         self.assertNotIn('core:pnpm', text)
-        # npm tools need Node and the project; other tools start at once (D87).
-        self.assertRegex(text, r'id: tool_openmausbot\n    run: .*\n    depends: \[trust, tool_node\]')
+        # Tools never wait for the project; npm packages wait only for Node (D87).
+        self.assertRegex(text, r'id: tool_openmausbot\n    run: cd / && MISE_NPM_PACKAGE_MANAGER=npm .*\n    depends: \[tool_node\]')
         self.assertRegex(text, r'id: tool_caddy\n    run: cd / && .*\n  - id:')
         # The bundled web login reaches its step as environment variables.
         self.assertRegex(text, r'id: web_auth\n    run: >-\n      cd "\$DIR" && FYSO_TINYAUTH_BUNDLED_BIN="\$TINYAUTH_BIN" FYSO_TINYAUTH_BUNDLED_META="\$TINYAUTH_META"\n.*run web-auth:install\n    depends: \[trust, tool_node\]')
