@@ -40,6 +40,6 @@ It extends the [product vocabulary](panel-spec.md#product-vocabulary) (project a
 
 ## Known gaps
 
-- The macOS installer still lists build tools without a business equivalent (Node.js, YAML, GitHub CLI, Go, pnpm/Tinyauth) as install steps.
+- The macOS installer still lists build tools without a business equivalent (Node.js, YAML, GitHub CLI, uv) as install steps.
 - Existing projects keep their Workflow Architect title ("Designs and fixes Dagu workflows") in `project/bots/team.yaml`; new projects get "Designs and fixes automations".
 - External extension repositories (for example `fyso-ext-human-requests`, `fyso-ext-silverbullet`) must apply the same terms in their own releases; the bundled copies here are updated.

@@ -9,7 +9,8 @@ The current macOS prototype provides an end-user installer: a disk image with **
 | Window | **[swiftDialog](https://github.com/swiftDialog/swiftDialog)** (MIT, notarized by its author), bundled inside the app: no `.pkg`, no admin password. The installer drives it through its command file (`listitem`, `progress`, `message`, `button1text`) | 3.1.1 (`build.sh`, sha256-checked); **needs macOS 15+** |
 | mise | `mise generate install-script`: downloads a pinned mise, sha256-checked, into `~/.local/bin/mise` (skipped when mise is already on `PATH`) | 2026.11.2 |
 | Engine | **Dagu CLI** (`dagu start --dagu-home …`): runs the installation workflow with no server, no ports and no UI | 2.24.0 |
-| Steps | `Resources/fyso-install.yaml`, **generated at build time** from `template/mise.toml.jinja`: one step per pinned tool (parallel; npm tools after Node), plus generate (Copier 9.19.1 via `uvx`), trust, git, setup, start | template pins |
+| Steps | `Resources/fyso-install.yaml`, **generated at build time** from `template/mise.toml.jinja`: one step per pinned tool, all started at once (npm tools after Node), plus generate (Copier 9.19.1 via `uvx`), trust, web login (`web_auth`), setup, git, start ([D87](#timings--d87)) | template pins |
+| Web login | **Tinyauth**, unmodified, built by `build-tinyauth.sh` (called from `build.sh`) from the pinned source tag (`FYSO_TINYAUTH_VERSION`, archive checked against `FYSO_TINYAUTH_SHA256`) for arm64 and x86_64 with the upstream release flags, joined with `lipo`: `Contents/Helpers/tinyauth`. Its AGPL-3.0 `LICENSE`, source URL/tag and checksums are in `Resources/third-party/tinyauth/`. Upstream publishes Linux binaries only | template pin (5.2.0) |
 | GitHub login | Only when plain `git ls-remote` cannot read the source (a private repository): `gh auth login --web` (device code shown in the window) + `gh auth setup-git`. A public source shows "not needed" and never installs GitHub CLI | GitHub CLI 2.95.0 |
 
 The installer is a bash script (`fyso-installer.sh`, macOS bash 3.2) bundled as `Fyso.app/Contents/Resources/fyso-installer.sh`, with swiftDialog in `Contents/Helpers`; `build.sh` assembles the app and the `.dmg` with `hdiutil`.
@@ -41,6 +42,8 @@ Verified 2026-11-06 on macOS (arm64): from `gh:fyso-dev/agentic-framework@main`,
 
 Each run logs one `timing: <step> <seconds>s` line per step (Dagu's own start/finish times for workflow steps) and the total.
 
+### Timings — D87
+
 Measured 2026-11-16 on macOS 26 (arm64), one cold run (its logs were not kept): a fresh home folder, so mise and every tool were downloaded, as on a new Mac; template from `main`. Total **250 s** until the panel answered; the chosen user and password then logged in (200; a wrong password 401) and the password appeared in no installer or Dagu file. The same run found that copier 9.19.1 needs Python ≥ 3.10 while a new Mac only has the Command Line Tools' 3.9: the generate step now asks uv for `>=3.10`, which uses an installed one or downloads its own.
 
 | Step | Seconds | Note |
@@ -51,9 +54,22 @@ Measured 2026-11-16 on macOS 26 (arm64), one cold run (its logs were not kept): 
 | setup, git | 5, 0 | |
 | start | 98 | ~82 building Tinyauth from source (pnpm install + Vite + Go), ~11 processes until Caddy is ready, ~5 restore, bots and MCP |
 
-With a warm mise cache (every earlier install on the same Mac, read from the runs Dagu kept in `~/Library/Application Support/Fyso/installer/dagu`), the workflow takes 22–110 s: `start` 14–90 s, `generate` 5–12 s, each tool 0–2 s, `setup` and `git` 0–5 s; the steps before it about 4 s. So on a new Mac the downloads (Go, pnpm, Node, sops, Python) and the Tinyauth build are the wait; on a second install it is `start`.
+The downloads share one connection: each tool fetched at ~450 kB/s while all ran, so sops (50 MB) and pnpm (48 MB) took as long as Go. The Tinyauth build also downloads: on a fresh home its Go modules took ~630 MB on disk and its frontend ~200 MB of npm packages.
 
-Slowest: `start` (Tinyauth build) and the tools phase, which is long only because of Go and pnpm, needed just for that build. Could wait until the panel is open (not implemented): the tools the panel does not need (gitleaks, Pi when another engine was chosen, GitHub CLI, the yaml tool) and, in `start`, the backup restore, bot repair, connector/app-access restore and the setup-check/observability runs. A prebuilt Tinyauth binary would remove both Go/pnpm downloads and the build instead of deferring them, if a reason to build from source does not rule it out.
+**D87: the web login is never compiled while a project is created.** On Linux `web-auth:install` downloads the upstream release binary (SHA-256 pinned). On macOS the app bundles the universal binary described above; the installer passes it to the `web_auth` step, which copies it into the per-user cache `${XDG_CACHE_HOME:-~/.cache}/fyso/web-auth/<version>-<source sha256>-darwin/` only when the bundle's version, source checksum and binary checksum all match the project's pins, and every project copies it from there after checking it again. A project without the bundle (made by hand, or a bundle that does not match) builds the pinned source once per machine into the same cache, installing the pinned Go and pnpm on demand; Go and pnpm are no longer project tools. The workflow also changed: every non-npm tool starts at once instead of after the project is generated, npm tools only wait for Node, `setup` waits only for age, sops, Node, YAML and Caddy, and steps run with mise's automatic installs off. After signing, `build-tinyauth.sh --record <app>` must rewrite the binary's checksum (codesign changes the file), or the installer falls back to building.
+
+Before and after on this Mac (macOS 26, arm64), unattended through the generated workflow with a fresh home folder (no mise, tools, Go or npm caches), the template from this branch, the project's own port block; "second" is another project in the same home folder. Seconds of the workflow (from *generate* to the panel answering); downloads vary between runs on the same connection (an earlier after-run took 114 s, another 165 s while the generate step's downloads were slow), so each row is one run:
+
+| Run | Workflow | generate | tools until the last one | web login | setup + git | start |
+|---|---|---|---|---|---|---|
+| Before, first project | 199 | 26 | 93 (pnpm, sops) | built in `start` | 6 | 97 (~80 build) |
+| After, first project | **95** | 69 (uv, Python, Copier sharing the connection) | 63 (sops) | 1 (bundled copy) | 6 | 17 |
+| Before, second project | 76 | 18 | 2 | built in `start` (warm caches) | 3 | 52 |
+| After, second project | **32** | 16 | 1 | 1 (cached copy) | 3 | 12 |
+
+The steps before the workflow (Apple tools, mise, Dagu) are unchanged: Dagu took 14–54 s to download in these runs. The app grows from 34 to 105 MB (dmg 21 → 49 MB), the universal Tinyauth binary being 71 MB of it.
+
+Not deferred until the panel is open, after measuring: tools, because the services keep the `PATH` they started with and would not see a tool installed later until a restart; and the post-start work in `up` (restore, bot repair, connector and app-access restore, connect-extensions, the setup-check and observability enqueues, which already run in Dagu), because it takes ~2 s in total and the first panel view needs the restored bots.
 
 The app icon is the logo full bleed: macOS rounds icons itself, and macOS 26 shows a pre-rounded square shrunk on a grey plate. The disk image's volume carries the logo too (`.VolumeIcon.icns` plus the root's custom-icon flag, set on a writable image because `hdiutil` does not copy it); the `.dmg` file's own icon is not set, since a downloaded file loses it.
 
