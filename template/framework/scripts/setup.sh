@@ -14,6 +14,7 @@ else
   echo "✓ Age key found: $key_file"
 fi
 recipient=$(age-keygen -y "$key_file")
+export SOPS_AGE_KEY_FILE="$key_file"
 
 if [ ! -f .sops.yaml ]; then
   cat > .sops.yaml <<YAML
@@ -27,13 +28,21 @@ YAML
 fi
 
 if [ ! -f secrets.enc.yaml ]; then
-  # D11: the gateway and Dagu start with admin / admin. Change it with `mise run secrets`.
-  tmp=$(mktemp)
+  # The legacy ADMIN password is now a technical Dagu credential, not a human login.
+  password=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
+  tmp=$(mktemp "${TMPDIR:-/tmp}/fyso-setup.XXXXXXXX")
   trap 'rm -f "$tmp"' EXIT
-  printf 'FYSO_ADMIN_PASSWORD: admin\n' > "$tmp"
+  q="'"; printf "FYSO_ADMIN_PASSWORD: '%s'\n" "${password//$q/$q$q}" > "$tmp"   # YAML single-quoted
   SOPS_AGE_KEY_FILE="$key_file" sops encrypt --filename-override secrets.enc.yaml \
     --input-type yaml --output-type yaml "$tmp" > secrets.enc.yaml
-  echo "✓ Created secrets.enc.yaml (login: admin / admin — change it with 'mise run secrets')"
+  echo "✓ Created secrets.enc.yaml (random technical Dagu credential)"
 else
   echo "✓ secrets.enc.yaml already exists"
+fi
+
+# Local browser users have their own encrypted hashes; existing projects migrate here.
+if [ -n "${FYSO_AUTH_UPSTREAM:-}" ]; then
+  echo "✓ Web users belong to the shared login at $FYSO_AUTH_UPSTREAM"
+else
+  framework/scripts/web-auth-users.sh init
 fi

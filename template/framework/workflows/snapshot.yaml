@@ -1,6 +1,9 @@
+name: fyso-snapshot
 # Save bots, memory and workflows to git (PLAN §6, D5). Hourly and on demand.
 # Owned by the framework; project/workflows/fyso-snapshot.yaml links here.
 description: Save bots, memory and workflows to git
+labels:
+  - fyso=system
 type: graph
 schedule: "0 * * * *"
 max_active_runs: 1

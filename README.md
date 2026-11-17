@@ -13,7 +13,7 @@ Requires Git, [mise](https://mise.jdx.dev), [uv](https://docs.astral.sh/uv/) and
 ```sh
 gh auth login
 gh auth setup-git
-uvx --from copier==9.19.1 copier copy --trust --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 git init -b main
@@ -28,7 +28,7 @@ mise run doctor
 
 With the default port, open **http://panel.localhost:8400**. The initial project login is `admin` / `admin`; change the password with `mise run secrets`. Custom administrator names use the name selected during generation.
 
-`preview` is the published installation branch while the initial delivery PR awaits review. The framework is verified locally on macOS; server deployment and the full template lifecycle phase remain pending. No public hosting or external telemetry is required.
+The initial delivery is merged into `main`, the installation branch. The framework is verified locally on macOS; server deployment and the full template lifecycle phase remain pending. No public hosting or external telemetry is required.
 
 ## Develop the framework
 

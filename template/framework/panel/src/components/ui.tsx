@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNow, useTimeFormat } from "../lib/time";
+import { botAvatarSrc } from "../lib/botAvatar";
+import type { BotAppearance } from "../api/types";
+import { BotMascot } from "./BotMascot";
 
 /** A link that opens in a new tab, with the ↗ glyph and a hidden hint for screen readers. */
 export function External({ href, className, children, arrow = true }: { href: string; className?: string; children: ReactNode; arrow?: boolean }) {
@@ -47,7 +50,7 @@ export function CopyLine({ text }: { text: string }) {
   return (
     <div className="copyline">
       <code>{text}</code>
-      <button type="button" className="btn" onClick={copy} aria-live="polite">
+      <button type="button" className="btn btn-sm" onClick={copy} aria-live="polite">
         {copied ? t("common.copied") : t("common.copy")}
       </button>
     </div>
@@ -127,10 +130,22 @@ export function initials(name: string): string {
 }
 
 
-export function Avatar({ name, large }: { name: string; large?: boolean }) {
+export function Avatar({ name, large, omb, appearance }: {
+  name: string; large?: boolean; omb?: string; appearance?: BotAppearance;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string>();
+  const src = botAvatarSrc(omb, appearance?.avatarUrl);
+  const crop = appearance?.avatarCrop;
+  const image = src && src !== failedSrc && crop !== "mascot";
+  const position = `${100 * (appearance?.avatarFocusX ?? 0.5)}% ${100 * (appearance?.avatarFocusY ?? 0.5)}%`;
+  const radius = crop === "circle" ? "50%" : crop === "rounded" ? "22%" : crop === "square" ? "0" : undefined;
   return (
-    <span aria-hidden="true" className={`avatar${large ? " avatar-lg" : ""}`}>
-      {initials(name)}
+    <span aria-hidden="true" className={`avatar${large ? " avatar-lg" : ""}${appearance && !image ? " avatar-mascot" : ""}`}
+      style={image ? { borderRadius: radius } : undefined}>
+      {image ? <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setFailedSrc(src)}
+        style={{ objectPosition: position, transformOrigin: position, transform: `scale(${appearance?.avatarZoom ?? 1})` }} />
+        : appearance ? <BotMascot body={appearance.mascotBody} color={appearance.color} face={appearance.mascotFaceColor} />
+          : initials(name)}
     </span>
   );
 }

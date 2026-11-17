@@ -1,5 +1,7 @@
 # Install from the repository
 
+> **On macOS there is also an installer app** (prototype): `installer/macos/build.sh` builds `Fyso Installer.app`, which does every step below in a friendly window. See [installer.md](installer.md).
+
 ## Requirements
 
 - Git with a configured author name and email. Project initialization and native configuration snapshots create local commits.
@@ -8,7 +10,7 @@
 - Claude Code and Codex installed and signed in on the host for their respective subscription-backed bots. The default team uses both providers. Check `claude --version`, `codex --version` and the provider's login before startup; the framework does not create subscription accounts or install these coding CLIs. A signed-in provider can still reject work because of its own quota or model availability.
 - An unused block of ten ports. The default is 8400–8409. Each concurrent project needs a different block.
 
-The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI and GitHub CLI through mise. The panel assets are already built.
+The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI GitHub CLI, Go and pnpm through mise. The panel assets are already built.
 
 ## 1. Authenticate and generate
 
@@ -22,19 +24,19 @@ gh auth setup-git
 Generate a **new project directory**, rather than running services from the template checkout:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 ```
 
-`preview` contains the initial published delivery while its PR awaits review. The explicit ref avoids silently selecting an older release. Only trust a template whose repository and revision you have reviewed: Copier can execute template tasks.
+`main` contains the reviewed initial delivery. The explicit ref avoids silently selecting an older release. Only trust a template whose repository and revision you have reviewed: Copier can execute template tasks.
 
 Copier asks for the project name, slug, first port and administrator name. With defaults, the login name is `admin` and the panel uses port 8400. For another instance, use an unused multiple of ten such as 8420. The startup script checks the project's ports before starting services.
 
 For repeatable generation without prompts:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=preview \
+uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=main \
   --data project_name="My project" --data project_slug=my-project \
   --data port_base=8420 --data admin_user=admin \
   gh:fyso-dev/agentic-framework my-project
@@ -57,17 +59,21 @@ mise run up
 mise run doctor
 ```
 
-If Git has no author configured, set `git config user.name` and `git config user.email` for this project before the first commit. `mise install` downloads the pinned native tools with signature verification enabled. `setup` creates an age key if absent, `.sops.yaml` and encrypted `secrets.enc.yaml`; rerunning it preserves existing files. Back up the age key securely. Do not commit the private key or plaintext secrets.
+If Git has no author configured, set `git config user.name` and `git config user.email` for this project before the first commit. `mise install` downloads the pinned native tools with signature verification enabled. `setup` creates an age key if absent, `.sops.yaml` and encrypted `secrets.enc.yaml`; rerunning it preserves existing files and initializes local web users if they are missing. Choose a password of 12–72 bytes; there is no default human password. Back up the age key securely. Do not commit the private key or plaintext secrets.
 
-For a default project:
+For `project_slug=my-project` and `port_base=8400`:
 
 | Service | URL |
 |---|---|
-| Panel | http://panel.localhost:8400 |
-| Dagu | http://dagu.localhost:8400 |
-| OpenMausBot | http://omb.localhost:8400 |
+| Panel | http://panel.my-project-8400.localhost:8400 |
+| Dagu | http://dagu.my-project-8400.localhost:8400 |
+| OpenMausBot | http://omb.my-project-8400.localhost:8400 |
 
-All three use the chosen administrator name and initial password `admin`. OpenMausBot uses the gateway's native session: no browser pairing code is needed. The default network binding is loopback. For a different `port_base`, replace 8400 in these URLs. Change the password with `mise run secrets`; restart the stack with `mise run down` then `mise run up` to load changed credentials.
+All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The first native login build runs on `mise run up` and uses pinned source and locked dependencies.
+
+HTTP access is loopback-only. Remote deployment requires the separate HTTPS acceptance in Phase 6. See [web authentication](web-auth.md) for permissions, identity limitations and future providers.
+
+For an existing generated project, stop its stack, apply the Copier update, run `mise install` and `mise run setup` to create local users, then start it again and run doctor. No user credentials are migrated implicitly from the old shared browser password. Rotate a legacy `admin` technical password through `mise run secrets` before restarting. To add/change a human password use `mise run web-auth:users add <username>` while stopped; it invalidates all web sessions. Grant application permissions separately in `project/auth/tinyauth.yaml`.
 
 ## 3. Verify the installation
 
@@ -96,11 +102,15 @@ Snapshots version native bot definitions, imported skills and memory; **chat his
 
 ## Update an existing generated project
 
+From the panel or Dagu, run the **`fyso-update`** workflow (params `REF`: a template tag, branch or commit, empty for Copier's latest tag; `SRC`: another Copier source for this run only, such as a local clone when the host cannot read this repository). It runs `copier update` in a clean `git worktree` of the project's `HEAD`, so uncommitted runtime state (bot memory) does not block it, commits the result as one `framework: update <from> -> <to>` commit and fast-forwards the project. A Copier conflict or an edited framework file stops it before anything is applied. It then installs tools, regenerates `.mcp.json` and panel data, loads new process and route fragments and restarts Caddy; changes to Dagu, OpenMausBot or Caddy's own processes need `mise run down && mise run up`. Output: `{from, to, commit, changed}`.
+
+By hand:
+
 Commit the project's intended changes first and keep a backup. Stop its stack before changing framework files:
 
 ```sh
 mise run down
-uvx --from copier==9.19.1 copier update --trust --vcs-ref=preview
+uvx --from copier==9.19.1 copier update --trust --vcs-ref=main
 # Inspect the diff and resolve any Copier conflicts before continuing.
 mise trust
 mise install
@@ -123,11 +133,16 @@ mise run doctor
 
 A fresh `.data/` restores versioned bots and memory from `state/` when available. Chat and usage history require the separate runtime backup. Host CLI logins are local to that machine and must be authenticated there.
 
+## Prepare a project for a client
+
+To hand a configured project to someone else and keep sending improvements (configuration, documents and bot memory, without cloning your repository), publish it as a distribution: [guide-share-project.md](guide-share-project.md).
+
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
 | Private repository cannot be cloned | Repository membership and `gh auth status`; configure Git credentials with `gh auth setup-git` |
+| Updates or the marketplace cannot read a private GitHub repository from the project | `mise run github:check [gh:owner/repo]`. If the host account has no access, add a read-only `FYSO_GITHUB_TOKEN` with `mise run secrets`, or set `FYSO_GITHUB_AUTH=gh` to use the host's `gh` login. Copier and catalog reads then use the `gh` credential helper for github.com only; the token never appears in arguments, URLs or Git config |
 | `mise` or `uvx` not found | Install the prerequisites and reopen a shell with their binaries on `PATH` |
 | SOPS cannot decrypt secrets | The age private key must match an authorized recipient; preserve the existing encrypted file |
 | Ports already in use | Choose another block for a new project; do not stop unrelated OMB or Dagu instances |

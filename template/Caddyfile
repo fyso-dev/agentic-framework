@@ -3,21 +3,90 @@
 {
 	admin localhost:{$FYSO_CADDY_ADMIN_PORT}
 	auto_https off
-	# Local by default; a server sets FYSO_BIND (e.g. 0.0.0.0) and a real domain.
+	# Authentication routes must execute before handle/handle_path application routes.
+	order route before handle
+	# The gateway is loopback HTTP in every mode. An HTTPS provider extension (D62)
+	# terminates TLS in front of it and sets the public scheme.
 	default_bind {$FYSO_BIND:127.0.0.1}
 	storage file_system {$FYSO_DATA}/caddy
 }
 
+# Native session authentication; the snippet is the stable extension boundary.
+(fyso_browser_guard) {
+	@foreignOrigin expression `{http.request.header.Origin} != "" && {http.request.header.Origin} != "{$FYSO_WEB_SCHEME:http}://" + {http.request.hostport}`
+	respond @foreignOrigin 403
+	@crossSiteApi {
+		path /api/*
+		header Sec-Fetch-Site cross-site
+	}
+	respond @crossSiteApi 403
+	@crossSiteWrite {
+		not method GET HEAD OPTIONS
+		header Sec-Fetch-Site cross-site
+	}
+	respond @crossSiteWrite 403
+}
+
 (fyso_login) {
-	basic_auth {
-		{$FYSO_ADMIN_USER} {$FYSO_ADMIN_HASH}
+	route {
+		import fyso_browser_guard
+		request_header -Authorization
+		request_header -Remote-*
+		request_header -X-Auth-Request-*
+		request_header -X-Original-*
+		request_header -X-Forwarded-*
+		map {path} {fyso_auth_ua} {
+			~^/(api|config)/ Fyso-API
+			default {http.request.header.User-Agent}
+		}
+		header -WWW-Authenticate
+		header Cache-Control no-store
+		forward_auth {$FYSO_AUTH_UPSTREAM} {
+			uri /api/auth/caddy
+			copy_headers Remote-User Remote-Name Remote-Email Remote-Groups
+			header_up User-Agent {fyso_auth_ua}
+			# The login builds its redirects from the public scheme (D62).
+			header_up X-Forwarded-Proto {$FYSO_WEB_SCHEME:http}
+		}
+		# Only the panel's authority-backed handlers may retain the web session.
+		@upstream {
+			not {
+				host panel.{$FYSO_WEB_DOMAIN}
+				path /api/session /api/session/logout
+			}
+		}
+		request_header @upstream Cookie "(^|;[ \t]*)tinyauth-session-[^=;]+=[^;]*" ""
 	}
 }
 
+http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	import fyso_browser_guard
+	@internal path /api/auth/*
+	respond @internal 404
+	reverse_proxy {$FYSO_AUTH_UPSTREAM}
+}
+
 # Panel files and same-origin Dagu API.
-http://panel.localhost:{$FYSO_HTTP_PORT} {
+http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	# Remote MCP clients (D63) carry a bearer token instead of a web session: this
+	# route runs before the login and the endpoint checks the token itself.
+	route /mcp {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
 	import fyso_login
-	@config path /config/project.json /config/apps.json /config/observability.json /config/bot-versioning.json
+	handle /api/session {
+		rewrite * /api/context/user
+		reverse_proxy {$FYSO_AUTH_UPSTREAM}
+	}
+	handle /api/session/logout {
+		@logout method POST
+		handle @logout {
+			rewrite * /api/user/logout
+			reverse_proxy {$FYSO_AUTH_UPSTREAM}
+		}
+		respond 405
+	}
+	@config path /config/project.json /config/apps.json /config/extensions.json /config/skills.json /config/observability.json /config/bot-versioning.json
 	handle @config {
 		@read method GET HEAD
 		handle @read {
@@ -39,6 +108,66 @@ http://panel.localhost:{$FYSO_HTTP_PORT} {
 	handle /config/* {
 		respond 404
 	}
+	# Only connector-management APIs are exposed. The OMB bearer stays in Caddy.
+	@panelForeignOrigin {
+		path /api/omb/*
+		header Origin *
+		not header Origin {$FYSO_WEB_SCHEME:http}://panel.{$FYSO_WEB_DOMAIN:localhost}{$FYSO_WEB_PORT_SUFFIX}
+	}
+	@panelCrossSite {
+		path /api/omb/*
+		header Sec-Fetch-Site cross-site
+	}
+	@nativeConnectors path_regexp nativeConnectors ^/api/omb/(connectors(/(catalog|connected|tools|[a-z][a-z0-9_-]{0,63}(/authorize|/accounts/[A-Za-z0-9][A-Za-z0-9_-]{0,127})?))?|mcp/servers(/[a-z][a-z0-9_-]{0,31}(/test|/sign-in(/[0-9a-f-]{36})?|/sign-out)?)?)$
+	handle @nativeConnectors {
+		route {
+			respond @panelForeignOrigin 403
+			respond @panelCrossSite 403
+			@badConnectorMethod not method GET POST PATCH DELETE
+			respond @badConnectorMethod 405
+			@managedDefinitionWrite {
+				path_regexp managedDefinitionWrite ^/api/omb/mcp/servers(/[a-z][a-z0-9_-]{0,31})?$
+				not method GET
+			}
+			respond @managedDefinitionWrite 405
+			uri replace /api/omb/ /api/ 1
+			header Cache-Control no-store
+			reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
+				header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
+			}
+		}
+	}
+	@managedMcp path_regexp managedMcp ^/api/connectors/mcp(/[a-z][a-z0-9_-]{0,31})?$
+	handle @managedMcp {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	# Extension secrets (D50): same private glue; values never pass through Dagu.
+	@extensionSecrets path_regexp extensionSecrets ^/api/extensions/[a-z][a-z0-9-]{1,30}/secrets$
+	handle @extensionSecrets {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	# Dedicated SOPS/native-activation glue; never send project keys through Dagu.
+	# Remote MCP connection commands (D65): same private glue, never through Dagu.
+	handle /api/agent/remote {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	handle /api/agent/* {
+		respond 404
+	}
+	handle /api/composio/setup {
+		reverse_proxy unix/{$FYSO_CONNECTOR_SETUP_SOCKET} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	handle /api/composio/* {
+		respond 404
+	}
 	# Exact read-only native roster, without conversation history. No generic OMB proxy.
 	handle /api/omb/bots {
 		@rosterRead method GET
@@ -53,41 +182,61 @@ http://panel.localhost:{$FYSO_HTTP_PORT} {
 	handle /api/omb/* {
 		respond 404
 	}
+	# Extension APIs (D79): same-origin reads and actions behind the web session, to the
+	# extension's own private socket (mode 0600). The extension receives only the path
+	# after its id; cookies, Authorization and forged identity headers are already gone.
+	# One regexp-matched block (not `handle /api/ext/*`): a path handle here would be re-sorted
+	# by Caddy ahead of the extension page route below.
+	@extensionApis path_regexp ^/api/ext(/|$)
+	handle @extensionApis {
+		@extensionApi path_regexp extensionApi ^/api/ext/([a-z][a-z0-9-]{1,30})/(.*)$
+		handle @extensionApi {
+			rewrite * /{re.extensionApi.2}
+			reverse_proxy unix//tmp/fyso-ext-{re.extensionApi.1}-{$FYSO_HTTP_PORT}.sock
+		}
+		respond 404
+	}
 	handle_path /api/dagu/* {
 		rewrite * /api/v1{uri}
-		reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT}
+		reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT} {
+			header_up Authorization "{$FYSO_DAGU_AUTH}"
+		}
+	}
+	# Only extension-owned public page assets are exposed, never other slots.
+	@extensionPage path_regexp extensionPage ^/extensions/[a-z][a-z0-9-]{1,30}/panel/([A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$
+	handle @extensionPage {
+		@extensionRead method GET HEAD
+		handle @extensionRead {
+			root * {$FYSO_ROOT}
+			header Cache-Control no-cache
+			file_server
+		}
+		respond 405
+	}
+	handle /extensions/* {
+		respond 404
 	}
 	handle {
 		root * {$FYSO_PANEL_ROOT}
 		try_files {path} /index.html
+		# Asset names carry no hash (stable diffs in git), so always revalidate (ETag).
+		header Cache-Control no-cache
 		file_server
 	}
 }
 
-# Dagu: same credentials as the gateway (D19). The browser asks once and
-# Caddy forwards the same Authorization header; Dagu listens on 127.0.0.1 only.
-http://dagu.localhost:{$FYSO_HTTP_PORT} {
+# Dagu keeps a technical Basic credential behind browser session authentication.
+http://dagu.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	import fyso_login
-	reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT}
+	reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT} {
+		header_up Authorization "{$FYSO_DAGU_AUTH}"
+	}
 }
 
 # OMB's native session stays in the gateway. Browsers authenticate with the
-# project's basic login; never forward their Authorization header to OMB.
-http://omb.localhost:{$FYSO_HTTP_PORT} {
+# project's web session; never forward their Authorization header to OMB.
+http://omb.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	import fyso_login
-	# The injected bearer authenticates API calls, so enforce browser CSRF
-	# protection at the gateway as well as OMB's own permission checks.
-	@foreignOrigin {
-		path /api/*
-		header Origin *
-		not header Origin http://omb.localhost:{$FYSO_HTTP_PORT}
-	}
-	respond @foreignOrigin 403
-	@crossSite {
-		path /api/*
-		header Sec-Fetch-Site cross-site
-	}
-	respond @crossSite 403
 	reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
 		header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"
 		flush_interval -1
@@ -96,3 +245,15 @@ http://omb.localhost:{$FYSO_HTTP_PORT} {
 
 # Project apps and extensions add their own routes here.
 import {$FYSO_ROOT}/project/apps/*/Caddyfile
+import {$FYSO_ROOT}/extensions/*/Caddyfile
+
+# Bookmarks from earlier templates keep working; redirects preserve no credentials.
+http://panel.localhost:{$FYSO_HTTP_PORT} {
+	redir {$FYSO_WEB_SCHEME:http}://panel.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
+}
+http://dagu.localhost:{$FYSO_HTTP_PORT} {
+	redir {$FYSO_WEB_SCHEME:http}://dagu.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
+}
+http://omb.localhost:{$FYSO_HTTP_PORT} {
+	redir {$FYSO_WEB_SCHEME:http}://omb.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}{uri} 308
+}

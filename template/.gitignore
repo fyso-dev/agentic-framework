@@ -2,3 +2,9 @@
 node_modules/
 .DS_Store
 *.log
+.mcp.json
+.mcp.json.*tmp
+# Dagu's skill for coding agents, installed by `mise run agent:setup` (D33).
+.claude/skills/dagu/
+.agents/skills/dagu/
+skills-lock.json

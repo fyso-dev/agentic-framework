@@ -1,0 +1,5 @@
+id: sample
+name: {es: Ejemplo, en: Sample}
+description: {es: Archivos de ejemplo, en: Sample files}
+icon: workflow
+url: http://sample.${FYSO_WEB_DOMAIN}:${FYSO_HTTP_PORT}

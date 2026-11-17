@@ -1,0 +1,10 @@
+# Example slot: customize before publishing.
+version: "0.5"
+processes:
+  ext-[[ extension_id ]]:
+    # Start everything through run-ext and keep $VARS in single quotes: process-compose's
+    # shell would expand them with the environment of the last `mise run up`, which
+    # lacks this extension right after a panel install.
+    command: framework/scripts/run-ext.sh [[ extension_id ]] -- bash -c 'exec miniserve --interfaces 127.0.0.1 --port "$FYSO_EXT_[[ extension_id | upper | replace('-', '_') ]]_PORT" extensions/[[ extension_id ]]/public'
+    readiness_probe:
+      exec: { command: framework/scripts/run-ext.sh [[ extension_id ]] -- extensions/[[ extension_id ]]/doctor.sh }

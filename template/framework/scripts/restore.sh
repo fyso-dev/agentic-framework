@@ -10,7 +10,9 @@ omb() { openmausbot "$@" --port "$FYSO_OMB_PORT"; }
 src=project/bots/team.yaml
 [ -s state/bots/team.yaml ] && src=state/bots/team.yaml
 echo "Applying bots from $src"
+node framework/scripts/managed-mcp.cjs
 framework/scripts/bots.sh apply "$src"
+node framework/scripts/app-access.cjs restore
 
 omb bots --json | node -e '
   let s = ""; process.stdin.on("data", d => s += d).on("end", () => {

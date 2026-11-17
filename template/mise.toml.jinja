@@ -4,7 +4,8 @@ min_version = "2026.10.6"
 
 [tools]
 "aqua:dagucloud/dagu" = "2.24.0"
-"npm:openmausbot" = "0.1.140"
+"npm:openmausbot" = "0.1.141"
+"npm:@earendil-works/pi-coding-agent" = "1.5.2"
 "aqua:F1bonacc1/process-compose" = "1.124.0"
 "aqua:caddyserver/caddy" = "2.11.9"
 "aqua:getsops/sops" = "3.13.3"
@@ -13,6 +14,8 @@ min_version = "2026.10.6"
 "core:node" = "24.15.0"
 "npm:yaml" = "2.8.1"
 "aqua:cli/cli" = "2.95.0"
+"core:go" = "1.26.8"
+"core:pnpm" = "11.1.2"
 
 [settings.npm]
 package_manager = "npm"
@@ -26,6 +29,11 @@ FYSO_PROJECT_NAME = "{{ project_name }}"
 FYSO_ROOT = "{% raw %}{{ config_root }}{% endraw %}"
 FYSO_DATA = "{% raw %}{{ config_root }}{% endraw %}/.data"
 FYSO_ADMIN_USER = "{{ admin_user }}"
+FYSO_WEB_DOMAIN = "{{ web_domain or (project_slug ~ '-' ~ port_base ~ '.localhost') }}"
+# Empty: this project runs its own web login. Otherwise the shared login it trusts (D61).
+FYSO_AUTH_UPSTREAM = "{{ auth_upstream }}"
+FYSO_TINYAUTH_VERSION = "5.2.0"
+FYSO_TINYAUTH_SHA256 = "5fec14cb1a7cf43ef5c9dafc9fa9fba6fcbc2d8fd328cd5a78dd42aae4c0efde" # gitleaks:allow public source checksum
 
 # Port block (PLAN §3.1): base {{ port_base }}.
 FYSO_HTTP_PORT = "{{ port_base }}"
@@ -37,9 +45,14 @@ FYSO_OMB_WEBHOOK_PORT = "{{ port_base + 5 }}"
 FYSO_DAGU_COORDINATOR_PORT = "{{ port_base + 6 }}"
 FYSO_DAGU_COORDINATOR_HEALTH_PORT = "{{ port_base + 7 }}"
 FYSO_CADDY_ADMIN_PORT = "{{ port_base + 8 }}"
+FYSO_AUTH_PORT = "{{ port_base + 9 }}"
 
 # Every `openmausbot` CLI call targets THIS project's server, never the
 # desktop app it would otherwise auto-discover on 8799.
+# Coding agents opened in this project reach the Dagu MCP of .mcp.json with this header
+# (D33); OpenMausBot sets the same value for bots. Derived, never stored.
+DAGU_MCP_AUTH = "{% raw %}Basic {{ exec(command='printf %s:%s \"$FYSO_ADMIN_USER\" \"$FYSO_ADMIN_PASSWORD\" | base64 | tr -d \"\\n\"') }}{% endraw %}"
+
 OPENMAUSBOT_URL = "http://127.0.0.1:{{ port_base + 4 }}"
 ALLOW_INSECURE_HTTP = "true"
 
@@ -48,20 +61,20 @@ description = "Create the age key (if missing), .sops.yaml and secrets.enc.yaml"
 run = "framework/scripts/setup.sh"
 
 [tasks.up]
-description = "Start Dagu, OpenMausBot and Caddy in the background"
+description = "Start web login, Dagu, OpenMausBot and Caddy in the background"
 run = "framework/scripts/up.sh"
 
 [tasks.down]
 description = "Stop every process of this project"
-run = "process-compose down --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh down"
 
 [tasks.status]
 description = "Show the state of each process"
-run = "process-compose process list --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh process list"
 
 [tasks.logs]
 description = "Follow the logs of one process: mise run logs <dagu|omb|caddy>"
-run = "process-compose process logs --follow --unix-socket /tmp/fyso-$FYSO_PROJECT-$FYSO_HTTP_PORT.sock"
+run = "framework/scripts/pc.sh process logs --follow"
 
 [tasks."bots:plan"]
 description = "Show how project/bots/team.yaml would change the bots"
@@ -79,6 +92,20 @@ run = "framework/scripts/bots.sh check"
 description = "Check and set up the engine logins (Claude, Codex, API keys)"
 run = "framework/scripts/auth.sh"
 
+[tasks."web-auth:install"]
+description = "Build the pinned, unmodified native login service"
+run = "framework/scripts/install-web-auth.sh"
+
+[tasks."web-auth:users"]
+description = "Manage local web users: add <username>, remove <username>; signs everyone out"
+raw = true   # a generated password is printed on purpose
+run = "framework/scripts/web-auth-users.sh"
+
+[tasks."web-auth:password"]
+description = "Show the web login password (default: the administrator's); --new sets a new readable one"
+raw = true   # the password is printed on purpose; mise would redact it otherwise
+run = "framework/scripts/web-auth-users.sh password"
+
 [tasks.snapshot]
 description = "Save bots, memory and workflows to git now (also runs hourly in Dagu)"
 run = "framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memory && framework/scripts/snapshot.sh commit"
@@ -87,10 +114,111 @@ run = "framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memor
 description = "Check ports, logins, instances and routes"
 run = "framework/scripts/doctor.sh"
 
+[tasks."tray:install"]
+description = "Show running Fyso projects in the macOS menu bar (needs SwiftBar)"
+run = "framework/scripts/tray-install.sh"
+
 [tasks.secrets]
 description = "Edit the encrypted secrets file"
-run = "sops edit secrets.enc.yaml"
+run = 'SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}" sops edit secrets.enc.yaml'
 
 [tasks."bots:architect"]
 description = "Run Bot Architect's versioned Dagu workflow with JSON parameters"
 run = "node framework/scripts/bot-architect.cjs submit"
+
+[tasks."agent:setup"]
+description = "Install Dagu's authoring skill (pinned to this Dagu) for Claude Code and Codex"
+run = "framework/scripts/agent-setup.sh"
+
+[tasks."agent:connect"]
+description = "Add this project's fyso MCP to Claude Desktop / Codex (default: desktop apps found); also claude-code"
+run = "node framework/scripts/agent-connect.cjs connect"
+
+[tasks."agent:open"]
+description = "Open Codex or Claude Desktop with a new conversation about this project (after agent:connect)"
+run = "node framework/scripts/agent-connect.cjs open"
+
+[tasks."agent:remote"]
+description = "Connect an agent on another machine to this project's MCP: prints its address and token (needs an HTTPS provider extension)"
+raw = true   # the token is printed on purpose; mise would redact it otherwise
+run = "framework/scripts/agent-remote.sh"
+
+[tasks."agent:disconnect"]
+description = "Remove this project's fyso MCP from Claude Desktop / Codex / Claude Code"
+run = "node framework/scripts/agent-connect.cjs disconnect"
+
+[tasks."ext:add"]
+description = "Add an extension by catalog id or Copier source: mise run ext:add <id|src>"
+run = "framework/scripts/ext.sh add"
+
+[tasks."ext:update"]
+description = "Update project extensions"
+run = "framework/scripts/ext.sh update"
+
+[tasks."ext:list"]
+description = "List project extensions"
+run = "framework/scripts/ext.sh list"
+
+[tasks."dist:publish"]
+description = "Publish this project's configuration, documents and memory as a new distribution version: mise run dist:publish [version]"
+run = "framework/scripts/dist.sh publish"
+
+[tasks."dist:add"]
+description = "Install a distribution in this project (its files win): mise run dist:add <repo> [version]"
+run = "framework/scripts/dist.sh add"
+
+[tasks."dist:update"]
+description = "Update to the latest distribution version (or the one given), merging bot memory"
+run = "framework/scripts/dist.sh update"
+
+[tasks."dist:status"]
+description = "Show the installed distribution and whether a newer version exists"
+run = "framework/scripts/dist.sh status"
+
+[tasks."dist:key"]
+description = "Print this installation's public key, for a publisher who sends secrets"
+run = "framework/scripts/dist.sh key"
+
+[tasks."ext:search"]
+description = "Search the extension catalogs: mise run ext:search [text]"
+run = "framework/scripts/ext.sh search"
+
+[tasks."skills:search"]
+description = "Search third-party skills in the sources of project/skill-sources.yaml: mise run skills:search [text]"
+run = "node framework/scripts/skills.cjs search"
+
+[tasks."skills:show"]
+description = "Read a third-party skill before installing it: mise run skills:show <source> [skill] [commit]"
+run = "node framework/scripts/skills.cjs show"
+
+[tasks."skills:add"]
+description = "Install a third-party skill pinned to a commit, pending review: mise run skills:add <source> [skill] [commit]"
+run = "node framework/scripts/skills.cjs add"
+
+[tasks."skills:update"]
+description = "Move an installed third-party skill to its source's latest commit (or a given one): mise run skills:update <name> [commit]"
+run = "node framework/scripts/skills.cjs update"
+
+[tasks."skills:scan"]
+description = "Run OpenMausBot's scan on an installed third-party skill: mise run skills:scan <name>"
+run = "node framework/scripts/skills.cjs scan"
+
+[tasks."skills:confirm"]
+description = "Confirm, after reading it, that bots may use a third-party skill: mise run skills:confirm <name>"
+run = "node framework/scripts/skills.cjs confirm"
+
+[tasks."skills:list"]
+description = "List installed third-party skills with their state, source and pinned commit"
+run = "node framework/scripts/skills.cjs list"
+
+[tasks."skills:remove"]
+description = "Remove a third-party skill no agent uses: mise run skills:remove <name>"
+run = "node framework/scripts/skills.cjs remove"
+
+[tasks."ext:remove"]
+description = "Remove project extensions"
+run = "framework/scripts/ext.sh remove"
+
+[tasks."github:check"]
+description = "Check noninteractive GitHub read access for this project (optional repository argument)"
+run = "node framework/scripts/github-auth.cjs check"

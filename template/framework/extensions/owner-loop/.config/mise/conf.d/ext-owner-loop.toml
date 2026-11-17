@@ -1,0 +1,4 @@
+# No extra tool: Dagu's human tasks and OpenMausBot's own cards and CLI.
+[tasks."owner-loop:doctor"]
+description = "Check that the pinned Dagu and OpenMausBot offer what the owner loop uses"
+run = "framework/scripts/run-ext.sh owner-loop -- bash extensions/owner-loop/doctor.sh"

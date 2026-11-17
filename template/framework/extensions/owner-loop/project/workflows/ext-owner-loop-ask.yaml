@@ -1,0 +1,30 @@
+# Ask the owner one question and keep the answer, with Dagu's own human task.
+# The run waits (status "waiting") until a person answers in Dagu, or a bot passes
+# their answer on with: dagu_execute action=approve name=ext-owner-loop-ask
+#   dagRunId=<run> stepName=ask attemptId=<from the run> inputs={"answer": "…"}
+# The answer is the run's output `answer` (published without a shell, by outputs.write).
+# For a question inside another workflow, copy the `ask` step there: human tasks
+# cannot run in sub-workflows.
+description: Ask the owner one question and wait for the answer
+type: graph
+params:
+  - QUESTION: ""      # the whole question, complete on its own
+steps:
+  - id: ask
+    action: human.task
+    with:
+      prompt: ${QUESTION}
+      form:
+        type: object
+        properties:
+          answer:
+            type: string
+            title: Respuesta / Answer
+            minLength: 1
+        required: [answer]
+  - id: answer
+    depends: [ask]
+    action: outputs.write
+    with:
+      values:
+        answer: ${steps.ask.outputs.answer}

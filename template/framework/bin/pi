@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# OMB supplies its own MCP extension explicitly. Disable Pi's independent
+# discovery so personal MCP servers and extensions never enter a bot turn.
+set -euo pipefail
+: "${FYSO_PI_EXEC:?project Pi executable is not configured}"
+origin=()
+if [ -n "${OMB_MCP_CONFIG:-}" ]; then
+  context=$(node "$(dirname "$0")/../scripts/pi-turn-origin.cjs" 2>/dev/null || true)
+  [ -z "$context" ] || origin=(--append-system-prompt "$context")
+fi
+exec "$FYSO_PI_EXEC" --no-mcp --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files ${origin[@]+"${origin[@]}"} "$@"

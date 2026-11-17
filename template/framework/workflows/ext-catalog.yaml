@@ -1,0 +1,15 @@
+name: fyso-ext-catalog
+description: Panel ext-catalog (extension marketplace, D31)
+labels:
+  - fyso=system
+type: graph
+# Reads into a per-run temporary directory, so runs may overlap and the panel starts
+# them at once instead of queueing (D80).
+max_active_runs: 4
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  - id: catalog
+    command: mise exec -- node framework/scripts/marketplace.cjs json
+    output: CATALOG

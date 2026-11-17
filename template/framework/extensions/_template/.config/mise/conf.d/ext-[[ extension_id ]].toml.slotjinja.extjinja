@@ -1,0 +1,6 @@
+# Example slot: customize before publishing.
+# Released miniserve binary, installed through the aqua registry.
+[tools]
+"aqua:svenstaro/miniserve" = "0.35.0"
+[env]
+FYSO_EXT_[[ extension_id | upper | replace('-', '_') ]]_PORT = "{{ extension_port }}"

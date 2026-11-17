@@ -1,0 +1,14 @@
+# Monthly spend cap per bot. Compares each bot's month-to-date cost (OpenMausBot's usage
+# ledger, through the framework's observability export) with `botMonthlyUsd` in
+# project/observability.json. It ALERTS: the run fails the first time a bot goes over
+# its cap in a month, so it shows in Dagu and in the panel's Observability alerts.
+# It never pauses a bot: OpenMausBot 0.1.141 has no per-bot limit to switch on.
+description: Alert when a bot goes over its monthly spend cap (alert only, never pauses)
+type: graph
+{% if spend_schedule %}schedule: "{{ spend_schedule }}"
+{% endif %}max_active_runs: 1
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: check
+    run: node extensions/ops-assistant/digest.cjs spend
+    output: RESULT

@@ -1,0 +1,68 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+test('Pi human requests receive only the necessary conversation context selection',async()=>{
+  const {ensurePiHumanRequestOrigin,piHumanRequestOriginBlocked}=await import('../template/framework/panel/src/lib/connector-access.ts');
+  const original={allow:['native:*','mcp:dagu:*'],deny:['mcp:other:*']};
+  const next=ensurePiHumanRequestOrigin(original);
+  assert.deepEqual(next,{allow:['native:*','mcp:dagu:*','mcp:agents:list_threads'],deny:['mcp:other:*']});
+  assert.deepEqual(original,{allow:['native:*','mcp:dagu:*'],deny:['mcp:other:*']});
+  assert.strictEqual(ensurePiHumanRequestOrigin(next),next);
+  assert.strictEqual(ensurePiHumanRequestOrigin(undefined),undefined);
+  const denied={allow:['native:*'],deny:['mcp:agents:*']};
+  assert.strictEqual(ensurePiHumanRequestOrigin(denied),denied);
+  assert.equal(piHumanRequestOriginBlocked(denied),true);
+  assert.equal(piHumanRequestOriginBlocked(next),false);
+  assert.equal(piHumanRequestOriginBlocked({deny:['mcp:agents:list_threads']}),true);
+  const full={allow:Array.from({length:256},(_,i)=>`mcp:service:tool${i}`)};
+  assert.strictEqual(ensurePiHumanRequestOrigin(full),full,'do not exceed OMB selector limit');
+  assert.equal(piHumanRequestOriginBlocked(full),true);
+});
+test('the bot form versions one connector selection and preserves other profiles and fields',async()=>{
+  const {parseTeam,readBots,upsertBot,serializeTeam}=await import('../template/framework/panel/src/lib/team.ts');
+  const text='# project comment\nversion: 1\ndefaults:\n  cwd: ${FYSO_ROOT}\n  tools:\n    allow: ["native:*", "mcp:dagu:*"]\nbots:\n  - name: One\n    model: codex/model\n    approval: ask\n    soul: { file: ${FYSO_ROOT}/project/one.md }\n  - name: Two\n    model: claude/model\n    tools: { allow: ["native:*", "mcp:other:read"] }\n';
+  const doc=parseTeam(text),before=readBots(doc);
+  assert.deepEqual(before[0].tools,{allow:['native:*','mcp:dagu:*']});
+  const tools={allow:['native:*','mcp:dagu:*','mcp:service:*'],deny:['mcp:other:*']};
+  upsertBot(doc,0,{name:'One',title:'Updated title',model:'codex/model',soulText:null,usesWorkflows:true,tools});
+  const after=readBots(doc);
+  assert.deepEqual(after[0].tools,tools);assert.equal(after[1].fingerprint,before[1].fingerprint);
+  assert.equal(doc.getIn(['bots',0,'approval']),'ask');
+  assert.ok(serializeTeam(doc).includes('${FYSO_ROOT}/project/one.md'));
+  assert.ok(serializeTeam(doc).includes('# project comment'));
+  upsertBot(doc,0,{name:'One',title:'Another title',model:'codex/model',soulText:null,usesWorkflows:true});
+  assert.deepEqual(readBots(doc)[0].tools,tools);
+});
+test('the bot detail reads and writes approval, falling back to defaults and to ask',async()=>{
+  const {parseTeam,readBots,upsertBot,serializeTeam}=await import('../template/framework/panel/src/lib/team.ts');
+  const text='version: 1\ndefaults:\n  approval: full\nbots:\n  - name: Inherits\n    model: codex/model\n  - name: Asks\n    model: codex/model\n    approval: ask   # keep this comment\n';
+  const doc=parseTeam(text);
+  assert.deepEqual(readBots(doc).map(b=>b.approval),['full','ask']);
+  assert.equal(readBots(parseTeam('version: 1\nbots:\n  - name: Bare\n    model: codex/model\n'))[0].approval,'ask');
+  upsertBot(doc,1,{name:'Asks',title:'',model:'codex/model',soulText:null,usesWorkflows:false,approval:'full'});
+  assert.equal(readBots(doc)[1].approval,'full');
+  upsertBot(doc,0,{name:'Inherits',title:'',model:'codex/model',soulText:null,usesWorkflows:false});
+  assert.equal(doc.getIn(['bots',0,'approval']),undefined,'omitting approval keeps the inherited default');
+  assert.ok(serializeTeam(doc).includes('# keep this comment'));
+});
+test('the bot form switches one extension skill as a native file entry and leaves other skills alone',async()=>{
+  const {parseTeam,readBots,upsertBot,serializeTeam,extensionSkillFile}=await import('../template/framework/panel/src/lib/team.ts');
+  const file=extensionSkillFile('silverbullet','project-knowledge');
+  assert.equal(file,'${FYSO_ROOT}/extensions/silverbullet/skills/project-knowledge/SKILL.md');
+  const text='version: 1\nbots:\n  - name: One\n    model: claude/model\n    skills:\n      - file: skills/one/own/SKILL.md\n  - name: Two\n    model: claude/model\n';
+  const doc=parseTeam(text),input={title:'',model:'claude/model',soulText:null,usesWorkflows:false};
+  const untouched=readBots(doc)[0].fingerprint;
+  upsertBot(doc,0,{...input,name:'One'});
+  assert.equal(readBots(doc)[0].fingerprint,untouched,'omitting skills keeps them');
+  for(let i=0;i<2;i++)for(const index of [0,1])upsertBot(doc,index,{...input,name:index?'Two':'One',skills:[{file,on:true}]});
+  assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md',file],[file]]);
+  assert.deepEqual(readBots(doc)[0].skills,['own','project-knowledge']);
+  assert.ok(serializeTeam(doc).includes(`- file: ${file}`));
+  // OMB's team apply never removes an omitted skill: off is the native `enabled: false`.
+  for(const index of [0,1])upsertBot(doc,index,{...input,name:index?'Two':'One',skills:[{file,on:false}]});
+  assert.deepEqual(readBots(doc).map(b=>b.skillFiles),[['skills/one/own/SKILL.md'],[]]);
+  assert.deepEqual(readBots(doc)[0].skills,['own']);
+  assert.ok(serializeTeam(doc).includes(`- file: ${file}\n        enabled: false`));
+  upsertBot(doc,1,{...input,name:'Two',skills:[{file,on:true}]});
+  assert.equal(doc.getIn(['bots',1,'skills',0,'enabled']),undefined);assert.deepEqual(readBots(doc)[1].skillFiles,[file]);
+  const never=parseTeam(text);upsertBot(never,1,{...input,name:'Two',skills:[{file,on:false}]});
+  assert.equal(never.getIn(['bots',1,'skills']),undefined,'switching off a skill that was never listed writes nothing');
+});

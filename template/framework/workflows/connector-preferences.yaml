@@ -1,0 +1,14 @@
+name: fyso-connector-preferences
+description: Native Claude MCP and skills preferences; no personal configuration is read by this workflow
+labels:
+  - fyso=system
+type: graph
+max_active_runs: 1
+params:
+  - OP: read
+  - SETTINGS_B64: ""
+working_dir: ${FYSO_ROOT}
+steps:
+  - id: operate
+    run: node framework/scripts/connector-preferences.cjs
+    output: RESULT

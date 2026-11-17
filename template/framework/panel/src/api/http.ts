@@ -1,6 +1,6 @@
 // Real backend: read-only files under /config/ and the Dagu API under /api/dagu/,
 // both served by Caddy on the panel origin (contract §1, §2).
-import type { App, Backend, Project, Run } from "./types";
+import type { App, Extension, Backend, Project, Run, ThirdPartySkill } from "./types";
 
 export class HttpError extends Error {
   constructor(
@@ -14,12 +14,13 @@ export class HttpError extends Error {
 
 async function request(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, { credentials: "same-origin", cache: "no-store", ...init });
+  if (res.status === 401) window.dispatchEvent(new Event("fyso-session-expired"));
   if (!res.ok) throw new HttpError(res.status, url, await res.text().catch(() => ""));
   return res;
 }
 
 const json = async <T>(url: string, init?: RequestInit) => (await request(url, init)).json() as Promise<T>;
-const dagu = (path: string) => `api/dagu/${path}`;
+const dagu = (path: string) => `/api/dagu/${path}`;
 const enc = encodeURIComponent;
 
 type DaguNode = { error?: string; status?: number; statusLabel?: string; step?: { name?: string } };
@@ -47,17 +48,42 @@ export function toRun(d: DaguRunDetails, fallbackId = ""): Run {
   };
 }
 
+
+// D80: Dagu 2.24.0 scans its queue at most every 3 s, so every enqueued action waits 0–3 s
+// before it starts. `start` begins at once but ignores `max_active_runs` (even with
+// `singleton`, concurrent starts all run), so it is used only for workflows that declare
+// they may overlap (`max_active_runs` other than 1). The answer is cached per page load.
+const overlap = new Map<string, Promise<boolean>>();
+function mayOverlap(dag: string): Promise<boolean> {
+  let known = overlap.get(dag);
+  if (!known) {
+    known = json<{ dag?: { maxActiveRuns?: number } }>(dagu(`dags/${enc(dag)}`))
+      .then((r) => (r.dag?.maxActiveRuns ?? 1) !== 1)
+      .catch(() => { overlap.delete(dag); return false; });
+    overlap.set(dag, known);
+  }
+  return known;
+}
+
 export const httpBackend: Backend = {
-  getBotVersioning: () => json("config/bot-versioning.json"),
-  getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("api/omb/bots")).bots,
-  getObservability: () => json("config/observability.json"),
-  getProject: () => json<Project>("config/project.json"),
-  getTeam: async () => (await request("config/team.yaml")).text(),
-  getApps: () => json<App[]>("config/apps.json"),
+  getBotVersioning: () => json("/config/bot-versioning.json"),
+  getRuntimeBots: async () => (await json<{ bots: import("./types").RuntimeBot[] }>("/api/omb/bots")).bots,
+  getObservability: () => json("/config/observability.json"),
+  getProject: () => json<Project>("/config/project.json"),
+  getTeam: async () => (await request("/config/team.yaml")).text(),
+  getApps: () => json<App[]>("/config/apps.json"),
+  getExtensions: () => json<Extension[]>("/config/extensions.json"),
+  // Written on start and after every skill change; a project updated in place has none until then.
+  getSkills: () => json<ThirdPartySkill[]>("/config/skills.json").catch((e) => {
+    if (e instanceof HttpError && e.status === 404) return [];
+    throw e;
+  }),
 
   async enqueue(dag, params) {
     const body = params ? { params: JSON.stringify(params) } : {};
-    const res = await json<{ dagRunId: string }>(dagu(`dags/${enc(dag)}/enqueue`), {
+    // D80: a workflow that may overlap starts at once; one that must not waits in Dagu's queue.
+    const how = (await mayOverlap(dag)) ? "start" : "enqueue";
+    const res = await json<{ dagRunId: string }>(dagu(`dags/${enc(dag)}/${how}`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

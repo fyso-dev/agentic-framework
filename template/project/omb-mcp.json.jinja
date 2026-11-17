@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+{% if engine == 'pi' %}
+    "dagu": {
+      "command": "node",
+      "args": ["${FYSO_ROOT}/framework/scripts/fyso-mcp.cjs", "--dagu-only"],
+      "enabled": true
+    }
+{% endif %}
+  }
+}

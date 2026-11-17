@@ -1,0 +1,21 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-knowledge-skills.yml
+_templates_suffix: .slotjinja
+_external_data:
+  project: .copier-answers.yml
+garden_schedule:
+  type: str
+  default: "0 7 * * 1"
+  help: When the wiki gardener runs (five-field cron, server time). Empty runs it only on demand.
+  validator: >-
+    {% if garden_schedule and not (garden_schedule | regex_search('^[0-9*/,-]+( [0-9*/,-]+){4}$')) %}
+    Use a five-field cron expression, or leave it empty.
+    {% endif %}
+garden_ai:
+  type: bool
+  default: true
+  help: Let the project's coding engine read the wiki to look for contradictions (uses AI on every run)
+_exclude:
+  - copier.yml
+  - /README.md
+  - .git

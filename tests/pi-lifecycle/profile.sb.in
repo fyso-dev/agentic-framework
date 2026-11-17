@@ -1,0 +1,61 @@
+(version 1)
+;; Full-lifecycle Pi beta profile. Rendered by controller.py with exact values;
+;; the rendered copy is saved with the evidence. Reads are NOT isolated: never
+;; pass secrets as arguments or inherited file descriptors.
+(allow default)
+
+;; No way out of the sandbox through launchd, LaunchServices, AppleScript or
+;; the keychain, and no signals to processes outside this sandbox.
+(deny process-exec
+  (literal "/bin/launchctl") (literal "/usr/bin/open")
+  (literal "/usr/bin/osascript") (literal "/usr/bin/security"))
+(deny signal)
+(allow signal (target same-sandbox))
+
+;; Writes: only the disposable fixture, the null device and Pi's three
+;; short-lived lock paths beside the user's existing login (no credential writes).
+(deny file-write*)
+(allow file-write*
+  (subpath (param "FIXTURE"))
+  (literal "/dev/null")
+  (literal "/dev/tty")
+  (literal (param "PI_AUTH_LOCK")) (subpath (param "PI_AUTH_LOCK"))
+  (literal (param "PI_TRUST_LOCK")) (subpath (param "PI_TRUST_LOCK"))
+  (literal (param "PI_SETTINGS_LOCK")) (subpath (param "PI_SETTINGS_LOCK")))
+
+;; The three fixed project sockets plus process-compose's control socket.
+;; controller.py refuses to start if any of them already exists.
+(allow file-write*
+  (literal (param "PC_SOCKET"))
+  (literal (param "CONNECTORS_SOCKET"))
+  (literal (param "MCP_SOCKET")))
+
+;; Dagu 2.24 hard-codes /tmp/@dagu_<name>_<md5(name+runID)[:6]>.sock and
+;; removes the path before binding. Run IDs of scheduled runs are not known in
+;; advance, so this allows only the framework/extension DAG name prefixes.
+;; Safety relies on controller.py: no other Dagu process may exist on the host
+;; before or during the run (checked at start and every poll; it aborts otherwise).
+(allow file-write* (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+
+(deny network*)
+;; DNS through the system resolver socket only (no direct UDP), and HTTPS for
+;; the real model turn. Loopback :443 is denied below (last match wins).
+;; Accepted residual risk: hosts on the local network at :443 stay reachable.
+(allow network-outbound (remote unix-socket (literal "/private/var/run/mDNSResponder")))
+(allow network-outbound (remote tcp "*:443"))
+(deny network-outbound (remote tcp "localhost:443"))
+;; Unix sockets owned by this fixture only.
+(allow network-bind network-inbound network-outbound
+  (local unix-socket (literal (param "PC_SOCKET")))
+  (local unix-socket (literal (param "CONNECTORS_SOCKET")))
+  (local unix-socket (literal (param "MCP_SOCKET")))
+  (local unix-socket (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+  (local unix-socket (subpath (param "FIXTURE"))))
+(allow network-outbound
+  (remote unix-socket (literal (param "PC_SOCKET")))
+  (remote unix-socket (literal (param "CONNECTORS_SOCKET")))
+  (remote unix-socket (literal (param "MCP_SOCKET")))
+  (remote unix-socket (regex #"^@TMP_ROOT@/@dagu_(fyso|ext)-[-A-Za-z0-9_.]+_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\.sock$"))
+  (remote unix-socket (subpath (param "FIXTURE"))))
+;; Loopback TCP: exactly the fixture's port block (rendered below).
+@PORT_RULES@

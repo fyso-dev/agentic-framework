@@ -6,17 +6,17 @@ A Fyso Agentic Framework project: OpenMausBot (bots) + Dagu (workflows) behind o
 
 Requirements: Git, [mise](https://mise.jdx.dev), and authenticated Claude Code / Codex CLIs for the corresponding bots. Framework tools are pinned in `mise.toml`. Initialize and commit this generated project before starting the stack.
 
-[Repository installation guide](https://github.com/fyso-dev/agentic-framework/blob/preview/docs/installation.md) covers generation, prerequisites, updates and recovery.
+[Repository installation guide](https://github.com/fyso-dev/agentic-framework/blob/main/docs/installation.md) covers generation, prerequisites, updates and recovery.
 
 ```sh
 mise trust && mise install
-mise run setup     # once: your age key + encrypted secrets (login admin / admin)
+mise run setup     # once: age key + encrypted secrets; choose your local login password
 mise run up
 ```
 
 | What | Where |
 |---|---|
-| Panel | http://panel.localhost:{{ port_base }} |
+| Panel | http://panel.{{ project_slug }}-{{ port_base }}.localhost:{{ port_base }} |
 | Dagu (workflows) | http://dagu.localhost:{{ port_base }} |
 | OpenMausBot (bots) | http://omb.localhost:{{ port_base }} (project login, no pairing code) |
 
@@ -29,9 +29,12 @@ mise run up
 | `project/` | this project | bots, workflows, apps — yours to change |
 | `framework/` | template | updated with `uvx copier update --trust`; do not edit |
 | `secrets.enc.yaml` | this project | encrypted with sops + age; edit with `mise run secrets` |
+| `extensions/<ext>/` | extension | installed with `mise run ext:add`; change upstream, not here |
+| `project/marketplaces.yaml` | this project | extension catalogs (git repos) shown in the marketplace |
+| `project/mcp.json` | this project | your MCP servers; `.mcp.json` is generated from it, `framework/` and extensions |
 | `.data/` | runtime | data of Dagu, OpenMausBot and Caddy; never committed |
 
-Ports {{ port_base }}–{{ port_base + 9 }} belong to this project. This project never connects to another Dagu or OpenMausBot on the machine.
+Ports {{ port_base }}–{{ port_base + 9 }} belong to this project, and {{ port_base + 10 }}–{{ port_base + 19 }} to its extensions. This project never connects to another Dagu or OpenMausBot on the machine.
 
 ## Build a change
 
@@ -52,6 +55,62 @@ the worktree and retain the branch. No code change reaches the base branch.
 
 Claude and Codex must already be installed and signed in on the host. Their user
 configuration can still affect execution (particularly Codex hooks and skills).
+
+## Extensions
+
+An extension is a Copier template that adds a tool or service (processes, routes, a panel tile, MCP servers, skills, workflows) without editing framework files.
+
+The panel's **Apps → Marketplace** lists the extensions of the catalogs in `project/marketplaces.yaml` and installs or upgrades them without a restart (each change is one commit). From the terminal:
+
+```bash
+mise run skills:search pdf                             # third-party skills: project sources + skills.sh
+mise run skills:add anthropics/skills brand-guidelines # pinned to a commit; off until confirmed in the panel
+mise run ext:search                                    # catalog entries, latest versions
+mise run ext:add foo                                   # by catalog id, latest tag
+mise run ext:add gh:org/fyso-ext-foo -- --vcs-ref v1   # or any Copier source
+mise install && mise run up                            # load its tools, processes and routes
+mise run ext:list                                      # id, source, version
+mise run ext:update foo                                # commit after each upgrade
+mise run ext:remove foo                                # keeps .data/ext/foo and secret values
+```
+
+Set the secrets it declares with `mise run secrets`; the panel's Apps page shows which are missing. To write one, start from `framework/extensions/_template` (see its README).
+
+## Share this project (distributions)
+
+Prepare a project for someone else and keep sending them improvements. Configuration, documents (`project/wiki/`) and bot memory travel; conversations, web logins and secrets you did not choose stay. Their configuration follows yours on every update; their bots keep what they learned (memory is merged). Contract: https://github.com/fyso-dev/agentic-framework/blob/main/docs/distribution.md
+
+```bash
+# Publisher: project/distribution.yaml → repo: gh:org/acme-fyso  (optional: secrets: [NAME], recipients: [age1…])
+mise run dist:publish                                  # committed files only; tags v1, v2, …
+# Client (its own project, after `mise run setup`):
+mise run dist:key                                      # public key, if it will receive secrets
+mise run dist:add gh:org/acme-fyso                     # install
+mise run dist:status                                   # installed vs latest version
+mise run dist:update                                   # or the fyso-dist-update workflow in Dagu
+```
+
+## See what is running
+
+Several projects on one Mac? A menu bar icon lists every running Fyso project with its health, links (panel, Dagu, OpenMausBot, extension apps), processes, and restart / stop actions; stopped projects stay listed with a Start action. It is a plugin for [SwiftBar](https://github.com/swiftbar/SwiftBar) (macOS):
+
+```sh
+brew install --cask swiftbar   # once; open SwiftBar and choose a plugin folder
+mise run tray:install          # from any project: one plugin lists them all
+```
+
+## Work with coding agents
+
+Open Claude Code or Codex in this folder (inside its mise environment: `mise activate` in your shell, or `mise exec -- claude`). Read `framework/agent-context.md` for the shared operating guide. Desktop clients receive it in MCP initialization; `fyso_context` retrieves it even when runtime services are down. Default bots load it from their role instructions, including the Chief. Existing project-owned bot profiles need an explicit update to adopt new role instructions.
+
+The project's `.mcp.json` gives the agent two MCP servers:
+
+- **`fyso`** — this platform: status, checks, bots (plan, then apply), extensions (search, install), snapshots. It runs the same workflows as the panel.
+- **`dagu`** — workflows: design, run and debug them. Install Dagu's own skill once with `mise run agent:setup`.
+
+To use `fyso` from **Claude Desktop** or **Codex** anywhere (not only in this folder): `mise run agent:connect` (desktop apps found on this Mac; add `claude-code` for the CLI). Remove it with `mise run agent:disconnect`.
+
+Secrets, removing extensions and starting/stopping the stack stay with you in the terminal.
 
 ## Observe bots and execution
 

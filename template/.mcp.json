@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "dagu": {
-      "type": "http",
-      "url": "http://127.0.0.1:${FYSO_DAGU_PORT}/mcp",
-      "headers": { "Authorization": "${DAGU_MCP_AUTH}" }
-    }
-  }
-}

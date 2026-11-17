@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Engine, type Plan, type Project, type Run, type SetupCheck } from "./types";
+import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -13,6 +13,7 @@ const PROJECT: Project = {
   slug: "foo-project",
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
+  framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -86,6 +87,13 @@ const DRAFT = TEAM.replace(
 
 const CLAUDE_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-4-5"];
 
+/** Desktop and CLI agents as `agent-connect.cjs status` reports them on the Dagu host. */
+const AGENTS = [
+  { id: "claude-desktop", label: "Claude Desktop", desktop: true, found: true },
+  { id: "codex", label: "Codex (app and CLI)", desktop: true, found: true },
+  { id: "claude-code", label: "Claude Code (CLI)", desktop: false, found: false },
+];
+
 function engines(scenario: Scenario): Engine[] {
   return [
     { id: "claude", label: "Claude", kind: "subscription", ok: true, models: CLAUDE_MODELS },
@@ -95,6 +103,60 @@ function engines(scenario: Scenario): Engine[] {
       models: ["gpt-5.5-codex", "gpt-5.5"], fixHint: "codex login --device-auth",
     },
   ];
+}
+
+function extensions(scenario: Scenario): Extension[] {
+  if (scenario === "empty") return [];
+  return [
+    {
+      id: "sample", src: "gh:fyso/ext-sample", version: "v1.2.0", apps: ["sample"],
+      secrets: [
+        {
+          name: "SAMPLE_TOKEN", description: "Token de ejemplo", description_i18n: { en: "Sample token" },
+          required: true, set: scenario !== "failed",
+        },
+        { name: "SAMPLE_WEBHOOK", required: false, set: false },
+      ],
+      mcpServers: ["sample"], workflows: ["ext-sample-report"], skills: ["sample-ops"],
+    },
+  ];
+}
+
+// Third-party skills (D64): one confirmed, one waiting for review; installs land in "review".
+const SKILL_MD = "---\nname: brand-guidelines\ndescription: Demonstration skill for panel review.\nlicense: Apache-2.0\n---\n\n# Demo skill\n\nThis is fictional content used to test the panel review flow.\n";
+const mockSkill = (name: string, state: ThirdPartySkill["state"], warnings: string[] = []): ThirdPartySkill => ({
+  name, description: name === "pdf-forms" ? "Fills PDF forms." : "Applies the brand colors and typography.", src: "gh:anthropics/skills",
+  path: `skills/${name}`, commit: "2c5958ecac7cee2b583967a2c4981d0f4a75c579", license: "Apache-2.0", licenseFile: "LICENSE.txt", licenseTitle: "Apache License",
+  sha256: "10067cdd9be9cd5d97c741fc6e25830135afa0e11cc71e567b75763e26d08799", files: 2, installedAt: "2026-11-11T12:00:00.000Z",
+  scan: { at: "2026-11-11T12:00:01.000Z", warnings }, review: state === "ready" ? { at: "2026-11-11T12:05:00.000Z" } : null, state, bots: [],
+});
+
+function marketplace(installed: Set<string>, versions: Map<string, string>): Marketplace {
+  const entries: Omit<MarketplaceEntry, "installed" | "version" | "update">[] = [
+    {
+      id: "sample", src: "gh:fyso/ext-sample", catalog: "Fyso", name: "Ejemplo", name_i18n: { en: "Sample" },
+      description: "Sitio estático de ejemplo", description_i18n: { en: "Sample static site" }, tags: ["demo"], latest: "v1.3.0",
+    },
+    {
+      id: "netbird", src: "gh:fyso/fyso-ext-netbird", catalog: "Fyso", name: "NetBird",
+      description: "Red privada entre hosts", description_i18n: { en: "Private network between hosts" },
+      tags: ["network", "multi-host"], homepage: "https://netbird.io", latest: "v0.4.1",
+    },
+    {
+      id: "metabase", src: "gh:acme/fyso-ext-metabase", catalog: "Acme", name: "Metabase",
+      description: "Tableros sobre los datos del proyecto", description_i18n: { en: "Dashboards over project data" },
+      tags: ["data"], latest: null,
+    },
+  ];
+  return {
+    collectedAt: new Date().toISOString(),
+    catalogs: [{ source: "gh:fyso-dev/fyso-extensions", name: "Fyso" }, { source: "gh:acme/fyso-catalog", name: "Acme" }],
+    extensions: entries.map((e) => {
+      const version = versions.get(e.id) ?? null;
+      const on = installed.has(e.id);
+      return { ...e, installed: on, version, update: on && !!e.latest && version !== e.latest };
+    }),
+  };
 }
 
 function apps(scenario: Scenario): App[] {
@@ -128,6 +190,11 @@ function apps(scenario: Scenario): App[] {
       id: "reports", name: "Reportes", name_i18n: { en: "Reports" }, description: "Resumen semanal",
       description_i18n: { en: "Weekly summary" }, icon: "chart", url: "http://reports.localhost:8400",
       group: "project", enabled: false,
+    },
+    {
+      id: "sample", name: "Ejemplo", name_i18n: { en: "Sample" }, description: "Extensión de ejemplo",
+      description_i18n: { en: "Sample extension" }, icon: "puzzle", url: "http://sample.localhost:8400",
+      group: "extension", enabled: true,
     },
   ];
 }
@@ -183,6 +250,10 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
   const runs = new Map<string, MockRun>();
   const latest = new Map<string, MockRun>();
   let seq = 0;
+  const installed = new Set(scenario === "empty" ? [] : ["sample"]);
+  const skills = new Map<string, ThirdPartySkill>(scenario === "empty" ? [] : [["brand-guidelines", mockSkill("brand-guidelines", "ready")]]);
+  const agentsOn = new Set(scenario === "empty" ? [] : ["claude-desktop"]);
+  const versions = new Map(scenario === "empty" ? [] : [["sample", "v1.2.0"]]);
 
   const check = (): SetupCheck => {
     const count = listedBots(readBots(parseTeam(team))).length;
@@ -232,6 +303,28 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     };
   }
 
+  function connectAgent(dag: string, id: string, createdAt: number, params?: Record<string, string>) {
+    const mode = params?.MODE ?? "connect", target = params?.TARGET ?? "";
+    if (mode === "status") {
+      add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+        mode, server: `fyso-${PROJECT.slug}`,
+        agents: AGENTS.map((a) => ({ ...a, connected: agentsOn.has(a.id) })),
+      }) }) });
+      return;
+    }
+    if (mode === "remote") {
+      add({ dag, id, createdAt, duration: 1200, outcome: "succeeded", outputs: () => ({ result: JSON.stringify({
+        mode, server: `fyso-${PROJECT.slug}`, url: `${location.origin}/mcp`, created: false }) }) });
+      return;
+    }
+    const failed = scenario === "failed" && mode === "connect";
+    if (!failed && mode === "connect") agentsOn.add(target);
+    if (mode === "disconnect") agentsOn.delete(target);
+    add({ dag, id, createdAt, duration: 1800, outcome: failed ? "failed" : "succeeded",
+      error: failed ? "Assistant CLI not found on the Dagu host" : undefined,
+      outputs: () => ({ result: JSON.stringify({ target, mode, message: "Mock: no assistant configuration was changed" }) }) });
+  }
+
   return {
     initialDraft: scenario === "failed" || scenario === "applyfail" ? DRAFT : null,
 
@@ -250,6 +343,19 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       await sleep(250);
       return apps(scenario);
     },
+    async getExtensions() {
+      await sleep(250);
+      const base = extensions(scenario);
+      const extra = [...installed].filter((id) => !base.some((e) => e.id === id)).map((id): Extension => ({
+        id, src: `gh:fyso/fyso-ext-${id}`, version: versions.get(id) ?? null, apps: [], secrets: [], mcpServers: [], workflows: [], skills: [],
+      }));
+      return [...base.map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
+    },
+
+    async getSkills() {
+      await sleep(200);
+      return [...skills.values()];
+    },
 
     async enqueue(dag, params) {
       await sleep(200);
@@ -257,6 +363,9 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const createdAt = Date.now();
       const proposed = params?.TEAM_B64 ? fromBase64Utf8(params.TEAM_B64) : team;
       switch (dag) {
+        case DAGS.agentConnect:
+          connectAgent(dag, id, createdAt, params);
+          break;
         case DAGS.setupCheck:
           add({ dag, id, createdAt, duration: 3500, outcome: "succeeded", outputs: () => ({ check: JSON.stringify(check()) }) });
           break;
@@ -285,6 +394,60 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
         case DAGS.snapshot:
           add({ dag, id, createdAt, duration: 2600, outcome: "succeeded", outputs: () => ({ result: "committed 3c81e07" }) });
           break;
+        case DAGS.extCatalog:
+          add({ dag, id, createdAt, duration: 1800, outcome: "succeeded", outputs: () => ({ catalog: JSON.stringify(marketplace(installed, versions)) }) });
+          break;
+        case DAGS.extInstall: {
+          const ext = params?.ID ?? "";
+          const fail = scenario === "failed";
+          const latest = marketplace(installed, versions).extensions.find((e) => e.id === ext)?.latest ?? null;
+          add({
+            dag, id, createdAt, duration: 3800, outcome: fail ? "failed" : "succeeded",
+            error: fail ? "error: the project has uncommitted changes; commit or discard them before upgrading" : undefined,
+            outputs: () => ({ result: JSON.stringify({ id: ext, mode: params?.MODE ?? "add", version: latest, commit: "5e0c1aa" }) }),
+            onDone: () => {
+              installed.add(ext);
+              if (latest) versions.set(ext, latest);
+            },
+          });
+          break;
+        }
+        case DAGS.skillsCatalog: {
+          const held = params?.NAME ? skills.get(params.NAME) : undefined;
+          const output: SkillCatalog = params?.OP ? { collectedAt: new Date().toISOString(), planId: `mock-${params.OP}-${params.NAME || params.SKILL}`, preview: { ...mockSkill(params.NAME || params.SKILL || "pdf-forms", "review"), skillMd: SKILL_MD.replaceAll("brand-guidelines", params.NAME || params.SKILL || "pdf-forms"), licenseText: "Apache License", files: ["SKILL.md"], installed: !!held } } : held
+            ? { collectedAt: new Date().toISOString(), local: { ...held, skillMd: SKILL_MD.replaceAll("brand-guidelines", held?.name || params?.SKILL || "pdf-forms"), files: ["LICENSE.txt", "SKILL.md"] } }
+            : params?.SRC
+              ? { collectedAt: new Date().toISOString(), preview: { ...mockSkill(params.SKILL || "pdf-forms", "review"), skillMd: SKILL_MD.replaceAll("brand-guidelines", params?.SKILL || "pdf-forms"), licenseText: "Apache License\nVersion 2.0, January 2004", files: ["LICENSE.txt", "SKILL.md"], installed: skills.has(params.SKILL || "pdf-forms") } }
+              : { collectedAt: new Date().toISOString(), query: params?.QUERY ?? "", sources: [{ source: "gh:anthropics/skills", count: 1 }, { source: "skills.sh", count: 1 }], installed: [...skills.values()],
+                  skills: [{ ...mockSkill("pdf-forms", "review"), origin: "source", installed: skills.has("pdf-forms") },
+                    { name: "report-writer", src: "gh:acme/agent-skills", origin: "directory", installs: 1280, url: "https://skills.sh/acme/agent-skills/report-writer", installed: false }] };
+          add({ dag, id, createdAt, duration: 1500, outcome: "succeeded", outputs: () => ({ catalog: JSON.stringify(output) }) });
+          break;
+        }
+        case DAGS.skillsInstall: {
+          const parts = (params?.PLAN_ID || "").split("-");
+          const name = params?.NAME || params?.SKILL || parts.slice(2).join("-") || "";
+          const op = params?.OP === "apply-plan" ? parts[1] : params?.OP ?? "";
+          add({
+            dag, id, createdAt, duration: 2400, outcome: "succeeded",
+            outputs: () => ({ result: JSON.stringify({ op, name, commit: "7ad31c2", skill: skills.get(name) ?? null, ...(op === "update" && { changed: false }) }) }),
+            onDone: () => {
+              if (op === "add") skills.set(name, mockSkill(name, "review"));
+              else if (op === "confirm") skills.set(name, mockSkill(name, "ready"));
+              else if (op === "remove") skills.delete(name);
+            },
+          });
+          break;
+        }
+        case DAGS.update: {
+          const fail = scenario === "failed";
+          add({
+            dag, id, createdAt, duration: 4200, outcome: fail ? "failed" : "succeeded",
+            error: fail ? "error: the update conflicts with local changes; nothing was applied: ./Caddyfile" : undefined,
+            outputs: () => ({ result: JSON.stringify({ from: "58f57cf", to: "73b74c2", commit: "1dcf4be", changed: true }) }),
+          });
+          break;
+        }
         default:
           throw new Error(`mock: unknown DAG ${dag}`);
       }

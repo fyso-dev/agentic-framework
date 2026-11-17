@@ -1,8 +1,14 @@
+name: fyso-bots-plan
 description: Panel bots-plan
+labels:
+  - fyso=system
 type: graph
-max_active_runs: 1
+# Reads into a per-run temporary directory, so runs may overlap and the panel starts
+# them at once instead of queueing (D80).
+max_active_runs: 4
 params:
   - TEAM_B64: ""
+  - TEAM_BASE_B64: ""
 env:
   - ROOT: ${FYSO_ROOT}
 working_dir: ${ROOT}

@@ -1,0 +1,22 @@
+# Native Tinyauth configuration. Project-owned: Copier never overwrites this file.
+# Password hashes live only in secrets.enc.yaml (FYSO_AUTH_USERS).
+# Match app names, or set apps.<name>.config.domain for an explicit domain.
+auth:
+  subdomainsEnabled: true
+  sessionExpiry: 2592000
+  sessionMaxLifetime: 2592000
+  loginMaxRetries: 5
+  loginTimeout: 300
+  acls:
+    policy: deny
+apps:
+  panel:
+    users:
+      allow: "{{ admin_user }}"
+  dagu:
+    users:
+      allow: "{{ admin_user }}"
+  omb:
+    users:
+      allow: "{{ admin_user }}"
+# Future OAuth/LDAP settings use Tinyauth's native format, without changing Caddy.

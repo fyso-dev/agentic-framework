@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { BottomNav, SideNav, TopBar } from "./components/Layout";
 import { useRoute } from "./lib/router";
 import { useTheme } from "./lib/theme";
-import { BotForm } from "./screens/BotForm";
 import { Bots } from "./screens/Bots";
+import { Connectors } from "./screens/Connectors";
 import { Apps } from "./screens/Apps";
 import { Observability } from "./screens/Observability";
+import { ExtensionPage } from "./screens/ExtensionPage";
+import { Mcp } from "./screens/Mcp";
 import { Setup } from "./screens/Setup";
 import { useStore } from "./store";
 
@@ -24,16 +26,25 @@ export function App() {
   let screen;
   switch (route.name) {
     case "bots":
-      screen = <Bots review={!!route.review} />;
+      screen = <Bots review={!!route.review} native={route.native} tab={route.tab} />;
       break;
     case "bot":
-      screen = <BotForm index={route.index} />;
+      screen = <Bots review={false} index={route.index} tab={route.tab} />;
       break;
     case "observability":
       screen = <Observability />;
       break;
+    case "connectors":
+      screen = <Connectors initialBotId={route.botId} />;
+      break;
+    case "extension":
+      screen = <ExtensionPage extensionId={route.extensionId} pageId={route.pageId} theme={theme} />;
+      break;
+    case "mcp":
+      screen = <Mcp />;
+      break;
     case "apps":
-      screen = <Apps />;
+      screen = <Apps tab={route.tab ?? "open"} />;
       break;
     default:
       screen = <Setup />;
@@ -54,11 +65,11 @@ export function App() {
       </a>
       <TopBar theme={theme} toggleTheme={toggleTheme} />
       {s.project.status === "error" && (
-        <div role="alert" className="banner banner-down" style={{ margin: "16px 24px 0", borderRadius: 12 }}>
+        <div role="alert" className="banner banner-down" style={{ margin: "16px 24px 0", borderRadius: "var(--fy-radius-lg)" }}>
           <p className="grow">
-            <strong style={{ color: "var(--down)" }}>{t("common.loadError", { what: "project.json" })}</strong> {s.project.error}
+            <strong style={{ color: "var(--fy-down)" }}>{t("common.loadError", { what: "project.json" })}</strong> {s.project.error}
           </p>
-          <button type="button" className="btn btn-ghost" onClick={s.reload}>{t("common.retry")}</button>
+          <button type="button" className="btn btn-sm btn-soft" onClick={s.reload}>{t("common.retry")}</button>
         </div>
       )}
       <div className="shell" id="main" tabIndex={-1} style={{ outline: "none" }}>

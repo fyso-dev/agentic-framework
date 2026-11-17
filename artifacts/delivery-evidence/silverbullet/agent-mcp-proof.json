@@ -1,0 +1,20 @@
+{
+  "fixtureOnly": true,
+  "provider": "claude",
+  "calls": [
+    {
+      "at": "2026-11-09T19:32:06.876Z",
+      "tool": "mcp__silverbullet__read_text_file",
+      "path": "project/wiki/index.md",
+      "isError": true,
+      "starterHeadingReturned": false
+    },
+    {
+      "at": "2026-11-09T19:32:09.484Z",
+      "tool": "mcp__silverbullet__read_text_file",
+      "path": "index.md",
+      "isError": false,
+      "starterHeadingReturned": true
+    }
+  ]
+}

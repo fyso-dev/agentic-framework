@@ -1,0 +1,26 @@
+name: fyso-skills-catalog
+description: Panel skills-catalog (search third-party skills, or read one before installing it, D73)
+labels:
+  - fyso=system
+type: graph
+# Searches and previews read only; a preview plan gets its own random id. Runs may
+# overlap, so the panel starts them at once instead of queueing (D80).
+max_active_runs: 4
+params:
+  - OP: ""
+  - QUERY: ""
+  - NAME: ""
+  - SRC: ""
+  - SKILL: ""
+  - SKILL_PATH: ""
+  - COMMIT: ""
+env:
+  - ROOT: ${FYSO_ROOT}
+working_dir: ${ROOT}
+steps:
+  # NAME: the installed copy of one skill. SRC: one skill of a repository (SKILL.md, license,
+  # files, commit). Otherwise a search for QUERY; a pasted repository is listed as it is.
+  # Parameters reach the script as env vars, never through the shell command line.
+  - id: catalog
+    command: mise exec -- node framework/scripts/skills.cjs catalog
+    output: CATALOG

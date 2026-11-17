@@ -1,0 +1,138 @@
+name: fyso-dev-task
+# Turn a task into a branch (and a PR when possible) with a coding agent (PLAN §7, D15).
+# Owned by the framework; project/workflows/fyso-dev-task.yaml links here.
+# The Builder bot starts it; a person can start it from Dagu too.
+#   worktree -> agent (Claude Code or Codex) -> change gate -> checks -> commit -> PR -> remove worktree
+# A human reviews and merges. Nothing here touches the base branch.
+description: Build a task on a new branch with a coding agent (Claude Code or Codex)
+labels:
+  - fyso=system
+type: graph
+params:
+  - TASK: ""                 # what to change, in plain words (the issue text)
+  - SOURCE_THREAD: ""        # native OMB identifier, never inferred
+  - SOURCE_TURN: ""
+  - BRANCH: ""               # empty: builder/<run id>
+  - PROVIDER: {{ 'codex' if engine == 'pi' else engine }}         # claude | codex (their subscription logins; no API key)
+  - PUBLISH: "false"         # true only when the person requests a remote PR
+  - BASE: main               # a branch name, not HEAD
+  - MODEL: ""                # empty: the provider's default model
+env:
+  - ROOT: ${FYSO_ROOT}
+  # Built from env, never from ${steps.*}: step working_dir does not resolve
+  # step references (spike `harness`).
+  - WT: ${FYSO_DATA}/worktrees/${DAG_RUN_ID}
+working_dir: ${ROOT}
+
+steps:
+  - id: prepare
+    run: framework/scripts/dev-task.sh prepare
+    outputs:
+      - name: branch
+
+  # Scoped step outputs are not included in Dagu's run outputs endpoint.
+  # Capture native correlation metadata explicitly, independent of agent success.
+  - id: context
+    depends: [prepare]
+    run: >-
+      node -e 'const e=process.env; console.log(JSON.stringify({thread:e.SOURCE_THREAD||null,turn:e.SOURCE_TURN||null,provider:e.PROVIDER,model:e.MODEL||null}))'
+    output: ORIGIN
+
+  - id: worktree
+    depends: [context]
+    action: git.worktree.add
+    with:
+      branch: ${steps.prepare.outputs.branch}
+      create_branch: true
+      base: ${params.BASE}
+      path: ${WT}
+
+  # The coding agent. One step per provider, because their safety flags differ;
+  # the other one is skipped. Safety flags are pinned here, not left to the
+  # user's CLI config. Never `bare: true` (it hides the subscription login).
+  - id: agent_claude
+    depends: [worktree]
+    preconditions:
+      - condition: ${params.PROVIDER}
+        expected: claude
+    continue_on:
+      skipped: true
+    working_dir: ${WT}
+    action: harness.run
+    with:
+      provider: claude
+      prompt: &prompt |
+        You are working in a git worktree of this project, on a new branch.
+        Make the change described below, editing files only inside the current directory.
+        Keep the change small and focused. Do not commit, push or switch branches:
+        the workflow checks, commits and opens the pull request after you finish.
+        End with one or two sentences on what you changed.
+
+        Task:
+        ${params.TASK}
+      model: ${params.MODEL}
+      permission-mode: acceptEdits
+      allowed-tools: "Read,Edit,Write,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(ls:*)"
+      setting-sources: project
+      output-format: json
+      no-session-persistence: true
+      tools: "Read,Edit,Write,Glob,Grep,Bash"
+      strict-mcp-config: true       # no MCP servers from the user's config
+      max-turns: 40
+    timeout_sec: 1200
+    output: AGENT
+    stdout:
+      artifact: agent.txt
+
+  - id: agent_codex
+    depends: [worktree]
+    preconditions:
+      - condition: ${params.PROVIDER}
+        expected: codex
+    continue_on:
+      skipped: true
+    working_dir: ${WT}
+    action: harness.run
+    with:
+      provider: codex
+      prompt: *prompt
+      model: ${params.MODEL}
+      sandbox: workspace-write
+      config: 'approval_policy="never"'
+      json: true
+      ephemeral: true
+    timeout_sec: 1200
+    output: AGENT
+    stdout:
+      artifact: agent.txt
+
+  - id: gate
+    depends: [agent_claude, agent_codex]
+    run: framework/scripts/dev-task.sh gate
+    outputs:
+      - name: changed
+
+  - id: check
+    depends: [gate]
+    run: framework/scripts/dev-task.sh check
+
+  - id: commit
+    depends: [check]
+    run: framework/scripts/dev-task.sh commit
+    outputs:
+      - name: commit
+
+  - id: publish
+    depends: [commit]
+    run: framework/scripts/dev-task.sh publish
+    output: RESULT
+
+  - id: remove_worktree
+    depends: [publish]
+    action: git.worktree.remove
+    with:
+      path: ${WT}
+
+handler_on:
+  failure:
+    run: framework/scripts/dev-task.sh cleanup

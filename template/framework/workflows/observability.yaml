@@ -1,4 +1,7 @@
+name: fyso-observability
 description: Refresh the private observability summary from native OMB and Dagu records
+labels:
+  - fyso=system
 schedule: "*/2 * * * *"
 max_active_runs: 1
 working_dir: ${FYSO_ROOT}

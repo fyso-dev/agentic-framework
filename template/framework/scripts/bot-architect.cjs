@@ -6,13 +6,20 @@ const protectedNames=new Set(['mausbot','workflow architect','run operator','bui
 const key=name=>String(name).trim().toLowerCase();
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const canonical=value=>JSON.stringify(value);
-const allowed=new Set(['name','title','description','model','soul','approval','computer','cwd']);
+// `team` places the bot in an existing OMB team (D81); `chief`, `manages` and rooms stay out:
+// bot-management powers need a person's explicit decision in team.yaml.
+const allowed=new Set(['name','title','description','model','soul','approval','computer','cwd','tools','team']);
 function validatePatch(input,root) {
   if (!input || typeof input!=='object' || Array.isArray(input)) throw new Error('expected one native bot entry');
   for(const field of Object.keys(input)) if(!allowed.has(field)) throw new Error(`unsupported profile field: ${field}`);
   const value={...input};
-  for(const [field,text] of Object.entries(value)) if(typeof text!=='string') throw new Error(`${field} must be text`);
+  for(const [field,text] of Object.entries(value)) if(field!=='tools' && typeof text!=='string') throw new Error(`${field} must be text`);
+  if(value.tools!==undefined) value.tools=require('./connections.cjs').validateTools(value.tools);
   if(value.name!==undefined && !/^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,79}$/u.test(value.name)) throw new Error('invalid bot name');
+  if(value.team!==undefined) {
+    value.team=value.team.trim();
+    if(!/^[^\r\n]{1,60}$/u.test(value.team)) throw new Error('team must be one line of at most 60 characters');
+  }
   if(value.approval!==undefined && !['ask','full'].includes(value.approval)) throw new Error('approval must be ask or full');
   if(value.computer!==undefined && value.computer!=='off') throw new Error('this surface supports computer off only');
   if(value.cwd!==undefined && !['${FYSO_ROOT}',root].includes(value.cwd)) throw new Error('cwd must be the project root');
@@ -36,7 +43,14 @@ async function main(env=process.env) {
   const base=path.join(data,'bot-architect'),projectFile=path.join(root,'project/bots/team.yaml');
   fs.mkdirSync(base,{recursive:true,mode:0o700});
   const yaml=yamlLib();
-  const cli=(args)=>execFileSync('openmausbot',[...args,'--port',String(port)],{encoding:'utf8',maxBuffer:8*1024*1024});
+  const cli=(args)=>{
+    try{return execFileSync('openmausbot',[...args,'--port',String(port)],{encoding:'utf8',maxBuffer:8*1024*1024});}
+    catch(error){
+      let detail;try{detail=JSON.parse(String(error.stdout)).error;}catch{}
+      throw new Error(typeof detail==='string'?`OpenMausBot: ${detail}`:'OpenMausBot command failed; inspect the native run logs');
+    }
+  };
+  async function sections() {const res=await fetch(`http://127.0.0.1:${port}/api/sidebar-sections`,{signal:AbortSignal.timeout(10000)});if(!res.ok)throw new Error('native team list unavailable');return (await res.json()).sections??[];}
   async function bots() {const res=await fetch(`http://127.0.0.1:${port}/api/bots`,{signal:AbortSignal.timeout(10000)});if(!res.ok)throw new Error('native bot list unavailable');return (await res.json()).bots;}
   async function state() {
     const live=await bots();
@@ -46,13 +60,15 @@ async function main(env=process.env) {
     return {live,native,digest:sha(canonical(native)+fs.readFileSync(projectFile,'utf8')+canonical(live.map(b=>[b.id,b.name]).sort()))};
   }
   const op=env.OP||'list';
+  if(op==='connections')return require('./connections.cjs').inventory(env);
   if(op==='import')return require('./import-bot.cjs').importBot(env);
-  if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
+  if(op.startsWith('team-'))return teamTemplate(op,env,{root,base,port}).catch(error=>{throw new Error(error.detail?`${error.message}: ${error.detail}`:error.message);});
+  if(op==='list') return {bots:(await bots()).map(b=>({id:b.id,name:b.name,team:b.section||'',title:b.title,model:b.modelSelection,busy:b.busy,activity:b.activity}))};
   if(op==='read') {
     const current=await state(),bot=current.live.find(b=>b.id===env.BOT_ID);
     if(!bot)throw new Error('exact bot ID was not found');
     if(current.live.filter(b=>key(b.name)===key(bot.name)).length!==1)throw new Error('native team name is ambiguous across teams');
-    return {id:bot.id,bot:current.native.bots?.find(b=>key(b.name)===key(bot.name)),revision:current.digest};
+    return {id:bot.id,bot:current.native.bots?.find(b=>key(b.name)===key(bot.name)),mcpServers:bot.mcpServers??null,revision:current.digest};
   }
   if(op==='plan') {
     const action=env.ACTION;
@@ -71,7 +87,15 @@ async function main(env=process.env) {
       patch={approval:'ask',computer:'off',cwd:'${FYSO_ROOT}',...patch};
     } else guardTarget(target,action,patch);
     if(action==='update' && patch.name && current.live.some(b=>b.id!==target.id && key(b.name)===key(patch.name)))throw new Error('bot name already exists');
-    const plan={action,targetId:target?.id||null,targetName:target?.name||null,patch,base:current.digest};
+    if(patch.team!==undefined) {
+      // Only an existing team: creating one (and its brief) is a team.yaml decision.
+      const team=(await sections()).find(name=>key(name)===key(patch.team));
+      if(!team)throw new Error('team does not exist; declare it in project/bots/team.yaml first');
+      patch.team=team;
+    }
+    let connectionsRevision;
+    if(patch.tools) connectionsRevision=await require('./connections.cjs').checkSelection(patch.tools,env,target);
+    const plan={...(connectionsRevision ? {connectionsRevision} : {}),action,targetId:target?.id||null,targetName:target?.name||null,patch,base:current.digest};
     const planId=sha(canonical(plan)),dir=path.join(base,'plans',planId);
     fs.mkdirSync(dir,{recursive:true,mode:0o700});
     fs.writeFileSync(path.join(dir,'plan.json'),canonical(plan),{mode:0o600});
@@ -99,6 +123,7 @@ async function main(env=process.env) {
     const current=await state();
     if(current.digest!==plan.base)throw new Error('plan is stale; request a fresh preview');
     const target=current.live.find(b=>b.id===plan.targetId);
+    if(plan.patch.tools && await require('./connections.cjs').checkSelection(plan.patch.tools,env,target)!==plan.connectionsRevision)throw new Error('connections changed; request a fresh preview');
     if(plan.action!=='create')guardTarget(target,plan.action,plan.patch);
     // Build and scan the future project file BEFORE touching the runtime.
     const marker='__FYSO_ROOT__';
@@ -107,8 +132,8 @@ async function main(env=process.env) {
     const declared=doc.toJS().bots||[];
     const index=declared.findIndex(b=>key(b.name)===key(plan.targetName));
     if(plan.action==='delete') {if(index>=0)doc.get('bots').items.splice(index,1);}
-    else if(index>=0)for(const [field,value] of Object.entries(plan.patch))doc.setIn(['bots',index,field],value.replaceAll('${FYSO_ROOT}',marker));
-    else doc.addIn(['bots'],{name:plan.patch.name||plan.targetName,...Object.fromEntries(Object.entries(plan.patch).map(([k,v])=>[k,v.replaceAll('${FYSO_ROOT}',marker)]))});
+    else if(index>=0)for(const [field,value] of Object.entries(plan.patch))doc.setIn(['bots',index,field],typeof value==='string'?value.replaceAll('${FYSO_ROOT}',marker):value);
+    else doc.addIn(['bots'],{name:plan.patch.name||plan.targetName,...Object.fromEntries(Object.entries(plan.patch).map(([k,v])=>[k,typeof v==='string'?v.replaceAll('${FYSO_ROOT}',marker):v]))});
     const projectText=doc.toString().replaceAll(marker,'${FYSO_ROOT}');
     fs.writeFileSync(path.join(dir,'project.yaml'),projectText,{mode:0o600});
     execFileSync('gitleaks',['dir',dir,'--no-banner','--redact'],{stdio:['ignore','ignore','pipe']});
@@ -127,6 +152,8 @@ async function main(env=process.env) {
     if(plan.action==='delete' && verified.some(b=>b.id===plan.targetId))throw new Error('native deletion did not remove the target');
     if(plan.action==='create' && (!found || native.created!==1))throw new Error('native creation result did not match the plan');
     if(plan.action==='update' && (!found || found.id!==plan.targetId || native.created))throw new Error('native update changed target identity');
+    if(plan.patch.team!==undefined && key(found?.section||'')!==key(plan.patch.team))throw new Error('native team did not match the plan');
+    if(plan.patch.tools && canonical(require('./connections.cjs').validateTools(found?.toolScope||{}))!==canonical(plan.patch.tools))throw new Error('native tool selection did not match the plan');
     fs.writeFileSync(projectFile,projectText);
     execFileSync('git',['add','--','project/bots/team.yaml']);
     execFileSync('framework/scripts/check-paths.sh',[],{stdio:['ignore','pipe','pipe']});
@@ -139,23 +166,28 @@ async function main(env=process.env) {
   } finally {fs.rmdirSync(lock);}
 }
 
-async function submit(params,env=process.env) {
-  const name='fyso-bot-architect',base=`http://127.0.0.1:${env.FYSO_DAGU_PORT}/api/v1`;
-  const headers={Authorization:'Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'),'Content-Type':'application/json'};
-  const get=async(url,init)=>{const r=await fetch(url,{headers,signal:AbortSignal.timeout(10000),...init});if(!r.ok)throw new Error(`Dagu request failed (${r.status})`);return r.json();};
-  const started=await get(`${base}/dags/${name}/enqueue`,{method:'POST',body:JSON.stringify({params:JSON.stringify(params)})});
-  for(let n=0;n<180;n++) {
-    let detail;
-    try {detail=(await get(`${base}/dag-runs/${name}/${encodeURIComponent(started.dagRunId)}`)).dagRunDetails;}
-    catch {await new Promise(resolve=>setTimeout(resolve,1000));continue;}
-    if(detail.statusLabel==='succeeded') {
-      const output=(await get(`${base}/dag-runs/${name}/${encodeURIComponent(started.dagRunId)}/outputs`)).outputs.result;
-      return {runId:started.dagRunId,...(typeof output==='string'?JSON.parse(output):output)};
-    }
-    if(['failed','aborted','rejected','cancelled'].includes(detail.statusLabel))throw new Error(`Bot Architect workflow failed: ${started.dagRunId}; read its Dagu logs`);
-    await new Promise(resolve=>setTimeout(resolve,1000));
+// Department templates (D82): list extension packages, export one department, import one.
+async function teamTemplate(op,env,{root,base,port}) {
+  const templates=require('./team-template.cjs');
+  if(op==='team-templates')return {templates:templates.templates({root})};
+  if(op==='team-export')return templates.exportDepartment(env.DEPARTMENT||'',{root,port,tmp:base});
+  if(op!=='team-import')throw new Error('OP must be team-templates, team-export or team-import');
+  if(!!env.PACKAGE_B64===!!env.SOURCE)throw new Error('team-import needs PACKAGE_B64 or SOURCE');
+  if(env.SLUG && !/^[a-z0-9][a-z0-9-]{0,59}$/.test(env.SLUG))throw new Error('invalid SLUG');
+  let pkg;
+  if(env.PACKAGE_B64) {
+    if(env.PACKAGE_B64.length>Math.ceil(templates.MAX_BYTES*4/3)+8)throw new Error('too_large');
+    try{pkg=JSON.parse(Buffer.from(env.PACKAGE_B64,'base64').toString('utf8'));}catch{throw new Error('PACKAGE_B64 must encode one omb-team/1 package');}
   }
-  throw new Error(`workflow still active: ${started.dagRunId}; inspect it in Dagu`);
+  const lock=path.join(base,'.lock');fs.mkdirSync(lock);
+  try {
+    return await templates.importPackage(pkg||null,{source:env.SOURCE||undefined,slug:env.SLUG||undefined,root});
+  } finally {fs.rmdirSync(lock);}
+}
+
+async function submit(params,env=process.env) {
+  const {runId,output}=await require('./dagu-client.cjs').client(env).run('fyso-bot-architect',params,{output:'RESULT',timeoutMs:180000});
+  return {runId,...output};
 }
 if(require.main===module) {
   (process.argv[2]==='submit'?submit(JSON.parse(process.argv[3]||'{}')):main()).then(r=>console.log(JSON.stringify(r))).catch(e=>{console.error(e.message);process.exitCode=1;});
