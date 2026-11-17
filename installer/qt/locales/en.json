@@ -16,7 +16,7 @@
   "port_busy": "The port block starting at {port} is reserved or in use. Choose another or leave it blank.",
   "no_ports": "No free port block was found. Supply another using --port.",
   "starting": "Preparing installation…",
-  "bootstrap": "Preparing mise and Dagu…",
+  "bootstrap": "Preparing the tools…",
   "github": "Checking GitHub access…",
   "installing": "Installing {name} in {folder}…",
   "checking": "Verifying the project with doctor…",
