@@ -154,3 +154,40 @@ test('an unavailable plan-usage report is explicit and does not affect token usa
     assert.equal(result.sources.traces,'ok');
   } finally {global.fetch=original;fs.rmSync(root,{recursive:true,force:true});}
 });
+
+// D88: list-price table for engines that report no amount (Codex) and the optional subscription threshold.
+test('a known model without a reported amount gets an estimated list-price equivalent; an unknown model stays unknown',()=>{
+  const {loadPricing,applyPricing}=require('../template/framework/scripts/observability.cjs');
+  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-pricing-'));
+  try {
+    const pricing=loadPricing(root);
+    assert.equal(pricing.info.project,false); assert.match(pricing.info.checkedAt,/^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(pricing.info.sources.every(u=>u.startsWith('https://')));
+    const rows=applyPricing([
+      row({id:'sol',model:'gpt-6.1-sol',billingKind:'subscription',input:1e6,cachedInput:5e5,output:1e5}),
+      row({id:'other',model:'some-new-model',billingKind:'subscription',input:1e6,output:1e5}),
+      row({id:'reported',model:'gpt-6.1-sol',billingKind:'subscription',costUsd:0.5}),
+      row({id:'noTokens',model:'gpt-6.1-sol',billingKind:'subscription',input:null,output:null}),
+    ],pricing);
+    assert.ok(Math.abs(rows[0].costUsd-2.05)<1e-9); assert.equal(rows[0].costSource,'estimated');
+    assert.equal(rows[1].costUsd,null); assert.equal(rows[2].costUsd,0.5); assert.equal(rows[3].costUsd,null);
+    assert.equal(pricing.info.priced,1);
+    const {totals}=aggregate(rows);
+    assert.ok(Math.abs(totals.subscriptionEquivalentUsd-2.55)<1e-9); assert.equal(totals.apiReportedUsd,null); assert.equal(totals.missingCost,2);
+    fs.mkdirSync(path.join(root,'project'));
+    fs.writeFileSync(path.join(root,'project/pricing.json'),JSON.stringify({checkedAt:'2099-01-01',sources:{x:'https://example.com/pricing'},models:{'gpt-6.1-sol':{input:1,cachedInput:1,output:1},'Custom':{input:1,cachedInput:0,output:0}}}));
+    const local=loadPricing(root);
+    assert.equal(local.info.project,true); assert.equal(local.info.checkedAt,'2099-01-01');
+    assert.deepEqual(local.models['gpt-6.1-sol'],{input:1,cachedInput:1,output:1}); assert.ok(local.models.custom);
+    const warnings=[];
+    fs.writeFileSync(path.join(root,'project/pricing.json'),'{"models":{"bad":{"input":-1}}}');
+    assert.equal(loadPricing(root,warnings).models.bad,undefined); assert.deepEqual(warnings,['invalidPricing']);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+test('the subscription threshold is optional and warns per account window at or above it',()=>{
+  const windows=[{instanceId:'codex',engine:'codex',window:'weekly',usedPercent:85},{instanceId:'codex',engine:'codex',window:'fiveHour',usedPercent:null},{instanceId:'claude',engine:'claude',window:'fiveHour',usedPercent:40}];
+  assert.deepEqual(makeAlerts({subscriptionPercent:null},{},[],[],0,windows),[]);
+  assert.deepEqual(makeAlerts({},{},[],[],0,windows),[]);
+  assert.deepEqual(makeAlerts({subscriptionPercent:80},{},[],[],0,windows),[{kind:'subscription',value:85,limit:80,engine:'codex',window:'weekly'}]);
+});
