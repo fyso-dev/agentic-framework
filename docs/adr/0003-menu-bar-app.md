@@ -1,6 +1,6 @@
 # ADR 0003 — One native menu bar app and CLI for every instance (D85)
 
-Date: 2026-11-16 · Status: accepted (testable beta) · Supersedes D34 (SwiftBar plugin) · Extends D35 (macOS installer)
+Date: 2026-11-16 · Status: accepted (release candidate, D86) · Supersedes D34 (SwiftBar plugin) · Extends D35 (macOS installer)
 
 ## Context
 
@@ -32,9 +32,11 @@ Today there are two pieces, and neither fits:
 3. **Status** comes from the stack's own process-compose socket `/tmp/fyso-<slug>-<port>.sock` (`curl --unix-socket … /processes`, curl ships with macOS): *running* (every process ok), *degraded*, *stopped*. No new daemon.
 4. **Start/stop** run the project's own `mise -C <folder> run up|down` with the person's login-shell `PATH` (apps start with a minimal one; same rule as the installer and D34), output appended to `<folder>/.data/logs/tray.log`.
 5. **Current instance**: one line in `~/Library/Application Support/Fyso/current` (the folder). It is the default target of `fyso open|start|stop|status` and the instance whose state colours the menu bar icon. A successful *create* makes the new instance current. `FYSO_HOME` overrides the support folder (tests; the installer honours it too).
-6. **Biz edition**: the same build with `EDITION=biz` gives `Fyso Biz.app` (`FysoEdition=biz` in `Info.plist`, own bundle id). Its menu starts with **Iniciar sesión en Fyso Biz**, opened automatically on first launch; for this beta it opens the existing Biz login page (`FYSO_BIZ_LOGIN_URL`, default `https://fyso.biz/login`) and `create` passes `FYSO_EDITION=biz` to the installer. Receiving the session back and installing the Biz extension in the created instance are not built yet.
+6. **Biz edition**: the same build with `EDITION=biz` gives `Fyso Biz.app` (`FysoEdition=biz` in `Info.plist`, own bundle id). Its menu starts with **Iniciar sesión en Fyso Biz**, started automatically on first launch. Sign-in is OAuth 2.1 for native apps against Biz's own authorization server (D86): dynamic registration of one public client with the loopback redirect `http://127.0.0.1/callback`, PKCE S256, the browser at Biz's authorize page and a one-shot listener on `127.0.0.1:<ephemeral>` for the code (RFC 8252). The grant is saved as `FYSO_HOME/biz/oauth.json` (0600) in fyso-ext-biz's format. *Create* signs in first when needed, runs the installer with `FYSO_EDITION=biz`, moves the grant into the new project's `.data/ext/biz/oauth.json` and installs the `biz` extension (`ext.sh apply add biz`, the panel's install path; another origin given with `FYSO_BIZ_URL` uses `ext:add biz -- --defaults -d biz_url=…`). Biz rotates refresh tokens, so the app does not keep a copy: the next instance needs a new sign-in (usually one click while the Biz browser session lasts).
 7. **i18n**: every menu and CLI string is in `installer/macos/app/locales/{es,en}.json` (i18next-style `{{name}}`); the first macOS preferred language picks `en`, else `es`; `FYSO_LANG` overrides. User-facing words: *Agentes*, *Automatizaciones*, never tool names.
-8. **Signing** (PR #65): the executable is now a real Mach-O, so the app is signed with hardened runtime by `sign.sh` exactly like PR #65's launcher; its `launcher.c` becomes unnecessary once both land. swiftDialog stays sealed in `Helpers` with its own signature.
+8. **Signing** (PR #65, D86): the executable is a real Mach-O, so `sign.sh` signs the app with hardened runtime (`SIGN_IDENTITY`), notarizes and staples app and dmg (`NOTARY_PROFILE`, a keychain profile); PR #65's `launcher.c` is not needed. swiftDialog stays sealed in `Helpers` with its own signature.
+9. **Unregistered stacks**: a running stack whose folder is not in the registry is found from its `/tmp/fyso-*.sock` owner's cwd (as D34 did; `lsof`, cached per socket) and listed under *En marcha, sin registrar* with *Añadir a Fyso*; `fyso list` marks it `+` and `--json` gives `registered: false`.
+10. **Updates** (D86): at launch and daily the app reads this repository's GitHub Releases; the newest non-prerelease `macos-v<X.Y.Z>` with this edition's dmg, newer than `CFBundleShortVersionString` (`VERSION` in `build.sh`), shows *Actualizar a la versión X*. It opens the dmg download in the browser (quarantined, so Gatekeeper checks the notarization) and the person drags the new app over the old one. `fyso update [--check]` does the same.
 
 ## Migration from SwiftBar
 
@@ -46,4 +48,4 @@ Today there are two pieces, and neither fits:
 - One download, one icon, one CLI; the installer form is reached from the menu instead of being a separate app.
 - Still custom code: one Swift file (~500 lines) — the menu and the CLI glue over existing pieces (registry, process-compose socket, `mise run up/down`, installer script). It is the macOS counterpart of D34's Python plugin, not a new service.
 - Linux/Windows (D38) are unchanged; the CLI contract (`list/open/create/switch/start/stop`) is what a future Qt tray there would reuse.
-- Open for release: Developer ID signing and notarization of `Fyso.app` (PR #65 flow), Biz session hand-back and Biz extension in *create*, auto-update (Sparkle or similar, to be evaluated), live status for projects not in the registry.
+- Open: a real Developer ID notarization of this layout and a real fyso.biz sign-in (both verified only against an ad-hoc signature and a local OAuth server); in-place install and relaunch on update (Sparkle, if wanted); a CI job that builds and publishes the release.
