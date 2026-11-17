@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D85, D88; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D85, D88, D89; D6, D9, D22 superseded; D16 resolved by D20; D82's two-way sync amended by D89) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -76,7 +76,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Native teams and Biz work delivery: beta scope, acceptance and checkpoint | [teams-biz-delivery.md](teams-biz-delivery.md) |
-| Department templates: `omb-team/1` packages, core import/export, extension `teams/` slot, Biz publishing and synchronization (D82) | [team-templates.md](team-templates.md) |
+| Department templates: `omb-team/1` packages, core import/export, extension `teams/` slot (D82); one-way Biz sync: publish once, then change proposals decided on fyso.biz, Biz name always wins (D89) | [team-templates.md](team-templates.md) |
 | Langfuse integration: OMB traces exported over OTLP (independent Copier repository; D48) | [fyso-dev/fyso-ext-langfuse](https://github.com/fyso-dev/fyso-ext-langfuse) · [evidence](../artifacts/delivery-evidence/langfuse/README.md) |
 | Agent surface: the `fyso` platform MCP (project map and file reads, typed tools over the panel workflows, forwarded Dagu tools for desktop agents, workflow scopes for bot groups) and Dagu's MCP + skill for coding agents (D33, D57, D60) | [agent-surface.md](agent-surface.md) |
 | Multi-host: a host is an SSH alias; Dagu workers + OMB VPS computers | [PLAN §13](PLAN.md#13-multi-host-d18) |
@@ -108,6 +108,8 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+2026-11-16: One-way Biz model (D89). Two-way synchronization let a project overwrite the Biz team, and a legacy download whose local name differed from Biz flipped the name and committed on every sync. Biz is now the source of truth: a department is published once to create its team, later local changes are proposals an admin decides on fyso.biz, and the Biz name wins on every sync. End to end against a local Biz: publish v1, propose, accept, pull v2; a second proposal rejected with its reason left Biz on v2. The panel in a browser and applying the pull in OMB remain unverified. [fyso-ext-biz #6](https://github.com/fyso-dev/fyso-ext-biz/pull/6) · [fyso-business #622](https://github.com/fyso-dev/fyso-business/pull/622)
 
 2026-11-16: Department imports store each package’s skills under its content digest. The currently applied declaration keeps its exact skill files while a replacement is reviewed or discarded.
 

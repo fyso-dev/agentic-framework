@@ -1,8 +1,10 @@
 # Department templates
 
-A **department template** is one OpenMausBot department (team) with its bots, rooms, shared instructions and skills, in OpenMausBot's own team file format. It moves a department between projects: shipped by an extension, published to Fyso Business, pulled by another project and kept in sync. Decision: [PLAN D82](PLAN.md#2-decisions-log).
+A **department template** is one OpenMausBot department (team) with its bots, rooms, shared instructions and skills, in OpenMausBot's own team file format. It moves a department between projects: shipped by an extension, published to Fyso Business, pulled by another project and kept in sync. Decisions: [PLAN D82](PLAN.md#2-decisions-log) (packages and core capability) and [D89](PLAN.md#2-decisions-log) (Biz to local is one-way).
 
 ## Delivery
+
+> The delivery below is the D82 beta, which synchronized in both directions. D89 replaced that with the one-way model described in [Synchronization](#synchronization-fyso-ext-biz); the checkpoint stays as the record of that run.
 
 - **Outcome:** a person installs an extension that ships the *Ventas* and *Marketing* departments, adds them to project A, publishes one to Fyso Business, and project B pulls it with its full configuration. Later changes on either side are synchronized; when both sides changed, synchronization stops and the person chooses.
 - **Level:** testable beta on the local Biz (`http://localhost:8787`) with two generated projects. Production Biz follows through a reviewed fyso-business PR.
@@ -84,18 +86,25 @@ Errors are the run's failure message: `unsupported_format`, `invalid_package: <d
 
 - `publicar_equipo({paquete, equipo_id?, version_base?, departamento_id?})`: without `equipo_id` creates a team from the package (its name, and its shared instructions as the team prompt) at version 1; with it, publishes a new version only when `version_base` equals the current version, else returns `version_conflict` with the current version. Same write authorization as the team catalog; the package is validated (format, size, one department).
 - `exportar_equipo` also returns `paquete` (the package of the published version) when the team has one; existing fields are unchanged.
+- `proponer_cambio_equipo({equipo_id, version_base, paquete})` records a change proposal for a team (D89). A `version_base` other than the current version returns `version_conflict`. `listar_propuestas_equipo` lists a team's proposals with their state (`pendiente`, `aceptada`, `rechazada`) and the rejection reason. `decidir_propuesta_equipo` (admin only, with the person's confirmation) accepts one, which publishes it as the next version, or rejects it with a reason. Accepting a proposal whose base is no longer current rejects it instead. Proposals are stored in `equipo_changelog` (version 0), with no new schema. Decision: [ADR 0127 in fyso-business #622](https://github.com/fyso-dev/fyso-business/pull/622).
 
 ## Synchronization (fyso-ext-biz)
 
+Biz to local is one-way (D89). Fyso Business is the source of truth for every department linked to a Biz team; the project proposes changes and never overwrites Biz.
+
 `project/biz-teams.json` records, per department: `equipo_id`, the Biz `version` and the package `digest` at the last publish or pull. *Synchronize* compares:
 
-| Local digest changed | Biz version changed | Action |
-|---|---|---|
-| no | no | nothing |
-| no | yes | pull (import, review, apply) |
-| yes | no | publish with `version_base` |
-| yes | yes | conflict: show both; the person chooses *pull from Biz* (local edits stay in git history) or *publish mine* |
+| Department | Local digest changed | Biz version changed | Action |
+|---|---|---|---|
+| no Biz team | — | — | publish once, which creates the team at version 1 |
+| linked | no | no | nothing |
+| linked | no | yes | pull (import, review, apply) |
+| linked | yes | either | propose the change; it waits on fyso.biz for a decision |
 
-Each publish or pull commits `project/biz-teams.json`.
+- **Publish once.** Only a department with no Biz team is published. A linked department refuses `publish` (`linked_to_biz`).
+- **Proposals.** A local change to a linked department becomes a change proposal (`team-propose` → `proponer_cambio_equipo`), identified by `equipo_id` + `version_base`. While one is pending the panel checks Biz every 60 seconds and on *Check*. An accepted proposal returns as a normal pull. A rejected one is shown with its reason, Biz stays on its current version, and the local edits stay in git until the person pulls or proposes again.
+- **The Biz name always wins.** Every sync takes the Biz team's current name, even without a new version. A department renamed locally is shown as *renamed*, with two actions. *Restore Biz name* (`team-rename`) proposes the rename as a `team.yaml` change that the person reviews and applies like a pull; the extension never writes `team.yaml` directly (D82). *Propose new name* sends the new name to Biz as a proposal.
+
+Each publish or pull commits `project/biz-teams.json`. Implementation: [fyso-ext-biz #6](https://github.com/fyso-dev/fyso-ext-biz/pull/6).
 
 The Biz team id (`equipoId`) is the department's stable identity on the local side: the Biz team list and the sync list match by it. A department downloaded before packages existed (fyso-equipo/v1, `project/bots/biz/<slug>/source.json`) is recorded under its Biz team id the first time the sync list is read, so it publishes to that team instead of creating a second one, and follows the Biz team's name on later downloads. (Finding 2026-11-16: the two lists read different files, so groups in Biz and in the project did not match.)
