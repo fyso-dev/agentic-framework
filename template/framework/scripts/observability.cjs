@@ -23,14 +23,15 @@ function normalizeHarness(text, provider) {
   return Object.fromEntries(['input','output','cachedInput','costUsd'].map(k => [k,knownSum(usage.map(u => u[k]))]));
 }
 
-function aggregate(records) {
+const GROUP_KEY = ['bot','model','engine','billingKind','source'];
+function aggregate(records, keyFields = GROUP_KEY) {
   const seen = new Set();
   const groups = new Map();
-  const empty = () => ({turns:0,input:null,output:null,cachedInput:null,apiReportedUsd:null,subscriptionEquivalentUsd:null,estimatedApiUsd:null,unclassifiedUsd:null,missingCost:0,missingTokens:0});
+  const empty = () => ({turns:0,input:null,output:null,cachedInput:null,reasoning:null,apiReportedUsd:null,subscriptionEquivalentUsd:null,estimatedApiUsd:null,unclassifiedUsd:null,missingCost:0,missingTokens:0});
   const totals = empty();
   const add = (to, row) => {
     to.turns++;
-    for (const k of ['input','output','cachedInput']) to[k] = knownSum([to[k],row[k]]);
+    for (const k of ['input','output','cachedInput','reasoning']) to[k] = knownSum([to[k],row[k]]);
     if (row.input === null || row.output === null) to.missingTokens++;
     if (numeric(row.costUsd) === null) {to.missingCost++; return;}
     const bucket = row.billingKind === 'subscription' ? 'subscriptionEquivalentUsd' : row.billingKind === 'api' ? (row.costSource === 'estimated' ? 'estimatedApiUsd' : row.costSource === 'reported' ? 'apiReportedUsd' : 'unclassifiedUsd') : 'unclassifiedUsd';
@@ -39,11 +40,27 @@ function aggregate(records) {
   for (const row of records) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    const key = JSON.stringify([row.bot,row.model,row.billingKind,row.source]);
-    if (!groups.has(key)) groups.set(key,{...empty(),bot:row.bot,model:row.model,billingKind:row.billingKind,source:row.source});
+    const key = JSON.stringify(keyFields.map(k => row[k] ?? null));
+    if (!groups.has(key)) groups.set(key,{...empty(),...Object.fromEntries(keyFields.map(k => [k,row[k] ?? null]))});
     add(totals,row); add(groups.get(key),row);
   }
   return {totals,groups:[...groups.values()]};
+}
+
+// D84: subscription windows as OMB reports them (GET /api/plan-usage, its 45 s cache). Only the percentage, reset
+// and check time leave OMB; no account, token or error text. A missing or closed window is `null` (unknown), never 0.
+const WINDOWS = ['fiveHour','weekly'];
+const SUBSCRIPTION_MAX_AGE_MS = 5*60*1000;
+function normalizePlanUsage(report) {
+  if (!report || typeof report !== 'object' || !Array.isArray(report.providers)) throw new Error('invalid plan usage');
+  const iso = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+  const checkedAt = iso(report.fetchedAt);
+  const text = value => typeof value === 'string' && value.length <= 80 ? value : null;
+  return report.providers.filter(p => p && typeof p === 'object' && typeof p.id === 'string').flatMap(p => WINDOWS.map(window => {
+    const w = p.ok === true && p[window] && p[window].available === true ? p[window] : null;
+    const usedPercent = w && numeric(w.usedPercent) !== null && w.usedPercent <= 100 ? w.usedPercent : null;
+    return {instanceId:p.id,engine:text(p.driver),plan:text(p.plan),window,usedPercent,resetsAt:usedPercent === null ? null : iso(w.resetsAt),checkedAt};
+  }));
 }
 
 function makeAlerts(settings, usage, runs, traces, now) {
@@ -79,7 +96,7 @@ async function collect(env = process.env, now = new Date()) {
         const r = JSON.parse(line);
         if (!r.botId || !r.threadId || !r.at || !r.model || numeric(r.input) === null || numeric(r.output) === null) throw new Error('invalid row');
         if (r.at.slice(0,7) !== month || Date.parse(r.at) > now.getTime()) continue;
-        records.push({id:`omb:${r.at}|${r.threadId}|${r.botId}`,source:'omb',threadId:r.threadId,turnId:r.turnId,parent:r.parent,bot:r.botName || r.botId,model:r.model,
+        records.push({id:`omb:${r.at}|${r.threadId}|${r.botId}`,source:'omb',day:r.at.slice(0,10),engine:typeof r.instanceId === 'string' ? r.instanceId : 'unknown',reasoning:numeric(r.reasoning),threadId:r.threadId,turnId:r.turnId,parent:r.parent,bot:r.botName || r.botId,model:r.model,
           billingKind:['api','subscription'].includes(billing[r.instanceId]) ? billing[r.instanceId] : 'unknown',
           input:(r.usageStatus==='unavailable'||(!r.usageStatus&&!r.input&&!r.output))?null:numeric(r.input),output:(r.usageStatus==='unavailable'||(!r.usageStatus&&!r.input&&!r.output))?null:numeric(r.output),cachedInput:numeric(r.cachedInput),costUsd:numeric(r.costUsd),costSource:r.costSource || 'reported'});
       } catch {invalidRows++;}
@@ -105,6 +122,19 @@ async function collect(env = process.env, now = new Date()) {
     }
     sources.traces='ok';
   } catch {sources.traces='unavailable';}
+  // OMB reports every Claude/Codex/Grok instance; an API-key engine has no subscription window of its own.
+  const subscribed=r=>billing[r.instanceId]!=='api';
+  // The provider endpoints behind plan-usage are rate limited: reuse a check younger than SUBSCRIPTION_MAX_AGE_MS.
+  let subscription=[];
+  try {
+    const previous=JSON.parse(fs.readFileSync(path.join(data,'panel/observability.json'),'utf8')).subscription;
+    const fresh=Array.isArray(previous) && previous.length>0 && previous.every(r=>now.getTime()-Date.parse(r.checkedAt)<SUBSCRIPTION_MAX_AGE_MS && Date.parse(r.checkedAt)<=now.getTime());
+    if (fresh) subscription=previous.map(r=>pick(r,['instanceId','engine','plan','window','usedPercent','resetsAt','checkedAt']));
+    subscription=subscription.filter(subscribed);
+  } catch {}
+  if (subscription.length) sources.subscription='ok';
+  else try {subscription=normalizePlanUsage(await get(env.FYSO_OMB_PORT,'/api/plan-usage')).filter(subscribed); sources.subscription=subscription.length?'ok':'empty';}
+  catch {sources.subscription='unavailable';}
   let runs=[],runsTruncated=false;
   const auth='Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64');
   const runShape = r => ({id:r.dagRunId,dag:r.name,statusLabel:r.statusLabel,startedAt:r.startedAt,finishedAt:r.finishedAt,retries:r.autoRetryCount ?? 0,sourceThread:null,sourceTurn:null});
@@ -146,7 +176,7 @@ async function collect(env = process.env, now = new Date()) {
         let text=''; try {text=fs.readFileSync(path.join(dir,'agent.txt'),'utf8');} catch {}
         let provider=/\"type\"\s*:\s*\"result\"/.test(text) ? 'claude' : /\"type\"\s*:\s*\"(?:thread.started|turn.completed)\"/.test(text) ? 'codex' : 'unknown';
         const usage=normalizeHarness(text,provider);
-        records.push({id,source:'harness',bot:'Builder',model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...usage,costSource:'reported',runId:meta.dagRunId});
+        records.push({id,source:'harness',day:new Date(meta.startedAt).toISOString().slice(0,10),engine:provider,reasoning:null,bot:'Builder',model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...usage,costSource:'reported',runId:meta.dagRunId});
       } catch {artifactFailures++;}
     }
     sources.harness='ok';
@@ -154,7 +184,7 @@ async function collect(env = process.env, now = new Date()) {
   if (artifactFailures) warnings.push('invalidArtifacts');
   // Runs without any usage artifact still have an explicitly unknown consumption record.
   for (const run of runs.filter(r=>['fyso-dev-task','dev-task'].includes(r.dag) && r.startedAt?.startsWith(month))) {
-    if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
+    if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',day:run.startedAt.slice(0,10),engine:'unknown',reasoning:null,bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
   }
   const turns=new Map(records.filter(r=>r.source==='omb' && r.turnId).map(r=>[`${r.threadId}~${r.turnId}`,r]));
   const rootOf = row => {
@@ -179,8 +209,9 @@ async function collect(env = process.env, now = new Date()) {
   }
   runs.sort((a,b)=>Date.parse(b.startedAt)-Date.parse(a.startedAt));
   const usage=aggregate(records);
-  return {version:1,collectedAt:now.toISOString(),from,to:now.toISOString().slice(0,10),sources,warnings:[...new Set(warnings)],invalidRows,
-    coverage:{tracesTruncated,runsTruncated},usage,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime())};
+  const daily=aggregate(records,['day','bot','model','engine']).groups;
+  return {version:2,collectedAt:now.toISOString(),from,to:now.toISOString().slice(0,10),sources,warnings:[...new Set(warnings)],invalidRows,
+    coverage:{tracesTruncated,runsTruncated},usage,daily,subscription,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime())};
 }
 
 if (require.main === module) {
@@ -194,4 +225,4 @@ if (require.main === module) {
     console.log(JSON.stringify({collectedAt:result.collectedAt,sources:result.sources,records:result.usage.totals.turns,durationMs:Math.round(performance.now()-started)}));
   }).catch(()=>{console.error('observability collection failed; previous snapshot retained');process.exitCode=1;});
 }
-module.exports={normalizeHarness,aggregate,makeAlerts,collect};
+module.exports={normalizeHarness,normalizePlanUsage,aggregate,makeAlerts,collect};
