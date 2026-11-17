@@ -1,4 +1,4 @@
 id: omb
-name: OpenMausBot
-description: {es: Bots y conversaciones, en: Bots and conversations}
+name: {es: Agentes, en: Agents}
+description: {es: Conversaciones con los agentes, en: Conversations with the agents}
 icon: bot

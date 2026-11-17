@@ -123,9 +123,9 @@ absent can still be removed from the declaration after review.
 
 Output `apply`: `{ created, changed, deleted, commit: string }`. On failure the run fails, and the panel shows the action's failed state with the link to the logs.
 
-### `fyso-ext-catalog` and `fyso-ext-install` — marketplace (D31)
+### `fyso-ext-catalog`, `fyso-ext-install` and `fyso-ext-remove` — marketplace (D31, D83)
 
-Read the extension catalogs (output `catalog`) and install or upgrade one extension (params `ID`, `MODE`; output `result`). Shapes and behavior: [extensions-contract.md §8](extensions-contract.md#8-marketplace-d31).
+Read the extension catalogs (output `catalog`), install or upgrade one extension (params `ID`, `MODE`; output `result`) and uninstall one after an in-page confirmation (param `ID`; output `result`). Shapes and behavior: [extensions-contract.md §8](extensions-contract.md#8-marketplace-d31).
 
 ### `fyso-snapshot` — save now (exists)
 
@@ -171,9 +171,11 @@ The screen uses the existing Dagu enqueue/poll flow to refresh the exporter and
 polls the summary every 15 seconds. A summary older than five minutes is stale.
 A 404 is an actionable no-summary state, not zero consumption. Failed source
 reads are explicit; collection does not overwrite previous data on fatal errors.
-Bot/model selectors filter usage, and bot selects conversation roots containing
-that bot. Conversation aggregates retain the entire delegation tree; filtering
-does not allocate shared work by guesswork. Run/alert lists remain project-wide.
+Period/agent/model/engine selectors filter the chart, totals and usage table from
+the `daily` rows; agent and period select conversation roots containing that agent.
+Conversation aggregates retain the entire delegation tree; filtering does not
+allocate shared work by guesswork. Alerts remain project-wide. Subscription
+windows (`subscription`, D84) are per engine account and never filtered.
 
 Optional native identifiers `SOURCE_THREAD`/`SOURCE_TURN` on `fyso-dev-task` are
 captured as the run's `ORIGIN` JSON output, independently of agent success.

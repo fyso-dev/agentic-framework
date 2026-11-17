@@ -65,6 +65,10 @@
   --fy-shadow-modal: 0 40px 80px -32px rgba(10, 10, 15, 0.45);
   --fy-scrim: rgba(14, 14, 18, 0.38);
   --fy-edge: transparent;
+  --fy-chart-1: #6e1fff;
+  --fy-chart-2: #b99bff;
+  --fy-chart-3: #0f8a8a;
+  --fy-chart-4: #c26a00;
   color-scheme: light;
 }
 
@@ -96,6 +100,10 @@
   --fy-shadow-modal: 0 40px 80px -32px rgba(0, 0, 0, 0.7);
   --fy-scrim: rgba(0, 0, 0, 0.6);
   --fy-edge: rgba(255, 255, 255, 0.06);
+  --fy-chart-1: #9d6bff;
+  --fy-chart-2: #5b3fa8;
+  --fy-chart-3: #3cc4c4;
+  --fy-chart-4: #f0a040;
   color-scheme: dark;
 }
 
@@ -585,6 +593,29 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 .observ-table th { color: var(--fy-mute); font-weight: 700; }
 .observ-table td:last-child { white-space: normal; min-width: 100px; }
 .observ-table tbody tr:last-child td { border: 0; }
+/* AI usage (D84): subscription windows, daily chart. */
+.plan-usage { padding: 18px; display: grid; gap: 14px; }
+.plan-accounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.plan-account { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--fy-line); border-radius: var(--fy-radius-lg); }
+.plan-account h3 { margin: 0; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+.plan-account h3 .plan-engine { text-transform: capitalize; }
+.plan-window { display: grid; gap: 6px; }
+.plan-window-head { display: flex; justify-content: space-between; font-size: 13px; }
+.plan-window-head strong { font-variant-numeric: tabular-nums; }
+.plan-window-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12px; }
+.plan-meter { height: 8px; border-radius: var(--fy-radius-pill); background: var(--fy-unk-soft); overflow: hidden; }
+.plan-meter span { display: block; height: 100%; border-radius: inherit; background: var(--fy-accent); }
+.plan-meter[data-level="warn"] span { background: var(--fy-warn); }
+.plan-meter[data-level="down"] span { background: var(--fy-down); }
+.observ-chart-head { display: flex; align-items: center; gap: 12px; }
+.observ-chart { padding: 18px; display: grid; gap: 10px; }
+.usage-chart { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.usage-chart .u-over { cursor: crosshair; }
+.usage-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.usage-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.segmented { display: inline-flex; border: 1px solid var(--fy-line-2); border-radius: var(--fy-radius-md); overflow: hidden; }
+.segmented button { border: 0; background: transparent; color: var(--fy-text); font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer; }
+.segmented button.active { background: var(--fy-accent-soft); color: var(--fy-accent-text); font-weight: 700; }
 .observ-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .observ-filters label { display: flex; gap: 8px; align-items: center; }
 .observ-filters .select { width: auto; }

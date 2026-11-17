@@ -6,7 +6,7 @@ UI copy is **Spanish by default, with English included** (simple i18n, PLAN D12)
 
 ## Product vocabulary
 
-Use **Agente / Agentes** in Spanish and **Agent / Agents** in English for project assistants throughout the panel and extension pages. Native product names such as OpenMausBot and the existing Bot Architect profile keep their names so people can find them. Internal translation keys, routes, CLI commands and native configuration fields retain their existing identifiers. This vocabulary supersedes the older Bot/Bots copy in this design study.
+Use **Agente / Agentes** in Spanish and **Agent / Agents** in English for project assistants throughout the panel and extension pages. The existing Bot Architect profile keeps its name so people can find it. Underlying tool names (OpenMausBot, Dagu, Caddy, mise…) never appear in UI copy: the [user-facing glossary](ui-glossary.md) gives the business term for each, which supersedes the tool names used elsewhere in this design study. Internal translation keys, routes, CLI commands and native configuration fields retain their existing identifiers. This vocabulary supersedes the older Bot/Bots copy in this design study.
 
 ## Purpose
 
