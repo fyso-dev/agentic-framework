@@ -97,3 +97,5 @@ Errors are the run's failure message: `unsupported_format`, `invalid_package: <d
 | yes | yes | conflict: show both; the person chooses *pull from Biz* (local edits stay in git history) or *publish mine* |
 
 Each publish or pull commits `project/biz-teams.json`.
+
+The Biz team id (`equipoId`) is the department's stable identity on the local side: the Biz team list and the sync list match by it. A department downloaded before packages existed (fyso-equipo/v1, `project/bots/biz/<slug>/source.json`) is recorded under its Biz team id the first time the sync list is read, so it publishes to that team instead of creating a second one, and follows the Biz team's name on later downloads. (Finding 2026-11-16: the two lists read different files, so groups in Biz and in the project did not match.)
