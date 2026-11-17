@@ -133,7 +133,12 @@ def install(request):
             run(['bash', RES / 'mise-bootstrap.sh', '--version'], env={**env, 'MISE_INSTALL_PATH': mise})
         env['PATH'] = str(Path(mise).parent) + os.pathsep + env.get('PATH', '')
         source = request.get('source', 'gh:fyso-dev/agentic-framework')
-        if source.startswith('gh:'):
+        # A public source needs only Git; GitHub CLI signs in only when Git cannot read it.
+        public = source.startswith('gh:') and subprocess.run(
+            ['git', 'ls-remote', '--heads', f'https://github.com/{source[3:]}.git'],
+            env={**env, 'GIT_TERMINAL_PROMPT': '0', 'GCM_INTERACTIVE': 'never'},
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+        if source.startswith('gh:') and not public:
             run([mise, 'install', GH], env=env)
             gh = [mise, 'exec', GH, '--', 'gh']
             status = subprocess.run([*gh, 'auth', 'status', '-h', 'github.com'], env=env)

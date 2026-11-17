@@ -48,6 +48,7 @@ STEP_tool_gitleaks='gitleaks (seguridad)'
 STEP_tool_node='Node.js'
 STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
+STEP_tool_uv='uv (ejecuta Copier)'
 
 STEP_tool_go='Go (compilación del acceso web)'
 STEP_tool_pnpm='pnpm (Tinyauth)'
