@@ -26,5 +26,7 @@ export type Observation = {
   sources: Record<string, string>; warnings: string[]; invalidRows: number;
   coverage: {tracesTruncated: boolean; runsTruncated: boolean};
   usage: {totals: Usage; groups: UsageGroup[]}; daily?: DailyUsage[]; subscription?: SubscriptionWindow[]; traces: Trace[]; runs: ObservedRun[];
-  alerts: {kind: string; value: number; limit: number; runId?: string; dag?: string; traceId?: string}[];
+  /** D88: the list-price table used for amounts the engine does not report; `priced` = turns estimated with it. */
+  pricing?: {checkedAt: string | null; sources: string[]; project: boolean; priced: number};
+  alerts: {kind: string; value: number; limit: number; runId?: string; dag?: string; traceId?: string; engine?: string; window?: "fiveHour" | "weekly"}[];
 };

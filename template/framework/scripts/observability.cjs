@@ -63,8 +63,52 @@ function normalizePlanUsage(report) {
   }));
 }
 
-function makeAlerts(settings, usage, runs, traces, now) {
+// D88: list prices (USD per million tokens) for turns whose engine reports no amount, such as Codex.
+// framework/pricing.json is the default; project/pricing.json overrides or adds models. Unknown model: no amount.
+const RATE_KEYS = ['input','cachedInput','output'];
+function validRates(rates) {
+  return rates && typeof rates === 'object' && RATE_KEYS.every(k => numeric(rates[k]) !== null);
+}
+function loadPricing(root, warnings = []) {
+  const read = (file, optional) => {
+    try {
+      const table = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (!table || typeof table !== 'object' || !table.models || typeof table.models !== 'object') throw new Error('invalid pricing');
+      return table;
+    } catch (e) { if (!(optional && e.code === 'ENOENT')) warnings.push('invalidPricing'); return null; }
+  };
+  const base = read(path.join(__dirname, '../pricing.json'), false), local = read(path.join(root, 'project/pricing.json'), true);
+  const models = {};
+  for (const table of [base, local]) for (const [id, rates] of Object.entries(table?.models || {}))
+    if (validRates(rates)) models[id.toLowerCase()] = pick(rates, RATE_KEYS); else warnings.push('invalidPricing');
+  const tables = [base, local].filter(Boolean);
+  const sources = [...new Set(tables.flatMap(t => Object.values(t.sources || {})).filter(u => typeof u === 'string' && /^https:\/\//.test(u)))];
+  const dates = tables.map(t => t.checkedAt).filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return {models, info:{checkedAt:dates.at(-1) || null, sources, project:!!local, priced:0}};
+}
+// Cached input is a subset of input; reasoning is a subset of output (D26).
+function estimateUsd(row, models) {
+  const rates = typeof row.model === 'string' ? models[row.model.toLowerCase()] : null;
+  if (!rates || numeric(row.input) === null || numeric(row.output) === null) return null;
+  const cached = Math.min(numeric(row.cachedInput) ?? 0, row.input);
+  return ((row.input - cached) * rates.input + cached * rates.cachedInput + row.output * rates.output) / 1e6;
+}
+function applyPricing(records, pricing) {
+  for (const row of records) {
+    if (numeric(row.costUsd) !== null) continue;
+    const usd = estimateUsd(row, pricing.models);
+    if (usd === null) continue;
+    row.costUsd = usd; row.costSource = 'estimated'; pricing.info.priced++;
+  }
+  return records;
+}
+
+function makeAlerts(settings, usage, runs, traces, now, subscription = []) {
   const alerts = [];
+  // D88: optional advisory on the account's subscription window; warning only, never a stop.
+  if (numeric(settings.subscriptionPercent) !== null && settings.subscriptionPercent <= 100)
+    for (const w of subscription) if (numeric(w.usedPercent) !== null && w.usedPercent >= settings.subscriptionPercent)
+      alerts.push({kind:'subscription',value:w.usedPercent,limit:settings.subscriptionPercent,engine:w.engine || w.instanceId,window:w.window});
   if (numeric(settings.monthlyApiUsd) !== null && usage.apiReportedUsd !== null && usage.apiReportedUsd >= settings.monthlyApiUsd)
     alerts.push({kind:'budget',value:usage.apiReportedUsd,limit:settings.monthlyApiUsd});
   const failures = runs.filter(r=>['failed','aborted','rejected','partially_succeeded'].includes(r.statusLabel)).length;
@@ -85,7 +129,7 @@ async function collect(env = process.env, now = new Date()) {
   const month = now.toISOString().slice(0,7), from = `${month}-01`;
   const warnings = [], sources = {};
   const settingsPath = path.join(root,'project/observability.json');
-  let settings = {monthlyApiUsd:null,longRunSeconds:600,maxRecentFailures:1,billingKinds:{}};
+  let settings = {monthlyApiUsd:null,longRunSeconds:600,maxRecentFailures:1,subscriptionPercent:null,billingKinds:{}};
   try {settings={...settings,...JSON.parse(fs.readFileSync(settingsPath,'utf8'))};} catch (e) {if (e.code !== 'ENOENT') warnings.push('invalidSettings');}
   const billing = {...kinds,...settings.billingKinds};
   const records = [], ledger = path.join(data,'omb/usage',`${month}.jsonl`);
@@ -186,6 +230,8 @@ async function collect(env = process.env, now = new Date()) {
   for (const run of runs.filter(r=>['fyso-dev-task','dev-task'].includes(r.dag) && r.startedAt?.startsWith(month))) {
     if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',day:run.startedAt.slice(0,10),engine:'unknown',reasoning:null,bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
   }
+  const pricing=loadPricing(root,warnings);
+  applyPricing(records,pricing);
   const turns=new Map(records.filter(r=>r.source==='omb' && r.turnId).map(r=>[`${r.threadId}~${r.turnId}`,r]));
   const rootOf = row => {
     let current=row;
@@ -211,7 +257,7 @@ async function collect(env = process.env, now = new Date()) {
   const usage=aggregate(records);
   const daily=aggregate(records,['day','bot','model','engine']).groups;
   return {version:2,collectedAt:now.toISOString(),from,to:now.toISOString().slice(0,10),sources,warnings:[...new Set(warnings)],invalidRows,
-    coverage:{tracesTruncated,runsTruncated},usage,daily,subscription,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime())};
+    coverage:{tracesTruncated,runsTruncated},usage,daily,subscription,pricing:pricing.info,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime(),subscription)};
 }
 
 if (require.main === module) {
@@ -225,4 +271,4 @@ if (require.main === module) {
     console.log(JSON.stringify({collectedAt:result.collectedAt,sources:result.sources,records:result.usage.totals.turns,durationMs:Math.round(performance.now()-started)}));
   }).catch(()=>{console.error('observability collection failed; previous snapshot retained');process.exitCode=1;});
 }
-module.exports={normalizeHarness,normalizePlanUsage,aggregate,makeAlerts,collect};
+module.exports={normalizeHarness,normalizePlanUsage,aggregate,makeAlerts,loadPricing,estimateUsd,applyPricing,collect};

@@ -45,6 +45,25 @@ skill.write_text('Root: '+os.environ['FYSO_ROOT']+'\\nHome: '+os.environ['HOME']
             subprocess.run(command, env=env, check=True, capture_output=True)
             self.assertFalse(stale.exists())
 
+    def test_snapshot_path_check_covers_only_the_snapshot_paths(self):
+        # A project generated from a local template clone records that clone in
+        # .copier-answers.yml; it must not make every snapshot fail.
+        with tempfile.TemporaryDirectory(prefix="fyso-check-paths-") as directory:
+            root = Path(directory)
+            git = lambda *a: subprocess.run(["git", *a], cwd=root, check=True, capture_output=True)
+            git("init", "-q")
+            host = "/" + "Users/someone"  # split so this file passes check-paths itself
+            (root / ".copier-answers.yml").write_text(f"_src_path: {host}/template\n")
+            (root / "state").mkdir()
+            (root / "state/ok.md").write_text("portable\n")
+            git("add", "-A")
+            check = str(ROOT / "template/framework/scripts/check-paths.sh")
+            self.assertEqual(subprocess.run([check, "state", "project/wiki"], cwd=root, capture_output=True).returncode, 0)
+            self.assertEqual(subprocess.run([check], cwd=root, capture_output=True).returncode, 1)
+            (root / "state/bad.md").write_text(f"{host}/notes\n")
+            git("add", "-A")
+            self.assertEqual(subprocess.run([check, "state"], cwd=root, capture_output=True).returncode, 1)
+
     def test_render_preserves_instruction_placeholders_and_resolves_only_file_paths(self):
         with tempfile.TemporaryDirectory(prefix="fyso-team-render-") as directory:
             root = Path(directory)

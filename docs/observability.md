@@ -1,6 +1,6 @@
 # Bot observability contract — Phase 5.5
 
-D26, extended by D84 (AI usage view and subscription percentage). A read-only panel summary over existing OMB and Dagu records. No custom server,
+D26, extended by D84 (AI usage view and subscription percentage) and D88 (list-price table and subscription threshold). A read-only panel summary over existing OMB and Dagu records. No custom server,
 external telemetry service, or copy of conversation bodies is introduced.
 
 ## Sources and persistence
@@ -46,6 +46,25 @@ OMB are undocumented and may change; the framework never reads credentials itsel
 The subscription equivalent USD stays labelled as an estimate at list price and is
 never presented as a share of a quota.
 
+## List-price table (D88)
+
+Some engines report tokens but no amount (Codex). For those turns the exporter
+estimates a list-price equivalent from `framework/pricing.json`: USD per million
+tokens for `input`, `cachedInput` and `output` per model ID, with `checkedAt` and
+the official `sources`. An optional `project/pricing.json` with the same shape
+overrides or adds models; invalid entries are ignored with an `invalidPricing`
+warning. A turn is priced only when it has input and output tokens, no reported
+amount and an exact (case-insensitive) model match:
+`(input − cachedInput) × input + cachedInput × cachedInput + output × output`,
+divided by one million. Reasoning is part of output. The result is
+`costSource: estimated` in the turn's usual bucket, so a subscription engine shows it
+as *subscription · estimated equivalent*: never a bill, never a share of a quota.
+Unknown models stay unknown. Only the standard tier is applied: long-context,
+batch, fast and regional surcharges are not, so long prompts may be underestimated.
+The export includes `pricing: {checkedAt, sources, project, priced}`; the panel names
+the date and source under the cost chart. Re-check the official page before
+changing a price and update `checkedAt`.
+
 OMB rows are keyed by its native ledger identity; trace roots are navigation and
 execution context only, never another cost source. Harness attempts have separate
 `dag/run/attempt` identities. Retries consume tokens independently and are retained.
@@ -74,8 +93,10 @@ UTC day, agent, model and engine) carry the same accounting fields as `usage.gro
 Recent Dagu runs are still collected for alerts and harness usage but are no longer
 listed here; the run log lives in Automations. Refresh is a Dagu action.
 
-Project settings define `monthlyApiUsd`, `longRunSeconds`, `maxRecentFailures`.
-Null disables a threshold. Alerts are advisory and visible locally; no messages
+Project settings define `monthlyApiUsd`, `longRunSeconds`, `maxRecentFailures` and
+`subscriptionPercent` (D88). Null disables a threshold; `subscriptionPercent` is null
+by default and, when set, warns for each subscription window of an engine account at
+or above that percentage (it is the account's usage, not the project's). Alerts are advisory and visible locally; no messages
 are sent, no bot is paused and no budget enforcement is implied. Monetary alerts
 use known reported API cost only, and explicitly flag incomplete coverage.
 
