@@ -16,8 +16,6 @@ min_version = "2026.10.6"
 "aqua:cli/cli" = "2.95.0"
 # uvx runs the pinned Copier for framework updates, extensions and distributions.
 "aqua:astral-sh/uv" = "0.5.1"
-"core:go" = "1.26.8"
-"core:pnpm" = "11.1.2"
 
 [settings.npm]
 package_manager = "npm"
@@ -36,6 +34,13 @@ FYSO_WEB_DOMAIN = "{{ web_domain or (project_slug ~ '-' ~ port_base ~ '.localhos
 FYSO_AUTH_UPSTREAM = "{{ auth_upstream }}"
 FYSO_TINYAUTH_VERSION = "5.2.0"
 FYSO_TINYAUTH_SHA256 = "5fec14cb1a7cf43ef5c9dafc9fa9fba6fcbc2d8fd328cd5a78dd42aae4c0efde" # gitleaks:allow public source checksum
+# Upstream release binaries, used on Linux (D87).
+FYSO_TINYAUTH_LINUX_AMD64_SHA256 = "a8c3d9e847e275f105bf74791ad9a733f76dcf890038381aeb7ab78ec50fc474" # gitleaks:allow public binary checksum
+FYSO_TINYAUTH_LINUX_ARM64_SHA256 = "373ff8eb72e437925f9222953767612e13bb5da71173af16ab91c562cc7abd18" # gitleaks:allow public binary checksum
+# Upstream has no macOS binary: the installer app bundles one built from the pinned source.
+# Without it, the first project on a Mac builds it with these tools, installed on demand (D87).
+FYSO_TINYAUTH_GO = "1.26.8"
+FYSO_TINYAUTH_PNPM = "11.1.2"
 
 # Port block (PLAN §3.1): base {{ port_base }}.
 FYSO_HTTP_PORT = "{{ port_base }}"
@@ -95,7 +100,7 @@ description = "Check and set up the engine logins (Claude, Codex, API keys)"
 run = "framework/scripts/auth.sh"
 
 [tasks."web-auth:install"]
-description = "Build the pinned, unmodified native login service"
+description = "Install the pinned, unmodified native login service (upstream binary on Linux; bundled or built once per machine on macOS)"
 run = "framework/scripts/install-web-auth.sh"
 
 [tasks."web-auth:users"]

@@ -38,6 +38,8 @@ lines = [
     "  - GIT_EMAIL: \"\"",
     "  - ADMIN: admin",
     "  - PASSWORD_FILE: \"\"  # private file with the chosen password (never the password itself)",
+    "  - TINYAUTH_BIN: \"\"   # macOS: the web login binary bundled in the app (D87)",
+    "  - TINYAUTH_META: \"\"  # its version, source and binary checksums",
     "env:",
     "  - MISE_YES: \"1\"",
     "steps:",
@@ -53,20 +55,40 @@ lines = [
     "    depends: [generate]",
 ]
 node = next((step_id(t) for t, _ in tools if t == "core:node"), None)
+node_version = next((v for t, v in tools if t == "core:node"), None)
 ids = []
+# Tools install into mise's own folders, not the project, so they all start at once while
+# the project is still being generated; npm packages only wait for Node. Outside the
+# project, mise's environment variables give them the project's Node and npm settings. Commands run with mise's automatic installs off, so a task waits only for the
+# tools its own step depends on (D87).
 for tool, version in tools:
     sid = step_id(tool)
     ids.append(sid)
-    deps = ["trust"] + ([node] if tool.startswith("npm:") and node else [])
-    lines += [
-        f"  - id: {sid}",
-        f"    run: cd \"$DIR\" && \"$MISE\" install \"{tool}@{version}\"",
-        f"    depends: [{', '.join(deps)}]",
-    ]
+    if tool.startswith("npm:"):
+        lines += [
+            f"  - id: {sid}",
+            f"    run: cd / && MISE_NPM_PACKAGE_MANAGER=npm MISE_NODE_VERSION={node_version} \"$MISE\" install \"{tool}@{version}\"",
+        ] + ([f"    depends: [{node}]"] if node else [])
+    else:
+        lines += [
+            f"  - id: {sid}",
+            f"    run: cd / && \"$MISE\" install \"{tool}@{version}\"",
+        ]
+by_tool = {t: step_id(t) for t, _ in tools}
+# setup: age key, sops file and the first web user (node + yaml glue, bcrypt by caddy).
+setup_deps = ["trust"] + [by_tool[t] for t in ["aqua:FiloSottile/age", "aqua:getsops/sops", "core:node", "npm:yaml", "aqua:caddyserver/caddy"] if t in by_tool]
+# The web login (Tinyauth): Linux downloads the upstream binary; macOS copies the one bundled
+# in the app (and builds it only without one). It runs alongside the other tools and setup.
+web_deps = ["trust"] + [by_tool[t] for t in ["core:node"] if t in by_tool]
 lines += [
+    "  - id: web_auth",
+    "    run: >-",
+    "      cd \"$DIR\" && FYSO_TINYAUTH_BUNDLED_BIN=\"$TINYAUTH_BIN\" FYSO_TINYAUTH_BUNDLED_META=\"$TINYAUTH_META\"",
+    "      MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run web-auth:install",
+    f"    depends: [{', '.join(web_deps)}]",
     "  - id: setup",
-    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" \"$MISE\" run setup",
-    f"    depends: [{', '.join(ids)}]",
+    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run setup",
+    f"    depends: [{', '.join(setup_deps)}]",
     # After setup: the first commit must include .sops.yaml and the encrypted secrets.
     "  - id: git",
     "    run: >-",
@@ -77,7 +99,8 @@ lines += [
     "    depends: [setup]",
     "  - id: start",
     "    run: cd \"$DIR\" && \"$MISE\" run up",
-    "    depends: [git]",
+    f"    depends: [{', '.join(['git'] + ids + ['web_auth'])}]",
 ]
+ids.append("web_auth")
 open(out, "w").write("\n".join(lines) + "\n")
 print(" ".join(ids))

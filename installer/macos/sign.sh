@@ -28,6 +28,9 @@ case $target in
       if file -b "$f" | grep -q 'Mach-O'; then codesign "${flags[@]}" --options runtime "$f"; fi
     done < <(find "$target/Contents" -type f -not -path "$target/Contents/MacOS/*" \
                -not -path "$target/Contents/Helpers/Dialog.app/*" -print0)
+    # The bundled web login's recorded checksum must match the signed file, and is written
+    # before the app is sealed so the app's signature covers it (D87).
+    [ ! -f "$target/Contents/Helpers/tinyauth" ] || "$(dirname "$0")/build-tinyauth.sh" --record "$target"
     codesign "${flags[@]}" --options runtime "$target"
     codesign --verify --strict --verbose=2 "$target"
     ;;

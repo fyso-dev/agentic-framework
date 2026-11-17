@@ -10,7 +10,7 @@
 - Claude Code and Codex installed and signed in on the host for their respective subscription-backed bots. The default team uses both providers. Check `claude --version`, `codex --version` and the provider's login before startup; the framework does not create subscription accounts or install these coding CLIs. A signed-in provider can still reject work because of its own quota or model availability.
 - An unused block of ten ports. The default is 8400–8409. Each concurrent project needs a different block.
 
-The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI, GitHub CLI, uv, Go and pnpm through mise. The panel assets are already built.
+The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI, GitHub CLI and uv through mise; Go and pnpm are installed only if a Mac has to build the web login itself (D87). The panel assets are already built.
 
 ## 1. Authenticate (private repositories only) and generate
 
@@ -69,7 +69,7 @@ For `project_slug=my-project` and `port_base=8400`:
 | Dagu | http://dagu.my-project-8400.localhost:8400 |
 | OpenMausBot | http://omb.my-project-8400.localhost:8400 |
 
-All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The first native login build runs on `mise run up` and uses pinned source and locked dependencies.
+All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The native login is installed on `mise run up`: the pinned upstream binary on Linux; on macOS the binary bundled in the installer app, or, without it, a build of the pinned source with locked dependencies made once per machine and reused by later projects (D87).
 
 HTTP access is loopback-only. Remote deployment requires the separate HTTPS acceptance in Phase 6. See [web authentication](web-auth.md) for permissions, identity limitations and future providers.
 
