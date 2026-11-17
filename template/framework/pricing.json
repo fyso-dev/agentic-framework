@@ -1,0 +1,13 @@
+{
+  "$comment": "List prices in USD per million tokens, used only for the estimated list-price equivalent of turns whose engine reports no amount (D88). Never a bill or a share of a subscription. Standard tier: long-context, batch, fast and regional surcharges are not applied. Override or add models in project/pricing.json (same shape).",
+  "checkedAt": "2026-11-16",
+  "sources": {
+    "openai": "https://developers.openai.com/api/docs/pricing"
+  },
+  "models": {
+    "gpt-6.1-sol": {"provider": "openai", "input": 2.00, "cachedInput": 0.10, "output": 10.00},
+    "gpt-6.1-terra": {"provider": "openai", "input": 1.00, "cachedInput": 0.05, "output": 5.00},
+    "gpt-6-luna": {"provider": "openai", "input": 0.10, "cachedInput": 0.01, "output": 0.50},
+    "gpt-6-astra": {"provider": "openai", "input": 10.00, "cachedInput": 1.00, "output": 50.00}
+  }
+}

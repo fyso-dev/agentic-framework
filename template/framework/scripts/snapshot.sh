@@ -35,7 +35,7 @@ case "${1:-}" in
       node framework/scripts/bot-versioning.cjs
       echo "no changes"; exit 0
     fi
-    if ! gitleaks git --staged --no-banner --redact . >&2 || ! framework/scripts/check-paths.sh >&2; then
+    if ! gitleaks git --staged --no-banner --redact . >&2 || ! framework/scripts/check-paths.sh "${paths[@]}" >&2; then
       git reset -q -- "${paths[@]}"
       fail "snapshot checks failed; nothing was committed (see the log above)"
     fi

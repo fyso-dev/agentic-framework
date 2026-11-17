@@ -366,7 +366,7 @@
     "missingTokens": "{{count}} without complete token data",
     "alerts": "Project advisories",
     "noAlerts": "No thresholds exceeded in available data.",
-    "alertNote": "Local advisories; no agents are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage.",
+    "alertNote": "Local advisories; no agents are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage. The subscription threshold (subscriptionPercent) warns about the account, not the project.",
     "usage": "Usage by agent, model and engine",
     "empty": "No records for this selection.",
     "conversations": "Conversations and delegations",
@@ -392,13 +392,15 @@
       "invalidSettings": "Invalid settings; defaults were used.",
       "invalidLedgerRows": "Some usage records could not be read.",
       "invalidArtifacts": "Some artifacts could not be read.",
-      "runDetailsUnavailable": "Some run details could not be read."
+      "runDetailsUnavailable": "Some run details could not be read.",
+      "invalidPricing": "The price table has invalid entries; they were ignored."
     },
     "alert": {
       "budget": "Reported API: USD {{value}} · threshold USD {{limit}}",
       "failures": "{{value}} failures in recent runs · threshold {{limit}}",
       "longRun": "Run active for {{value}} s · threshold {{limit}} s",
-      "longConversation": "Conversation active for {{value}} s · threshold {{limit}} s"
+      "longConversation": "Conversation active for {{value}} s · threshold {{limit}} s",
+      "subscription": "Your subscription usage ({{engine}} · {{window}}): {{value}}% · threshold {{limit}}%"
     },
     "tokenNote": "New input + cached input = total input. Reasoning is included in output.",
     "tokens": "Tokens",
@@ -430,7 +432,10 @@
       "checked": "Checked {{when}}",
       "unknownNote": "\"Unknown\" is normal: some plans lack one of the windows, or the provider did not answer.",
       "unknownAccounts": "No data for now: {{engines}}."
-    }
+    },
+    "pricing": "Amounts the engine does not report (for example Codex) are estimated with the list-price table of {{date}}: an estimated equivalent, not your bill or a share of your subscription. A model not in the table shows as \"{{unknown}}\".",
+    "pricingProject": "Includes this project's own prices from project/pricing.json.",
+    "pricingSource": "Price source"
   },
   "ext": {
     "title": "Installed extensions",

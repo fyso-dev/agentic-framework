@@ -6,9 +6,11 @@
 #        build-tinyauth.sh --record <Fyso.app>  record the checksum again (after codesign
 #        changes the binary); the installer copies the binary only when it matches.
 set -euo pipefail
-cd "$(dirname "$0")"
+# The checksum lives in Resources, which the app's signature seals: sign.sh records it after
+# signing the binary and before signing the app; an unsigned build keeps the one below.
 record() { shasum -a 256 "$1/Contents/Helpers/tinyauth" | cut -d' ' -f1 > "$1/Contents/Resources/third-party/tinyauth/tinyauth.sha256"; }
-if [ "${1:-}" = --record ]; then record "$2"; exit 0; fi
+if [ "${1:-}" = --record ]; then record "${2:?usage: build-tinyauth.sh --record <Fyso.app>}"; exit 0; fi
+cd "$(dirname "$0")"
 APP=$1
 pin() { sed -n "s/^$1 = \"\\([^\"]*\\)\".*/\\1/p" ../../template/mise.toml.jinja; }
 tool() { sed -n "s/^\"$1\" = \"\\([^\"]*\\)\".*/\\1/p" ../../template/mise.toml.jinja; }
