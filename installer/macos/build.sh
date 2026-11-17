@@ -75,6 +75,15 @@ EOF
 
 # Drag-to-Applications disk image.
 stage=$(mktemp -d); cp -R "$APP" "$stage/"; ln -s /Applications "$stage/Applications"
-hdiutil create -quiet -volname "Fyso" -srcfolder "$stage" -ov -format UDZO "$DIST/Fyso-Installer.dmg"
+# The mounted volume shows the logo, not the generic grey disk: .VolumeIcon.icns plus the
+# volume root's "has custom icon" Finder flag (0x0400). hdiutil does not copy that flag from
+# the source folder, so it is set on a writable image, then compressed.
+cp "$R/Fyso.icns" "$stage/.VolumeIcon.icns"
+rw="$(mktemp -d)/rw.dmg"; mnt=$(mktemp -d)
+hdiutil create -quiet -volname "Fyso" -srcfolder "$stage" -ov -format UDRW "$rw"
+hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"
+xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$mnt"
+hdiutil detach -quiet "$mnt"
+hdiutil convert -quiet "$rw" -format UDZO -ov -o "$DIST/Fyso-Installer.dmg"; rm -rf "$(dirname "$rw")"
 rm -rf "$stage"
 du -sh "$APP" "$DIST/Fyso-Installer.dmg"

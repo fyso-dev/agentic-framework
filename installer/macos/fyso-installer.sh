@@ -51,7 +51,7 @@ ui() { printf '%s\n' "$*" >> "$CMD"; }
 item() { ui "listitem: index: $1, status: $2${3:+, statustext: $3}"; }   # wait|success|fail|error|pending
 dialog_alive() { kill -0 "$DIALOG_PID" 2>/dev/null; }
 fail() {   # index, short text, message for the person
-  item "$1" fail "$2"
+  item "$1" fail "$2"; ui "progresstext: $P_FAILED"
   echo "failed: ${TITLES[$1]:-step $1}: $2"
   ui "message: $(t "$L_FAILED" "$3")"
   ui "button1text: $B_CLOSE"; ui "button1: enable"
@@ -68,7 +68,7 @@ TITLES=("$T_APPLE" "$T_MISE" "$T_DAGU" "$T_GITHUB")
 IDS=("" "" "" "")
 while IFS=$'\t' read -r sid title; do IDS+=("$sid"); TITLES+=("$title"); done < "$RES/steps.$UI_LANG.tsv"
 ENGINE_ITEM=${#TITLES[@]}; TITLES+=("$T_ENGINE_ANY")
-"$DIALOG" "${STYLE[@]}" --title none --message " " --progress ${#TITLES[@]} --commandfile "$CMD" \
+"$DIALOG" "${STYLE[@]}" --title none --message " " --progress ${#TITLES[@]} --progresstext " " --commandfile "$CMD" \
   --button1text "$B_CANCEL" "${SIZE[@]}" --moveable &
 DIALOG_PID=$!
 sleep 1
@@ -92,34 +92,82 @@ block_free() {   # $1: port base. Free = valid range, not taken by another proje
 }
 first_free_block() { b=8400; while [ $b -lt 9900 ] && ! block_free $b; do b=$((b+10)); done; echo $b; }
 short() { case $1 in "$HOME"/*) printf '~/%s' "${1#$HOME/}" ;; *) printf '%s' "$1" ;; esac; }
+js() { local s; s=$(printf '%s' "$1" | tr -d '\000-\037'); s=${s//\\/\\\\}; printf '"%s"' "${s//\"/\\\"}"; }   # JSON string
+# The person's own password, with a moderate policy: 12-72 bytes (what the login service's
+# bcrypt accepts), no symbol rules, and not something trivially guessed. Prints the reason
+# it is refused, or nothing. The value is never logged.
+norm() { printf '%s' "$1" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9'; }
+password_problem() {   # password, user, project name
+  local p=$1 bytes plain leet letters w rest
+  bytes=$(printf '%s' "$p" | wc -c | tr -d ' ')
+  [ "$bytes" -ge 12 ] || { printf '%s' "$PW_SHORT"; return; }
+  [ "$bytes" -le 72 ] || { printf '%s' "$PW_LONG"; return; }
+  [ "$(printf '%s' "$p" | fold -w1 | sort -u | wc -l | tr -d ' ')" -ge 5 ] || { printf '%s' "$PW_REPEATED"; return; }
+  plain=$(norm "$p")
+  # Symbols-only passwords have no letters or digits here: neither check applies to them.
+  case $plain in ''|*[a-z]*) ;; *) printf '%s' "$PW_DIGITS"; return ;; esac
+  # A keyboard or alphabet sequence, alone or with a few characters added (qwertyuiop12).
+  for w in "$plain" "$(printf '%s' "$plain" | tr -d '0-9')" "$(printf '%s' "$plain" | tr -d 'a-z')"; do
+    [ ${#w} -ge 6 ] && [ $(( ${#plain} - ${#w} )) -le 4 ] || continue
+    case "01234567890123456789 98765432109876543210 abcdefghijklmnopqrstuvwxyz qwertyuiopasdfghjklzxcvbnm qwertzuiop azertyuiop 1qaz2wsx3edc4rfv5tgb6yhn7ujm" in
+      *"$w"*) printf '%s' "$PW_SEQUENCE"; return ;;
+    esac
+  done
+  # Common words, also written with digits for letters (p4ssw0rd), repeated or with digits
+  # and symbols around them (Password2026!, adminadmin).
+  leet=$(printf '%s' "$p" | tr 'A-Z@4310$57!' 'a-zaaeiossti' | tr -cd 'a-z')
+  for letters in "$leet" "$(printf '%s' "$plain" | tr -d '0-9')"; do
+    rest=$letters
+    for w in password passwd contrasena clave admin administrador administrator root qwerty asdf zxcv \
+             letmein welcome bienvenido iloveyou teamo secret secreto changeme cambiame fyso hola hello \
+             monkey dragon football futbol abc xyz test prueba; do rest=${rest//$w/}; done
+    # A common word with at most two letters left over (Passw0rd1 reads as "passwordi").
+    [ ${#rest} -lt ${#letters} ] && [ ${#rest} -le 2 ] && { printf '%s' "$PW_COMMON"; return; }
+  done
+  for w in "$(norm "$2")" "$(norm "$3")"; do
+    [ ${#w} -ge 4 ] && case " $plain $leet " in *"$w"*) printf '%s' "$PW_PERSONAL"; return ;; esac
+  done
+}
 NAME=$default_name; FOLDER="$HOME/Fyso"; CHOICE="Claude Code"; ADMIN=admin; PASSWORD=""; PORT=""
 if [ "${FYSO_AUTO:-}" = 1 ]; then
   NAME=${FYSO_NAME:-$NAME}; FOLDER=${FYSO_FOLDER:-$FOLDER}; CHOICE=${FYSO_ENGINE:-$CHOICE}
   ADMIN=${FYSO_ADMIN:-$ADMIN}; PASSWORD=${FYSO_PASSWORD:-$PASSWORD}; PORT=${FYSO_PORT:-$(first_free_block)}
+  # Without FYSO_PASSWORD, setup generates a readable one (web-auth.md); a given one obeys the policy.
+  if [ -n "$PASSWORD" ]; then problem=$(password_problem "$PASSWORD" "$ADMIN" "$NAME"); [ -z "$problem" ] || { echo "failed: password refused: $problem"; ui "quit:"; exit 1; }; fi
 else
   # One clean form: name and engine as fields; the folder as text plus a button that opens
   # macOS's own folder picker (it has "New Folder"), so the layout stays two aligned rows.
+  # Fields use swiftDialog's per-field JSON form: its comma form reads every token as a
+  # possible keyword, so "name=name" named the project field ",value=" and the typed name
+  # was lost, and a typed comma or "=" broke the field. The password is never passed in
+  # (no secret in process arguments) and has no regex (swiftDialog logs failing values).
   while :; do
     [ -n "$PORT" ] || PORT=$(first_free_block)
-    answers=$("$DIALOG" "${STYLE[@]}" --title none \
+    answers=$("$DIALOG" "${STYLE[@]}" --title none --json \
       --message "$(t "$L_FORM" "$(short "$FOLDER")")" \
-      --textfield "$F_NAME,name=name,value=$NAME,required" \
-      --textfield "$F_ADMIN,name=admin,value=$ADMIN,required" \
-      --textfield "$F_PASSWORD,name=password,secure,value=$PASSWORD,required,regex=^.{12}.*$,regexerror=$F_PASSWORD_ERR" \
-      --textfield "$F_PORT,name=port,value=$PORT,required,regex=^[1-9][0-9][0-9][0-9]?0$,regexerror=$F_PORT_ERR" \
+      --textfield "{\"title\":$(js "$F_NAME"),\"name\":\"project\",\"value\":$(js "$NAME"),\"required\":true}" \
+      --textfield "{\"title\":$(js "$F_ADMIN"),\"name\":\"admin\",\"value\":$(js "$ADMIN"),\"required\":true}" \
+      --textfield "{\"title\":$(js "$F_PASSWORD"),\"name\":\"password\",\"secure\":true,\"confirm\":true,\"required\":true}" \
+      --textfield "{\"title\":$(js "$F_PORT"),\"name\":\"port\",\"value\":$(js "$PORT"),\"required\":true,\"regex\":\"^[1-9][0-9]{2,3}0$\",\"regexerror\":$(js "$F_PORT_ERR")}" \
       --selecttitle "$F_ENGINE" --selectvalues "Claude Code,Codex,Pi (ChatGPT)" --selectdefault "$CHOICE" \
       --infobuttontext "$B_CHANGE_FOLDER" --button1text "$B_INSTALL" --button2text "$B_CANCEL" \
       "${SIZE[@]}" --ontop --moveable)
     rc=$?
-    # Keys from name= (and swiftDialog's SelectedOption), never the translated labels.
-    field() { printf '%s\n' "$answers" | sed -n "s/^\"*$1\"* : \"*\(.*[^\"]\)\"*$/\1/p" | head -1; }
-    v=$(field name); [ -n "$v" ] && NAME=$v
+    # Keys from "name" (and swiftDialog's SelectedOption), never the translated labels.
+    field() { printf '%s' "$answers" | plutil -extract "$1" raw -o - - 2>/dev/null; }
+    v=$(field project); [ -n "$v" ] && NAME=$v
     v=$(field SelectedOption); [ -n "$v" ] && CHOICE=$v
     v=$(field admin); [ -n "$v" ] && ADMIN=$v
-    v=$(field password); [ -n "$v" ] && PASSWORD=$v
+    PASSWORD=$(field password)
     v=$(field port); [ -n "$v" ] && PORT=$v
+    answers=""
     case $rc in
-      0) block_free "$PORT" && break
+      0) problem=$(password_problem "$PASSWORD" "$ADMIN" "$NAME")
+         if [ -n "$problem" ]; then
+           "$DIALOG" "${STYLE[@]}" --title none --message "$(t "$L_PASSWORD_WEAK" "$problem")" --button1text "$B_BACK" --width 520 --height 300
+           continue
+         fi
+         block_free "$PORT" && break
          "$DIALOG" "${STYLE[@]}" --title none --message "$(t "$L_PORT_BUSY" "$PORT" "$((PORT+9))")" --button1text "$B_BACK" --width 520 --height 300
          PORT="" ;;
       3) PORT=""; start=$FOLDER; [ -d "$start" ] || start=$HOME   # the default folder may not exist yet
@@ -158,37 +206,42 @@ ui "message: $(t "$L_INSTALLING" "$NAME" "$(short "$DIR")")"
 for t in "${TITLES[@]}"; do ui "listitem: add, title: $t, status: pending"; done
 ui "activate:"
 done_count=0; step_done() { done_count=$((done_count+1)); ui "progress: $done_count"; }
+# The current step in words under the bar ("Descargando…", "Creando proyecto…").
+shown=""; phase() { [ "$1" = "$shown" ] || { ui "progresstext: $1"; shown=$1; }; }
+# Step timings go to the log ("timing: <step> <seconds>s") to see what makes the wait long.
+INSTALL_START=$(date +%s); mark=$INSTALL_START
+timing() { now=$(date +%s); echo "timing: $1 $((now - mark))s"; mark=$now; }
 cancelled() { dialog_alive || { echo "cancelled by the person"; [ -n "${DAGU_PID:-}" ] && kill "$DAGU_PID" 2>/dev/null; exit 130; }; }
 
 # 2.1 Apple Command Line Tools (git, and the python3 used below)
-item 0 wait "$S_CHECKING"
+item 0 wait "$S_CHECKING"; phase "$P_CHECKING"
 if ! xcode-select -p >/dev/null 2>&1; then
   xcode-select --install >/dev/null 2>&1
   item 0 wait "$S_APPLE"
   ui "message: $L_APPLE"
   until xcode-select -p >/dev/null 2>&1; do sleep 5; cancelled; done
 fi
-item 0 success; step_done
+item 0 success; step_done; timing apple
 if [ -z "$(git config --global user.email 2>/dev/null)" ]; then GIT_NAME=$(id -F 2>/dev/null || whoami); GIT_EMAIL="$(whoami)@$(scutil --get LocalHostName 2>/dev/null || echo localhost).local"
 else GIT_NAME=$(git config --global user.name); GIT_EMAIL=$(git config --global user.email); fi
 
 # 2.2 mise, pinned (Resources/mise-bootstrap.sh is `mise generate install-script`)
-item 1 wait "$S_DOWNLOADING"; cancelled
+item 1 wait "$S_DOWNLOADING"; phase "$(t "$P_DOWNLOADING" "$T_MISE")"; cancelled
 MISE=$(command -v mise || true)
 if [ -z "$MISE" ]; then
   MISE_INSTALL_PATH="$HOME/.local/bin/mise" sh "$RES/mise-bootstrap.sh" --version || fail 1 "$S_ERROR" "$E_MISE"
   MISE="$HOME/.local/bin/mise"
 fi
-item 1 success; step_done
+item 1 success; step_done; timing mise
 
 # 2.3 Dagu (runs the rest of the installation)
-item 2 wait "$S_DOWNLOADING"; cancelled
+item 2 wait "$S_DOWNLOADING"; phase "$(t "$P_DOWNLOADING" "$T_DAGU")"; cancelled
 "$MISE" install "$DAGU_TOOL" || fail 2 "$S_ERROR" "$E_DAGU"
-item 2 success; step_done
+item 2 success; step_done; timing dagu
 
 # 2.4 GitHub account: only when plain Git cannot read the source (a private repository).
 # A public source needs no account, no GitHub CLI and no login.
-item 3 wait "$S_CHECKING"; cancelled
+item 3 wait "$S_CHECKING"; phase "$P_GITHUB"; cancelled
 gh() { "$MISE" exec "$GH_TOOL" -- gh "$@"; }
 public_source() { GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git ls-remote --heads "https://github.com/${SOURCE#gh:}.git" >/dev/null 2>&1; }
 case $SOURCE in
@@ -210,7 +263,7 @@ case $SOURCE in
     item 3 success; fi ;;
   *) item 3 success "$S_NOT_NEEDED" ;;
 esac
-step_done
+step_done; timing github
 
 # ---------------------------------------------------------------- 3. The workflow
 RUN="install-$(date +%Y%m%d%H%M%S)"
@@ -231,31 +284,54 @@ d=json.loads(sys.stdin.read())
 for n in d.get("nodes",[]):
     s=n.get("step",{}); print((s.get("id") or s.get("name"))+"\t"+str(n.get("status",0))+"\t"+(n.get("error") or "").replace("\t"," ").replace("\n"," ")[:120])'
 }
+# The run's step timings, from the same file (Dagu records when each step started and ended).
+dagu_timings() {
+  f=$(ls -t "$DAGU_HOME"/data/dag-runs/*/dag-runs/*/*/*/*"_$RUN"/*/status.jsonl 2>/dev/null | head -1)
+  [ -n "$f" ] && tail -1 "$f" | /usr/bin/python3 -c 'import json,sys
+from datetime import datetime as T
+for n in json.loads(sys.stdin.read()).get("nodes",[]):
+    a,b=n.get("startedAt") or "",n.get("finishedAt") or ""
+    try: secs=(T.fromisoformat(b)-T.fromisoformat(a)).total_seconds()
+    except ValueError: continue   # not started or not finished ("-")
+    s=n.get("step",{}); print("timing: workflow/%s %ds" % (s.get("id") or s.get("name"), secs))'
+}
+# Words under the bar for the step that is running (the latest one when tools run in parallel).
+step_phase() {
+  case $1 in
+    generate|trust|git) phase "$P_CREATING" ;;
+    setup) phase "$P_KEYS" ;;
+    start) phase "$P_STARTING" ;;
+    *) phase "$(t "$P_DOWNLOADING" "$2")" ;;
+  esac
+}
 seen=""
 apply_states() {
+  running=""
   while IFS=$'\t' read -r sid st err; do
     i=4; while [ $i -lt $ENGINE_ITEM ]; do [ "${IDS[$i]}" = "$sid" ] && break; i=$((i+1)); done
     [ $i -lt $ENGINE_ITEM ] || continue
     case $st in
-      1) item $i wait "$S_INSTALLING" ;;
+      1) item $i wait "$S_INSTALLING"; running=$i ;;
       4) case " $seen " in *" $sid "*) ;; *) item $i success; step_done; seen="$seen $sid" ;; esac ;;
       2) item $i fail "$S_FAILED"; FAILED_STEP=$i; FAILED_ERR=$err ;;
       3) item $i error "$S_NOT_RUN" ;;
     esac
   done
+  [ -z "$running" ] || step_phase "${IDS[$running]}" "${TITLES[$running]}"
 }
 FAILED_STEP=""
 # Process substitution, not a pipe: apply_states must update this shell's variables.
 while kill -0 $DAGU_PID 2>/dev/null; do apply_states < <(states); sleep 1; cancelled; done
 wait $DAGU_PID; rc=$?
 apply_states < <(states)
+dagu_timings; timing workflow
 if [ $rc -ne 0 ] || [ -n "$FAILED_STEP" ]; then
   echo "step error: ${FAILED_ERR:-dagu exit $rc}"; tail -40 "$WORK/dagu.out"
   fail "${FAILED_STEP:-4}" "$S_FAILED" "$(t "$E_STEP" "${TITLES[${FAILED_STEP:-4}]}")"
 fi
 
 # ---------------------------------------------------------------- 4. Coding engine session (optional)
-item $ENGINE_ITEM wait "$S_CHECKING"
+item $ENGINE_ITEM wait "$S_CHECKING"; phase "$(t "$P_ENGINE" "$engine_title")"
 if [ "$ENGINE" = pi ]; then
   check="mise exec -- pi auth login openai-codex"
   if (cd "$DIR" && mise exec -- pi auth check --provider openai-codex --no-refresh >/dev/null 2>&1); then item $ENGINE_ITEM success; step_done
@@ -266,6 +342,7 @@ else
   else item $ENGINE_ITEM pending "$(t "$S_LOGIN" "$check")"; step_done; fi
 fi
 
+timing engine; echo "timing: total $(( $(date +%s) - INSTALL_START ))s"; phase "$P_DONE"
 mkdir -p "$(dirname "$REGISTRY")"; printf '%s\t%s\n' "$PORT" "$DIR" >> "$REGISTRY"
 ui "progress: complete"
 # The setup step validates and encrypts the chosen local-user password.
