@@ -52,14 +52,15 @@ skill.write_text('Root: '+os.environ['FYSO_ROOT']+'\\nHome: '+os.environ['HOME']
             root = Path(directory)
             git = lambda *a: subprocess.run(["git", *a], cwd=root, check=True, capture_output=True)
             git("init", "-q")
-            (root / ".copier-answers.yml").write_text("_src_path: /Users/someone/template\n")
+            host = "/" + "Users/someone"  # split so this file passes check-paths itself
+            (root / ".copier-answers.yml").write_text(f"_src_path: {host}/template\n")
             (root / "state").mkdir()
             (root / "state/ok.md").write_text("portable\n")
             git("add", "-A")
             check = str(ROOT / "template/framework/scripts/check-paths.sh")
             self.assertEqual(subprocess.run([check, "state", "project/wiki"], cwd=root, capture_output=True).returncode, 0)
             self.assertEqual(subprocess.run([check], cwd=root, capture_output=True).returncode, 1)
-            (root / "state/bad.md").write_text("/Users/someone/notes\n")
+            (root / "state/bad.md").write_text(f"{host}/notes\n")
             git("add", "-A")
             self.assertEqual(subprocess.run([check, "state"], cwd=root, capture_output=True).returncode, 1)
 
