@@ -349,7 +349,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
       const extra = [...installed].filter((id) => !base.some((e) => e.id === id)).map((id): Extension => ({
         id, src: `gh:fyso/fyso-ext-${id}`, version: versions.get(id) ?? null, apps: [], secrets: [], mcpServers: [], workflows: [], skills: [],
       }));
-      return [...base.map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
+      return [...base.filter((e) => installed.has(e.id)).map((e) => ({ ...e, version: versions.get(e.id) ?? e.version })), ...extra];
     },
 
     async getSkills() {
@@ -409,6 +409,15 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
               installed.add(ext);
               if (latest) versions.set(ext, latest);
             },
+          });
+          break;
+        }
+        case DAGS.extRemove: {
+          const ext = params?.ID ?? "";
+          add({
+            dag, id, createdAt, duration: 2600, outcome: "succeeded",
+            outputs: () => ({ result: JSON.stringify({ id: ext, mode: "remove", version: versions.get(ext) ?? null, commit: "7b2d9e4" }) }),
+            onDone: () => installed.delete(ext),
           });
           break;
         }
