@@ -599,7 +599,12 @@
     "installedShort": "Installed",
     "noMatch": "No extension matches the search.",
     "terminal": "From the terminal",
-    "removeNote": "Removing an extension is a terminal-only task."
+    "remove": "Uninstall {{name}}",
+    "removeTitle": "Uninstall {{name}}?",
+    "removeHint": "Its files, processes, routes and workflows are removed in one commit. Its data in .data/ext and its saved keys are kept. Switch off its skills in your agents first.",
+    "removeConfirm": "Uninstall",
+    "removing": "Uninstalling…",
+    "removed": "{{id}} was uninstalled and committed ({{commit}})."
   },
   "extensionPage": {
     "missing": "This extension page is not installed.",

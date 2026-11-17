@@ -89,9 +89,29 @@ case "$action" in
     # Panel install/upgrade (fyso-ext-install): one commit per change, then load
     # the new processes and routes into the running stack. Prints JSON.
     mode=${1:-${MODE:-}}; id=${2:-${ID:-}}
-    [[ $mode =~ ^(add|update)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update> <id>'
+    [[ $mode =~ ^(add|update|remove)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update|remove> <id>'
     answers=".copier-answers.ext-$id.yml"
     read_version() { node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._commit || "")' "$1"; }
+    if [ "$mode" = remove ]; then
+      # Panel uninstall (fyso-ext-remove): the same removal as `ext:remove`, then one
+      # commit of only this extension's slots. Data in .data/ext/<id> and secrets stay.
+      [ -e "$answers" ] || fail "$id is not installed"
+      version=$(read_version "$answers")
+      slots=("$answers" ".config/mise/conf.d/ext-$id.toml" "extensions/$id")
+      while IFS= read -r file; do slots+=("$file"); done < <(node -e 'require("./framework/scripts/extensions.cjs").workflows(process.argv[1]).forEach(f=>console.log(f))' "$id")
+      node framework/scripts/ext-lifecycle.cjs remove "$id" >&2
+      refresh >&2
+      tracked=(); for file in "${slots[@]}"; do [ -z "$(git ls-files -- "$file")" ] || tracked+=("$file"); done
+      if [ "${#tracked[@]}" -gt 0 ]; then
+        git add -A -- "${tracked[@]}" >&2
+        git diff --cached --quiet -- "${tracked[@]}" || git commit -q -m "ext: remove $id ${version}" -- "${tracked[@]}" >&2
+      fi
+      # process-compose drops the processes of the removed fragment; Caddy and the login reload routes and access.
+      activate
+      node -e 'console.log(JSON.stringify({id:process.argv[1],mode:"remove",version:process.argv[2]||null,commit:process.argv[3]}))' \
+        "$id" "$version" "$(git rev-parse --short HEAD)"
+      exit 0
+    fi
     if [ "$mode" = add ]; then
       [ ! -e "$answers" ] || fail "$id is already installed"
       EXT_APPLY=1 "$0" add "$id" -- --defaults >&2
