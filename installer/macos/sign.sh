@@ -21,6 +21,13 @@ case $target in
     # swiftDialog keeps its author's Developer ID signature: it is sealed as a helper,
     # never re-signed (no --deep).
     codesign --verify --strict "$target/Contents/Helpers/Dialog.app"
+    # Every other nested Mach-O (e.g. a bundled tool binary in Resources or Helpers) is signed
+    # first, inside out, with the same identity and hardened runtime: notarization rejects
+    # unsigned or ad-hoc nested code, and the app's seal then covers the signed files.
+    while IFS= read -r -d '' f; do
+      if file -b "$f" | grep -q 'Mach-O'; then codesign "${flags[@]}" --options runtime "$f"; fi
+    done < <(find "$target/Contents" -type f -not -path "$target/Contents/MacOS/*" \
+               -not -path "$target/Contents/Helpers/Dialog.app/*" -print0)
     codesign "${flags[@]}" --options runtime "$target"
     codesign --verify --strict --verbose=2 "$target"
     ;;

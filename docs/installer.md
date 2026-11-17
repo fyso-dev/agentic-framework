@@ -40,7 +40,7 @@ SIGN_IDENTITY="Developer ID Application: <name> (<TEAMID>)" NOTARY_PROFILE=fyso-
 
 A downloaded copy opens without warnings only when the app is signed with a **Developer ID Application** certificate, notarized by Apple and stapled. `build.sh` does all of it when `SIGN_IDENTITY` is set, through `installer/macos/sign.sh`:
 
-1. `codesign --options runtime --timestamp` on the app (hardened runtime, carried by the `fyso` Mach-O). swiftDialog's own signature (team `PWA5E9TQ59`) is checked and sealed as a helper, never re-signed: no `--deep`.
+1. `codesign --options runtime --timestamp` on every nested Mach-O outside `Contents/MacOS` (a bundled tool binary in `Resources` or `Helpers`), then on the app (hardened runtime, carried by the `fyso` Mach-O). swiftDialog's own signature (team `PWA5E9TQ59`) is checked and sealed as a helper, never re-signed: no `--deep`.
 2. The app is zipped and submitted with `notarytool submit --wait`; on rejection the service log is printed. The ticket is stapled to the app before the dmg is built, so the app inside the image carries it.
 3. The dmg is signed, notarized and stapled on its own; `spctl --assess` confirms both verdicts.
 
@@ -90,9 +90,21 @@ One native app replaces the separate installer app and the SwiftBar plugin (D34)
 - **`Fyso.app`** (`installer/macos/app/Fyso.swift`, compiled with `swiftc` by `build.sh`, universal, macOS 15+). Without arguments it is a SwiftUI `MenuBarExtra` (`LSUIElement`: no window, no Dock icon) that registers itself as a login item on first launch (toggle *Abrir al iniciar sesión*). With arguments it is the CLI; on launch it links `~/.local/bin/fyso` to itself.
 - **Instances** are the installer's registry `projects.tsv` (`port<TAB>folder`); name, slug and panel URL come from each project. State: *en marcha* / *con problemas* / *detenida* / *no responde*, from the stack's process-compose socket. The menu bar icon is filled while the current instance runs.
 - **Menu**: the current instance and its state; per instance *Abrir panel*, *Usar como actual*, *Iniciar*/*Detener* (`mise run up/down`, login-shell `PATH`, log in `.data/logs/tray.log`, notification at the end), *Abrir carpeta*, *Ver registro*; then *Crear instancia…* (the installer form above; the new instance becomes current), *Abrir al iniciar sesión*, *Salir*. First launch with no instance opens the create form.
-- **CLI**: `fyso list [--json] | status | open | switch | start | stop [<instance>] | create | add <folder> | biz-login`; an instance is named by name, slug or folder, default the current one. `fyso status` exits 0 only when the instance runs.
-- **Biz edition** (`EDITION=biz`, `Fyso Biz.app`, bundle id `dev.fyso.biz`): the menu starts with *Iniciar sesión en Fyso Biz*, opened on first launch (`FYSO_BIZ_LOGIN_URL`, default `https://fyso.biz/login`); `create` passes `FYSO_EDITION=biz` to the installer, which records it. The session hand-back and installing the Biz extension during *create* are not built yet.
+- **Not registered**: stacks running on the Mac whose folder is not in the registry (found from their `/tmp/fyso-*.sock` owner) appear under *En marcha, sin registrar* with *Añadir a Fyso*; `fyso list` marks them `+` and prints the `fyso add` command.
+- **CLI**: `fyso list [--json] | status | open | switch | start | stop [<instance>] | create | add <folder> | biz-login | biz-status | biz-logout | update [--check] | version`; an instance is named by name, slug or folder, default the current one. `fyso status` exits 0 only when the instance runs.
+- **Biz edition** (`EDITION=biz`, `Fyso Biz.app`, bundle id `dev.fyso.biz`, D86): the menu starts with *Iniciar sesión en Fyso Biz*, started on first launch. The browser opens Biz's authorize page and the session comes back to the app on a one-shot `127.0.0.1` callback (OAuth dynamic registration, PKCE, RFC 8252 loopback; Biz's existing server). *Crear instancia…* signs in first when needed, runs the installer, hands the session to the new project (`.data/ext/biz/oauth.json`, the Biz extension's file) and installs the `biz` extension; the panel's Fyso Biz page is then already connected. A session goes to one instance (Biz rotates refresh tokens), so the next one asks to sign in again. `FYSO_BIZ_URL` points the app at another Biz origin (a local Biz: `http://localhost:8787`).
+- **Updates** (D86): the app checks this repository's GitHub Releases at launch and daily; *Actualizar a la versión X* opens the new dmg download in the browser (Gatekeeper checks it) to drag over the old app.
 - **Migration**: the template no longer ships the SwiftBar plugin; `mise run tray:install` lists a hand-made project in the registry (through `fyso add` when the CLI exists). On first launch the app imports the old plugin's remembered projects and removes SwiftBar's link to `framework/tray/fyso.10s.py` (only that link). `FYSO_TEST=1` skips these first-launch effects and the login item.
+
+### Publishing a release (D86)
+
+```sh
+VERSION=0.2.0 SIGN_IDENTITY="Developer ID Application: <name> (<TEAMID>)" NOTARY_PROFILE=fyso-notary installer/macos/build.sh
+VERSION=0.2.0 EDITION=biz SIGN_IDENTITY="…" NOTARY_PROFILE=fyso-notary installer/macos/build.sh
+gh release create macos-v0.2.0 --latest=false --title "Fyso for Mac 0.2.0" installer/macos/dist/Fyso.dmg installer/macos/dist/Fyso-Biz.dmg
+```
+
+Installed apps older than `0.2.0` offer the update. The `macos-v` prefix keeps these tags out of Copier's template versions (not PEP 440) and `--latest=false` keeps the framework release as the repository's latest.
 
 ## Cross-platform installer direction — D38
 

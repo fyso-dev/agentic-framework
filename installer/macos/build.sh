@@ -16,6 +16,9 @@ case $EDITION in
   *) echo "EDITION must be core or biz" >&2; exit 1 ;;
 esac
 APP="$DIST/$APP_NAME.app"
+# App version: the auto-update check (D86) compares it with the newest `macos-v<version>` release.
+VERSION=${VERSION:-0.1.0}
+[[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "VERSION must be X.Y.Z" >&2; exit 1; }
 
 # Pins. Change deliberately (AGENTS.md: never "latest").
 MISE_VERSION=2026.11.2
@@ -87,8 +90,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>FysoEdition</key><string>$EDITION</string>
   <key>CFBundleIconFile</key><string>Fyso</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
