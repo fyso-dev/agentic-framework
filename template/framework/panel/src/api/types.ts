@@ -86,7 +86,8 @@ export type Marketplace = {
 /** Output `result` of `fyso-ext-install`. */
 export type UpdateResult = { from: string | null; to: string | null; commit: string | null; changed: boolean };
 
-export type ExtInstallResult = { id: string; mode: "add" | "update"; version: string | null; commit: string };
+/** Output `result` of `fyso-ext-install` and `fyso-ext-remove` (`mode: "remove"`, `version` = the removed one). */
+export type ExtInstallResult = { id: string; mode: "add" | "update" | "remove"; version: string | null; commit: string };
 
 /** Third-party skills (D64, docs/third-party-skills.md). `GET /config/skills.json` lists the installed ones. */
 export type ThirdPartySkill = {
@@ -208,6 +209,7 @@ export const DAGS = {
   snapshot: "fyso-snapshot",
   extCatalog: "fyso-ext-catalog",
   extInstall: "fyso-ext-install",
+  extRemove: "fyso-ext-remove",
   skillsCatalog: "fyso-skills-catalog",
   skillsInstall: "fyso-skills-install",
   update: "fyso-update",

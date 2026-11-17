@@ -1,0 +1,18 @@
+name: fyso-ext-remove
+description: Panel ext-remove (uninstall one extension, the same removal as ext:remove)
+labels:
+  - fyso=system
+type: graph
+max_active_runs: 1
+params:
+  - ID: ""
+env:
+  - ROOT: ${FYSO_ROOT}
+  - MODE: remove
+working_dir: ${ROOT}
+steps:
+  # mise exec: Dagu steps start from a cleared environment (ports, secrets, tools).
+  # ID reaches the script as an env var, never through the shell command line.
+  - id: remove
+    command: mise exec -- framework/scripts/ext.sh apply
+    output: RESULT

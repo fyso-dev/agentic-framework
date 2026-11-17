@@ -128,38 +128,40 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
     return rosterRefresh.current;
   }, [backend]);
 
+  // Config files change outside this page: a panel install, `mise run ext:add|ext:remove`,
+  // an agent's fyso_ext_install, another tab. Unchanged content keeps its state object, so
+  // a background read does not re-render or re-probe the apps; a failed one keeps what is shown.
+  const readConfig = useCallback((background: boolean) => {
+    const keep = <T,>(set: (f: (p: Loadable<T>) => Loadable<T>) => void, read: Promise<T>) => read.then(
+      (data) => set((p) => (p.status === "ok" && JSON.stringify(p.data) === JSON.stringify(data) ? p : { status: "ok", data })),
+      (e) => { if (!background) set((p) => ({ ...p, status: "error", error: message(e) })); },
+    );
+    void keep(setProject, backend.getProject());
+    void keep(setApps, backend.getApps());
+    void keep(setExtensions, backend.getExtensions());
+    void keep(setSkills, backend.getSkills());
+  }, [backend]);
+
   const load = useCallback(() => {
-    backend.getProject().then(
-      (data) => setProject({ status: "ok", data }),
-      (e) => setProject({ status: "error", error: message(e) }),
-    );
     void refreshRoster();
-    backend.getApps().then(
-      (data) => setApps({ status: "ok", data }),
-      (e) => setApps({ status: "error", error: message(e) }),
-    );
-    backend.getExtensions().then(
-      (data) => setExtensions({ status: "ok", data }),
-      (e) => setExtensions({ status: "error", error: message(e) }),
-    );
-    backend.getSkills().then(
-      (data) => setSkills({ status: "ok", data }),
-      (e) => setSkills({ status: "error", error: message(e) }),
-    );
-  }, [backend, refreshRoster]);
+    readConfig(false);
+  }, [refreshRoster, readConfig]);
 
   useEffect(load, [load]);
 
   useEffect(() => {
     if (mock) return;
-    const onFocus = () => void refreshRoster();
+    const onFocus = () => {
+      void refreshRoster();
+      readConfig(true);
+    };
     const timer = setInterval(onFocus, 5000);
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [mock, refreshRoster]);
+  }, [mock, refreshRoster, readConfig]);
 
   // Keep the original base so an external change cannot be mistaken for an edit.
   useEffect(() => {

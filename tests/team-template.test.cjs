@@ -198,7 +198,7 @@ test('extension templates are listed and imported from the teams slot',async()=>
     const result=await t.importPackage(null,{source:'extension:demo/ventas',root,scan:false});
     assert.equal(result.currentTeamYaml,CURRENT);
     assert.equal(result.slug,'ventas');assert.equal(result.digest,t.digest(pkg));assert.match(result.commit,/^[a-f0-9]{40}$/);
-    assert.match(result.proposedTeamYaml,/teams\/ventas\/skills\/jefa\/tono\/SKILL\.md/);
+    assert.match(result.proposedTeamYaml,/teams\/ventas\/revisions\/[a-f0-9]{64}\/skills\/jefa\/tono\/SKILL\.md/);
     assert.equal(fs.readFileSync(path.join(root,'project/bots/team.yaml'),'utf8'),CURRENT,'the team file is only proposed');
     await assert.rejects(t.importPackage(null,{source:'extension:demo/../x',root}),/invalid_source/);
   } finally {fs.rmSync(root,{recursive:true,force:true});}
@@ -299,8 +299,25 @@ test('a department without skills imports without a commit; a skill directory of
     fs.writeFileSync(path.join(root,'project/bots/team.yaml'),ventas.proposedTeamYaml);git('commit','-qam','apply');
     const other={...plain,departamento:'Ventas.',team:plain.team.replaceAll('Soporte','Ventas.').replace('Soportista','Otro')};
     await assert.rejects(t.importPackage(other,{root,scan:false,slug:'ventas'}),err=>err.message==='slug_taken'&&/Ventas/.test(err.detail));
-    assert.ok(fs.existsSync(path.join(root,'project/bots/teams/ventas/skills/jefa/tono/SKILL.md')),'the other department keeps its skills');
+    assert.ok(fs.existsSync(path.join(root,`project/bots/teams/ventas/revisions/${t.digest(sample())}/skills/jefa/tono/SKILL.md`)),'the other department keeps its skills');
     // The same department may replace its own files.
     assert.equal((await t.importPackage(sample(),{root,scan:false})).commit,null);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+
+
+test('a new package preserves skills referenced by the applied declaration when the draft is discarded',async()=>{
+  const {root,git}=repo();
+  try {
+    const first=await t.importPackage(sample(),{root,scan:false});
+    fs.writeFileSync(path.join(root,'project/bots/team.yaml'),first.proposedTeamYaml);git('commit','-qam','apply');
+    const old=yaml.parse(first.proposedTeamYaml.replaceAll('${FYSO_ROOT}',root)).bots.find(b=>b.name==='Jefa').skills[0].file;
+    const oldContent=fs.readFileSync(old,'utf8');
+    const updated=sample(); updated.skills[0].contenido='changed content';
+    const second=await t.importPackage(updated,{root,scan:false});
+    assert.equal(fs.readFileSync(old,'utf8'),oldContent);
+    const next=yaml.parse(second.proposedTeamYaml.replaceAll('${FYSO_ROOT}',root)).bots.find(b=>b.name==='Jefa').skills[0].file;
+    assert.notEqual(next,old);assert.equal(fs.readFileSync(next,'utf8'),'changed content');
+    assert.equal(fs.readFileSync(path.join(root,'project/bots/team.yaml'),'utf8'),first.proposedTeamYaml);
   } finally {fs.rmSync(root,{recursive:true,force:true});}
 });

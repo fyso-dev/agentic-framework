@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D82; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D83; D6, D9, D22 superseded; D16 resolved by D20) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
 
 ## Layer 2 — Architecture
@@ -107,10 +107,14 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-16: Department imports store each package’s skills under its content digest. The currently applied declaration keeps its exact skill files while a replacement is reviewed or discarded.
+
 2026-11-15: Biz Work panel candidate creates project-agent requests and configures dispatch to a native bot. An authenticated gateway-to-Dagu-to-bot test reached Biz `done` with progress; browser acceptance and evidence storage remain open. [Checkpoint](teams-biz-delivery.md#checkpoint).
 
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
+
+2026-11-16: Panel extensions (D83). The panel read `apps.json`/`extensions.json`/`skills.json` only on page load, so an extension added or removed from the terminal, by an agent or by a panel install the person navigated away from stayed hidden until a browser reload; it now re-reads them with the five-second roster poll. Install was already direct (Dagu + Copier, no model). Uninstall is now a panel action through `fyso-ext-remove` with an in-page confirmation. Verified in a generated project on its own ports. [extensions-contract §8](extensions-contract.md#fyso-ext-remove-param-id--output-result-d83)
 
 2026-11-14: Recorded extension-first product growth in AGENTS, PLAN and the extension contract: a simple default experience, optional use-case capabilities, minimal generic slots and explicit criteria for promotion to core. No runtime migration is implied.
 
@@ -294,3 +298,4 @@ stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-exten
 | 2026-11-15 | **Department templates (D82).** `openmausbot team export --team <name> --port <project>` already writes one department with its bots, rooms and skills (`skills/<bot>/<skill>/SKILL.md` beside the file, engine keys as placeholders) but also each bot's absolute `cwd` and a dated comment; normalizing rebuilds the text without both, so exporting the same department twice gives the same digest. The fixture's *Equipo comercial* exported as a valid package and, renamed, imported into a `team.yaml` that `fyso-bots-plan` accepted. On a scratch OMB, applying an imported package and exporting it again first differed only where OMB fills `approval` (default `full`) and `computer` (from the project's `defaults`); the canonical form now states both, and the round trip gives the same digest for a real export and a hand-written package. [team-templates.md](team-templates.md) |
 | 2026-11-15 | **Department templates end to end (D82).** Two generated projects synchronized *Ventas* and *Marketing* through the local Biz in both directions and through two conflicts. Each pull reproduced the publisher's package digest. Findings: (1) Editing a skill file changes the department only once it is applied. The export reads OpenMausBot, as the plan's `skill … replace` line shows. (2) A pull marked as waiting for apply stayed marked after the apply, so a later local change read as a pull. Status now records the apply. (3) `publicar_equipo` answers `{equipo, creado}`. (4) `omb team apply` writes its error as JSON on stdout and applies section by section, so a failed panel apply showed only `exit status 1` and could leave part of the change applied. The panel now reports OMB's error and asks for a fresh preview. (5) Biz's team list counts its own agents, so a published team shows 0 agents. [team-templates.md](team-templates.md) |
 | 2026-11-16 | **Reads need no GitHub account; uv pinned.** Generated projects run Copier through `uvx` (`update.sh`, `ext.sh`, `dist.sh`) but did not pin uv, so a host without uv failed; the template now pins `aqua:astral-sh/uv` 0.5.1, the installers' version. Template, catalog, skill and distribution reads already used plain Git over HTTPS (Copier expands `gh:` itself); only the installers required a GitHub CLI login for every `gh:` source. They now run `git ls-remote` first and sign in only when Git cannot read the source. Verified with no `gh` on `PATH`, no `GH_TOKEN`/`GITHUB_TOKEN` and no global Git config: generation, `mise install`, `uvx`, `github:check`, `ext:search`, `skills:search`/`show`, Copier from `gh:fyso-dev/fyso-ext-netbird` and a no-op framework update. Open: `fyso-dev/agentic-framework` and four of the five catalog extensions are still private, so they still need a credential. [Installation](installation.md) |
+| 2026-11-16 | **Biz teams and local departments did not match (D82).** fyso-ext-biz kept two identities: the Biz team list read only older downloads (`project/bots/biz/<slug>/source.json`) and the sync list only `project/biz-teams.json`. Departments pulled as packages showed as not downloaded, and a department downloaded before packages showed as unpublished, so publishing it would create a second Biz team. Both now match by the Biz team id; older downloads are recorded under it (fyso-ext-biz `fix/biz-groups`). [team-templates.md](team-templates.md) |

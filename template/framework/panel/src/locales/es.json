@@ -591,7 +591,12 @@
     "installedShort": "Instalada",
     "noMatch": "Ninguna extensión coincide con la búsqueda.",
     "terminal": "Desde la terminal",
-    "removeNote": "Quitar una extensión se hace solo desde la terminal."
+    "remove": "Desinstalar {{name}}",
+    "removeTitle": "¿Desinstalar {{name}}?",
+    "removeHint": "Se quitan sus archivos, procesos, rutas y workflows en un commit. Se conservan sus datos en .data/ext y sus claves guardadas. Apaga antes sus skills en tus agentes.",
+    "removeConfirm": "Desinstalar",
+    "removing": "Desinstalando…",
+    "removed": "{{id}} se desinstaló y se hizo commit ({{commit}})."
   },
   "extensionPage": {
     "missing": "La página de la extensión no está instalada.",
