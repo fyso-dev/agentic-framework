@@ -276,7 +276,8 @@ PASSWORD_FILE="$WORK/initial-password"
 DAGU_HOME="$WORK/dagu"
 "$MISE" exec "$DAGU_TOOL" -- dagu start -q --dagu-home "$DAGU_HOME" -r "$RUN" "$RES/fyso-install.yaml" -- \
   "DIR=$DIR" "NAME=$NAME" "SLUG=$SLUG" "PORT=$PORT" "ENGINE=$ENGINE" "SOURCE=$SOURCE" "REF=$REF" \
-  "MISE=$MISE" "GIT_NAME=$GIT_NAME" "GIT_EMAIL=$GIT_EMAIL" "ADMIN=$ADMIN" "PASSWORD_FILE=$PASSWORD_FILE" > "$WORK/dagu.out" 2>&1 &
+  "MISE=$MISE" "GIT_NAME=$GIT_NAME" "GIT_EMAIL=$GIT_EMAIL" "ADMIN=$ADMIN" "PASSWORD_FILE=$PASSWORD_FILE" \
+  "TINYAUTH_BIN=$(dirname "$RES")/Helpers/tinyauth" "TINYAUTH_META=$RES/third-party/tinyauth" > "$WORK/dagu.out" 2>&1 &
 DAGU_PID=$!
 # Read each step's state from the run's status file (4 ok, 1 running, 2 failed, 3 skipped, 0 not started).
 states() {

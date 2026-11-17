@@ -49,8 +49,6 @@ STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
 STEP_tool_uv='uv (Copier runner)'
 
-STEP_tool_go='Compiler (sign-in on Mac)'
-STEP_tool_pnpm='Packages (sign-in on Mac)'
 STEP_web_auth='Sign-in'
 
 # Password policy (the reason a password is refused) and the text under the progress bar.

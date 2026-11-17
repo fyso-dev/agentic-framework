@@ -5,29 +5,15 @@ One step per tool of template/mise.toml.jinja, so the installer window can show 
 dependency installing. Parameters arrive as environment variables (never interpolated
 into the command line). Usage: make-dag.py <template/mise.toml.jinja> <out.yaml>
 """
-import os
-import platform
 import re
 import sys
 
 source, out = sys.argv[1], sys.argv[2]
 text = open(source).read()
 block = re.search(r"^\[tools\]\n(.*?)(?:^\[|\Z)", text, re.S | re.M).group(1)
-# `"tool" = "1.2.3"` or `"tool" = { version = "1.2.3", os = ["macos"] }` (mise's per-OS tools).
-entries = re.findall(r'^"?([^"=\s]+)"?\s*=\s*(?:"([^"]+)"|\{([^}]*)\})', block, re.M)
-if not entries:
+tools = re.findall(r'^"?([^"=\s]+)"?\s*=\s*"([^"]+)"', block, re.M)
+if not tools:
     sys.exit("no [tools] found in " + source)
-# The OS the installed project runs on: the build host's, unless FYSO_INSTALLER_OS says
-# otherwise. Windows installs run inside WSL, so they get the Linux steps.
-target = os.environ.get("FYSO_INSTALLER_OS") or ("macos" if platform.system() == "Darwin" else "linux")
-tools = []
-for tool, version, table in entries:
-    if table:
-        version = re.search(r'version\s*=\s*"([^"]+)"', table).group(1)
-        only = re.search(r'os\s*=\s*\[([^\]]*)\]', table)
-        if only and target not in re.findall(r'"([^"]+)"', only.group(1)):
-            continue
-    tools.append((tool, version))
 
 
 def step_id(tool):
@@ -52,6 +38,8 @@ lines = [
     "  - GIT_EMAIL: \"\"",
     "  - ADMIN: admin",
     "  - PASSWORD_FILE: \"\"  # private file with the chosen password (never the password itself)",
+    "  - TINYAUTH_BIN: \"\"   # macOS: the web login binary bundled in the app (D87)",
+    "  - TINYAUTH_META: \"\"  # its version, source and binary checksums",
     "env:",
     "  - MISE_YES: \"1\"",
     "steps:",
@@ -89,12 +77,14 @@ for tool, version in tools:
 by_tool = {t: step_id(t) for t, _ in tools}
 # setup: age key, sops file and the first web user (node + yaml glue, bcrypt by caddy).
 setup_deps = ["trust"] + [by_tool[t] for t in ["aqua:FiloSottile/age", "aqua:getsops/sops", "core:node", "npm:yaml", "aqua:caddyserver/caddy"] if t in by_tool]
-# The web login (Tinyauth) is the slowest piece: install it as soon as its tools are there,
-# alongside the remaining tools, setup and git. On macOS it is built (Go, pnpm).
-web_deps = ["trust"] + [by_tool[t] for t in ["core:node", "core:go", "core:pnpm"] if t in by_tool]
+# The web login (Tinyauth): Linux downloads the upstream binary; macOS copies the one bundled
+# in the app (and builds it only without one). It runs alongside the other tools and setup.
+web_deps = ["trust"] + [by_tool[t] for t in ["core:node"] if t in by_tool]
 lines += [
     "  - id: web_auth",
-    "    run: cd \"$DIR\" && MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run web-auth:install",
+    "    run: >-",
+    "      cd \"$DIR\" && FYSO_TINYAUTH_BUNDLED_BIN=\"$TINYAUTH_BIN\" FYSO_TINYAUTH_BUNDLED_META=\"$TINYAUTH_META\"",
+    "      MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run web-auth:install",
     f"    depends: [{', '.join(web_deps)}]",
     "  - id: setup",
     "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run setup",

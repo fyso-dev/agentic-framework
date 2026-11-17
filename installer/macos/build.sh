@@ -32,6 +32,9 @@ echo "$DIALOG_SHA256  $cache" | shasum -a 256 -c - >/dev/null
 mnt=$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$cache" >/dev/null
 cp -R "$mnt/Dialog.app" "$APP/Contents/Helpers/"; hdiutil detach -quiet "$mnt"
 
+# The web login, built from its pinned source (D87; Helpers/tinyauth, a Mach-O to sign).
+./build-tinyauth.sh "$APP"
+
 # Pinned mise bootstrap, the workflow and the window's step titles.
 mise generate install-script -V "$MISE_VERSION" > "$APP/Contents/Resources/mise-bootstrap.sh"
 ids=$(python3 make-dag.py "$ROOT/template/mise.toml.jinja" "$APP/Contents/Resources/fyso-install.yaml")

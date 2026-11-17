@@ -50,8 +50,6 @@ STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
 STEP_tool_uv='uv (ejecuta Copier)'
 
-STEP_tool_go='Compilador (inicio de sesión en Mac)'
-STEP_tool_pnpm='Paquetes (inicio de sesión en Mac)'
 STEP_web_auth='Inicio de sesión'
 
 # Password policy (the reason a password is refused) and the text under the progress bar.
