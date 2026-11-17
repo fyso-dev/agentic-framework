@@ -1,4 +1,5 @@
 """The macOS installer's Dagu workflow is generated from the template's pinned tools (D35)."""
+import os
 import re
 import subprocess
 import sys
@@ -10,27 +11,41 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstallerDag(unittest.TestCase):
-    def test_one_step_per_pinned_tool_in_dependency_order(self):
-        tools = re.findall(r'^"([^"]+)" = "([^"]+)"', (ROOT / 'template/mise.toml.jinja').read_text().split('[tools]')[1].split('\n[')[0], re.M)
+    def dag(self, target):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'dag.yaml'
             ids = subprocess.run([sys.executable, str(ROOT / 'installer/macos/make-dag.py'), str(ROOT / 'template/mise.toml.jinja'), str(out)],
-                                 check=True, capture_output=True, text=True).stdout.split()
-            text = out.read_text()
-        self.assertEqual(len(ids), len(tools))
-        for step in ['generate', 'trust', *ids, 'setup', 'git', 'start']:
-            self.assertRegex(step, r'^[a-zA-Z][a-zA-Z0-9_]*$')  # Dagu step id format
-            self.assertIn(f'  - id: {step}\n', text)
-        for tool, version in tools:
-            self.assertIn(f'install "{tool}@{version}"', text)
-        # npm tools need Node first; setup waits for every tool; the first commit comes
-        # after setup so it includes .sops.yaml and the encrypted secrets.
-        self.assertRegex(text, r'id: tool_openmausbot\n    run: .*\n    depends: \[trust, tool_node\]')
-        self.assertIn(f'depends: [{", ".join(ids)}]', text)
-        self.assertRegex(text, r'id: git\n    run: >-\n(?:      .*\n)+    depends: \[setup\]')
-        self.assertRegex(text, r'id: start\n    run: .*\n    depends: \[git\]')
-        # Parameters reach commands as environment variables, never interpolated.
-        self.assertNotIn('${params.', text)
+                                 check=True, capture_output=True, text=True, env={**os.environ, 'FYSO_INSTALLER_OS': target}).stdout.split()
+            return ids, out.read_text()
+
+    def test_one_step_per_pinned_tool_in_dependency_order(self):
+        block = (ROOT / 'template/mise.toml.jinja').read_text().split('[tools]')[1].split('\n[')[0]
+        tools = re.findall(r'^"([^"]+)" = (?:"([^"]+)"|\{ version = "([^"]+)"(?:, os = \[([^\]]*)\])? \})', block, re.M)
+        for target in ['macos', 'linux']:
+            ids, text = self.dag(target)
+            wanted = [(t, a or b) for t, a, b, only in tools if not only or f'"{target}"' in only]
+            self.assertEqual(ids[-1], 'web_auth')
+            self.assertEqual(len(ids), len(wanted) + 1)
+            for step in ['generate', 'trust', *ids, 'setup', 'git', 'start']:
+                self.assertRegex(step, r'^[a-zA-Z][a-zA-Z0-9_]*$')  # Dagu step id format
+                self.assertIn(f'  - id: {step}\n', text)
+            for tool, version in wanted:
+                self.assertIn(f'install "{tool}@{version}"', text)
+            # npm tools need Node and the project; other tools start at once (D87).
+            self.assertRegex(text, r'id: tool_openmausbot\n    run: .*\n    depends: \[trust, tool_node\]')
+            self.assertRegex(text, r'id: tool_caddy\n    run: cd / && .*\n  - id:')
+            # setup waits only for what it uses; start waits for every tool and the web login;
+            # the first commit comes after setup so it includes .sops.yaml and the secrets.
+            self.assertIn('depends: [trust, tool_age, tool_sops, tool_node, tool_yaml, tool_caddy]', text)
+            self.assertIn(f'depends: [git, {", ".join(ids)}]', text)
+            self.assertRegex(text, r'id: git\n    run: >-\n(?:      .*\n)+    depends: \[setup\]')
+            self.assertNotIn('${params.', text)
+        mac, linux = self.dag('macos')[1], self.dag('linux')[1]
+        # Go and pnpm only build the web login on macOS; Linux uses the upstream binary.
+        self.assertIn('id: web_auth\n    run: cd "$DIR" && MISE_TASK_RUN_AUTO_INSTALL=false "$MISE" run web-auth:install\n    depends: [trust, tool_node, tool_go, tool_pnpm]', mac)
+        self.assertIn('depends: [trust, tool_node]\n  - id: setup', linux)
+        self.assertNotIn('core:go', linux)
+        self.assertNotIn('core:pnpm', linux)
 
 
 class InstallerResources(unittest.TestCase):

@@ -303,6 +303,7 @@ step_phase() {
     generate|trust|git) phase "$P_CREATING" ;;
     setup) phase "$P_KEYS" ;;
     start) phase "$P_STARTING" ;;
+    web_auth) phase "$P_WEB_AUTH" ;;
     *) phase "$(t "$P_DOWNLOADING" "$2")" ;;
   esac
 }

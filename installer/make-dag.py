@@ -5,15 +5,29 @@ One step per tool of template/mise.toml.jinja, so the installer window can show 
 dependency installing. Parameters arrive as environment variables (never interpolated
 into the command line). Usage: make-dag.py <template/mise.toml.jinja> <out.yaml>
 """
+import os
+import platform
 import re
 import sys
 
 source, out = sys.argv[1], sys.argv[2]
 text = open(source).read()
 block = re.search(r"^\[tools\]\n(.*?)(?:^\[|\Z)", text, re.S | re.M).group(1)
-tools = re.findall(r'^"?([^"=\s]+)"?\s*=\s*"([^"]+)"', block, re.M)
-if not tools:
+# `"tool" = "1.2.3"` or `"tool" = { version = "1.2.3", os = ["macos"] }` (mise's per-OS tools).
+entries = re.findall(r'^"?([^"=\s]+)"?\s*=\s*(?:"([^"]+)"|\{([^}]*)\})', block, re.M)
+if not entries:
     sys.exit("no [tools] found in " + source)
+# The OS the installed project runs on: the build host's, unless FYSO_INSTALLER_OS says
+# otherwise. Windows installs run inside WSL, so they get the Linux steps.
+target = os.environ.get("FYSO_INSTALLER_OS") or ("macos" if platform.system() == "Darwin" else "linux")
+tools = []
+for tool, version, table in entries:
+    if table:
+        version = re.search(r'version\s*=\s*"([^"]+)"', table).group(1)
+        only = re.search(r'os\s*=\s*\[([^\]]*)\]', table)
+        if only and target not in re.findall(r'"([^"]+)"', only.group(1)):
+            continue
+    tools.append((tool, version))
 
 
 def step_id(tool):
@@ -54,19 +68,37 @@ lines = [
 ]
 node = next((step_id(t) for t, _ in tools if t == "core:node"), None)
 ids = []
+# Tools install into mise's own folders, not the project: everything except npm packages
+# (which need Node and the project's npm setting) starts at once, while the project is
+# still being generated. Commands run with mise's automatic installs off, so a task waits
+# only for the tools its own step depends on (D87).
 for tool, version in tools:
     sid = step_id(tool)
     ids.append(sid)
-    deps = ["trust"] + ([node] if tool.startswith("npm:") and node else [])
-    lines += [
-        f"  - id: {sid}",
-        f"    run: cd \"$DIR\" && \"$MISE\" install \"{tool}@{version}\"",
-        f"    depends: [{', '.join(deps)}]",
-    ]
+    if tool.startswith("npm:"):
+        lines += [
+            f"  - id: {sid}",
+            f"    run: cd \"$DIR\" && \"$MISE\" install \"{tool}@{version}\"",
+            f"    depends: [{', '.join(['trust'] + ([node] if node else []))}]",
+        ]
+    else:
+        lines += [
+            f"  - id: {sid}",
+            f"    run: cd / && \"$MISE\" install \"{tool}@{version}\"",
+        ]
+by_tool = {t: step_id(t) for t, _ in tools}
+# setup: age key, sops file and the first web user (node + yaml glue, bcrypt by caddy).
+setup_deps = ["trust"] + [by_tool[t] for t in ["aqua:FiloSottile/age", "aqua:getsops/sops", "core:node", "npm:yaml", "aqua:caddyserver/caddy"] if t in by_tool]
+# The web login (Tinyauth) is the slowest piece: install it as soon as its tools are there,
+# alongside the remaining tools, setup and git. On macOS it is built (Go, pnpm).
+web_deps = ["trust"] + [by_tool[t] for t in ["core:node", "core:go", "core:pnpm"] if t in by_tool]
 lines += [
+    "  - id: web_auth",
+    "    run: cd \"$DIR\" && MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run web-auth:install",
+    f"    depends: [{', '.join(web_deps)}]",
     "  - id: setup",
-    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" \"$MISE\" run setup",
-    f"    depends: [{', '.join(ids)}]",
+    "    run: cd \"$DIR\" && FYSO_INITIAL_PASSWORD_FILE=\"$PASSWORD_FILE\" MISE_TASK_RUN_AUTO_INSTALL=false \"$MISE\" run setup",
+    f"    depends: [{', '.join(setup_deps)}]",
     # After setup: the first commit must include .sops.yaml and the encrypted secrets.
     "  - id: git",
     "    run: >-",
@@ -77,7 +109,8 @@ lines += [
     "    depends: [setup]",
     "  - id: start",
     "    run: cd \"$DIR\" && \"$MISE\" run up",
-    "    depends: [git]",
+    f"    depends: [{', '.join(['git'] + ids + ['web_auth'])}]",
 ]
+ids.append("web_auth")
 open(out, "w").write("\n".join(lines) + "\n")
 print(" ".join(ids))
