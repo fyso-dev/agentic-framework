@@ -182,7 +182,7 @@ function check(pkg) {
  * The proposed team.yaml: the department's `teams:` entry, bots and rooms replaced in
  * place (new ones appended), everything else, comments and order included, kept.
  */
-function propose(current, pkg, teamSlug) {
+function propose(current, pkg, teamSlug, revision) {
   const yaml = yamlModule();
   if (!SLUG.test(teamSlug || '')) fail('invalid_slug');
   pkg = canonicalize(pkg);
@@ -214,7 +214,7 @@ function propose(current, pkg, teamSlug) {
     const taken = list(team.rooms).find(room => same(room.name, str(node.get('name'))));
     if (taken) fail('name_taken', taken.name);
   }
-  const prefix = `${MARKER}/project/bots/teams/${teamSlug}/`;
+  const prefix = `${MARKER}/project/bots/teams/${teamSlug}/${revision ? `revisions/${revision}/` : ""}`;
   const replace = (seq, wanted) => {
     const at = seq.items.findIndex(owned);
     const kept = seq.items.filter(node => !owned(node));
@@ -244,12 +244,13 @@ function ownerOf(current, teamSlug) {
 }
 
 /** Replace the department's skill files and commit that directory on its own. */
-function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}), scan} = {}) {
+function writeFiles(pkg, teamSlug, {root = process.cwd(), git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'}), scan, revision} = {}) {
   pkg = canonicalize(pkg);
   check(pkg);
   if (!SLUG.test(teamSlug || '')) fail('invalid_slug');
-  const dir = `project/bots/teams/${teamSlug}`, skillsDir = path.join(root, dir, 'skills');
-  if (git('status', '--porcelain', '--', dir).trim()) fail('uncommitted_changes', dir);
+  const base = `project/bots/teams/${teamSlug}`;
+  const dir = revision ? `${base}/revisions/${revision}` : base, skillsDir = path.join(root, dir, 'skills');
+  if (git('status', '--porcelain', '--', base).trim()) fail('uncommitted_changes', base);
   fs.rmSync(skillsDir, {recursive: true, force: true});
   for (const skill of pkg.skills) {
     const file = path.join(root, dir, skill.path);
@@ -370,8 +371,9 @@ async function importPackage(pkg, {root = process.env.FYSO_ROOT || process.cwd()
   const owner = ownerOf(currentTeamYaml, teamSlug);
   if (owner !== null && !same(owner, pkg.departamento)) fail('slug_taken', `${teamSlug} (${owner})`);
   // Propose first: a rejected package writes nothing.
-  const proposedTeamYaml = propose(currentTeamYaml, pkg, teamSlug);
-  const commit = writeFiles(pkg, teamSlug, {root, scan: scan || undefined, ...(git && {git})});
+  const revision = digest(pkg);
+  const proposedTeamYaml = propose(currentTeamYaml, pkg, teamSlug, revision);
+  const commit = writeFiles(pkg, teamSlug, {root, revision, scan: scan || undefined, ...(git && {git})});
   return {proposedTeamYaml, currentTeamYaml, commit, slug: teamSlug, departamento: pkg.departamento, digest: digest(pkg), ...(source && {source})};
 }
 

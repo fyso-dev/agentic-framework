@@ -8,12 +8,10 @@ Includes conversational bot administration, a Workflow Architect, Builder workfl
 
 ## Quick start
 
-Requires Git, [mise](https://mise.jdx.dev), [uv](https://docs.astral.sh/uv/) and access to this private repository. Authenticate a supported coding CLI on the host to run bots; see the guide.
+Requires Git and [mise](https://mise.jdx.dev); mise runs the pinned [uv](https://docs.astral.sh/uv/) that provides `uvx`. Reading the template, catalogs and skills needs no GitHub account or GitHub CLI when the repositories are public; while this repository is private, authenticate Git for it first (for example `gh auth login && gh auth setup-git`). Authenticate a supported coding CLI on the host to run bots; see the guide.
 
 ```sh
-gh auth login
-gh auth setup-git
-uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
+mise exec aqua:astral-sh/uv@0.5.1 -- uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 git init -b main
