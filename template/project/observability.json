@@ -2,5 +2,6 @@
   "monthlyApiUsd": null,
   "longRunSeconds": 600,
   "maxRecentFailures": 1,
+  "subscriptionPercent": null,
   "billingKinds": {}
 }

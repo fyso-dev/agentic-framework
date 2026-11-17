@@ -366,7 +366,7 @@
     "missingTokens": "{{count}} sin tokens completos",
     "alerts": "Avisos del proyecto",
     "noAlerts": "Sin umbrales superados entre los datos disponibles.",
-    "alertNote": "Avisos locales; no detienen agentes ni envían mensajes. Configuración: project/observability.json. El umbral monetario usa solo API reportada y puede tener cobertura incompleta.",
+    "alertNote": "Avisos locales; no detienen agentes ni envían mensajes. Configuración: project/observability.json. El umbral monetario usa solo API reportada y puede tener cobertura incompleta. El umbral de suscripción (subscriptionPercent) avisa sobre la cuenta, no sobre el proyecto.",
     "usage": "Consumo por agente, modelo y motor",
     "empty": "No hay registros para esta selección.",
     "conversations": "Conversaciones y delegaciones",
@@ -392,13 +392,15 @@
       "invalidSettings": "Configuración inválida; se usaron valores predeterminados.",
       "invalidLedgerRows": "Hay registros de consumo ilegibles.",
       "invalidArtifacts": "Hay artefactos ilegibles.",
-      "runDetailsUnavailable": "No se pudieron leer los detalles de algunas ejecuciones."
+      "runDetailsUnavailable": "No se pudieron leer los detalles de algunas ejecuciones.",
+      "invalidPricing": "La tabla de precios tiene entradas inválidas; se ignoraron."
     },
     "alert": {
       "budget": "API reportada: USD {{value}} · umbral USD {{limit}}",
       "failures": "{{value}} fallos en las ejecuciones recientes · umbral {{limit}}",
       "longRun": "Ejecución activa de {{value}} s · umbral {{limit}} s",
-      "longConversation": "Conversación activa de {{value}} s · umbral {{limit}} s"
+      "longConversation": "Conversación activa de {{value}} s · umbral {{limit}} s",
+      "subscription": "Uso de tu suscripción ({{engine}} · {{window}}): {{value}} % · umbral {{limit}} %"
     },
     "tokenNote": "Entrada nueva + entrada en caché = entrada total. El razonamiento está incluido en la salida.",
     "tokens": "Tokens",
@@ -430,7 +432,10 @@
       "checked": "Consultado {{when}}",
       "unknownNote": "\"Sin dato\" es normal: algunos planes no tienen una de las ventanas, o el proveedor no respondió.",
       "unknownAccounts": "Sin dato por ahora: {{engines}}."
-    }
+    },
+    "pricing": "Los importes que el motor no reporta (por ejemplo, Codex) se estiman con la tabla de precios de lista del {{date}}: es un equivalente estimado, no tu factura ni una parte de tu suscripción. Un modelo que no está en la tabla queda como «{{unknown}}».",
+    "pricingProject": "Incluye precios propios de project/pricing.json.",
+    "pricingSource": "Fuente de precios"
   },
   "ext": {
     "title": "Extensiones instaladas",

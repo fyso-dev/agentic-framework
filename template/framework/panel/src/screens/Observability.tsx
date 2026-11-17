@@ -168,6 +168,7 @@ export function Observability() {
           {daily.length ? <UsageChart days={days} series={series} label={t("observ.chartLabel", {metric:t(`observ.metrics.${metric}`)})}
             format={metric === "cost" ? money : number} formatDay={formatDay} axis={metric === "cost" ? axisMoney : compact} /> : <p className="observ-empty">{t("observ.empty")}</p>}
           <p className="mute">{t(metric === "cost" ? "observ.costNote" : "observ.tokenNote")}</p>
+          {metric === "cost" && data.pricing?.checkedAt && <p className="mute">{t("observ.pricing", {date:data.pricing.checkedAt, unknown:t("observ.unknown")})}{data.pricing.project && <> {t("observ.pricingProject")}</>}{data.pricing.sources.map(url => <span key={url}> <External href={url}>{t("observ.pricingSource")}</External></span>)}</p>}
         </div>
       </section>
 
@@ -189,7 +190,7 @@ export function Observability() {
       </tbody></table>{!traces.length && <p className="observ-empty">{t("observ.empty")}</p>}</div></section>
 
       <section className="observ-section"><h2 className="section-title">{t("observ.alerts")}</h2><div className="card">
-        {!data.alerts.length ? <p className="observ-empty">{t("observ.noAlerts")}</p> : <ul className="list">{data.alerts.map((a,i)=><li key={i} className="row"><span className="grow">{t(`observ.alert.${a.kind}`, {value:number(a.value), limit:number(a.limit)})}</span>{a.dag && <External href={dagUrl(a.dag)}>{t("common.logs")}</External>}{a.traceId && <External href={traceUrl(a.traceId)}>{t("observ.details")}</External>}</li>)}</ul>}
+        {!data.alerts.length ? <p className="observ-empty">{t("observ.noAlerts")}</p> : <ul className="list">{data.alerts.map((a,i)=><li key={i} className="row"><span className="grow">{t(`observ.alert.${a.kind}`, {value:number(a.value), limit:number(a.limit), engine:engineLabel(a.engine), window:a.window ? t(`observ.plan.${a.window}`) : ""})}</span>{a.dag && <External href={dagUrl(a.dag)}>{t("common.logs")}</External>}{a.traceId && <External href={traceUrl(a.traceId)}>{t("observ.details")}</External>}</li>)}</ul>}
       </div><p className="mute">{t("observ.alertNote")}</p></section>
     </>}
   </main>;
