@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LANGS, setLanguage, localized } from "../lib/i18n";
-import type { Extension } from "../api/types";
+import type { App, Extension } from "../api/types";
 import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { useExtensionBadges } from "../lib/extensionBadges";
-import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconUsage } from "./Icons";
+import { AppIcon, IconApps, IconBot, IconChecklist, IconExternal, IconMoon, IconPlug, IconSidebar, IconSun, IconUsage } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
 import markUrl from "../assets/brand/fyso-mark.png";
@@ -132,18 +132,35 @@ function Attention() {
   );
 }
 
-export function TopBar(props: ThemeProps) {
-  const { t } = useTranslation();
-  const { project } = useStore();
+export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean; toggleNav: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { project, apps } = useStore();
   const p = project.data;
+  const embedded = (id: string) => !!apps.data?.some((app) => app.id === id && app.enabled && app.embed);
+  const route = props.route;
+  const openApp = route.name === "app" ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
   return (
     <header className="topbar">
+      <button type="button" className="icon-btn nav-toggle only-desktop" onClick={props.toggleNav} aria-expanded={!props.navCollapsed}
+              aria-label={props.navCollapsed ? t("nav.expand") : t("nav.collapse")} title={props.navCollapsed ? t("nav.expand") : t("nav.collapse")}>
+        <IconSidebar size={18} />
+      </button>
       <a className="brand" href={href.setup}>
         {/* The Fyso mark from the design system; the project name sits beside it. */}
         <img className="logo logo-on-light" src={markUrl} alt="" width={28} />
         <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
         <span className="brand-name">{p?.name ?? t("top.logo")}</span>
       </a>
+      {openApp && (
+        <span className="crumb">
+          <span className="crumb-sep" aria-hidden="true">/</span>
+          <span className="crumb-name">{localized(i18n.language, openApp.name, openApp.name_i18n)}</span>
+          <a className="icon-btn tip-r" href={openApp.url} target="_blank" rel="noopener noreferrer"
+             data-tip={t("top.openInTab")} aria-label={`${t("top.openInTab")} ${t("common.newTab")}`}>
+            <IconExternal size={16} />
+          </a>
+        </span>
+      )}
       {p && <span className="env-badge only-desktop">{t(`top.env.${p.env}`, { defaultValue: p.env })}</span>}
       <span className="grow only-desktop" />
       <Attention />
@@ -154,12 +171,17 @@ export function TopBar(props: ThemeProps) {
       <span className="only-desktop">
         <ThemeButton {...props} />
       </span>
-      {p && (
+      {p && openApp?.id !== "omb" && (embedded("omb") ? (
+        <a href={href.app("omb")} className="btn btn-pri">
+          <span className="only-desktop">{t("top.openOmb")}</span>
+          <span className="only-mobile">{t("top.ombShort")}</span>
+        </a>
+      ) : (
         <External href={p.urls.omb} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
-      )}
+      ))}
       <SessionMenu />
       <MoreMenu {...props} />
     </header>
@@ -171,20 +193,26 @@ const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconUsage },
-  { id: "connectors", href: href.connectors, icon: IconApps },
+  { id: "connectors", href: href.connectors, icon: IconPlug },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
 const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
+  if(r.name === "app")return `app:${r.id}`;
   return r.name === "bot" ? "bots" : r.name;
 }
 
-export function SideNav({ route }: { route: Route }) {
+/** Apps that open inside the panel (D92) get their own menu entries, after the panel's sections. */
+const appItems = (apps:App[],lang:string):NavItem[] => apps.filter(app=>app.enabled&&app.embed).map(app=>({id:`app:${app.id}`,href:href.app(app.id),label:localized(lang,app.name,app.name_i18n),icon:(p:{size?:number})=><AppIcon name={app.icon} size={p.size} />}));
+
+export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
-  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
+  const apps = appItems(s.apps.data ?? [], i18n.language);
+  const items = [...ITEMS,...apps,...extensionItems(s.extensions.data??[],i18n.language)];
+  const firstApp = apps[0]?.id;
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
   const down = downApps(s);
@@ -206,17 +234,40 @@ export function SideNav({ route }: { route: Route }) {
       ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
       : <span className="nav-count">{s.apps.data?.length ?? ""}</span>,
   };
+  // Collapsed, the menu keeps only its icons; the names show as tooltips and a dot marks what needs attention.
+  const attention: Record<string, boolean> = {
+    ...Object.fromEntries(Object.entries(badges).map(([id, badge]) => [id, !!badge.warn && badge.count > 0])),
+    setup: !loadingSteps(s) && open > 0, bots: unapplied > 0, apps: down > 0,
+    ...Object.fromEntries((s.apps.data ?? []).map((app) => [`app:${app.id}`, s.health[app.id] === "down"])),
+  };
   return (
-    <nav aria-label={t("nav.label")} className="sidenav">
-      {items.map(({ id, href: h, icon: Icon, label }) => (
-        <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
-          <Icon />
-          <span className="grow"><span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span></span>
-          {counts[id]}
-        </a>
-      ))}
+    <nav aria-label={t("nav.label")} className={`sidenav${collapsed ? " collapsed" : ""}`}>
+      {items.map(({ id, href: h, icon: Icon, label }) => {
+        const name = label ?? t(`nav.${id}`);
+        return (
+          <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}
+             data-first-app={id === firstApp || undefined}
+             {...(collapsed ? { "data-tip": name, className: "tip-side", "aria-label": name } : {})}>
+            <span className="nav-icon"><Icon size={18} />{attention[id] && <span className="nav-dot" aria-hidden="true" />}</span>
+            <span className="grow nav-label" aria-hidden={collapsed || undefined}><span className="bottomnav-label">{name}</span></span>
+            <span className="nav-extra" aria-hidden={collapsed || undefined}>{counts[id] ?? (attention[id] ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>!<span className="sr-only"> {t("apps.downFlag")}</span></span> : null)}</span>
+          </a>
+        );
+      })}
     </nav>
   );
+}
+
+/** Wide or collapsed is the person's choice, remembered in this browser; wide by default. */
+export function useNavCollapsed(): [boolean, () => void] {
+  const read = () => { try { return localStorage.getItem("fy-nav-collapsed") === "1"; } catch { return false; } };
+  const [collapsed, setCollapsed] = useState<boolean>(read);
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem("fy-nav-collapsed", next ? "1" : "0"); } catch { /* the choice lasts this visit */ }
+  };
+  return [collapsed, toggle];
 }
 
 export function BottomNav({ route }: { route: Route }) {

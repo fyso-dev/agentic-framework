@@ -164,12 +164,12 @@ function apps(scenario: Scenario): App[] {
     {
       id: "dagu", name: "Automatizaciones", name_i18n: { es: "Automatizaciones", en: "Automations" },
       description: "Flujos de trabajo y ejecuciones", description_i18n: { en: "Workflows and runs" },
-      icon: "workflow", url: PROJECT.urls.dagu, group: "framework", enabled: true,
+      icon: "workflow", url: PROJECT.urls.dagu, group: "framework", enabled: true, embed: true,
     },
     {
-      id: "omb", name: "Agentes", name_i18n: { es: "Agentes", en: "Agents" },
+      id: "omb", name: "Chat de agentes", name_i18n: { es: "Chat de agentes", en: "Agent chat" },
       description: "Conversaciones con los agentes", description_i18n: { en: "Conversations with the agents" },
-      icon: "bot", url: PROJECT.urls.omb, group: "framework", enabled: true,
+      icon: "chat", url: PROJECT.urls.omb, group: "framework", enabled: true, embed: true,
       accessNote: "Login del proyecto; no requiere código de emparejamiento",
       accessNote_i18n: { en: "Project login; no pairing code required" },
     },
