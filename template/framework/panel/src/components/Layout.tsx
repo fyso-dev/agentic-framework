@@ -132,7 +132,7 @@ function Attention() {
   );
 }
 
-export function TopBar(props: ThemeProps & { route: Route }) {
+export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean; toggleNav: () => void }) {
   const { t, i18n } = useTranslation();
   const { project, apps } = useStore();
   const p = project.data;
@@ -141,6 +141,10 @@ export function TopBar(props: ThemeProps & { route: Route }) {
   const openApp = route.name === "app" ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
   return (
     <header className="topbar">
+      <button type="button" className="icon-btn nav-toggle only-desktop" onClick={props.toggleNav} aria-expanded={!props.navCollapsed}
+              aria-label={props.navCollapsed ? t("nav.expand") : t("nav.collapse")} title={props.navCollapsed ? t("nav.expand") : t("nav.collapse")}>
+        <IconSidebar size={18} />
+      </button>
       <a className="brand" href={href.setup}>
         {/* The Fyso mark from the design system; the project name sits beside it. */}
         <img className="logo logo-on-light" src={markUrl} alt="" width={28} />
@@ -199,7 +203,7 @@ function section(r:Route) {
   return r.name === "bot" ? "bots" : r.name === "app" ? "apps" : r.name;
 }
 
-export function SideNav({ route }: { route: Route }) {
+export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
   const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
@@ -229,7 +233,6 @@ export function SideNav({ route }: { route: Route }) {
     ...Object.fromEntries(Object.entries(badges).map(([id, badge]) => [id, !!badge.warn && badge.count > 0])),
     setup: !loadingSteps(s) && open > 0, bots: unapplied > 0, apps: down > 0,
   };
-  const [collapsed, toggle] = useNavCollapsed();
   return (
     <nav aria-label={t("nav.label")} className={`sidenav${collapsed ? " collapsed" : ""}`}>
       {items.map(({ id, href: h, icon: Icon, label }) => {
@@ -237,23 +240,18 @@ export function SideNav({ route }: { route: Route }) {
         return (
           <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}
              {...(collapsed ? { "data-tip": name, className: "tip-side", "aria-label": name } : {})}>
-            <span className="nav-icon"><Icon />{collapsed && attention[id] && <span className="nav-dot" aria-hidden="true" />}</span>
-            {!collapsed && <span className="grow"><span className="bottomnav-label">{name}</span></span>}
-            {!collapsed && counts[id]}
+            <span className="nav-icon"><Icon size={18} />{attention[id] && <span className="nav-dot" aria-hidden="true" />}</span>
+            <span className="grow nav-label" aria-hidden={collapsed || undefined}><span className="bottomnav-label">{name}</span></span>
+            <span className="nav-extra" aria-hidden={collapsed || undefined}>{counts[id]}</span>
           </a>
         );
       })}
-      <button type="button" className="nav-toggle tip-side" onClick={toggle} aria-expanded={!collapsed}
-              data-tip={collapsed ? t("nav.expand") : undefined} aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}>
-        <span className="nav-icon"><IconSidebar /></span>
-        {!collapsed && <span className="grow">{t("nav.collapse")}</span>}
-      </button>
     </nav>
   );
 }
 
 /** Wide or collapsed is the person's choice, remembered in this browser; wide by default. */
-function useNavCollapsed(): [boolean, () => void] {
+export function useNavCollapsed(): [boolean, () => void] {
   const read = () => { try { return localStorage.getItem("fy-nav-collapsed") === "1"; } catch { return false; } };
   const [collapsed, setCollapsed] = useState<boolean>(read);
   const toggle = () => {
