@@ -219,6 +219,47 @@ with `Origin`, and `initialize` plus `tools/list` (26 tools, none `dagu_*`) with
 right one; `claude mcp add --transport http …` then showed the server as connected.
 Not verified: a Codex client, and tool calls that change the project through this path.
 
+### OAuth sign-in (D88)
+
+Claude Desktop and claude.ai take remote connectors over OAuth, not a pasted header. `/mcp`
+therefore also accepts a token issued by the web login the project trusts. The token
+above keeps working; whoever signs in gets the same tools.
+
+| Piece | What |
+|---|---|
+| Authorization server | The trusted Tinyauth (OIDC since 5.1): the project's own (`web-auth`) or the shared login (D61, `FYSO_AUTH_UPSTREAM`). It shows the login and consent pages and issues opaque tokens; no OAuth code of ours |
+| Discovery | `GET https://panel.<web_domain>/.well-known/oauth-protected-resource[/mcp]` (RFC 9728): `authorization_servers` is the `issuer` of the login's own `/.well-known/openid-configuration`, read through the upstream. The 401 of `/mcp` carries `WWW-Authenticate: Bearer resource_metadata="…", scope="openid profile"` |
+| PKCE | Own login: `https://auth.<web_domain>/.well-known/oauth-authorization-server` is Tinyauth's discovery plus `code_challenge_methods_supported: ["S256"]`, which Tinyauth 5.2 enforces but does not list. A shared login must serve the same at its own issuer |
+| Token check | `userinfo` of the same login (tokens are opaque), then `sub` = `UUIDv5(NameSpaceURL, "<user>:<client_id>")` for this project's client, then the allowed users. A valid result is remembered one minute |
+| Client, own login | `fyso-mcp`, written into the generated Tinyauth configuration; secret `FYSO_MCP_CLIENT_SECRET` in `secrets.enc.yaml`, created by `agent:remote` (`--rotate` replaces it); redirects: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`, `http://localhost:33418/callback`, `http://127.0.0.1:33418/callback`; more under `oidc.clients.mcp.trustedRedirectUris` in `project/auth/tinyauth.yaml` |
+| Allowed, own login | the panel's rule (`apps.panel.users` and the ACL policy), copied to `.data/web-auth/runtime/mcp-access.json` with the configuration |
+| Client and users, shared login | the hub registers the client and keeps its secret; the project's environment gets `FYSO_MCP_CLIENT_ID` and `FYSO_MCP_ALLOW` (Tinyauth filter: names, or `/regex/`). Without an id OAuth is off; without a list nobody gets in |
+| Off | no HTTPS provider (Tinyauth's issuer must be https), or no client |
+
+Connecting: `agent:remote` and the panel's `#/mcp` list *Claude Desktop · claude.ai*
+(Settings › Connectors › Add custom connector: the URL, and under Advanced settings
+the client id and secret) and *Claude Code (OAuth)*
+(`MCP_CLIENT_SECRET=… claude mcp add --transport http --scope user --client-id fyso-mcp --client-secret --callback-port 33418 <name> <url>`, then `/mcp`).
+With a shared login the secret is not in the project, so the list shows the URL and
+the client id and the person gets the secret from the hub's administrator.
+
+Limits: Tinyauth has no dynamic client registration, so the client is pre-registered
+and its secret is shared by everyone who connects; Tinyauth keeps one session per
+user and client, so signing in again (another app or machine with the same user)
+revokes the previous token, which the endpoint may still accept for up to a minute.
+
+Verified (2026-11-18): `tests/mcp-oauth.test.cjs` (discovery, own and shared login,
+tokens of another client, a forged subject, users outside the list, the connection
+list); `tests/mcp-oauth-tinyauth.test.cjs` against the real Tinyauth 5.2.0 binary:
+the generated configuration registers the client, `/authorize` → login →
+`authorize-complete` → `token` with PKCE S256 and the client secret issues a real
+token that opens `/mcp` and lists the tools for `admin`; `viewer` (not a panel user),
+a wrong client secret and an unknown token are refused; a second sign-in revokes the
+first token. `tests/test_web_auth_http.py` (real Caddy, both schemes): the discovery
+paths skip the login on the panel and auth hosts only. Not verified: a real Claude
+Desktop or claude.ai connection (needs a project behind an HTTPS provider), and a
+shared login, whose client, discovery with S256 and allowed list the hub must provide.
+
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment. Desktop agents reach its tools through `fyso-<slug>` instead (forwarded, D57).
 
 ### Shared context verification (2026-11-06)

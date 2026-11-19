@@ -44,6 +44,16 @@ if (require.main === module) {
     config.database = {driver:'sqlite', path:path.join(runtime,'sessions.db')};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
     config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
+    // Remote MCP sign-in (D88): this login is the OAuth server of the panel's /mcp.
+    const oauth = require('./mcp-oauth.cjs');
+    const mcpEnv = {...env, FYSO_WEB_SCHEME: web.scheme(env), FYSO_AUTH_UPSTREAM: ''};
+    if (oauth.enabled(mcpEnv)) {
+      const declared = config.oidc?.clients?.mcp || {};
+      config.oidc = {...config.oidc, privateKeyPath:path.join(runtime,'oidc/private.pem'), publicKeyPath:path.join(runtime,'oidc/public.pem'),
+        clients:{...config.oidc?.clients, mcp:oauth.tinyauthClient(mcpEnv, declared)}};
+    }
+    const panel = config.apps?.panel?.users || {};
+    fs.writeFileSync(oauth.accessFile(env), JSON.stringify({allow:panel.allow || '', block:panel.block || '', policy:config.auth?.acls?.policy || 'allow'})+'\n', {mode:0o600});
     fs.writeFileSync(path.join(runtime,'config.yaml'), yaml.stringify(config), {mode:0o600});
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

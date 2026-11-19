@@ -977,11 +977,14 @@
     "setupLink": "Conectar",
     "remoteRun": "Ejecutar",
     "remoteRunning": "Ejecutando…",
-    "remoteSecret": "Estas órdenes incluyen el token de este proyecto: quien las tenga puede usar sus herramientas. Cópialas solo en tu equipo.",
+    "remoteSecret": "Estas órdenes incluyen el token y el secreto OAuth de este proyecto: quien los tenga puede usar sus herramientas (con OAuth, además, necesita un usuario del panel). Cópialos solo en tu equipo.",
     "remoteOther": "Otro cliente MCP",
     "remoteNote": {
       "env": "El token queda en una variable de entorno; añade el export a tu perfil de shell.",
-      "json": "Configuración para clientes que usan un archivo JSON."
+      "json": "Configuración para clientes que usan un archivo JSON.",
+      "oauth": "Ajustes › Conectores › Agregar conector personalizado: pega la URL y, en Configuración avanzada, el Client ID y el Client Secret. Al conectar, inicia sesión con tu usuario del panel.",
+      "oauthCli": "Después ejecuta /mcp en Claude Code e inicia sesión con tu usuario del panel. El callback usa el puerto local 33418.",
+      "oauthHub": "Ajustes › Conectores › Agregar conector personalizado: pega la URL y, en Configuración avanzada, el Client ID y el Client Secret que te da quien administra el login compartido. Al conectar, inicia sesión con tu usuario."
     },
     "remoteError": {
       "httpsRequired": "El proyecto todavía no tiene acceso HTTPS.",
@@ -989,6 +992,11 @@
       "origin": "Abre el panel desde su dirección habitual e inténtalo de nuevo.",
       "unauthorized": "Tu sesión venció. Entra de nuevo.",
       "failed": "No se pudieron obtener las órdenes de conexión."
+    },
+    "remoteField": {
+      "url": "URL del servidor",
+      "clientId": "OAuth Client ID",
+      "clientSecret": "OAuth Client Secret"
     }
   },
   "update": {

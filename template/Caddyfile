@@ -63,6 +63,11 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	import fyso_browser_guard
 	@internal path /api/auth/*
 	respond @internal 404
+	# Remote MCP sign-in (D88): the login's discovery document, with the PKCE method
+	# it implements, at the address MCP clients ask first.
+	route /.well-known/oauth-authorization-server {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
 	reverse_proxy {$FYSO_AUTH_UPSTREAM}
 }
 
@@ -70,7 +75,10 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	# Remote MCP clients (D63) carry a bearer token instead of a web session: this
 	# route runs before the login and the endpoint checks the token itself.
-	route /mcp {
+	# OAuth (D88): the same route serves where clients learn which login issues tokens
+	# for /mcp (RFC 9728). One route: a second one changes how Caddy sorts the handles below.
+	@remoteMcp path /mcp /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/mcp
+	route @remoteMcp {
 		reverse_proxy unix/{$FYSO_MCP_SOCKET}
 	}
 	import fyso_login
