@@ -4,11 +4,12 @@ The target is a testable beta that publishes the running Fyso panel at a public
 HTTPS URL. Users sign in to Tinyauth with their Fyso Biz identity. Each linked
 project serves its own version from its assigned domain.
 
-The [Biz publication extension](../template/framework/extensions/biz-publication/README.md)
+The [Biz publication extension](https://github.com/fyso-dev/fyso-ext-biz-publication/tree/v0.1.0)
 owns the Cloudflare Worker, relay, project connector and native Tinyauth
 provider. Fyso Biz is the OAuth authority. The framework exposes its existing
 D62 HTTPS contract and a generic Tinyauth provider slot. Cloudflare provisioning
-and the relay run on infrastructure managed by Fyso Biz.
+and the relay run on infrastructure managed by Fyso Biz. Install the external
+extension with `mise run ext:add gh:fyso-dev/fyso-ext-biz-publication -- --vcs-ref v0.1.0`.
 
 ## Acceptance
 
@@ -40,7 +41,7 @@ guard also remained active.
 The isolated Worker `fyso-biz-panel-publication-preview` runs version
 `56c532ba-86d4-44e5-9308-932aa0451fad`. The preview deployment initially used
 an incorrect Durable Object binding name. The corrected deployment binds
-`PUBLICATION_RELAY`. [Preview configuration](../template/framework/extensions/biz-publication/service/wrangler.preview.toml).
+`PUBLICATION_RELAY`. The public extension includes a [deployment example](https://github.com/fyso-dev/fyso-ext-biz-publication/blob/v0.1.0/service/wrangler.example.toml).
 
 On 2026-11-19, the real Biz issuer verified the smoke account. An isolated
 generated project on port block 47960 was published at
