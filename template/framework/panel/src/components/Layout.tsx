@@ -7,7 +7,7 @@ import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { useExtensionBadges } from "../lib/extensionBadges";
-import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconUsage } from "./Icons";
+import { AppIcon, IconApps, IconBot, IconChecklist, IconExternal, IconMoon, IconPlug, IconSidebar, IconSun, IconUsage } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
 import markUrl from "../assets/brand/fyso-mark.png";
@@ -132,11 +132,13 @@ function Attention() {
   );
 }
 
-export function TopBar(props: ThemeProps) {
-  const { t } = useTranslation();
+export function TopBar(props: ThemeProps & { route: Route }) {
+  const { t, i18n } = useTranslation();
   const { project, apps } = useStore();
   const p = project.data;
   const embedded = (id: string) => !!apps.data?.some((app) => app.id === id && app.enabled && app.embed);
+  const route = props.route;
+  const openApp = route.name === "app" ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
   return (
     <header className="topbar">
       <a className="brand" href={href.setup}>
@@ -145,6 +147,16 @@ export function TopBar(props: ThemeProps) {
         <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
         <span className="brand-name">{p?.name ?? t("top.logo")}</span>
       </a>
+      {openApp && (
+        <span className="crumb">
+          <span className="crumb-sep" aria-hidden="true">/</span>
+          <span className="crumb-name">{localized(i18n.language, openApp.name, openApp.name_i18n)}</span>
+          <a className="icon-btn tip-r" href={openApp.url} target="_blank" rel="noopener noreferrer"
+             data-tip={t("top.openInTab")} aria-label={`${t("top.openInTab")} ${t("common.newTab")}`}>
+            <IconExternal size={16} />
+          </a>
+        </span>
+      )}
       {p && <span className="env-badge only-desktop">{t(`top.env.${p.env}`, { defaultValue: p.env })}</span>}
       <span className="grow only-desktop" />
       <Attention />
@@ -155,7 +167,7 @@ export function TopBar(props: ThemeProps) {
       <span className="only-desktop">
         <ThemeButton {...props} />
       </span>
-      {p && (embedded("omb") ? (
+      {p && openApp?.id !== "omb" && (embedded("omb") ? (
         <a href={href.app("omb")} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
@@ -177,7 +189,7 @@ const ITEMS: NavItem[] = [
   { id: "setup", href: href.setup, icon: IconChecklist },
   { id: "bots", href: href.bots, icon: IconBot },
   { id: "observability", href: href.observability, icon: IconUsage },
-  { id: "connectors", href: href.connectors, icon: IconApps },
+  { id: "connectors", href: href.connectors, icon: IconPlug },
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
@@ -212,17 +224,45 @@ export function SideNav({ route }: { route: Route }) {
       ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>{down} !<span className="sr-only"> {t("nav.appsDown", { count: down })}</span></span>
       : <span className="nav-count">{s.apps.data?.length ?? ""}</span>,
   };
+  // Collapsed, the menu keeps only its icons; the names show as tooltips and a dot marks what needs attention.
+  const attention: Record<string, boolean> = {
+    ...Object.fromEntries(Object.entries(badges).map(([id, badge]) => [id, !!badge.warn && badge.count > 0])),
+    setup: !loadingSteps(s) && open > 0, bots: unapplied > 0, apps: down > 0,
+  };
+  const [collapsed, toggle] = useNavCollapsed(route);
   return (
-    <nav aria-label={t("nav.label")} className="sidenav">
-      {items.map(({ id, href: h, icon: Icon, label }) => (
-        <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}>
-          <Icon />
-          <span className="grow"><span className="bottomnav-label">{label ?? t(`nav.${id}`)}</span></span>
-          {counts[id]}
-        </a>
-      ))}
+    <nav aria-label={t("nav.label")} className={`sidenav${collapsed ? " collapsed" : ""}`}>
+      {items.map(({ id, href: h, icon: Icon, label }) => {
+        const name = label ?? t(`nav.${id}`);
+        return (
+          <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}
+             {...(collapsed ? { "data-tip": name, className: "tip-side", "aria-label": name } : {})}>
+            <span className="nav-icon"><Icon />{collapsed && attention[id] && <span className="nav-dot" aria-hidden="true" />}</span>
+            {!collapsed && <span className="grow"><span className="bottomnav-label">{name}</span></span>}
+            {!collapsed && counts[id]}
+          </a>
+        );
+      })}
+      <button type="button" className="nav-toggle tip-side" onClick={toggle} aria-expanded={!collapsed}
+              data-tip={collapsed ? t("nav.expand") : undefined} aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}>
+        <span className="nav-icon"><IconSidebar /></span>
+        {!collapsed && <span className="grow">{t("nav.collapse")}</span>}
+      </button>
     </nav>
   );
+}
+
+/** One remembered choice; until the person picks, apps opened in the panel start with the menu collapsed. */
+function useNavCollapsed(route: Route): [boolean, () => void] {
+  const read = () => { try { const v = localStorage.getItem("fy-nav-collapsed"); return v === null ? null : v === "1"; } catch { return null; } };
+  const [pref, setPref] = useState<boolean | null>(read);
+  const collapsed = pref ?? route.name === "app";
+  const toggle = () => {
+    const next = !collapsed;
+    setPref(next);
+    try { localStorage.setItem("fy-nav-collapsed", next ? "1" : "0"); } catch { /* the choice lasts this visit */ }
+  };
+  return [collapsed, toggle];
 }
 
 export function BottomNav({ route }: { route: Route }) {

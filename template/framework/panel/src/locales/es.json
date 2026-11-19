@@ -63,7 +63,9 @@
     "appsDown_one": "{{count}} app no responde",
     "appsDown_other": "{{count}} apps no responden",
     "observability": "Uso de IA",
-    "connectors": "Conectores"
+    "connectors": "Conectores",
+    "collapse": "Contraer menú",
+    "expand": "Expandir menú"
   },
   "setup": {
     "title": "Puesta a punto",

@@ -67,7 +67,7 @@ export function App() {
       >
         {t("common.skip")}
       </a>
-      <TopBar theme={theme} toggleTheme={toggleTheme} />
+      <TopBar theme={theme} toggleTheme={toggleTheme} route={route} />
       {s.project.status === "error" && (
         <div role="alert" className="banner banner-down" style={{ margin: "16px 24px 0", borderRadius: "var(--fy-radius-lg)" }}>
           <p className="grow">
@@ -76,7 +76,7 @@ export function App() {
           <button type="button" className="btn btn-sm btn-soft" onClick={s.reload}>{t("common.retry")}</button>
         </div>
       )}
-      <div className="shell" id="main" tabIndex={-1} style={{ outline: "none" }}>
+      <div className={`shell${route.name === "app" ? " shell-app" : ""}`} id="main" tabIndex={-1} style={{ outline: "none" }}>
 
         <SideNav route={route} />
         {screen}
