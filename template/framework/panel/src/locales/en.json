@@ -48,6 +48,7 @@
     "toLight": "Switch to light theme",
     "toDark": "Switch to dark theme",
     "more": "More options: language and theme",
+    "openInTab": "Open in a new tab",
     "openOmb": "Open agents",
     "ombShort": "Agents",
     "attention": "{{name}}: {{count}}"

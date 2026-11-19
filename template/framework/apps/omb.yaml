@@ -2,3 +2,5 @@ id: omb
 name: {es: Agentes, en: Agents}
 description: {es: Conversaciones con los agentes, en: Conversations with the agents}
 icon: bot
+# Opens inside the panel frame (D92); the gateway lets only the panel frame it.
+embed: true

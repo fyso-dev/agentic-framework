@@ -1,4 +1,4 @@
-// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index>[?tab=…] · #/bots/review · #/apps[?tab=ext|skills]
+// Plain hash routing: #/ · #/bots · #/bots/new · #/bots/<index>[?tab=…] · #/bots/review · #/apps[?tab=ext|skills] · #/apps/<id>
 import { useEffect, useState } from "react";
 
 export type BotTab = "perfil" | "instrucciones" | "conectores";
@@ -20,6 +20,7 @@ export type Route =
   | { name: "extension"; extensionId:string; pageId:string }
   | { name: "mcp" }
   | { name: "apps"; tab?: AppsTab }
+  | { name: "app"; id: string }
   | { name: "observability" };
 
 export function parseHash(hash: string): Route {
@@ -29,6 +30,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "observability") return { name: "observability" };
   if (parts[0] === "connectors") {const botId=new URLSearchParams(query||" ").get("bot");return { name: "connectors",...(botId?{botId}:{}) };}
   if (parts[0] === "extensions" && parts[1] && parts[2]) return {name:"extension",extensionId:parts[1],pageId:parts[2]};
+  if (parts[0] === "apps" && parts[1]) return { name: "app", id: decodeURIComponent(parts[1]) };
   if (parts[0] === "apps") {
     const tab = new URLSearchParams(query || "").get("tab");
     return tab === "ext" || tab === "skills" ? { name: "apps", tab } : { name: "apps" };
@@ -59,6 +61,7 @@ export const href = {
   extension: (id:string,page:string) => `#/extensions/${encodeURIComponent(id)}/${encodeURIComponent(page)}`,
   mcp: "#/mcp",
   apps: "#/apps",
+  app: (id: string) => `#/apps/${encodeURIComponent(id)}`,
   appsTab: (tab: AppsTab) => (tab === "open" ? "#/apps" : `#/apps?tab=${tab}`),
   observability: "#/observability",
 };

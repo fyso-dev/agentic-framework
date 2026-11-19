@@ -21,6 +21,8 @@ export type App = {
   enabled: boolean;
   accessNote?: string;
   accessNote_i18n?: Record<string, string>;
+  /** Opens inside the panel frame at #/apps/<id> (D92); the app's gateway route must allow it. */
+  embed?: boolean;
 };
 
 export type Health = "ok" | "down" | "unknown";

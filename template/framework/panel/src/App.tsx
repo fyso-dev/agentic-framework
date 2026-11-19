@@ -9,6 +9,7 @@ import { Connectors } from "./screens/Connectors";
 import { Apps } from "./screens/Apps";
 import { Observability } from "./screens/Observability";
 import { ExtensionPage } from "./screens/ExtensionPage";
+import { AppFrame } from "./screens/AppFrame";
 import { Mcp } from "./screens/Mcp";
 import { Setup } from "./screens/Setup";
 import { useStore } from "./store";
@@ -45,6 +46,9 @@ export function App() {
       break;
     case "apps":
       screen = <Apps tab={route.tab ?? "open"} />;
+      break;
+    case "app":
+      screen = <AppFrame id={route.id} />;
       break;
     default:
       screen = <Setup />;

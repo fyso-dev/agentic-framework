@@ -42,6 +42,10 @@ if (require.main === module) {
     config.appUrl = web.origin('auth', env);
     config.server = {address:'127.0.0.1', port:Number(env.FYSO_AUTH_PORT)};
     config.database = {driver:'sqlite', path:path.join(runtime,'sessions.db')};
+    // Project identity (D92): the login shows the project's name on the design system's dark
+    // background; a ui block declared in project/auth/tinyauth.yaml wins.
+    const brand = require('./brand.cjs').resolve(env);
+    config.ui = {title: brand.name, backgroundImage: '/fyso-brand/login-background.svg', ...config.ui};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
     config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
     // Remote MCP sign-in (D90): this login is the OAuth server of the panel's /mcp.

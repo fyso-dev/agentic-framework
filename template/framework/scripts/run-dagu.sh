@@ -6,6 +6,7 @@ require_env FYSO_DATA FYSO_ROOT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD FYSO_DAGU_PO
 mkdir -p "$FYSO_DATA/dagu"
 clean_exec \
   DAGU_HOME="$FYSO_DATA/dagu" \
+  DAGU_UI_NAVBAR_TITLE="$(node "$FYSO_ROOT/framework/scripts/brand.cjs" title)" \
   DAGU_DAGS_DIR="$FYSO_ROOT/project/workflows" \
   DAGU_WIKI_DIR="$FYSO_ROOT/project/wiki" \
   DAGU_HOST=127.0.0.1 \

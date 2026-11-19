@@ -27,8 +27,11 @@ type App = {
   enabled: boolean
   accessNote?: string
   accessNote_i18n?: Record<string, string>
+  embed?: boolean                    // D92: opens inside the panel at #/apps/<id>
 }
 ```
+
+**Apps inside the panel (D92).** An app with `embed: true` opens at `#/apps/<id>`: a thin bar with its name and *Abrir en otra pestaña ↗*, then the app in an iframe. The framework apps (Dagu, OpenMausBot) declare it, and the top bar's *Abrir agentes* opens OpenMausBot there. The gateway imports `fyso_framed` on those hosts and on the login host: it drops the app's `X-Frame-Options` and sends `frame-ancestors <panel origin>`, so only the panel may frame them. The session cookie covers the project's subdomains, so the app keeps the web session inside the frame. A project or extension app that opts in must import the same snippet in its own Caddyfile.
 
 **App health.** The panel probes each app with `fetch(app.url, { mode: "no-cors" })` and shows **ok** if the request resolves, **down** if it rejects, **unknown** until the first probe ends. "Degraded" is not used for now.
 

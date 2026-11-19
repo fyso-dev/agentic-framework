@@ -134,8 +134,9 @@ function Attention() {
 
 export function TopBar(props: ThemeProps) {
   const { t } = useTranslation();
-  const { project } = useStore();
+  const { project, apps } = useStore();
   const p = project.data;
+  const embedded = (id: string) => !!apps.data?.some((app) => app.id === id && app.enabled && app.embed);
   return (
     <header className="topbar">
       <a className="brand" href={href.setup}>
@@ -154,12 +155,17 @@ export function TopBar(props: ThemeProps) {
       <span className="only-desktop">
         <ThemeButton {...props} />
       </span>
-      {p && (
+      {p && (embedded("omb") ? (
+        <a href={href.app("omb")} className="btn btn-pri">
+          <span className="only-desktop">{t("top.openOmb")}</span>
+          <span className="only-mobile">{t("top.ombShort")}</span>
+        </a>
+      ) : (
         <External href={p.urls.omb} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
         </External>
-      )}
+      ))}
       <SessionMenu />
       <MoreMenu {...props} />
     </header>
@@ -178,7 +184,7 @@ const ITEMS: NavItem[] = [
 const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
-  return r.name === "bot" ? "bots" : r.name;
+  return r.name === "bot" ? "bots" : r.name === "app" ? "apps" : r.name;
 }
 
 export function SideNav({ route }: { route: Route }) {

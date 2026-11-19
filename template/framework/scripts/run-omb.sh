@@ -29,6 +29,13 @@ if [ -n "$composio_secret" ]; then
 elif [ -n "${FYSO_COMPOSIO_API_KEY:-}" ]; then
   bot_env+=("COMPOSIO_API_KEY=$FYSO_COMPOSIO_API_KEY")
 fi
+# Project identity (D92): OMB applies brand.json only with a whitelabel licence
+# (OMB_LICENSE_KEY in secrets.enc.yaml); without one it keeps its own name.
+node "$FYSO_ROOT/framework/scripts/brand.cjs" install
+if [ -f secrets.enc.yaml ] && grep -q '^OMB_LICENSE_KEY:' secrets.enc.yaml; then
+  bot_env+=("OMB_LICENSE_KEY=$(SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}" \
+    sops decrypt --extract '["OMB_LICENSE_KEY"]' secrets.enc.yaml)")
+fi
 # Resolve Pi before inserting the project wrapper; keep the resolved binary private
 # to this OMB instance and do not alter the caller's PATH.
 pi_exec=$(command -v pi || true)
@@ -37,6 +44,7 @@ clean_exec \
   PATH="$FYSO_ROOT/framework/bin:$PATH" \
   ${bot_env[@]+"${bot_env[@]}"} \
   OMB_PORT="$FYSO_OMB_PORT" \
+  OMB_BRAND_FILE="$FYSO_DATA/brand/omb.json" \
   FYSO_DAGU_PORT="$FYSO_DAGU_PORT" \
   DAGU_MCP_AUTH="Basic $(printf '%s:%s' "$FYSO_ADMIN_USER" "$FYSO_ADMIN_PASSWORD" | base64 | tr -d '\n')" \
   OMB_WEBHOOK_PORT="$FYSO_OMB_WEBHOOK_PORT" \

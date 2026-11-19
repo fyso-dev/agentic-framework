@@ -81,6 +81,16 @@ function AppTile({ app }: { app: App }) {
   if (off) {
     return <li><div className="ap-tile off" aria-label={t("apps.offAria", { name })}>{body}</div></li>;
   }
+  if (app.embed) {
+    return (
+      <li>
+        <a className={`ap-tile${down ? " down" : ""}`} href={href.app(app.id)}>
+          {body}
+          <span className="sr-only">{t(`apps.health.${h}`)}</span>
+        </a>
+      </li>
+    );
+  }
   return (
     <li>
       <a className={`ap-tile${down ? " down" : ""}`} href={app.url} target="_blank" rel="noopener noreferrer">
