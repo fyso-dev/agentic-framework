@@ -37,7 +37,7 @@ test('isolated Dagu startup preserves custom age-key paths without passing secre
     const required = Object.fromEntries(['FYSO_ADMIN_USER','FYSO_ADMIN_PASSWORD','FYSO_DAGU_PORT','FYSO_OMB_PORT','OPENMAUSBOT_URL','FYSO_DAGU_SCHEDULER_PORT','FYSO_DAGU_WORKER_HEALTH_PORT','FYSO_DAGU_COORDINATOR_PORT','FYSO_DAGU_COORDINATOR_HEALTH_PORT','FYSO_PROJECT','FYSO_HTTP_PORT'].map(k=>[k,'fixture']));
     for (const patch of [{SOPS_AGE_KEY_FILE:path.join(dir,'sops-key')}, {MISE_SOPS_AGE_KEY_FILE:path.join(dir,'mise-key'),SOPS_AGE_KEY_FILE:'ignored'}]) {
       const output = execFileSync('bash', [path.resolve(__dirname,'../template/framework/scripts/run-dagu.sh')], {
-        encoding:'utf8',env:{...required,HOME:dir,PATH:`${dir}:${process.env.PATH}`,FYSO_DATA:path.join(dir,'data'),FYSO_ROOT:dir,COMPOSIO_API_KEY:'must-not-pass',...patch},
+        encoding:'utf8',env:{...required,FYSO_CONFINE:'off',HOME:dir,PATH:`${dir}:${process.env.PATH}`,FYSO_DATA:path.join(dir,'data'),FYSO_ROOT:dir,COMPOSIO_API_KEY:'must-not-pass',...patch},
       }).split('\n');
       assert.equal(output[0], patch.MISE_SOPS_AGE_KEY_FILE || patch.SOPS_AGE_KEY_FILE);
       assert.equal(output[1], '');

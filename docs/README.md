@@ -55,6 +55,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Human requests: experimental HTTP return contract | [extension guide](../template/framework/extensions/human-requests/extensions/human-requests/HTTP.md) |
 | Human requests: proposed test-only approval scenario | [scenario](../template/framework/extensions/human-requests/extensions/human-requests/docs/approval-case.md) |
 | Human requests: experimental native OpenMausBot send identifiers | [experiment](adr/human-requests-send-id-experiment.md) |
+| Confinement of OMB and Dagu to the project folder: sandbox, project age key, engine credentials, Unix sockets (D83) | [confinement.md](confinement.md) |
 | Isolating XDG state in clean service execution | [spike](adr/spikes/clean-exec-xdg.md) |
 | Auth (subscription and API keys) and health checks | [PLAN §8](PLAN.md#8-auth-and-health-checks) |
 | Panel: customization layer over OMB, rules and i18n | [PLAN §9](PLAN.md#9-panel-customization-layer--launcher-the-only-real-custom-code) |
@@ -115,6 +116,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
+
+2026-11-19: **OMB and Dagu run confined to the project folder (D83).** Anthropic's sandbox-runtime as a library, file system and local IPC only. Findings: with the network unrestricted its macOS profile allows every Unix socket (a confined shell could drive tmux or another project's process-compose), so `confine.cjs` adds socket rules; Node's `os.uptime()` needs `kern.boottime`; Dagu puts a socket per run in `/tmp/@dagu_*`, which broke every workflow until allowed (the self-test now opens one); OpenMausBot's permission broker socket lives in `.data/omb` and limits project paths to about 50 characters on macOS. Verified on macOS with a generated project: doctor green, escape probe through Dagu denied, `fyso-snapshot` and a bot turn work. Linux unverified. [Contract](confinement.md)
 
 2026-11-14: Recorded extension-first product growth in AGENTS, PLAN and the extension contract: a simple default experience, optional use-case capabilities, minimal generic slots and explicit criteria for promotion to core. No runtime migration is implied.
 
