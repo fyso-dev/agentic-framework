@@ -6,8 +6,11 @@ anything private. `framework/scripts/web-auth-config.cjs` embeds it in the runti
 configuration as a `data:` URL, so Tinyauth's resources server stays disabled.
 
 The image is the Fyso mark on the fyso.biz palette (`#0E0E12` background, `#6E1FFF`
-/ `#8F55FF` violet), 1920x1080 WebP, under 300 KB. A project can replace the
+/ `#8F55FF` violet), 1920x1080 WebP, under 100 KB (a test enforces it). A project can replace the
 defaults with its own `ui.title` or `ui.backgroundImage` in `project/auth/tinyauth.yaml`.
+A project background must be an `https://` URL or its own `data:` URL: the resources
+server is always forced off, so a project cannot serve a local file. Serving project
+files is out of scope of issue #83 and needs its own issue.
 
 Verified (2026-11-19) with the unmodified Tinyauth 5.2.0 binary: `/api/context/app`
 returns the title and a background whose bytes are identical to this file,
