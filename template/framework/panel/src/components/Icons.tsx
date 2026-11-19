@@ -134,6 +134,8 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
       return <IconWorkflow size={size} />;
     case "bot":
       return <IconBot size={size} />;
+    case "chat":
+      return <IconChat size={size} />;
     case "users":
       return <IconUsers size={size} />;
     case "truck":
@@ -186,4 +188,5 @@ export const IconLockOpen = (p: P) => <Svg {...p}><rect x="5" y="11" width="14" 
 export const IconDownload = icon("M12 4v12M7 11l5 5 5-5M5 20h14");
 export const IconTerminal = icon("M5 7l5 5-5 5M12 17h7");
 export const IconExternal = icon("M10 14L20 4M14 4h6v6M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5");
+export const IconSidebar = (p: P) => <Svg {...p}><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><path d="M9.5 4.5v15" /></Svg>;
 export const IconCheck = icon("M5 12l5 5L20 7");

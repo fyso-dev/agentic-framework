@@ -48,6 +48,7 @@
     "toLight": "Switch to light theme",
     "toDark": "Switch to dark theme",
     "more": "More options: language and theme",
+    "openInTab": "Open in a new tab",
     "openOmb": "Open agents",
     "ombShort": "Agents",
     "attention": "{{name}}: {{count}}"
@@ -62,7 +63,9 @@
     "appsDown_one": "{{count}} app is not responding",
     "appsDown_other": "{{count}} apps are not responding",
     "observability": "AI usage",
-    "connectors": "Connectors"
+    "connectors": "Connectors",
+    "collapse": "Collapse menu",
+    "expand": "Expand menu"
   },
   "setup": {
     "title": "Setup",
@@ -304,7 +307,7 @@
   },
   "apps": {
     "title": "Apps",
-    "subtitle": "Everything that runs in the project. Each one opens in a new tab.",
+    "subtitle": "Everything that runs in the project. Framework apps open here; the rest, in a new tab.",
     "framework": "Framework",
     "project": "Project",
     "open": "Open",

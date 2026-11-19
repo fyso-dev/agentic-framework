@@ -48,6 +48,7 @@
     "toLight": "Cambiar a tema claro",
     "toDark": "Cambiar a tema oscuro",
     "more": "Más opciones: idioma y tema",
+    "openInTab": "Abrir en otra pestaña",
     "openOmb": "Abrir agentes",
     "ombShort": "Agentes",
     "attention": "{{name}}: {{count}}"
@@ -62,7 +63,9 @@
     "appsDown_one": "{{count}} app no responde",
     "appsDown_other": "{{count}} apps no responden",
     "observability": "Uso de IA",
-    "connectors": "Conectores"
+    "connectors": "Conectores",
+    "collapse": "Contraer menú",
+    "expand": "Expandir menú"
   },
   "setup": {
     "title": "Puesta a punto",
@@ -304,7 +307,7 @@
   },
   "apps": {
     "title": "Apps",
-    "subtitle": "Todo lo que corre en el proyecto. Cada una se abre en una pestaña nueva.",
+    "subtitle": "Todo lo que corre en el proyecto. Las del framework se abren acá; las demás, en una pestaña nueva.",
     "framework": "Framework",
     "project": "Proyecto",
     "open": "Abrir",

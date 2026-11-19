@@ -7,6 +7,8 @@ require_env FYSO_WEB_DOMAIN FYSO_AUTH_PORT
 web_scheme >/dev/null
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || fail "The gateway listens on loopback only. Remote access goes through a private forwarder or an HTTPS provider extension."
 mkdir -p "$FYSO_DATA/caddy"
+# Project identity (D92): the icons and login background Caddy serves to every app.
+node "$FYSO_ROOT/framework/scripts/brand.cjs" install
 panel_root="$FYSO_ROOT/framework/panel-placeholder"
 [ ! -d "$FYSO_ROOT/framework/panel/dist" ] || panel_root="$FYSO_ROOT/framework/panel/dist"
 # Mint a native, project-scoped OMB session. Never serve or log its bearer token.

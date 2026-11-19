@@ -53,6 +53,10 @@ export type Store = {
 
 const Ctx = createContext<Store | null>(null);
 
+/** Whether an app opens inside the panel (D92, `embed: true`). */
+export const embedded = (s: { apps: Loadable<App[]> }, id: string) =>
+  !!s.apps.data?.some((app) => app.id === id && app.enabled && app.embed);
+
 export function useStore(): Store {
   const s = useContext(Ctx);
   if (!s) throw new Error("useStore outside StoreProvider");

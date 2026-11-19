@@ -11,7 +11,7 @@ import { CopyLine, External, RelTime } from "../components/ui";
 import { localized } from "../lib/i18n";
 import { useDaguAction, type Action } from "../lib/useDaguAction";
 import { href } from "../lib/router";
-import { useStore, type StepState } from "../store";
+import { embedded, useStore, type StepState } from "../store";
 
 function StepIcon({ state }: { state: StepState }) {
   const glyph = state === "done" ? "✓" : state === "failed" ? "×" : null;
@@ -292,8 +292,10 @@ export function Setup() {
           </div>
           {p && (
             <div className="hero-actions">
-              <External href={p.urls.dagu} className="btn btn-lg btn-soft">{t("setup.openDagu")} </External>
-              <External href={p.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>
+              {embedded(s, "dagu") ? <a href={href.app("dagu")} className="btn btn-lg btn-soft">{t("setup.openDagu")}</a>
+                : <External href={p.urls.dagu} className="btn btn-lg btn-soft">{t("setup.openDagu")} </External>}
+              {embedded(s, "omb") ? <a href={href.app("omb")} className="btn btn-lg btn-pri">{t("top.openOmb")}</a>
+                : <External href={p.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>}
             </div>
           )}
         </section>
