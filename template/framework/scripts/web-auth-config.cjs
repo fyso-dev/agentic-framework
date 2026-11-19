@@ -18,7 +18,25 @@ function withExtensionApps(config, root) {
   }
   return config;
 }
-module.exports = {withExtensionApps};
+// Provider fragments use Tinyauth's native schema. Project-owned providers take
+// precedence. A fragment with pending credentials leaves local login available.
+function withExtensionProviders(config, root, read, expand, env) {
+  const providers = { ...config.oauth?.providers };
+  for (const file of fs.globSync('extensions/*/tinyauth.providers.yaml', {cwd:root}).sort()) {
+    const extension = path.basename(path.dirname(file));
+    if (!fs.existsSync(path.join(root, `.copier-answers.ext-${extension}.yml`))) continue;
+    const fragment = read(path.join(root, file));
+    for (const [id, provider] of Object.entries(fragment || {})) {
+      if (Object.hasOwn(providers, id)) continue;
+      const required = JSON.stringify(provider).matchAll(/\$\{(FYSO_AUTH_[A-Z0-9_]+)\}/g);
+      if ([...required].some(([, name]) => !env[name])) continue;
+      Object.defineProperty(providers, id, { value: expand(provider), enumerable: true });
+    }
+  }
+  if (Object.keys(providers).length) config.oauth = { ...config.oauth, providers };
+  return config;
+}
+module.exports = {withExtensionApps, withExtensionProviders};
 
 if (require.main === module) {
   const {createRequire} = require('node:module');
@@ -36,6 +54,7 @@ if (require.main === module) {
   };
   try {
     const config = withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT);
+    withExtensionProviders(config, env.FYSO_ROOT, file => yaml.parse(fs.readFileSync(file, 'utf8')), expand, env);
     const runtime = path.join(env.FYSO_DATA, 'web-auth/runtime');
     fs.mkdirSync(runtime, {recursive:true, mode:0o700});
     const web = require('./web-origin.cjs');

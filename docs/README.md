@@ -39,6 +39,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Topic | Where |
 |---|---|
 | Install from the private GitHub repository: prerequisites, startup, updates and recovery | [installation.md](installation.md) |
+| Publish a running panel via Fyso Biz | [Managed panel publication brief](biz-panel-publication.md) |
 | End-user installer: verified macOS swiftDialog prototype (D35); selected Linux Qt Installer Framework direction and proposed Windows/WSL2 architecture (D38); project creation without compiling the web login, bundled macOS binary and timings (D87) | [installer.md](installer.md) |
 | macOS menu bar app and `fyso` CLI: one native app lists, opens, creates, switches, starts and stops instances; Biz edition with sign-in hand-off, signing/notarization, updates from GitHub Releases (D85, D86) | [ADR 0003](adr/0003-menu-bar-app.md) · [installer.md](installer.md#menu-bar-app-and-cli--d85) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
@@ -138,6 +139,7 @@ stays in Auditor by explicit request. See [Cloudflare evidence](cloudflare-exten
 
 | Date | Entry |
 |---|---|
+| 2026-11-19 | **Fyso Biz panel publication and SSO prototype.** Verified the relay in a local Cloudflare Workers runtime and the OAuth callback through real Caddy and Tinyauth with a simulated Biz issuer. The deployed preview passed live Biz SSO, project doctor, revocation and republication. [Checkpoint](biz-panel-publication.md#checkpoint) |
 | 2026-11-12 | **Third-party skills (D73).** skills.sh anonymous CLI endpoint verified; documented v1 requires Vercel identity. Native OMB 0.1.141 disabled import scans SKILL.md and omits supporting files. Git copies retain full provenance/license and require human confirmation; panel/MCP apply immutable previews. [Spike](adr/spikes/skills-registry.md) · [contract and verification](third-party-skills.md). |
 | 2026-11-15 | **Human requests independent publication.** Published `fyso-dev/fyso-ext-human-requests` as `v0.1.0` and added it to the official catalog (D31), as for SilverBullet. Runtime files match the bundled copy. A real Copier/Git check migrated a bundled installation to the tag (`_commit: v0.1.0`), updated it cleanly and listed it in the panel inventory; it also caught the repository `.gitignore` overwriting the project's, fixed by excluding it before the tag was used. Doctor and browser acceptance were not rerun for this packaging-only change. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md#published-versioned-source) |
 | 2026-11-14 | **Pi doctor, stack stopped.** A generated fixture passed `mise run doctor` with only its connector-setup component; a deliberately occupied fixture port was detected. The running-stack branch and full lifecycle remain pending independent review. [Evidence](../artifacts/delivery-evidence/human-requests/pi-beta.md) |

@@ -60,6 +60,15 @@
 }
 
 http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	# An OAuth authorization response is a cross-site navigation. Tinyauth
+	# validates its pending session cookie, state and PKCE verifier.
+	@loginCallback {
+		method GET
+		path /api/oauth/callback/*
+	}
+	route @loginCallback {
+		reverse_proxy {$FYSO_AUTH_UPSTREAM}
+	}
 	import fyso_browser_guard
 	@internal path /api/auth/*
 	respond @internal 404

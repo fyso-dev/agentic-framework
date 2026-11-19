@@ -1,0 +1,30 @@
+name = "fyso-biz-panel-publication-preview"
+main = "worker.mjs"
+compatibility_date = "2026-06-18"
+workers_dev = false
+preview_urls = false
+
+[[durable_objects.bindings]]
+name = "PUBLICATION_RELAY"
+class_name = "PanelPublication"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PanelPublication"]
+
+[vars]
+PUBLICATION_CONTROL_HOST = "publish-smoke.fyso.biz"
+PUBLICATION_ASSIGNMENTS = "{}"
+BIZ_ORIGIN = "https://fyso.biz"
+
+[[routes]]
+pattern = "publish-smoke.fyso.biz"
+custom_domain = true
+
+[[routes]]
+pattern = "panel.publication-smoke.fyso.biz"
+custom_domain = true
+
+[[routes]]
+pattern = "auth.publication-smoke.fyso.biz"
+custom_domain = true

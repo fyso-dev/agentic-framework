@@ -33,3 +33,29 @@ test('without a panel rule nothing is granted',()=>{
   assert.deepEqual(withExtensionApps({apps:{dagu:{}}},root).apps,{dagu:{}});
   assert.deepEqual(withExtensionApps({},root),{});
 });
+
+test('native OAuth fragments preserve project providers and skip pending credentials', t => {
+  const { withExtensionProviders } = require('../template/framework/scripts/web-auth-config.cjs');
+  const placeholder = '${FYSO_AUTH_TEST_SECRET}';
+  const root = project({
+    'extensions/one/tinyauth.providers.yaml': JSON.stringify({ existing: { name: 'Extension override' }, extra: { clientSecret: placeholder } }),
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+  const config = { oauth: { whitelist: ['existing@example.com'], providers: { existing: { name: 'Project provider' } } } };
+  const original = structuredClone(config);
+  const expand = provider => ({ ...provider, clientSecret: 'fixture-secret' });
+  assert.deepEqual(withExtensionProviders(config, root, read, expand, {}), original);
+  const env = { FYSO_AUTH_TEST_SECRET: 'fixture-secret' };
+  assert.deepEqual(withExtensionProviders(structuredClone(original), root, read, expand, env), original);
+  const answers = path.join(root, '.copier-answers.ext-one.yml');
+  fs.writeFileSync(answers, '');
+  assert.deepEqual(withExtensionProviders(structuredClone(original), root, read, expand, {}), original);
+  withExtensionProviders(config, root, read, expand, env);
+  assert.deepEqual(config.oauth, {
+    whitelist: ['existing@example.com'],
+    providers: { existing: { name: 'Project provider' }, extra: { clientSecret: 'fixture-secret' } },
+  });
+  fs.unlinkSync(answers);
+  assert.deepEqual(withExtensionProviders(structuredClone(original), root, read, expand, env), original);
+});
