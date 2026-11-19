@@ -158,6 +158,9 @@ case "$action" in
     id=${1:-}
     [[ $id =~ ^[a-z][a-z0-9-]{1,30}$ && -d extensions/$id ]] || fail 'Usage: ext.sh configured <id>'
     if stack_running; then
+      if [ -f "extensions/$id/tinyauth.providers.yaml" ]; then
+        pc process restart web-auth >&2
+      fi
       if [ -f "extensions/$id/process.yaml" ]; then
         while IFS= read -r name; do
           [ -z "$name" ] || pc process restart "$name" >&2 || true
@@ -175,8 +178,15 @@ case "$action" in
     printf '{"missing":%s,"check":"%s"}\n' "$missing" "$check"
     ;;
   remove)
+    reload_login=false
+    if [[ ${1:-} =~ ^[a-z][a-z0-9-]{1,30}$ && -f extensions/$1/tinyauth.providers.yaml ]]; then
+      reload_login=true
+    fi
     node framework/scripts/ext-lifecycle.cjs remove "$@"
     refresh
+    if [ "$reload_login" = true ] && stack_running; then
+      pc process restart web-auth >&2
+    fi
     ;;
   *) fail 'Usage: ext.sh <add|update|list|search|remove|apply|configured>' ;;
 esac
