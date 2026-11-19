@@ -1,4 +1,5 @@
 // Remote MCP OAuth sign-in (D90): discovery, and tokens of the trusted web login (own or shared).
+// Registration and `iss` on the authorization answers (D91).
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'), os=require('node:os'), path=require('node:path'), http=require('node:http');
@@ -113,6 +114,51 @@ test('the project token keeps working next to OAuth, and the challenge stays pla
   const plain=await start(t,()=>({FYSO_WEB_SCHEME:'https',FYSO_MCP_TOKEN:token}));
   assert.equal((await plain.call('POST','/mcp',{},init)).headers['www-authenticate'],'Bearer');
   assert.equal((await plain.call('GET','/.well-known/oauth-protected-resource/mcp')).status,404);
+});
+
+test('own login: registration hands out the client for trusted redirects only',async t=>{
+  const auth=await login(t,'https://auth.demo.example.com',{});
+  const s=await start(t,dir=>{
+    fs.mkdirSync(path.join(dir,'web-auth/runtime'),{recursive:true});
+    fs.writeFileSync(oauth.accessFile({FYSO_DATA:dir}),JSON.stringify({allow:'admin',block:'',policy:'deny',redirectUris:[...oauth.REDIRECT_URIS,'https://extra.example.com/cb']}));
+    return {FYSO_WEB_SCHEME:'https',FYSO_AUTH_PORT:String(auth.port),FYSO_MCP_CLIENT_SECRET:SECRET};
+  });
+  const meta=(await s.call('GET','/.well-known/oauth-authorization-server')).body;
+  assert.equal(meta.registration_endpoint,'https://auth.demo.example.com/oauth/register');
+  assert.equal(meta.authorization_response_iss_parameter_supported,true);
+  const chatgpt=await s.call('POST','/oauth/register',{},{redirect_uris:['https://chatgpt.com/connector_platform_oauth_redirect'],token_endpoint_auth_method:'none'});
+  assert.equal(chatgpt.status,201);
+  assert.equal(chatgpt.body.client_id,'fyso-mcp');assert.equal(chatgpt.body.client_secret,SECRET);
+  assert.equal(chatgpt.body.token_endpoint_auth_method,'client_secret_basic','the login always checks the secret');
+  assert.equal(chatgpt.headers['cache-control'],'no-store');
+  assert.equal((await s.call('POST','/oauth/register',{},{redirect_uris:['https://extra.example.com/cb'],token_endpoint_auth_method:'client_secret_post'})).body.token_endpoint_auth_method,'client_secret_post','a redirect the project added');
+  for(const bad of [{},{redirect_uris:[]},{redirect_uris:['https://chatgpt.com/connector/oauth/abc123']},{redirect_uris:['https://claude.ai/api/mcp/auth_callback'],grant_types:['client_credentials']},{redirect_uris:['https://claude.ai/api/mcp/auth_callback'],response_types:['token']},[]]){
+    const r=await s.call('POST','/oauth/register',{},bad);
+    assert.equal(r.status,400,JSON.stringify(bad));assert.equal(r.body.client_secret,undefined);
+  }
+  assert.equal((await s.call('GET','/oauth/register')).status,405);
+});
+
+test('registration is off without the own login\'s secret or with a shared login',async t=>{
+  const auth=await login(t,'https://auth.hub.example.com',{});
+  const body={redirect_uris:['https://claude.ai/api/mcp/auth_callback']};
+  const shared=await start(t,()=>({FYSO_WEB_SCHEME:'https',FYSO_AUTH_UPSTREAM:`127.0.0.1:${auth.port}`,FYSO_MCP_CLIENT_ID:'auditor-mcp',FYSO_MCP_ALLOW:'ana'}));
+  assert.equal((await shared.call('POST','/oauth/register',{},body)).status,404);
+  const tokenOnly=await start(t,()=>({FYSO_WEB_SCHEME:'https',FYSO_AUTH_PORT:String(auth.port),FYSO_MCP_TOKEN:'t'.repeat(43)}));
+  assert.equal((await tokenOnly.call('POST','/oauth/register',{},body)).status,404);
+  // The login's own answers still pass through unchanged (other apps sign in there too).
+  const passed=await tokenOnly.call('GET','/authorize?client_id=x');
+  assert.equal(passed.status,404);assert.deepEqual(passed.body,{},'answered by the login, not by the endpoint');
+});
+
+test('iss goes only on answers that send a code or an error back to a client',()=>{
+  const issuer='https://auth.demo.example.com';
+  assert.equal(oauth.withIssuer('https://chatgpt.com/connector_platform_oauth_redirect?code=c&state=s',issuer),'https://chatgpt.com/connector_platform_oauth_redirect?code=c&state=s&iss=https%3A%2F%2Fauth.demo.example.com');
+  assert.match(oauth.withIssuer('http://localhost:33418/callback?error=access_denied',issuer),/iss=https%3A%2F%2Fauth\.demo\.example\.com/);
+  assert.equal(oauth.withIssuer(`${issuer}/oidc/authorize?oidc_ticket=t`,issuer),`${issuer}/oidc/authorize?oidc_ticket=t`);
+  assert.equal(oauth.withIssuer(`${issuer}/error?error=x`,issuer),`${issuer}/error?error=x`);
+  assert.equal(oauth.withIssuer('https://app.example.com/home',issuer),'https://app.example.com/home');
+  assert.equal(oauth.withIssuer('/relative?code=c',issuer),'/relative?code=c');
 });
 
 test('Tinyauth filters: block first, then allow (names or /regex/), then the policy',()=>{

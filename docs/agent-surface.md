@@ -244,7 +244,8 @@ With a shared login the secret is not in the project, so the list shows the URL 
 the client id and the person gets the secret from the hub's administrator.
 
 Limits: Tinyauth has no dynamic client registration, so the client is pre-registered
-and its secret is shared by everyone who connects; Tinyauth keeps one session per
+and its secret is shared by everyone who connects (with the own login it is handed out
+by the registration endpoint, D91); Tinyauth keeps one session per
 user and client, so signing in again (another app or machine with the same user)
 revokes the previous token, which the endpoint may still accept for up to a minute.
 
@@ -259,6 +260,32 @@ first token. `tests/test_web_auth_http.py` (real Caddy, both schemes): the disco
 paths skip the login on the panel and auth hosts only. Not verified: a real Claude
 Desktop or claude.ai connection (needs a project behind an HTTPS provider), and a
 shared login, whose client, discovery with S256 and allowed list the hub must provide.
+
+### Dynamic registration (D91)
+
+ChatGPT (and claude.ai, when offered) register themselves instead of asking for a
+Client ID. With the project's own login:
+
+| Piece | What |
+|---|---|
+| Registration | `POST https://auth.<web_domain>/oauth/register` (RFC 7591), answered by the MCP endpoint: `201` with `client_id: fyso-mcp`, its secret, `client_secret_basic` (or `client_secret_post` when asked; `none` is answered with a secret, the login always checks it). Refused with `invalid_redirect_uri` unless every requested redirect is one the login trusts (the list in `mcp-access.json`, written with the configuration). The secret is therefore public: sign-in, consent, PKCE S256, the redirect list and the allowed users protect the tokens; `--rotate` still replaces it |
+| `iss` (RFC 9207) | Caddy routes `/authorize` and `/api/oidc/authorize-complete` of the auth host through the endpoint, which passes them to Tinyauth and adds `iss` to the redirect (or the consent page's `redirect_uri`) that carries a `code` or an `error` to a client. The login's own pages are untouched, and so is everything when OAuth is off or the login is shared. If the endpoint is down Caddy tries the login directly (`lb_policy first`), without `iss` |
+| Metadata | the RFC 8414 document adds `registration_endpoint` and `authorization_response_iss_parameter_supported: true`, so ChatGPT uses its stable redirect `https://chatgpt.com/connector_platform_oauth_redirect` (now in the client's redirect list) instead of one per connection |
+| Shared login | no registration: the hub keeps the secret, people paste the client as in D90 |
+
+Claude Code registers with a random local port, which the list does not trust: it keeps
+using `--client-id … --callback-port 33418`.
+
+Verified (2026-11-18): `tests/mcp-oauth.test.cjs` (registration answers and refusals,
+off with a shared login or without the secret, `iss` only on answers to a client, the
+login's answers pass through unchanged when OAuth is off);
+`tests/mcp-oauth-tinyauth.test.cjs` with the real Tinyauth 5.2.0: registration with
+ChatGPT's redirect, `/authorize` through the endpoint (consent page unchanged, an error
+redirect with `iss`), `authorize-complete` with `iss`, `code` and `state`, token with
+the registered credentials and `client_secret_post`, `/mcp` opens;
+`tests/test_web_auth_http.py` (real Caddy, both schemes): the three paths reach the
+endpoint on the auth host only, and with the endpoint down `/authorize` is answered by
+the login. Not verified: a real ChatGPT or claude.ai connection.
 
 The Dagu MCP is not registered globally: it needs the project's login as a header, which stays inside the project's mise environment. Desktop agents reach its tools through `fyso-<slug>` instead (forwarded, D57).
 

@@ -53,7 +53,9 @@ if (require.main === module) {
         clients:{...config.oidc?.clients, mcp:oauth.tinyauthClient(mcpEnv, declared)}};
     }
     const panel = config.apps?.panel?.users || {};
-    fs.writeFileSync(oauth.accessFile(env), JSON.stringify({allow:panel.allow || '', block:panel.block || '', policy:config.auth?.acls?.policy || 'allow'})+'\n', {mode:0o600});
+    // The redirect addresses the login trusts for the client: registration (D91) accepts only these.
+    const redirectUris = config.oidc?.clients?.mcp?.trustedRedirectUris || [];
+    fs.writeFileSync(oauth.accessFile(env), JSON.stringify({allow:panel.allow || '', block:panel.block || '', policy:config.auth?.acls?.policy || 'allow', redirectUris})+'\n', {mode:0o600});
     fs.writeFileSync(path.join(runtime,'config.yaml'), yaml.stringify(config), {mode:0o600});
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

@@ -405,6 +405,8 @@ function serveStdio() {
 // OAuth (D90): a token the trusted web login (own or shared) issued to this project's
 // client, for a user allowed in, is accepted too; the gateway also routes the discovery
 // documents here (protected resource on the panel host, authorization server on auth).
+// Registration (D91): the own login's client for clients that register themselves, and
+// the login's authorization answers pass through here to carry `iss`.
 const MAX_BODY = 1024 * 1024;
 function serveHttp(socket, env = process.env, fetchImpl = fetch) {
   const crypto = require('node:crypto');
@@ -441,6 +443,24 @@ function serveHttp(socket, env = process.env, fetchImpl = fetch) {
       if (req.method !== 'GET') return reply(405, {error: 'Use GET.'}, {Allow: 'GET'});
       try { return reply(200, await oauth.authorizationServerMetadata(env, fetchImpl)); }
       catch { return reply(502, {error: 'The web login is not answering.'}); }
+    }
+    // Always passed to the login: other apps of the same login sign in through it too.
+    if (oauth.AUTHORIZATION_RESPONSE_PATHS.includes(url)) {
+      const own = !off && withOAuth && !oauth.shared(env);
+      try {
+        const issuer = own ? (await oauth.discovery(env, fetchImpl)).issuer : null;
+        return await oauth.forwardAuthorization(req, res, env, issuer);
+      } catch { return res.headersSent ? res.destroy() : reply(502, {error: 'The web login is not answering.'}); }
+    }
+    if (url === oauth.REGISTRATION_PATH) {
+      if (off || !withOAuth || oauth.shared(env)) return reply(404, {error: 'not found'});
+      if (req.method !== 'POST') return reply(405, {error: 'Use POST.'}, {Allow: 'POST'});
+      const chunks = []; let size = 0;
+      for await (const chunk of req) { size += chunk.length; if (size > 64 * 1024) return reply(413, {error: 'Request too large.'}, {Connection: 'close'}); chunks.push(chunk); }
+      let request;
+      try { request = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return reply(400, {error: 'invalid_client_metadata', error_description: 'Send the client metadata as JSON.'}); }
+      const {status, body} = oauth.register(request, env);
+      return reply(status, body);
     }
     if (url !== '/mcp') return reply(404, {error: 'not found'});
     if (off) return reply(404, {error: off});

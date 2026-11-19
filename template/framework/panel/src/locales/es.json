@@ -982,7 +982,7 @@
     "remoteNote": {
       "env": "El token queda en una variable de entorno; añade el export a tu perfil de shell.",
       "json": "Configuración para clientes que usan un archivo JSON.",
-      "oauth": "Ajustes › Conectores › Agregar conector personalizado: pega la URL y, en Configuración avanzada, el Client ID y el Client Secret. Al conectar, inicia sesión con tu usuario del panel.",
+      "oauth": "Agrega un conector personalizado con la URL. ChatGPT y claude.ai se registran solos; si piden Client ID y Client Secret, usa estos. Al conectar, inicia sesión con tu usuario del panel.",
       "oauthCli": "Después ejecuta /mcp en Claude Code e inicia sesión con tu usuario del panel. El callback usa el puerto local 33418.",
       "oauthHub": "Ajustes › Conectores › Agregar conector personalizado: pega la URL y, en Configuración avanzada, el Client ID y el Client Secret que te da quien administra el login compartido. Al conectar, inicia sesión con tu usuario."
     },
