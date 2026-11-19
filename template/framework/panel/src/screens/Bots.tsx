@@ -151,7 +151,7 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
         ) : rows.length === 0 && groups.length === 0 ? (
           <div className="card empty">
             <span aria-hidden="true" className="empty-icon"><IconBot size={22} /></span>
-            <p style={{ fontWeight: 700, fontSize: 16 }}>{t("bots.emptyTitle")}</p>
+            <p className="empty-title">{t("bots.emptyTitle")}</p>
             <p className="mute" style={{ maxWidth: 360 }}>{t("bots.emptyBody")}</p>
             <a href={href.newBot} className="btn btn-lg btn-pri" style={{ marginTop: 4 }}>+ {t("bots.add")}</a>
           </div>
