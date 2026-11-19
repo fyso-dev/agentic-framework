@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { policy, parseArgs, macosSocketRules } = require('../template/framework/scripts/confine.cjs');
+const { policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity } = require('../template/framework/scripts/confine.cjs');
 
 function fixture(fn) {
   const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'confine-')));
@@ -61,10 +61,13 @@ test('macOS: Unix sockets are denied except DNS and the project\'s own', () => {
   const rules = macosSocketRules({ sockets: ['/tmp/fyso-demo-8400.sock', { prefix: '/tmp/fyso-ext-', suffix: '-8400.sock' }, { prefix: '/tmp/@dagu_', suffix: '.sock', create: true }] });
   assert.match(rules, /^\(deny network-outbound \(remote unix-socket\)\)/);
   assert.match(rules, /mDNSResponder/);
-  assert.match(rules, /path-literal "\/private\/tmp\/fyso-demo-8400\.sock"/);
+  // Seatbelt matches resolved paths: /tmp is a link on macOS, so rules name where it leads.
+  const tmp = fs.realpathSync('/tmp');
+  const re = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\/g, '\\\\');
+  assert.ok(rules.includes(`(path-literal "${tmp}/fyso-demo-8400.sock")`));
   // Seatbelt regex has no `+`: one path component is [^/]*, as sandbox-runtime writes it.
-  assert.ok(rules.includes('(regex "^/private/tmp/fyso-ext-[^/]*-8400\\\\.sock$")'));
-  assert.ok(rules.includes('(allow file-write* (regex "^/private/tmp/@dagu_[^/]*\\\\.sock$"))'));
+  assert.ok(rules.includes(`(regex "^${re(tmp)}/fyso-ext-[^/]*-8400\\\\.sock$")`));
+  assert.ok(rules.includes(`(allow file-write* (regex "^${re(tmp)}/@dagu_[^/]*\\\\.sock$"))`));
   assert.ok(!rules.includes("'"));
 });
 
@@ -81,4 +84,26 @@ test('lib.sh confined_exec routes through confine.cjs unless FYSO_CONFINE=off, w
   assert.match(strict, /^NODE \/r\/framework\/scripts\/confine\.cjs run --root \/r --data \/r\/\.data --project demo --port 8400 --shared-key .* -- \/bin\/sh -c /m);
   assert.match(strict, /CANARY=unset MODE=strict/);
   assert.equal(run('off').trim(), 'PLAIN A=1 CANARY=unset');
+}));
+
+test('the Unix-socket switch goes where sandbox-runtime reads it: network.allowAllUnixSockets', () => fixture(home => {
+  const p = policy({ root: path.join(home, 'demo'), sharedKeys: [], allowRead: [], allowWrite: [] }, { PATH: '' }, home);
+  const config = sandboxConfig(p);
+  assert.equal(config.network.allowAllUnixSockets, process.platform === 'linux');
+  assert.equal('allowAllUnixSockets' in config, false);
+  assert.equal(config.network.allowedDomains, undefined); // the network stays unrestricted
+}));
+
+test('only the git author identity is carried into the private home', () => fixture(home => {
+  const file = path.join(home, 'gitconfig');
+  fs.writeFileSync(file, '[user]\n\tname = Ada Lovelace\n\temail = ada@example.invalid\n[credential]\n\thelper = store\n');
+  const saved = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = file;
+  try {
+    assert.equal(gitIdentity(), '\tname = "Ada Lovelace"\n\temail = "ada@example.invalid"\n');
+    fs.writeFileSync(file, '[credential]\n\thelper = store\n');
+    assert.equal(gitIdentity(), '');
+  } finally {
+    if (saved === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = saved;
+  }
 }));

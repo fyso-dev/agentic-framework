@@ -135,6 +135,21 @@ function prepareHome(p) {
     fs.mkdirSync(path.join(p.privateHome, c.engine.dir), {recursive:true, mode:0o700});
     link(c.target, path.join(p.privateHome, c.engine.dir, c.file));
   }
+  // Git reads the author from ~/.gitconfig; carry only that identity, not the whole file
+  // (credential helpers, aliases and includes stay out). Written from outside the sandbox.
+  const identity = gitIdentity();
+  const gitconfig = path.join(p.privateHome, '.gitconfig');
+  if (identity) fs.writeFileSync(gitconfig, `# Written by confine.cjs from the user's git identity.\n[user]\n${identity}`, {mode:0o600});
+  else fs.rmSync(gitconfig, {force:true});
+}
+function gitIdentity() {
+  const lines = [];
+  for (const key of ['name', 'email']) {
+    let value = '';
+    try { value = execFileSync('git', ['config', '--global', '--get', `user.${key}`], {encoding:'utf8', stdio:['ignore', 'pipe', 'ignore']}).trim(); } catch {}
+    if (value) lines.push(`\t${key} = ${JSON.stringify(value)}\n`);
+  }
+  return lines.join('');
 }
 function link(target, at) {
   try { if (fs.readlinkSync(at) === target) return; } catch {}
@@ -151,6 +166,8 @@ function link(target, at) {
 const OPEN_NETWORK = '(allow network*)';
 const sbpl = s => `"${s.replace(/[\\"]/g, '\\$&')}"`;
 const regex = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Seatbelt matches resolved paths: /tmp is a link on macOS, so use where it leads.
+const resolvedTmp = s => s.replace(/^\/tmp(?=\/)/, real('/tmp'));
 function macosSocketRules(p) {
   const rules = ['(deny network-outbound (remote unix-socket))',
     '(allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))'];
@@ -158,8 +175,8 @@ function macosSocketRules(p) {
   if (p.root) rules.push(`(allow network-outbound (remote unix-socket (subpath ${sbpl(real(p.root))})))`);
   for (const s of p.sockets) {
     const at = typeof s === 'string'
-      ? `(path-literal ${sbpl(`/private${s}`)})`
-      : `(regex ${sbpl(`^/private${regex(s.prefix)}[^/]*${regex(s.suffix)}$`)})`;
+      ? `(path-literal ${sbpl(resolvedTmp(s))})`
+      : `(regex ${sbpl(`^${regex(resolvedTmp(s.prefix))}[^/]*${regex(s.suffix)}$`)})`;
     rules.push(`(allow network-outbound (remote unix-socket ${at}))`);
     // Dagu creates its run sockets itself: the file and its bind.
     if (s.create) rules.push(`(allow file-write* ${at})`, `(allow network-bind (local unix-socket ${at}))`);
@@ -192,9 +209,10 @@ function linuxSockets(p) {
 function sandboxConfig(p) {
   const linux = process.platform === 'linux' ? linuxSockets(p) : {denyRead:[], allowRead:[]};
   return {
-    network: {},  // no allowedDomains: the network is not restricted
+    // No allowedDomains: the network is not restricted. On Linux the seccomp filter that
+    // blocks every Unix socket is off; linuxSockets() limits them through the file system.
+    network: {allowAllUnixSockets: process.platform === 'linux'},
     allowPty: true,
-    allowAllUnixSockets: process.platform === 'linux',
     filesystem: {
       denyRead: [...p.denyRead, ...linux.denyRead],
       allowRead: [...p.allowRead, ...linux.allowRead],
@@ -280,7 +298,7 @@ async function selftest(argv) {
   });
 }
 
-module.exports = {policy, parseArgs, macosSocketRules, ENGINES};
+module.exports = {policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity, ENGINES};
 
 if (require.main === module) {
   const [mode, ...rest] = process.argv.slice(2);

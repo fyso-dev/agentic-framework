@@ -16,7 +16,9 @@ they read and write the project folder, and nothing else of the user's home.
 
 Every confined process gets a private home, `.data/confine/home`: `HOME`, `TMPDIR`,
 the XDG folders, mise's cache and state, and `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and
-`PI_CODING_AGENT_DIR` point there. The caddy gateway, the web login, connector setup and
+`PI_CODING_AGENT_DIR` point there. Its `.gitconfig` carries only the user's git author
+identity (`user.name`, `user.email`), so snapshots and `dev-task` commits keep working;
+credential helpers, aliases and includes stay out. The caddy gateway, the web login, connector setup and
 the remote MCP server run framework code only and stay unconfined; remote agents execute
 through Dagu, which is confined.
 
@@ -42,7 +44,7 @@ through Dagu, which is confined.
   Dagu's, and allow `kern.boottime` (Node's `os.uptime()`). If the profile is not the
   expected one (another sandbox-runtime version), the process does not start.
 - Linux: sandbox-runtime's seccomp filter would block every Unix socket, which Dagu,
-  OpenMausBot and the extensions need. It is turned off (`allowAllUnixSockets`); `/tmp`
+  OpenMausBot and the extensions need. It is turned off (`network.allowAllUnixSockets`); `/tmp`
   and the user's runtime folder are hidden instead and the project's own sockets are bound
   back.
 
