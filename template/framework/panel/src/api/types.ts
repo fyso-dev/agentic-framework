@@ -7,7 +7,12 @@ export type Project = {
   urls: { dagu: string; omb: string };
   /** Template revision and source from .copier-answers.yml (fyso-update). */
   framework?: { commit: string | null; src: string | null };
+  /** Project identity (D92, project/brand.json); absent before the first `up` with it. */
+  brand?: Brand;
 };
+
+/** icon: the project's own icon URL, or null for the Fyso mark. */
+export type Brand = { name: string; accent: string; icon: string | null; defaults: { name: string; accent: string } };
 
 export type App = {
   id: string;

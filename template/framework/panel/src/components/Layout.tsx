@@ -147,9 +147,11 @@ export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean
       </button>
       <a className="brand" href={href.setup}>
         {/* The Fyso mark from the design system; the project name sits beside it. */}
-        <img className="logo logo-on-light" src={markUrl} alt="" width={28} />
-        <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
-        <span className="brand-name">{p?.name ?? t("top.logo")}</span>
+        {p?.brand?.icon ? <img className="logo logo-custom" src={p.brand.icon} alt="" width={28} height={28} /> : <>
+          <img className="logo logo-on-light" src={markUrl} alt="" width={28} />
+          <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
+        </>}
+        <span className="brand-name">{p?.brand?.name ?? p?.name ?? t("top.logo")}</span>
       </a>
       {openApp && (
         <span className="crumb">

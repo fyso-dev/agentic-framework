@@ -1094,3 +1094,15 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
 /* Design system titles (ui-board-title, ui-dialog-title): Demo 700, tight tracking. */
 .page-head h1, .h1, .bots-list-head h1, .bd-title h2, .ap-head h1 { font-family: var(--font-display); letter-spacing: -.015em; }
 .modal-head h2, .empty-title { font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 22px; }
+
+/* ── Project identity (D92) ─────────────────────────────────────────────── */
+.brand-mark { width: auto; flex-shrink: 0; border-radius: 8px; object-fit: contain; }
+.logo-custom { height: 28px; object-fit: contain; border-radius: 6px; }
+.identity-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: 0; }
+.identity-form .identity-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.identity-color { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--fy-line-2); border-radius: var(--fy-radius-md); background: var(--fy-surface); cursor: pointer; }
+.identity-hex { width: 110px; }
+.identity-form label.btn { cursor: pointer; }
+.identity-form label.btn:focus-within { outline: 2px solid var(--fy-focus); outline-offset: 2px; }
+.identity-preview { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--fy-radius-md); background: var(--fy-surface-2); box-shadow: inset 0 0 0 1px var(--fy-line); }
+.identity-preview .btn { pointer-events: none; }

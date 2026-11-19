@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BottomNav, SideNav, TopBar, useNavCollapsed } from "./components/Layout";
 import { useRoute, type Route } from "./lib/router";
 import { localized } from "./lib/i18n";
+import { applyAccent, applyFavicon } from "./lib/brand";
 import { useTheme } from "./lib/theme";
 import { Bots } from "./screens/Bots";
 import { Connectors } from "./screens/Connectors";
@@ -21,7 +22,9 @@ export function App() {
   const [theme, toggleTheme] = useTheme();
   const s = useStore();
   const [navCollapsed, toggleNav] = useNavCollapsed();
-  const name = s.project.data?.name;
+  const brand = s.project.data?.brand;
+  const name = brand?.name ?? s.project.data?.name;
+  useEffect(() => { applyAccent(brand?.accent); applyFavicon(brand?.icon); }, [brand?.accent, brand?.icon]);
   // The tab names the place first, so it stays readable when tabs are narrow: "Conectores · Acme".
   const place = placeName(route, s, i18n.language, t);
   useEffect(() => {

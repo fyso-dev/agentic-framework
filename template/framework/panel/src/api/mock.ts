@@ -14,6 +14,7 @@ const PROJECT: Project = {
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
   framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
+  brand: { name: "Foo project", accent: "#6e1fff", icon: null, defaults: { name: "Foo project", accent: "#6e1fff" } },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -334,7 +335,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     async getObservability() { throw new Error("Observability requires the real stack"); },
     async getProject() {
       await sleep(150);
-      return PROJECT;
+      return { ...PROJECT, brand: PROJECT.brand && { ...PROJECT.brand } };
     },
     async getTeam() {
       await sleep(200);
@@ -456,6 +457,17 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
             error: fail ? "error: the update conflicts with local changes; nothing was applied: ./Caddyfile" : undefined,
             outputs: () => ({ result: JSON.stringify({ from: "58f57cf", to: "73b74c2", commit: "1dcf4be", changed: true }) }),
           });
+          break;
+        }
+        case "fyso-brand": {
+          const input = params?.SETTINGS_B64 ? JSON.parse(fromBase64Utf8(params.SETTINGS_B64)) as { name?: string; accent?: string; icon?: string | null } : {};
+          const brand = PROJECT.brand!;
+          if (params?.OP === "save") {
+            if (input.name !== undefined) brand.name = input.name;
+            if (input.accent !== undefined) brand.accent = input.accent.toLowerCase();
+            if (input.icon !== undefined) brand.icon = input.icon === null ? null : `data:image/png;base64,${input.icon}`;
+          }
+          add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify(brand) }) });
           break;
         }
         default:
