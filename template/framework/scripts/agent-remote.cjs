@@ -10,7 +10,7 @@ const serverName = env => `fyso-${env.FYSO_PROJECT}`;
 const address = env => `${web.origin('panel', env)}/mcp`;
 
 // Each command was checked against the client's own `mcp add --help`.
-// With an OAuth client (D88), people sign in with their web login instead of a token:
+// With an OAuth client (D90), people sign in with their web login instead of a token:
 // Claude Desktop and claude.ai take the address, client id and secret in a custom
 // connector's advanced settings; Claude Code needs the fixed callback port.
 function clients({name, url, token, clientId, clientSecret}) {

@@ -44,7 +44,7 @@ if (require.main === module) {
     config.database = {driver:'sqlite', path:path.join(runtime,'sessions.db')};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
     config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
-    // Remote MCP sign-in (D88): this login is the OAuth server of the panel's /mcp.
+    // Remote MCP sign-in (D90): this login is the OAuth server of the panel's /mcp.
     const oauth = require('./mcp-oauth.cjs');
     const mcpEnv = {...env, FYSO_WEB_SCHEME: web.scheme(env), FYSO_AUTH_UPSTREAM: ''};
     if (oauth.enabled(mcpEnv)) {

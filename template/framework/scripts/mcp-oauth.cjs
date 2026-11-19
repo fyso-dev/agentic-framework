@@ -1,4 +1,4 @@
-// OAuth sign-in for the remote MCP (D88). The web login this project trusts, Tinyauth
+// OAuth sign-in for the remote MCP (D90). The web login this project trusts, Tinyauth
 // (an OpenID Connect provider since 5.1), is the authorization server: it signs people
 // in, asks for consent and issues the tokens. That login is either the project's own
 // or a shared one on this host (the hub, D61, FYSO_AUTH_UPSTREAM). This module only

@@ -1,4 +1,4 @@
-// D88 against a real Tinyauth: FYSO_TEST_TINYAUTH (5.2.0 binary) and FYSO_TEST_CADDY (for bcrypt).
+// D90 against a real Tinyauth: FYSO_TEST_TINYAUTH (5.2.0 binary) and FYSO_TEST_CADDY (for bcrypt).
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const path=require('node:path'),{spawnSync}=require('node:child_process');
 const repo=path.resolve(__dirname,'..');

@@ -1,4 +1,4 @@
-// Remote MCP OAuth sign-in (D88): discovery, and tokens of the trusted web login (own or shared).
+// Remote MCP OAuth sign-in (D90): discovery, and tokens of the trusted web login (own or shared).
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'), os=require('node:os'), path=require('node:path'), http=require('node:http');

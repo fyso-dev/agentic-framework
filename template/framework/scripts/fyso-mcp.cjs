@@ -402,7 +402,7 @@ function serveStdio() {
 // Remote clients (D63). The gateway routes only /mcp here, without the web login: the
 // bearer token is the credential, compared in constant time. Browsers are refused (they
 // send Origin; CLI clients do not), which also closes DNS rebinding.
-// OAuth (D88): a token the trusted web login (own or shared) issued to this project's
+// OAuth (D90): a token the trusted web login (own or shared) issued to this project's
 // client, for a user allowed in, is accepted too; the gateway also routes the discovery
 // documents here (protected resource on the panel host, authorization server on auth).
 const MAX_BODY = 1024 * 1024;

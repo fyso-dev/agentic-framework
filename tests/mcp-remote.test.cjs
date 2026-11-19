@@ -116,7 +116,7 @@ test('the Dagu action creates the token once and reports the address, never the 
   assert.deepEqual(JSON.parse(created.stdout),{mode:'remote',server:`fyso-remote-${process.pid}`,url:'https://panel.host1.proxy.example.com/mcp',created:true});
   assert.ok(!(created.stdout+created.stderr).includes(token));
   const secret=spawnSync(sopsTools[0],['decrypt','--extract','["FYSO_MCP_CLIENT_SECRET"]','secrets.enc.yaml'],{cwd:dir,env,encoding:'utf8'}).stdout.trim();
-  assert.equal(secret.length,43,'the OAuth client secret (D88) is created with the token');assert.ok(!(created.stdout+created.stderr).includes(secret));
+  assert.equal(secret.length,43,'the OAuth client secret (D90) is created with the token');assert.ok(!(created.stdout+created.stderr).includes(secret));
   const again=action({FYSO_MCP_TOKEN:token,FYSO_MCP_CLIENT_SECRET:secret});
   assert.equal(JSON.parse(again.stdout).created,false);assert.equal(stored(),token);assert.ok(!(again.stdout+again.stderr).includes(token));
   const plain=action({FYSO_WEB_SCHEME:'http'});
