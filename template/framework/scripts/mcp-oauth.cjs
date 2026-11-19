@@ -17,6 +17,14 @@
 //   secrets.enc.yaml, allowed users = the panel's access rule;
 // - shared login: the hub registers the client and keeps its secret; the project gets
 //   FYSO_MCP_CLIENT_ID and the allowed users FYSO_MCP_ALLOW (Tinyauth filter syntax).
+// With the own login, clients that register themselves (ChatGPT, claude.ai) get that
+// same client from a registration endpoint (RFC 7591, D91): it hands out `fyso-mcp` and
+// its secret for trusted redirect addresses only, so the secret works as a public
+// client's. Sign-in, consent, PKCE S256, the fixed redirect list and the allowed users
+// keep protecting the tokens. Tinyauth does not return `iss` with the authorization
+// response (RFC 9207); without it ChatGPT uses a redirect per connection, which a fixed
+// list cannot hold. The gateway passes the two answers that carry the code or the error
+// back to the client through here, and `iss` is added.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -31,9 +39,14 @@ const REDIRECT_URIS = [
   'https://claude.com/api/mcp/auth_callback',
   `http://localhost:${CALLBACK_PORT}/callback`,
   `http://127.0.0.1:${CALLBACK_PORT}/callback`,
+  'https://chatgpt.com/connector_platform_oauth_redirect',
 ];
 const RESOURCE_PATH = '/.well-known/oauth-protected-resource';
 const AUTHORIZATION_SERVER_PATH = '/.well-known/oauth-authorization-server';
+const REGISTRATION_PATH = '/oauth/register';
+// Tinyauth's answers that send the browser back to the client: a redirect from
+// /authorize (errors) and the JSON its consent page follows (the code, or an error).
+const AUTHORIZATION_RESPONSE_PATHS = ['/authorize', '/api/oidc/authorize-complete'];
 // Written by web-auth-config.cjs next to the own login's runtime configuration.
 const accessFile = env => path.join(env.FYSO_DATA || '', 'web-auth/runtime/mcp-access.json');
 
@@ -69,9 +82,84 @@ async function discovery(env = process.env, fetchImpl = fetch) {
   if (typeof metadata?.issuer !== 'string' || !metadata.issuer.startsWith('https://')) throw Error('login discovery has no https issuer');
   return metadata;
 }
-// Tinyauth 5.2 verifies S256 (and plain) but does not list them.
+// Tinyauth 5.2 verifies S256 (and plain) but does not list them. Registration and `iss`
+// come from this module (D91).
 async function authorizationServerMetadata(env = process.env, fetchImpl = fetch) {
-  return {...await discovery(env, fetchImpl), code_challenge_methods_supported: ['S256']};
+  const metadata = await discovery(env, fetchImpl);
+  return {...metadata, code_challenge_methods_supported: ['S256'],
+    registration_endpoint: `${metadata.issuer}${REGISTRATION_PATH}`, authorization_response_iss_parameter_supported: true};
+}
+
+// RFC 7591 registration with the own login's single client. Only redirect addresses the
+// login trusts are accepted: any other could never complete a sign-in.
+const AUTH_METHODS = ['client_secret_basic', 'client_secret_post'];
+function trustedRedirects(env) {
+  try {
+    const listed = JSON.parse(fs.readFileSync(accessFile(env), 'utf8')).redirectUris;
+    if (Array.isArray(listed) && listed.length) return listed;
+  } catch {}
+  return REDIRECT_URIS;
+}
+function register(request, env = process.env) {
+  const refuse = (error, description) => ({status: 400, body: {error, error_description: description}});
+  if (!request || typeof request !== 'object' || Array.isArray(request)) return refuse('invalid_client_metadata', 'Send the client metadata as a JSON object.');
+  const redirects = request.redirect_uris;
+  if (!Array.isArray(redirects) || !redirects.length || !redirects.every(uri => typeof uri === 'string')) return refuse('invalid_redirect_uri', 'redirect_uris is required.');
+  const trusted = trustedRedirects(env);
+  const unknown = redirects.filter(uri => !trusted.includes(uri));
+  if (unknown.length) return refuse('invalid_redirect_uri', `Not a redirect address this login trusts: ${unknown.join(', ')}`);
+  const grants = request.grant_types ?? ['authorization_code'];
+  if (!Array.isArray(grants) || !grants.every(grant => ['authorization_code', 'refresh_token'].includes(grant))) return refuse('invalid_client_metadata', 'Only authorization_code and refresh_token grants are supported.');
+  const responses = request.response_types ?? ['code'];
+  if (!Array.isArray(responses) || !responses.every(type => type === 'code')) return refuse('invalid_client_metadata', 'Only the code response type is supported.');
+  // The login always checks the secret: a client asking for none gets one anyway (RFC 7591 §3.2.1).
+  const method = AUTH_METHODS.includes(request.token_endpoint_auth_method) ? request.token_endpoint_auth_method : 'client_secret_basic';
+  return {status: 201, body: {client_id: OWN_CLIENT_ID, client_secret: env.FYSO_MCP_CLIENT_SECRET, client_secret_expires_at: 0,
+    client_name: `Fyso ${env.FYSO_PROJECT || ''}`.trim(), redirect_uris: redirects, grant_types: grants, response_types: ['code'],
+    token_endpoint_auth_method: method, scope: SCOPE}};
+}
+
+// RFC 9207: the issuer travels with every code or error sent back to a client.
+function withIssuer(target, issuer) {
+  let address;
+  try { address = new URL(target); } catch { return target; }
+  if (address.origin === new URL(issuer).origin) return target;   // the login's own pages
+  if (!address.searchParams.has('code') && !address.searchParams.has('error')) return target;
+  address.searchParams.set('iss', issuer);
+  return address.toString();
+}
+// Passes an authorization response path to the login unchanged, adding `iss` (when
+// given) to where it sends the browser back. The gateway falls back to the login when
+// this endpoint is down.
+function forwardAuthorization(req, res, env = process.env, issuer = null) {
+  const target = new URL(upstream(env));
+  const headers = {...req.headers};
+  for (const hop of ['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'proxy-connection']) delete headers[hop];
+  return new Promise((resolve, reject) => {
+    const out = require('node:http').request({host: target.hostname, port: target.port, method: req.method, path: req.url, headers}, answer => {
+      const back = {...answer.headers};
+      delete back.connection; delete back['transfer-encoding'];
+      if (back.location && issuer) back.location = withIssuer(back.location, issuer);
+      const json = !!issuer && /application\/json/.test(back['content-type'] || '');
+      if (!json) { res.writeHead(answer.statusCode, back); answer.pipe(res); answer.on('end', resolve); return; }
+      const chunks = [];
+      answer.on('data', chunk => chunks.push(chunk));
+      answer.on('end', () => {
+        let body = Buffer.concat(chunks);
+        try {
+          const parsed = JSON.parse(body.toString('utf8'));
+          if (typeof parsed?.redirect_uri === 'string') {
+            parsed.redirect_uri = withIssuer(parsed.redirect_uri, issuer);
+            body = Buffer.from(JSON.stringify(parsed));
+          }
+        } catch {}
+        back['content-length'] = String(body.length);
+        res.writeHead(answer.statusCode, back); res.end(body); resolve();
+      });
+    });
+    out.on('error', reject);
+    req.pipe(out);
+  });
 }
 
 const resourceMetadataUrl = env => `${web.origin('panel', env)}${RESOURCE_PATH}/mcp`;
@@ -148,5 +236,6 @@ function verifier(env = process.env, fetchImpl = fetch) {
 }
 
 module.exports = {OWN_CLIENT_ID, SCOPE, CALLBACK_PORT, REDIRECT_URIS, RESOURCE_PATH, AUTHORIZATION_SERVER_PATH,
+  REGISTRATION_PATH, AUTHORIZATION_RESPONSE_PATHS,
   shared, clientId, enabled, tinyauthClient, discovery, resourceMetadata, resourceMetadataUrl, challenge,
-  authorizationServerMetadata, allowed, subject, verifier, accessFile};
+  authorizationServerMetadata, register, withIssuer, forwardAuthorization, allowed, subject, verifier, accessFile};

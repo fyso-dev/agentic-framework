@@ -1,5 +1,7 @@
 // End to end against a real Tinyauth 5.2.0: generated config -> login -> authorize with
 // PKCE -> token with the client secret -> fyso-mcp accepts it; viewer and wrong client refused.
+// D91: a client that registers itself (ChatGPT's redirect) gets the client, and the
+// authorization answers passed through fyso-mcp carry `iss`.
 // Run by mcp-oauth-tinyauth.test.cjs: node mcp-oauth-tinyauth.cjs <repo> <tinyauth> <caddy> <yaml-bin-dir>
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), http = require('node:http'), crypto = require('node:crypto');
 const {spawn, execFileSync} = require('node:child_process');
@@ -84,6 +86,39 @@ const wait = async (url, tries = 100) => { for (let i = 0; i < tries; i++) { try
   check(list.body.result.tools.some(t => t.name === 'fyso_status'), 'tools listed with the OAuth token');
   check((await call('POST', '/mcp', {Authorization: `Bearer ${viewer.access_token}`}, init)).status === 401, 'viewer (not a panel user) is refused');
   check((await call('POST', '/mcp', {Authorization: 'Bearer not-a-real-token-123456'}, init)).status === 401, 'unknown token is refused');
+  // D91, the way ChatGPT connects: register, authorize through the endpoint (as the gateway
+  // routes it), get `iss` with the code, exchange it with the registered credentials.
+  const raw = (method, urlPath, hdrs = {}, body) => new Promise((resolve, reject) => {
+    const req = http.request({socketPath: socket, path: urlPath, method, headers: hdrs}, res => {
+      let text = ''; res.on('data', c => text += c); res.on('end', () => resolve({status: res.statusCode, headers: res.headers, text}));
+    });
+    req.on('error', reject); req.end(body);
+  });
+  check(as.body.registration_endpoint === `${discovery.issuer}/oauth/register` && as.body.authorization_response_iss_parameter_supported === true, 'metadata names the registration endpoint and iss support');
+  const chatgpt = 'https://chatgpt.com/connector_platform_oauth_redirect';
+  const refused = await call('POST', '/oauth/register', {}, {redirect_uris: ['https://evil.example/callback']});
+  check(refused.status === 400 && refused.body.error === 'invalid_redirect_uri', 'registration refuses an untrusted redirect');
+  const reg = await call('POST', '/oauth/register', {}, {client_name: 'ChatGPT', redirect_uris: [chatgpt], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'client_secret_post'});
+  check(reg.status === 201 && reg.body.client_id === 'fyso-mcp' && reg.body.client_secret === SECRET && reg.body.token_endpoint_auth_method === 'client_secret_post', 'registration returns the client');
+  {
+    const login = await fetch(`${base}/api/user/login`, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify({username: 'admin', password: PASSWORD})});
+    const cookie = (login.headers.getSetCookie() || []).map(c => c.split(';')[0]).join('; ');
+    const verifier = crypto.randomBytes(32).toString('base64url');
+    const query = new URLSearchParams({client_id: reg.body.client_id, redirect_uri: chatgpt, response_type: 'code', scope: 'openid profile', state: 'st', code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', resource: 'https://panel.demo.example.com/mcp'});
+    const start = await raw('GET', `/authorize?${query}`, {...headers, Cookie: cookie});
+    const ticket = new URL(start.headers.location || '', discovery.issuer).searchParams.get('oidc_ticket');
+    check(start.status === 302 && !!ticket && !start.headers.location.includes('iss='), 'authorize passes through to the consent page unchanged');
+    const bad = await raw('GET', `/authorize?${new URLSearchParams({...Object.fromEntries(query), response_type: 'token'})}`, {...headers, Cookie: cookie});
+    const badUrl = new URL(bad.headers.location || 'x:', discovery.issuer);
+    check(bad.status === 302 && badUrl.origin === 'https://chatgpt.com' && badUrl.searchParams.get('error') && badUrl.searchParams.get('iss') === discovery.issuer, 'an error sent back to the client carries iss');
+    const complete = await raw('POST', '/api/oidc/authorize-complete', {...headers, Cookie: cookie, 'Content-Type': 'application/json'}, JSON.stringify({ticket}));
+    const back = new URL(JSON.parse(complete.text).redirect_uri);
+    check(complete.status === 200 && back.origin + back.pathname === chatgpt && back.searchParams.get('iss') === discovery.issuer && back.searchParams.get('state') === 'st', 'the code sent back to the client carries iss');
+    const exchange = await fetch(`${base}/api/oidc/token`, {method: 'POST', headers: {...headers, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({grant_type: 'authorization_code', code: back.searchParams.get('code'), redirect_uri: chatgpt, code_verifier: verifier, client_id: reg.body.client_id, client_secret: reg.body.client_secret, resource: 'https://panel.demo.example.com/mcp'})});
+    const issued = await exchange.json();
+    check(exchange.ok && (await call('POST', '/mcp', {Authorization: `Bearer ${issued.access_token}`}, init)).status === 200, 'the registered client\'s token opens the MCP');
+  }
   // Tinyauth keeps one session per user and client: signing in again revokes the old token.
   const second = await tokenFor('admin');
   check((await call('POST', '/mcp', {Authorization: `Bearer ${second.access_token}`}, init)).status === 200, 'a new sign-in works');

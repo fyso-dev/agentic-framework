@@ -11,13 +11,14 @@ const address = env => `${web.origin('panel', env)}/mcp`;
 
 // Each command was checked against the client's own `mcp add --help`.
 // With an OAuth client (D90), people sign in with their web login instead of a token:
-// Claude Desktop and claude.ai take the address, client id and secret in a custom
-// connector's advanced settings; Claude Code needs the fixed callback port.
+// Claude Desktop, claude.ai and ChatGPT take the address and register themselves with the
+// own login (D91), or take the client id and secret in a custom connector's advanced
+// settings; Claude Code needs the fixed callback port.
 function clients({name, url, token, clientId, clientSecret}) {
   const variable = `${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_MCP_TOKEN`;
   // With a shared login the hub keeps the secret: without a local copy, people get it there.
   const signIn = !clientId ? [] : [
-    {id: 'claude-desktop', label: 'Claude Desktop · claude.ai', note: clientSecret ? 'oauth' : 'oauthHub', commands: clientSecret ? [url, clientId, clientSecret] : [url, clientId]},
+    {id: 'claude-desktop', label: 'Claude Desktop · claude.ai · ChatGPT', note: clientSecret ? 'oauth' : 'oauthHub', commands: clientSecret ? [url, clientId, clientSecret] : [url, clientId]},
     {id: 'claude-code-oauth', label: 'Claude Code (OAuth)', note: 'oauthCli', commands: [
       `${clientSecret ? `MCP_CLIENT_SECRET=${clientSecret} ` : ''}claude mcp add --transport http --scope user --client-id ${clientId} --client-secret --callback-port ${oauth.CALLBACK_PORT} ${name} ${url}`]},
   ];
@@ -62,7 +63,7 @@ function print(env = process.env) {
   for (const client of list) {
     lines.push(client.id === 'other' ? 'Any other MCP client (configuration)' : client.label
       + (client.note === 'env' ? ' (the token stays in an environment variable; add the export to your shell profile)' : '')
-      + (client.note === 'oauth' ? ': Settings › Connectors › Add custom connector; under Advanced settings, the client ID and secret. Then sign in with your panel user.' : '')
+      + (client.note === 'oauth' ? ': add a custom connector with the URL. ChatGPT and claude.ai register themselves; if they ask for a client ID and secret, use these. Then sign in with your panel user.' : '')
       + (client.note === 'oauthHub' ? ': Settings › Connectors › Add custom connector; under Advanced settings, the client ID and the secret the shared login\'s administrator gives you.' : '')
       + (client.note === 'oauthCli' ? ': then run /mcp in Claude Code and sign in with your panel user.' : ''));
     const labels = ['oauth', 'oauthHub'].includes(client.note) ? ['URL', 'OAuth Client ID', 'OAuth Client Secret'] : [];

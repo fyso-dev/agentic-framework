@@ -65,8 +65,20 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	respond @internal 404
 	# Remote MCP sign-in (D90): the login's discovery document, with the PKCE method
 	# it implements, at the address MCP clients ask first.
-	route /.well-known/oauth-authorization-server {
+	# Registration (D91): the login's client for clients that register themselves.
+	@mcpAuthServer path /.well-known/oauth-authorization-server /oauth/register
+	route @mcpAuthServer {
 		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
+	# The answers that send the browser back to a client gain `iss` (RFC 9207, D91).
+	# When the MCP endpoint is down they go to the login directly, without it.
+	@authorizationResponse path /authorize /api/oidc/authorize-complete
+	route @authorizationResponse {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET} {$FYSO_AUTH_UPSTREAM} {
+			lb_policy first
+			lb_try_duration 2s
+			fail_duration 10s
+		}
 	}
 	reverse_proxy {$FYSO_AUTH_UPSTREAM}
 }
