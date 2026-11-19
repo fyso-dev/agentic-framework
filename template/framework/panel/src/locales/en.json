@@ -50,7 +50,9 @@
     "more": "More options: language and theme",
     "openOmb": "Open OpenMausBot",
     "ombShort": "OpenMausBot",
-    "attention": "{{name}}: {{count}}"
+    "attention": "{{name}}: {{count}}",
+    "switchProject": "Switch project",
+    "projects": "Projects"
   },
   "nav": {
     "label": "Sections",
