@@ -47,7 +47,7 @@ test('project OMB startup selects the isolated Pi wrapper and filters inherited 
     fs.copyFileSync(wrapper,path.join(frameworkBin,'pi'));fs.chmodSync(path.join(frameworkBin,'pi'),0o755);
     fs.writeFileSync(path.join(tools,'pi'),'#!/bin/sh\nprintf "REAL_PI_ARGS=%s\\n" "$*"\n',{mode:0o755});
     fs.writeFileSync(path.join(tools,'openmausbot'),'#!/bin/sh\nprintf "RESOLVED_PI=%s\\n" "$(command -v pi)"\nprintf "CANARY=%s\\n" "${FYSO_TEST_SECRET-unset}"\npi --version\n',{mode:0o755});
-    const env={...process.env,PATH:`${tools}:${process.env.PATH}`,FYSO_ROOT:dir,FYSO_DATA:path.join(dir,'data'),FYSO_OMB_PORT:'32104',FYSO_OMB_WEBHOOK_PORT:'32105',FYSO_HTTP_PORT:'32100',FYSO_DAGU_PORT:'32101',FYSO_ADMIN_USER:'fixture',FYSO_ADMIN_PASSWORD:'fixture',FYSO_WEB_DOMAIN:'fixture.localhost',FYSO_TEST_SECRET:'must-not-leak'};
+    const env={...process.env,PATH:`${tools}:${process.env.PATH}`,FYSO_ROOT:dir,FYSO_DATA:path.join(dir,'data'),FYSO_OMB_PORT:'32104',FYSO_OMB_WEBHOOK_PORT:'32105',FYSO_HTTP_PORT:'32100',FYSO_DAGU_PORT:'32101',FYSO_ADMIN_USER:'fixture',FYSO_ADMIN_PASSWORD:'fixture',FYSO_WEB_DOMAIN:'fixture.localhost',FYSO_TEST_SECRET:'must-not-leak',FYSO_CONFINE:'off'};
     const result=spawnSync('bash',[path.join(scripts,'run-omb.sh')],{encoding:'utf8',env});
     assert.equal(result.status,0,result.stderr);
     assert.match(result.stdout,new RegExp(`RESOLVED_PI=${frameworkBin.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}/pi`));
