@@ -10,6 +10,7 @@ provider. Fyso Biz is the OAuth authority. The framework exposes its existing
 D62 HTTPS contract and a generic Tinyauth provider slot. Cloudflare provisioning
 and the relay run on infrastructure managed by Fyso Biz. Install the external
 extension with `mise run ext:add gh:fyso-dev/fyso-ext-biz-publication -- --vcs-ref v0.1.0`.
+The [relay decision](adr/0004-biz-publication-relay.md) records the architectural exception and its preview limits.
 
 ## Acceptance
 

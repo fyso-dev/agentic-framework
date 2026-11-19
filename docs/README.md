@@ -22,7 +22,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Topic | Where |
 |---|---|
 | Decisions log (D1–D89; D6, D9, D22 superseded; D16 resolved by D20; D82's two-way sync amended by D89) | [PLAN §2](PLAN.md#2-decisions-log) |
-| Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) |
+| Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) · [ADR 0004](adr/0004-biz-publication-relay.md): managed Biz publication relay |
 
 ## Layer 2 — Architecture
 *How the pieces fit together.*
