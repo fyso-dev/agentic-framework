@@ -307,7 +307,7 @@
   },
   "apps": {
     "title": "Apps",
-    "subtitle": "Todo lo que corre en el proyecto. Cada una se abre en una pestaña nueva.",
+    "subtitle": "Todo lo que corre en el proyecto. Las del framework se abren acá; las demás, en una pestaña nueva.",
     "framework": "Framework",
     "project": "Proyecto",
     "open": "Abrir",
