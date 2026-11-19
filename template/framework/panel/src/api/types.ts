@@ -11,8 +11,12 @@ export type Project = {
   brand?: Brand;
 };
 
-/** icon: the project's own icon URL, or null for the Fyso mark. */
-export type Brand = { name: string; accent: string; icon: string | null; defaults: { name: string; accent: string } };
+/** icon and loginBackground: the project's own file URLs, or null for the defaults. */
+export type Brand = {
+  name: string; accent: string; font: import("../lib/brand").Font; radius: import("../lib/brand").Radius;
+  icon: string | null; loginBackground: string | null;
+  defaults: { name: string; accent: string; font: import("../lib/brand").Font; radius: import("../lib/brand").Radius };
+};
 
 export type App = {
   id: string;

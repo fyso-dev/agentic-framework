@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
+import { DAGS, type App, type Backend, type Brand, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -14,7 +14,10 @@ const PROJECT: Project = {
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
   framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
-  brand: { name: "Foo project", accent: "#6e1fff", icon: null, defaults: { name: "Foo project", accent: "#6e1fff" } },
+  brand: {
+    name: "Foo project", accent: "#6e1fff", font: "fyso", radius: "soft", icon: null, loginBackground: null,
+    defaults: { name: "Foo project", accent: "#6e1fff", font: "fyso", radius: "soft" },
+  },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -460,12 +463,15 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
           break;
         }
         case "fyso-brand": {
-          const input = params?.SETTINGS_B64 ? JSON.parse(fromBase64Utf8(params.SETTINGS_B64)) as { name?: string; accent?: string; icon?: string | null } : {};
+          const input = params?.SETTINGS_B64 ? JSON.parse(fromBase64Utf8(params.SETTINGS_B64)) as Partial<Brand> : {};
           const brand = PROJECT.brand!;
           if (params?.OP === "save") {
             if (input.name !== undefined) brand.name = input.name;
             if (input.accent !== undefined) brand.accent = input.accent.toLowerCase();
+            if (input.font !== undefined) brand.font = input.font;
+            if (input.radius !== undefined) brand.radius = input.radius;
             if (input.icon !== undefined) brand.icon = input.icon === null ? null : `data:image/png;base64,${input.icon}`;
+            if (input.loginBackground !== undefined) brand.loginBackground = input.loginBackground === null ? null : `data:image/jpeg;base64,${input.loginBackground}`;
           }
           add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify(brand) }) });
           break;

@@ -29,6 +29,22 @@ test('save versions the identity, installs it and keeps the panel in step; defau
   } finally { fs.rmSync(root,{recursive:true,force:true}); }
 });
 
+test('font, corners and login background are saved, served by install and reset to the defaults',()=>{
+  const {root,git,env}=project();
+  const jpeg=Buffer.concat([Buffer.from([0xff,0xd8,0xff,0xe0]),Buffer.alloc(64)]).toString('base64');
+  try {
+    const saved=brand.save({font:'classic',radius:'round',loginBackground:jpeg},env);
+    assert.equal(saved.font,'classic');assert.equal(saved.radius,'round');assert.match(saved.loginBackground,/^\/fyso-brand\/login-background\?v=[0-9a-f]{10}$/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'project/brand.json'),'utf8')),{font:'classic',radius:'round',loginBackground:'brand/login-background.jpg'});
+    assert.equal(fs.existsSync(path.join(env.FYSO_DATA,'brand/login-background.jpg')),true);
+    assert.equal(git(['status','--porcelain','--','project']).trim(),'');
+    for(const input of [{font:'comic'},{radius:'square'},{loginBackground:png}])assert.throws(()=>brand.save(input,env));
+    const reset=brand.save({font:'fyso',radius:'soft',loginBackground:null},env);
+    assert.equal(reset.loginBackground,null);assert.equal(fs.existsSync(path.join(root,'project/brand.json')),false);
+    assert.equal(fs.existsSync(path.join(env.FYSO_DATA,'brand/login-background.jpg')),false);
+  } finally { fs.rmSync(root,{recursive:true,force:true}); }
+});
+
 test('a first save without an icon commits; invalid input is rejected and leaves nothing behind',()=>{
   const {root,git,env}=project();
   try {
