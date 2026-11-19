@@ -229,7 +229,7 @@ export function SideNav({ route }: { route: Route }) {
     ...Object.fromEntries(Object.entries(badges).map(([id, badge]) => [id, !!badge.warn && badge.count > 0])),
     setup: !loadingSteps(s) && open > 0, bots: unapplied > 0, apps: down > 0,
   };
-  const [collapsed, toggle] = useNavCollapsed(route);
+  const [collapsed, toggle] = useNavCollapsed();
   return (
     <nav aria-label={t("nav.label")} className={`sidenav${collapsed ? " collapsed" : ""}`}>
       {items.map(({ id, href: h, icon: Icon, label }) => {
@@ -252,14 +252,13 @@ export function SideNav({ route }: { route: Route }) {
   );
 }
 
-/** One remembered choice; until the person picks, apps opened in the panel start with the menu collapsed. */
-function useNavCollapsed(route: Route): [boolean, () => void] {
-  const read = () => { try { const v = localStorage.getItem("fy-nav-collapsed"); return v === null ? null : v === "1"; } catch { return null; } };
-  const [pref, setPref] = useState<boolean | null>(read);
-  const collapsed = pref ?? route.name === "app";
+/** Wide or collapsed is the person's choice, remembered in this browser; wide by default. */
+function useNavCollapsed(): [boolean, () => void] {
+  const read = () => { try { return localStorage.getItem("fy-nav-collapsed") === "1"; } catch { return false; } };
+  const [collapsed, setCollapsed] = useState<boolean>(read);
   const toggle = () => {
     const next = !collapsed;
-    setPref(next);
+    setCollapsed(next);
     try { localStorage.setItem("fy-nav-collapsed", next ? "1" : "0"); } catch { /* the choice lasts this visit */ }
   };
   return [collapsed, toggle];
