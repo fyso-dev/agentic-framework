@@ -10,7 +10,7 @@ import { useExtensionBadges } from "../lib/extensionBadges";
 import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconWorkflow } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
-import { ProjectSwitcher } from "./ProjectSwitcher";
+import { InstanceSwitcher } from "./InstanceSwitcher";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -142,7 +142,7 @@ export function TopBar(props: ThemeProps) {
         <span className="logo" aria-hidden="true" title={t("top.logo")}>F</span>
         <span className="brand-name">{p?.name ?? t("top.logo")}</span>
       </a>
-      <ProjectSwitcher />
+      <InstanceSwitcher />
       {p && <span className="env-badge only-desktop">{t(`top.env.${p.env}`, { defaultValue: p.env })}</span>}
       <span className="grow only-desktop" />
       <Attention />

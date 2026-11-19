@@ -571,7 +571,7 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 }
 .menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
-/* Project switcher beside the brand (D92) */
+/* Instance switcher beside the brand (D92) */
 .switcher { position: relative; flex: none; }
 .switcher-btn { width: 28px; height: 28px; margin-left: -6px; }
 .switcher-menu { left: 0; right: auto; top: 36px; max-height: 70vh; overflow-y: auto; gap: 6px; }

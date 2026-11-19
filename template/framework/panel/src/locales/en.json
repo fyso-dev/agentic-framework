@@ -51,8 +51,8 @@
     "openOmb": "Open OpenMausBot",
     "ombShort": "OpenMausBot",
     "attention": "{{name}}: {{count}}",
-    "switchProject": "Switch project",
-    "projects": "Projects"
+    "switchInstance": "Switch instance",
+    "instances": "Instances"
   },
   "nav": {
     "label": "Sections",
