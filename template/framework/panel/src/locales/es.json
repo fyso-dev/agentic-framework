@@ -50,7 +50,9 @@
     "more": "Más opciones: idioma y tema",
     "openOmb": "Abrir OpenMausBot",
     "ombShort": "OpenMausBot",
-    "attention": "{{name}}: {{count}}"
+    "attention": "{{name}}: {{count}}",
+    "switchProject": "Cambiar de proyecto",
+    "projects": "Proyectos"
   },
   "nav": {
     "label": "Secciones",

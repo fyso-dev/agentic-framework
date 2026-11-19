@@ -139,3 +139,21 @@ test('a page may declare a run counter as data; anything else is refused',()=>fi
     'badge: 3\n',
   ]) { page(invalid); result=invoke(); assert.equal(result.status,1,invalid); assert.match(result.stderr,/invalid page badge/); }
 }));
+test('an extension may declare one project switcher URL as data; anything else is refused',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-hub.yml','_src_path: fixture\n');
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  const check=()=>run(['node','framework/scripts/extensions.cjs','check']);
+  let result=invoke();assert.equal(result.status,0,result.stderr);assert.equal('switcher' in JSON.parse(result.stdout)[0],false);
+  for (const url of ['https://portal.example.test/environments.json','http://portal.example.test:8480/environments.json','/hub/environments.json']) {
+    put('extensions/hub/switcher.yaml',`url: ${JSON.stringify(url)}\n`);
+    result=invoke();assert.equal(result.status,0,result.stderr);assert.deepEqual(JSON.parse(result.stdout)[0].switcher,{url});
+  }
+  for (const invalid of ['url: "javascript:alert(1)"\n','url: "//evil.test/x.json"\n','url: "https://user:pw@portal.example.test/x"\n',
+    'url: "ftp://portal.example.test/x"\n','url: 3\n','url: /x\nscript: /x.js\n','- url: /x\n','']) {
+    put('extensions/hub/switcher.yaml',invalid);result=invoke();assert.equal(result.status,1,invalid);assert.match(result.stderr,/invalid switcher/);
+    result=check();assert.equal(result.status,1,invalid);assert.match(result.stderr,/invalid switcher/);
+  }
+  put('extensions/hub/switcher.yaml','url: /a.json\n');
+  put('.copier-answers.ext-other.yml','_src_path: fixture\n');put('extensions/other/switcher.yaml','url: /b.json\n');
+  result=check();assert.equal(result.status,1);assert.match(result.stderr,/Only one extension may declare a switcher: hub, other/);
+}));

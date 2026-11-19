@@ -27,6 +27,7 @@ Write **only** these paths. Never edit files another template owns (`mise.toml`,
 | `extensions/[[ extension_id ]]/process.yaml` | process-compose processes, named `ext-[[ extension_id ]]*` |
 | `extensions/[[ extension_id ]]/Caddyfile` | Routes; keep `import fyso_login` |
 | `extensions/[[ extension_id ]]/app.yaml` | Panel tile (`url` is required; `${FYSO_*}` is expanded) |
+| `extensions/[[ extension_id ]]/switcher.yaml` | Optional: `url` of a project list for the top bar's switcher (panel API 3, one per project) |
 | `extensions/[[ extension_id ]]/doctor.sh` | Health check, run by `mise run doctor` and the readiness probe |
 | `extensions/[[ extension_id ]]/secrets.yaml` | Secret **names** and descriptions; never values |
 | `extensions/[[ extension_id ]]/mcp.json` | MCP servers merged into the project's `.mcp.json`; use `${VAR}` placeholders |
