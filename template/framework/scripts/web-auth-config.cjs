@@ -18,7 +18,17 @@ function withExtensionApps(config, root) {
   }
   return config;
 }
-module.exports = {withExtensionApps};
+/**
+ * Fyso branding of the login page (issue #83): only Tinyauth's native `ui.title` and
+ * `ui.backgroundImage`. The image is embedded as a data URL so the resources file
+ * server stays disabled; values the project sets under `ui` win.
+ */
+function withBranding(config, dir = path.join(__dirname, '../web-auth')) {
+  const image = fs.readFileSync(path.join(dir, 'background.webp')).toString('base64');
+  config.ui = {title:'Fyso', backgroundImage:`data:image/webp;base64,${image}`, ...config.ui};
+  return config;
+}
+module.exports = {withExtensionApps, withBranding};
 
 if (require.main === module) {
   const {createRequire} = require('node:module');
@@ -35,7 +45,7 @@ if (require.main === module) {
     return value;
   };
   try {
-    const config = withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT);
+    const config = withBranding(withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT));
     const runtime = path.join(env.FYSO_DATA, 'web-auth/runtime');
     fs.mkdirSync(runtime, {recursive:true, mode:0o700});
     const web = require('./web-origin.cjs');
