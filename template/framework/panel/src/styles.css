@@ -730,11 +730,14 @@ dialog.modal.small { width: min(440px, calc(100vw - 24px)); margin-top: 20vh; }
 /* Installed extensions own their page contents. */
 .extension-page { min-width: 0; width: 100%; padding: 0; }
 /* Apps opened inside the panel (D92): the panel's top bar names the app; the app fills the rest. */
-.shell-app { padding: 0 0 0 12px; gap: 12px; }
-.shell-app .sidenav { top: 72px; padding-top: 12px; }
+/* Same left/top spacing and gap as every screen, so the menu never moves; the app fills the rest. */
+.shell-app { padding-right: 0; padding-bottom: 0; }
 .app-page { flex: 1 1 auto; min-width: 0; padding: 0; }
-.app-frame { display: block; width: 100%; height: calc(100dvh - 57px); border: 0; border-left: 1px solid var(--fy-line); background: var(--fy-surface); }
-@media (max-width: 720px) { .shell-app { padding: 0; } .app-frame { height: calc(100dvh - 57px - 64px); border-left: 0; } }
+.app-frame {
+  display: block; width: 100%; height: calc(100dvh - 57px - 24px); border: 1px solid var(--fy-line); border-right: 0; border-bottom: 0;
+  border-top-left-radius: var(--fy-radius-panel, 12px); background: var(--fy-surface);
+}
+@media (max-width: 720px) { .shell-app { padding: 0; } .app-frame { height: calc(100dvh - 57px - 64px); border: 0; border-radius: 0; } }
 .crumb { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .crumb-sep { color: var(--fy-mute); }
 .crumb-name { font-weight: 700; font-size: 15px; white-space: nowrap; }
