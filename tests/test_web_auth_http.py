@@ -243,7 +243,7 @@ class WebAuthHTTP(unittest.TestCase):
             self.assertEqual(self.request(app, '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, app)
 
     def test_00_remote_mcp_oauth_discovery_skips_the_login(self):
-        # D88: MCP clients read both documents without a session; only these paths reach the endpoint.
+        # D90: MCP clients read both documents without a session; only these paths reach the endpoint.
         for path in ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']:
             status, _, body = self.request('panel', path)
             self.assertEqual(status, 200, path); self.assertEqual(json.loads(body)['path'], path)

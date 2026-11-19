@@ -219,7 +219,7 @@ with `Origin`, and `initialize` plus `tools/list` (26 tools, none `dagu_*`) with
 right one; `claude mcp add --transport http …` then showed the server as connected.
 Not verified: a Codex client, and tool calls that change the project through this path.
 
-### OAuth sign-in (D88)
+### OAuth sign-in (D90)
 
 Claude Desktop and claude.ai take remote connectors over OAuth, not a pasted header. `/mcp`
 therefore also accepts a token issued by the web login the project trusts. The token

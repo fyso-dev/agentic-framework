@@ -5,7 +5,7 @@
 #                              (old connections stop working)
 #   agent-remote.sh --ensure   create what is missing and print JSON without secrets
 #                              (the panel's "run" action, through Dagu)
-# The token and the OAuth client secret (D88) are created here on first use and kept in
+# The token and the OAuth client secret (D90) are created here on first use and kept in
 # secrets.enc.yaml. They are printed by this task in the terminal; the panel shows them
 # only on request (D65), through the private setup adapter, never through Dagu.
 set -euo pipefail
@@ -31,7 +31,7 @@ if [ -z "$token" ] || [ "$mode" = --rotate ]; then
   created=true
   note "✓ New token saved in secrets.enc.yaml (commit that file)."
 fi
-# The OAuth client of the web login (D88): the secret people give Claude Desktop.
+# The OAuth client of the web login (D90): the secret people give Claude Desktop.
 oauth_changed=false
 # A shared login (D61) registers the client and keeps its secret in the hub.
 if ! shared_login && { [ -z "$client_secret" ] || [ "$mode" = --rotate ]; }; then
