@@ -977,11 +977,14 @@
     "setupLink": "Connect",
     "remoteRun": "Run",
     "remoteRunning": "Running…",
-    "remoteSecret": "These commands include this project's token: whoever has them can use its tools. Copy them only on your own machine.",
+    "remoteSecret": "These commands include this project's token and OAuth secret: whoever has them can use its tools (with OAuth, they also need a panel user). Copy them only on your own machine.",
     "remoteOther": "Another MCP client",
     "remoteNote": {
       "env": "The token stays in an environment variable; add the export to your shell profile.",
-      "json": "Configuration for clients that use a JSON file."
+      "json": "Configuration for clients that use a JSON file.",
+      "oauth": "Settings › Connectors › Add custom connector: paste the URL and, under Advanced settings, the Client ID and Client Secret. When connecting, sign in with your panel user.",
+      "oauthCli": "Then run /mcp in Claude Code and sign in with your panel user. The callback uses local port 33418.",
+      "oauthHub": "Settings › Connectors › Add custom connector: paste the URL and, under Advanced settings, the Client ID and the Client Secret the shared login's administrator gives you. When connecting, sign in with your user."
     },
     "remoteError": {
       "httpsRequired": "The project has no HTTPS access yet.",
@@ -989,6 +992,11 @@
       "origin": "Open the panel from its usual address and try again.",
       "unauthorized": "Your session expired. Sign in again.",
       "failed": "The connection commands could not be fetched."
+    },
+    "remoteField": {
+      "url": "Server URL",
+      "clientId": "OAuth Client ID",
+      "clientSecret": "OAuth Client Secret"
     }
   },
   "update": {

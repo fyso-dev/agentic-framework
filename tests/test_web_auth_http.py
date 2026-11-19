@@ -242,6 +242,18 @@ class WebAuthHTTP(unittest.TestCase):
         for app in ['dagu', 'omb']:
             self.assertEqual(self.request(app, '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, app)
 
+    def test_00_remote_mcp_oauth_discovery_skips_the_login(self):
+        # D88: MCP clients read both documents without a session; only these paths reach the endpoint.
+        for path in ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']:
+            status, _, body = self.request('panel', path)
+            self.assertEqual(status, 200, path); self.assertEqual(json.loads(body)['path'], path)
+        status, _, body = self.request('auth', '/.well-known/oauth-authorization-server')
+        self.assertEqual(status, 200); self.assertEqual(json.loads(body)['path'], '/.well-known/oauth-authorization-server')
+        self.assertNotEqual(self.request('auth', '/.well-known/openid-configuration')[0], 404)
+        for app in ['dagu', 'omb']:
+            self.assertNotEqual(json.loads(self.request(app, '/.well-known/oauth-protected-resource/mcp')[2] or '{}').get('path'),
+                '/.well-known/oauth-protected-resource/mcp', app)
+
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:
             status, headers, _ = self.request(app, **{'User-Agent':'Mozilla/5.0 Chrome/130.0.0.0'})
