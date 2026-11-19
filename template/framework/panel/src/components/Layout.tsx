@@ -10,6 +10,8 @@ import { useExtensionBadges } from "../lib/extensionBadges";
 import { AppIcon, IconApps, IconBot, IconChecklist, IconMoon, IconSun, IconUsage } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
+import markUrl from "../assets/brand/fyso-mark.png";
+import markWhiteUrl from "../assets/brand/fyso-mark-white.png";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -137,8 +139,9 @@ export function TopBar(props: ThemeProps) {
   return (
     <header className="topbar">
       <a className="brand" href={href.setup}>
-        {/* Logo slot: the product name is provisional, swap this mark freely. */}
-        <span className="logo" aria-hidden="true" title={t("top.logo")}>F</span>
+        {/* The Fyso mark from the design system; the project name sits beside it. */}
+        <img className="logo logo-on-light" src={markUrl} alt="" width={28} />
+        <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
         <span className="brand-name">{p?.name ?? t("top.logo")}</span>
       </a>
       {p && <span className="env-badge only-desktop">{t(`top.env.${p.env}`, { defaultValue: p.env })}</span>}
