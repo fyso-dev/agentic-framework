@@ -1,6 +1,6 @@
 id: omb
-name: {es: Agentes, en: Agents}
+name: {es: Chat de agentes, en: Agent chat}
 description: {es: Conversaciones con los agentes, en: Conversations with the agents}
-icon: bot
+icon: chat
 # Opens inside the panel frame (D92); the gateway lets only the panel frame it.
 embed: true

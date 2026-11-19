@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { LANGS, setLanguage, localized } from "../lib/i18n";
-import type { Extension } from "../api/types";
+import type { App, Extension } from "../api/types";
 import type { Route } from "../lib/router";
 import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
@@ -200,13 +200,19 @@ const ITEMS: NavItem[] = [
 const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
-  return r.name === "bot" ? "bots" : r.name === "app" ? "apps" : r.name;
+  if(r.name === "app")return `app:${r.id}`;
+  return r.name === "bot" ? "bots" : r.name;
 }
+
+/** Apps that open inside the panel (D92) get their own menu entries, after the panel's sections. */
+const appItems = (apps:App[],lang:string):NavItem[] => apps.filter(app=>app.enabled&&app.embed).map(app=>({id:`app:${app.id}`,href:href.app(app.id),label:localized(lang,app.name,app.name_i18n),icon:(p:{size?:number})=><AppIcon name={app.icon} size={p.size} />}));
 
 export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
-  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
+  const apps = appItems(s.apps.data ?? [], i18n.language);
+  const items = [...ITEMS,...apps,...extensionItems(s.extensions.data??[],i18n.language)];
+  const firstApp = apps[0]?.id;
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
   const down = downApps(s);
@@ -232,6 +238,7 @@ export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean
   const attention: Record<string, boolean> = {
     ...Object.fromEntries(Object.entries(badges).map(([id, badge]) => [id, !!badge.warn && badge.count > 0])),
     setup: !loadingSteps(s) && open > 0, bots: unapplied > 0, apps: down > 0,
+    ...Object.fromEntries((s.apps.data ?? []).map((app) => [`app:${app.id}`, s.health[app.id] === "down"])),
   };
   return (
     <nav aria-label={t("nav.label")} className={`sidenav${collapsed ? " collapsed" : ""}`}>
@@ -239,10 +246,11 @@ export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean
         const name = label ?? t(`nav.${id}`);
         return (
           <a key={id} href={h} aria-current={section(route) === id ? "page" : undefined}
+             data-first-app={id === firstApp || undefined}
              {...(collapsed ? { "data-tip": name, className: "tip-side", "aria-label": name } : {})}>
             <span className="nav-icon"><Icon size={18} />{attention[id] && <span className="nav-dot" aria-hidden="true" />}</span>
             <span className="grow nav-label" aria-hidden={collapsed || undefined}><span className="bottomnav-label">{name}</span></span>
-            <span className="nav-extra" aria-hidden={collapsed || undefined}>{counts[id]}</span>
+            <span className="nav-extra" aria-hidden={collapsed || undefined}>{counts[id] ?? (attention[id] ? <span className="nav-count" style={{ color: "var(--fy-warn)", fontWeight: 700 }}>!<span className="sr-only"> {t("apps.downFlag")}</span></span> : null)}</span>
           </a>
         );
       })}

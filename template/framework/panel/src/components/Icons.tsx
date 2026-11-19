@@ -134,6 +134,8 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
       return <IconWorkflow size={size} />;
     case "bot":
       return <IconBot size={size} />;
+    case "chat":
+      return <IconChat size={size} />;
     case "users":
       return <IconUsers size={size} />;
     case "truck":

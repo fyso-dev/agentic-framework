@@ -284,6 +284,9 @@ code, .mono { font-family: var(--font-mono); }
 .sidenav a { padding: 0 13px; gap: 12px; white-space: nowrap; }
 .nav-label, .nav-extra { transition: opacity 160ms; }
 .sidenav.collapsed { flex-basis: 44px; }
+/* The apps opened inside the panel start a second group, after a hairline. */
+.sidenav a[data-first-app] { margin-top: 13px; position: relative; }
+.sidenav a[data-first-app]::before { content: ""; position: absolute; left: 6px; right: 6px; top: -8px; border-top: 1px solid var(--fy-line); }
 .sidenav.collapsed .nav-label, .sidenav.collapsed .nav-extra { opacity: 0; pointer-events: none; }
 .sidenav.collapsed .nav-dot { opacity: 1; }
 .topbar .nav-toggle { margin-left: -6px; }
