@@ -146,6 +146,8 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
       return <IconPuzzle size={size} />;
     case "book-open":
       return <IconBook size={size} />;
+    case "palette":
+      return <IconPalette size={size} />;
     default:
       return <IconApps size={size} />;
   }
@@ -157,6 +159,7 @@ export const IconChat = icon("M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.6A7.5 7
 export const IconTrash = icon("M5 7h14M10 11v5M14 11v5M7 7l.8 11.2a2 2 0 0 0 2 1.8h4.4a2 2 0 0 0 2-1.8L17 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7");
 export const IconPerson = icon("M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 19.5a7 7 0 0 1 14 0");
 export const IconDoc = icon("M8 4h6l4 4v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM14 4v4h4M9.5 13h5M9.5 16.5h3.5");
+export const IconPalette = icon("M12 4a8 8 0 1 0 0 16c1.2 0 1.6-.8 1.6-1.6 0-.9-.7-1.4-.7-2.2 0-1 .8-1.6 1.7-1.6H17a3 3 0 0 0 3-3C20 7.3 16.4 4 12 4zM8 12h.01M9.5 8.5h.01M14 8h.01");
 export const IconPlug = icon("M9 7V4M15 7V4M7 7h10v4a5 5 0 0 1-10 0zM12 16v4");
 export const IconWrench = icon("M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z");
 export const IconAlert = icon("M12 4.5l8.5 15h-17zM12 10.5v3.5M12 16.8v.2");

@@ -146,7 +146,7 @@ function OpenTab() {
   const apps = s.apps.data ?? [];
   const groups: { id: App["group"]; title: string; apps: App[] }[] = [
     { id: "framework", title: t("apps.framework"), apps: apps.filter((a) => a.group === "framework") },
-    { id: "project", title: s.project.data?.name ?? t("apps.project"), apps: apps.filter((a) => a.group === "project") },
+    { id: "project", title: s.project.data?.brand?.name ?? s.project.data?.name ?? t("apps.project"), apps: apps.filter((a) => a.group === "project") },
     { id: "extension", title: t("apps.extension"), apps: apps.filter((a) => a.group === "extension") },
   ];
   return (

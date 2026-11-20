@@ -64,7 +64,7 @@ if (require.main === module) {
     // Project identity (D92): the login shows the project's name on the design system's dark
     // background; a ui block declared in project/auth/tinyauth.yaml wins.
     const brand = require('./brand.cjs').resolve(env);
-    config.ui = {title: brand.name, backgroundImage: '/fyso-brand/login-background.svg', ...config.ui};
+    config.ui = {title: brand.name, backgroundImage: '/fyso-brand/login-background', ...config.ui};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
     config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
     // Remote MCP sign-in (D90): this login is the OAuth server of the panel's /mcp.

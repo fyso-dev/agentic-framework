@@ -46,7 +46,7 @@ if [[ $src != "$origin" ]]; then
   answer _src_path "$answers" "$src"
   git commit -q -m "tmp: template source for this update" -- "$answers" >&2
 fi
-node "$auth" -- uvx --from copier==9.19.1 copier update --trust --defaults --skip-answered ${ref:+--vcs-ref "$ref"} >&2
+node "$auth" -- uvx --python 3.12.7 --from copier==9.19.1 copier update --trust --defaults --skip-answered ${ref:+--vcs-ref "$ref"} >&2
 if [[ $src != "$origin" ]]; then
   answer _src_path "$answers" "$origin"
 fi

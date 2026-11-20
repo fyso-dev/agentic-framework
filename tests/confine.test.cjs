@@ -124,3 +124,14 @@ test('framework scripts create temporary files under TMPDIR, which Dagu passes t
   const dagu=fs.readFileSync(path.join(dir,'run-dagu.sh'),'utf8').match(/DAGU_ENV_PASSTHROUGH_PREFIXES=(\S+)/)[1].split(',');
   assert.ok(dagu.includes('TMPDIR'),'Dagu steps must receive the confined TMPDIR');
 });
+
+// Confined Dagu steps cannot see the uv-managed Pythons of the user's home; without a
+// pinned Python uvx falls back to the system one (3.9 on macOS) and Copier refuses it.
+test('every framework Copier call runs on a pinned Python',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const dir=path.resolve(__dirname,'../template/framework/scripts');
+  const calls=fs.readdirSync(dir).filter(f=>f.endsWith('.sh')).flatMap(name=>
+    fs.readFileSync(path.join(dir,name),'utf8').split('\n').filter(line=>/uvx\b.*copier==/.test(line)).map(line=>({name,line})));
+  assert.ok(calls.length>=3);
+  for (const {name,line} of calls) assert.match(line,/uvx --python \d+\.\d+\.\d+ --from copier==/,name);
+});
