@@ -191,3 +191,68 @@ test('the subscription threshold is optional and warns per account window at or 
   assert.deepEqual(makeAlerts({},{},[],[],0,windows),[]);
   assert.deepEqual(makeAlerts({subscriptionPercent:80},{},[],[],0,windows),[{kind:'subscription',value:85,limit:80,engine:'codex',window:'weekly'}]);
 });
+
+function harnessFixture(prefix) {
+  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),prefix));
+  const data=path.join(root,'.data'), artifacts=path.join(data,'dagu/data/artifacts');
+  const attempt=(name,runId,files)=>{
+    const dir=path.join(artifacts,name,`dag-run_${runId}`,'attempt_1');
+    fs.mkdirSync(path.dirname(dir),{recursive:true});
+    fs.writeFileSync(dir+'.meta',JSON.stringify({name,dagRunId:runId,attemptId:'attempt_1',startedAt:'2026-11-06T00:30:00Z',dir:'/etc'}));
+    for (const [file,text] of Object.entries(files)) {fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});fs.writeFileSync(path.join(dir,file),text);}
+  };
+  return {root,data,attempt,env:{FYSO_ROOT:root,FYSO_DATA:data,FYSO_DAGU_PORT:'1',FYSO_OMB_PORT:'2'},cleanup:()=>fs.rmSync(root,{recursive:true,force:true})};
+}
+
+test('any workflow reports usage through usage/<step>.jsonl, invalid lines become a warning, absent runs are fetched',async()=>{
+  const {collect}=require('../template/framework/scripts/observability.cjs');
+  const fx=harnessFixture('fyso-observation-usage-');
+  const line=extra=>JSON.stringify({v:1,step:'triage',provider:'claude',model:'claude-sonnet',input:120,output:30,cachedInput:100,costUsd:0.5,...extra});
+  fx.attempt('etendo-triage','run-1',{'usage/triage.jsonl':[line({}),line({provider:'opencode',model:null,costUsd:null}),'not json',line({input:-1}),line({v:2})].join('\n')+'\n','usage/notes.txt':'ignored'});
+  fx.attempt('quiet-workflow','run-2',{});
+  const original=global.fetch, requested=[];
+  global.fetch=async url=>{
+    url=String(url); requested.push(url);
+    if (url.includes('usage/traces')) return {ok:true,json:async()=>({roots:[]})};
+    if (url.endsWith('/dag-runs/etendo-triage/run-1')) return {ok:true,json:async()=>({dagRunDetails:{dagRunId:'run-1',name:'etendo-triage',statusLabel:'succeeded',startedAt:'2026-11-06T00:30:00Z'}})};
+    return {ok:true,json:async()=>({dagRuns:Array.from({length:100},(_,i)=>({dagRunId:`obs-${i}`,name:'fyso-observability',statusLabel:'succeeded',startedAt:'2026-11-06T00:59:00Z'}))})};
+  };
+  try {
+    const result=await collect(fx.env,new Date('2026-11-06T01:00:00Z'));
+    const group=result.usage.groups.find(g=>g.bot==='etendo-triage' && g.model==='claude-sonnet');
+    assert.equal(group.turns,1); assert.equal(group.input,120); assert.equal(group.cachedInput,100);
+    assert.equal(group.billingKind,'subscription'); assert.equal(group.subscriptionEquivalentUsd,0.5); assert.equal(group.source,'harness');
+    const other=result.usage.groups.find(g=>g.bot==='etendo-triage' && g.model==='opencode');
+    assert.equal(other.billingKind,'unknown'); assert.equal(other.missingCost,1);
+    assert.ok(result.warnings.includes('invalidUsageRows'));
+    assert.equal(result.usage.groups.some(g=>g.bot==='quiet-workflow'),false);
+    assert.equal(requested.some(u=>u.includes('quiet-workflow')),false);
+    const run=result.runs.find(r=>r.id==='run-1');
+    assert.equal(run.dag,'etendo-triage'); assert.equal(run.usage.turns,2); assert.equal(run.usage.output,60);
+    assert.equal(result.usage.groups.some(g=>g.model==='unknown' && g.bot==='etendo-triage'),false);
+  } finally {global.fetch=original;fx.cleanup();}
+});
+
+test('legacy dev-task agent.txt still counts as Builder; usage files take precedence when present',async()=>{
+  const {collect}=require('../template/framework/scripts/observability.cjs');
+  const fx=harnessFixture('fyso-observation-legacy-');
+  const claude=JSON.stringify({type:'result',total_cost_usd:0.2,usage:{input_tokens:10,cache_read_input_tokens:50,cache_creation_input_tokens:20,output_tokens:3}});
+  fx.attempt('fyso-dev-task','dev-1',{'agent.txt':claude});
+  fx.attempt('fyso-dev-task','dev-2',{'agent.txt':claude,'usage/agent.jsonl':JSON.stringify({v:1,step:'agent',provider:'codex',model:'gpt-5',input:7,output:1,cachedInput:null,costUsd:null})+'\n'});
+  const original=global.fetch;
+  global.fetch=async url=>{
+    url=String(url);
+    if (url.includes('usage/traces')) return {ok:true,json:async()=>({roots:[]})};
+    if (url.endsWith('/outputs')) return {ok:true,json:async()=>({outputs:{}})};
+    return {ok:true,json:async()=>({dagRuns:['dev-1','dev-2'].map(id=>({dagRunId:id,name:'fyso-dev-task',statusLabel:'succeeded',startedAt:'2026-11-06T00:30:00Z'}))})};
+  };
+  try {
+    const result=await collect(fx.env,new Date('2026-11-06T01:00:00Z'));
+    const legacy=result.runs.find(r=>r.id==='dev-1').usage, modern=result.runs.find(r=>r.id==='dev-2').usage;
+    assert.equal(legacy.input,80); assert.equal(legacy.subscriptionEquivalentUsd,0.2);
+    assert.equal(modern.turns,1); assert.equal(modern.input,7);
+    assert.deepEqual([...new Set(result.usage.groups.map(g=>g.bot))],['Builder']);
+    assert.equal(result.warnings.length,0);
+  } finally {global.fetch=original;fx.cleanup();}
+});

@@ -39,7 +39,8 @@ fi
 # Resolve Pi before inserting the project wrapper; keep the resolved binary private
 # to this OMB instance and do not alter the caller's PATH.
 pi_exec=$(command -v pi || true)
-clean_exec \
+# Bots have a shell: OMB runs confined to the project folder (D93).
+confined_exec \
   FYSO_PI_EXEC="$pi_exec" \
   PATH="$FYSO_ROOT/framework/bin:$PATH" \
   ${bot_env[@]+"${bot_env[@]}"} \

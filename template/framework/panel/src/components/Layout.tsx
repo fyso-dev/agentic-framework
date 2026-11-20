@@ -12,6 +12,7 @@ import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
 import markUrl from "../assets/brand/fyso-mark.png";
 import markWhiteUrl from "../assets/brand/fyso-mark-white.png";
+import { InstanceSwitcher } from "./InstanceSwitcher";
 
 export type ThemeProps = { theme: Theme; toggleTheme: () => void };
 
@@ -151,6 +152,7 @@ export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean
         <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
         <span className="brand-name">{p?.name ?? t("top.logo")}</span>
       </a>
+      <InstanceSwitcher />
       {openApp && (
         <span className="crumb">
           <span className="crumb-sep" aria-hidden="true">/</span>

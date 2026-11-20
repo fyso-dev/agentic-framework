@@ -185,6 +185,9 @@ captured as the run's `ORIGIN` JSON output, independently of agent success.
 `harness.run` publishes Claude JSON or Codex JSONL as `agent.txt`; the exporter
 reads only whitelisted usage numbers and never serves that raw artifact. Legacy
 artifacts without structured data retain unknown consumption.
+Any workflow can also write `usage/<step>.jsonl` to its artifacts directory
+([contract](observability.md#workflow-usage-artifacts)); its usage is grouped
+under the workflow name, and the usage table labels that column agent/workflow.
 
 ## Bot versioning metadata and import
 
@@ -212,3 +215,6 @@ The MCP page enqueues this DAG and uses the shared action state, errors and Dagu
 ## Third-party skills (D73)
 
 Apps → Skills uses `GET /config/skills.json`, `fyso-skills-catalog` and `fyso-skills-install`. Immutable preview, scan, human confirmation, states, params and native per-bot behavior: [contract](third-party-skills.md). Third-party Markdown is plain text. Pending skills cannot be switched on.
+
+
+A large `omb-team/1` JSON package can be staged in project-local runtime data with `mise exec -- node framework/scripts/bot-architect.cjs stage-package < package.json`. The command validates it, stores it privately under its SHA-256 and returns `packageRef`. Pass that value as `PACKAGE_REF` to `fyso-bot-architect` with `OP=team-import`; no package bytes go through an environment variable. The workflow checks the reference, size and hash again. `PACKAGE_B64` remains supported for small packages; `SOURCE` continues to import installed extension templates. Staged files are project runtime data, not configuration, and may be removed after the import.
