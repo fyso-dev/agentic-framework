@@ -231,3 +231,10 @@ To rerun, set `FYSO_TEST_FRAMEWORK_GATEWAY` to this repository's
 `tests/test_web_auth_http.py`, point `FYSO_TEST_BIZ_EXTENSION` at a generated
 project with the managed extension installed, and set explicit Caddy and
 Tinyauth binaries. Run `worker/oauth-perfil.test.ts` in the Biz checkout.
+
+With `FYSO_TEST_DAGU` set to the pinned server binary, the combined test also
+starts Dagu on the fixture's own ports and executes a real workflow. The
+operator's authorized execution reached `succeeded`. The reader could neither
+start that workflow nor read the operator's run, and revocation immediately
+blocked another start. The control-plane identity and consent are still
+fixture-managed.

@@ -121,7 +121,7 @@ class WebAuthFixture(unittest.TestCase):
 
             def log_message(self, *_):
                 pass
-        for offset in [1, 4]:
+        for offset in ([4] if getattr(cls, "dagu_binary", None) else [1, 4]):
             server = ThreadingHTTPServer(('127.0.0.1', cls.port + offset), Echo)
             cls.servers.append(server)
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -465,6 +465,7 @@ class BizPolicyGateway(WebAuthFixture):
     scheme = 'https'
     port_offset = 40
     biz_extension = os.environ.get('FYSO_TEST_BIZ_EXTENSION')
+    dagu_binary = os.environ.get('FYSO_TEST_DAGU')
 
     @classmethod
     def setUpClass(cls):
@@ -474,13 +475,29 @@ class BizPolicyGateway(WebAuthFixture):
 
     @classmethod
     def setup_extra_services(cls, env):
+        if cls.dagu_binary:
+            workflows = cls.root / 'workflows'
+            workflows.mkdir()
+            (workflows / 'invoice.yaml').write_text(
+                'name: invoice\nsteps:\n  - name: record\n    command: echo authorized-invoice\n'
+            )
+            cls.start([cls.dagu_binary, 'start-all'], {
+                **env, 'DAGU_HOME': str(cls.root / 'dagu'), 'DAGU_DAGS_DIR': str(workflows),
+                'DAGU_HOST': '127.0.0.1', 'DAGU_PORT': str(cls.port + 1),
+                'DAGU_SCHEDULER_PORT': str(cls.port + 2), 'DAGU_WORKER_HEALTH_PORT': str(cls.port + 3),
+                'DAGU_COORDINATOR_HOST': '127.0.0.1', 'DAGU_COORDINATOR_PORT': str(cls.port + 6),
+                'DAGU_COORDINATOR_HEALTH_PORT': str(cls.port + 7), 'DAGU_PEER_INSECURE': 'true',
+                'DAGU_AUTH_MODE': 'basic', 'DAGU_AUTH_BASIC_USERNAME': 'technical',
+                'DAGU_AUTH_BASIC_PASSWORD': 'fixture-service-password',
+            })
+            cls.wait_port(cls.port + 1, '/api/v1/health')
         source = Path(cls.biz_extension) / 'extensions/biz'
         installed = cls.root / 'extensions/biz'
         installed.mkdir()
         for filename in ('authorize.caddy', 'panel-access.caddy'):
             shutil.copy(source / filename, installed / filename)
         cls.permissions = {
-            'operator': {'app:panel', 'workflow:invoice:run'},
+            'operator': {'app:panel', 'workflow:invoice:run', 'workflow:invoice:read'},
             'reader': {'app:panel'},
         }
         cls.external_biz = os.environ.get('FYSO_TEST_BIZ_ORIGIN')
@@ -566,8 +583,20 @@ class BizPolicyGateway(WebAuthFixture):
         operator = link('admin', 'operator')
         reader = link('viewer', 'reader')
         route = '/api/dagu/dags/invoice/enqueue'
-        self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 200)
+        status, _, body = self.request('panel', route, 'POST', {}, cookie=operator)
+        self.assertIn(status, (200, 201, 202), body)
         self.assertEqual(self.request('panel', route, 'POST', {}, cookie=reader)[0], 403)
+        if self.dagu_binary:
+            run = json.loads(body)['dagRunId']
+            details = '/api/dagu/dag-runs/invoice/' + run
+            for _ in range(100):
+                status, _, body = self.request('panel', details, cookie=operator)
+                if status == 200 and json.loads(body)['dagRunDetails']['statusLabel'] == 'succeeded':
+                    break
+                time.sleep(.1)
+            else:
+                self.fail(f'The allowed workflow did not complete, last HTTP status {status}')
+            self.assertEqual(self.request('panel', details, cookie=reader)[0], 403)
         status, _, body = self.request('panel', '/api/panel-access', cookie=reader)
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {'capabilities': ['app:panel']})
