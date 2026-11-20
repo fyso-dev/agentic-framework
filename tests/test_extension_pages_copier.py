@@ -27,7 +27,7 @@ class ExtensionPagesCopier(unittest.TestCase):
             run(*copier, 'copy', '--trust', '--defaults', str(source), str(project))
             self.assertTrue((project / 'framework/panel/dist/assets/extension-sdk.js').is_file())
             import json
-            self.assertEqual(json.loads((project / 'framework/panel/extension-api.json').read_text())['version'], 4)
+            self.assertEqual(json.loads((project / 'framework/panel/extension-api.json').read_text())['version'], 5)
             run(*copier, 'copy', '--trust', '--defaults', str(ROOT / 'tests/fixtures/ext-pages'), str(project))
             starter = base / 'starter'
             run(*copier, 'copy', '--trust', '--defaults', '-d', 'extension_id=demo-pages',

@@ -7,6 +7,7 @@ import { href } from "../lib/router";
 import type { Theme } from "../lib/theme";
 import { useStore, type Store } from "../store";
 import { useExtensionBadges } from "../lib/extensionBadges";
+import { useExtensionVisibility } from "../lib/extensionVisibility";
 import { AppIcon, IconApps, IconBot, IconChecklist, IconExternal, IconMoon, IconPlug, IconSidebar, IconSun, IconUsage } from "./Icons";
 import { External } from "./ui";
 import { SessionMenu } from "./SessionMenu";
@@ -201,7 +202,7 @@ const ITEMS: NavItem[] = [
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
-const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
+const extensionItems = (extensions:Extension[],lang:string,shown:(ext:string,page:string,conditional:boolean)=>boolean):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).filter(page=>shown(ext.id,page.id,!!page.visible)).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
   if(r.name === "app")return `app:${r.id}`;
@@ -215,7 +216,8 @@ export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean
   const { t, i18n } = useTranslation();
   const s = useStore();
   const apps = appItems(s.apps.data ?? [], i18n.language);
-  const items = [...ITEMS,...apps,...extensionItems(s.extensions.data??[],i18n.language)];
+  const shown = useExtensionVisibility(s.extensions.data ?? [], !s.mock);
+  const items = [...ITEMS,...apps,...extensionItems(s.extensions.data??[],i18n.language,shown)];
   const firstApp = apps[0]?.id;
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
@@ -277,7 +279,8 @@ export function useNavCollapsed(): [boolean, () => void] {
 export function BottomNav({ route }: { route: Route }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
-  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
+  const shown = useExtensionVisibility(s.extensions.data ?? [], !s.mock);
+  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language,shown)];
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const extensionBadges = useExtensionBadges(s.extensions.data ?? [], !s.mock);
   const badges: Record<NavItem["id"], [number, string]> = {

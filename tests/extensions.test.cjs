@@ -172,3 +172,17 @@ test('an unchanged .mcp.json is left alone, and a confined process cannot rewrit
   } finally {fs.chmodSync(root,0o755);}
   assert.equal(fs.readFileSync(file,'utf8'),'{}\n');
 }));
+test('a page may be listed only while its own extension API says so; anything else is refused',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-biz.yml','_src_path: fixture\n');
+  put('extensions/biz/panel/identity.html','<!doctype html>');
+  const page=visible=>put('extensions/biz/pages/identity.yaml',`name: Identity\nurl: /extensions/biz/panel/identity.html\n${visible}`);
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  page('visible: {api: status, field: connected}\n');
+  let result=invoke();assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout)[0].pages[0].visible,{url:'/api/ext/biz/status',field:'connected'});
+  page('');result=invoke();assert.equal(result.status,0);assert.equal('visible' in JSON.parse(result.stdout)[0].pages[0],false);
+  for (const invalid of [
+    'visible: {api: /etc/passwd, field: x}\n','visible: {api: ../other/status, field: x}\n','visible: {api: "https://evil.test/x", field: x}\n',
+    'visible: {api: status, field: "a.b"}\n','visible: {api: status}\n','visible: {api: status, field: x, url: /x}\n','visible: true\n',
+  ]) { page(invalid); result=invoke(); assert.equal(result.status,1,invalid); assert.match(result.stderr,/invalid page visibility/); }
+}));
