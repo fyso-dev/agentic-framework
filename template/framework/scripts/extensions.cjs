@@ -40,6 +40,14 @@ function badge(file, data) {
     (data.attention!==undefined && typeof data.attention!=='boolean'))throw new Error(`${file}: invalid page badge`);
   return {dagu_runs:{status:'waiting',labels:runs.labels},...(data.warn_labels&&{warn_labels:data.warn_labels}),...(data.attention===true&&{attention:true})};
 }
+// A page may be listed only while its own extension API says so: `visible: {api, field}`
+// is GET /api/ext/<ext>/<api>, shown when that JSON field is true (D95). Data only.
+function visibility(file, id, data) {
+  const extra = data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data).filter(key => !['api','field'].includes(key)) : ['?'];
+  if (extra.length || typeof data.api !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,40}(\/[a-z0-9][a-z0-9_-]{0,40}){0,3}$/.test(data.api) ||
+    typeof data.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(data.field)) throw new Error(`${file}: invalid page visibility`);
+  return {url:`/api/ext/${id}/${data.api}`, field:data.field};
+}
 function pages(id) {
   return glob(`extensions/${id}/pages/*.yaml`).map(file=>{
     const pageId=file.split('/').pop().slice(0,-5),data=read(file);
@@ -47,7 +55,7 @@ function pages(id) {
     if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
     if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
     const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
-    return {id:pageId,...name,url:data.url,icon:data.icon||'apps',...(data.badge!==undefined&&{badge:badge(file,data.badge)})};
+    return {id:pageId,...name,url:data.url,icon:data.icon||'apps',...(data.badge!==undefined&&{badge:badge(file,data.badge)}),...(data.visible!==undefined&&{visible:visibility(file,id,data.visible)})};
   });
 }
 /** Optional Setup step an extension adds (D51): `extensions/<ext>/setup.yaml` with a title and description. */

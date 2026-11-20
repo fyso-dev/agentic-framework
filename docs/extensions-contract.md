@@ -306,6 +306,24 @@ The declaration is data. The panel runs the query itself against Dagu's run list
 
 A page that changes the runs it counts calls the SDK's `refreshBadges()` so the menu does not wait for the next poll. Old inventories without `badge` show no counter.
 
+### Conditional pages (panel API 5, D95)
+
+A page may be listed in the menus only while its own extension says so, for example a page that needs the project to be connected to a service:
+
+```yaml
+# extensions/biz/pages/identity.yaml
+name: {es: Identidad, en: Identity}
+url: /extensions/biz/panel/identity.html
+visible: {api: status, field: connected}   # GET /api/ext/biz/status → {"connected": true}
+```
+
+| Field | Meaning |
+|---|---|
+| `visible.api` | A path of the extension's own same-origin API (D79), `/api/ext/<ext>/<api>`; nothing else can be named |
+| `visible.field` | A top-level field of that JSON answer; the page is listed only while it is exactly `true` |
+
+The panel reads it with the counters' cadence (every 30 seconds while visible, on navigation, and when a page calls `refreshBadges()`). Until the answer is `true`, and on any error, the page stays out of the side and bottom menus; its URL still opens it, so the page keeps its own access checks. Frameworks before API 5 ignore the field and always list the page.
+
 ### Instance switcher (panel API 3)
 
 When several instances share one login, for example the instances behind a host's hub, an extension can let people jump between their panels from the top bar:
@@ -334,7 +352,7 @@ Who appears in the list is the list server's decision; the panel does not grant 
 
 Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
 
-Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `4`; version 2 added page counters and `refreshBadges`, version 3 the instance switcher, version 4 the project identity (D92), and none removed anything.
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `5`; version 2 added page counters and `refreshBadges`, version 3 the instance switcher, version 4 the project identity (D92), version 5 conditional pages (D95), and none removed anything.
 
 The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External`, `RelTime` and `refreshBadges`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 

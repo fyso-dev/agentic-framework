@@ -49,7 +49,9 @@ export type ExtensionSecret = {
 
 /** Counter an extension page declares (extensions-contract §9): the panel counts matching Dagu runs. */
 export type ExtensionPageBadge = { dagu_runs: { status: "waiting"; labels: string[] }; warn_labels?: string[]; attention?: boolean };
-export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string; badge?:ExtensionPageBadge};
+/** Listed only while GET `url` (the extension's own API) answers `{[field]: true}` (D95). */
+export type ExtensionPageVisibility = { url: string; field: string };
+export type ExtensionPageRegistration = {id:string; name:string; name_i18n?:Record<string,string>; url:string; icon?:string; badge?:ExtensionPageBadge; visible?:ExtensionPageVisibility};
 
 export type Extension = {
   id: string;
