@@ -14,6 +14,30 @@ source "$(dirname "$0")/lib.sh"
 auth="$(cd "$(dirname "$0")" && pwd)/github-auth.cjs"
 ref=${REF:-}; src=${SRC:-}
 [[ -z $ref || $ref =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || fail "REF must be a tag, branch or commit"
+# Inside the sandbox (a Dagu step, D93) Copier cannot run: git init and clone write
+# .git/config and older templates hold .mcp.json, both forbidden to confined processes.
+# The project's unconfined connector service runs this same script instead.
+if [[ -n ${FYSO_CONFINED:-} ]]; then
+  [[ -z $src ]] || fail "SRC needs a terminal: the update service only uses the project's own template source"
+  exec node - "$(connector_setup_socket)" "$ref" <<'JS'
+const http = require('node:http');
+const [socketPath, ref] = process.argv.slice(2);
+const auth = 'Basic ' + Buffer.from(`${process.env.FYSO_ADMIN_USER}:${process.env.FYSO_ADMIN_PASSWORD}`).toString('base64');
+const request = http.request({socketPath, path:'/internal/framework-update', method:'POST',
+  headers:{'Content-Type':'application/json', Authorization:auth}}, response => {
+  let body = ''; response.setEncoding('utf8');
+  response.on('data', chunk => { body += chunk; });
+  response.on('end', () => {
+    let data = {}; try { data = JSON.parse(body); } catch {}
+    if (response.statusCode === 200) { process.stdout.write(`${JSON.stringify(data)}\n`); return; }
+    process.stderr.write(`error: update failed (${data.error || response.statusCode})\n${data.detail || ''}\n`);
+    process.exit(1);
+  });
+});
+request.on('error', error => { process.stderr.write(`error: the update service is unavailable (${error.code || error.message}); run the update from a terminal\n`); process.exit(1); });
+request.end(JSON.stringify({ref}));
+JS
+fi
 answers=.copier-answers.yml
 answer() {
   node - "$@" <<'JS'
