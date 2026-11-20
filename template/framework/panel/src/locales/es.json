@@ -446,6 +446,7 @@
     "pricingSource": "Fuente de precios"
   },
   "ext": {
+    "advanced": "Avanzado",
     "title": "Extensiones instaladas",
     "ready": "Lista",
     "missing_one": "Falta {{count}} secreto",

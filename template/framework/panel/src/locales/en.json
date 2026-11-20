@@ -446,6 +446,7 @@
     "pricingSource": "Price source"
   },
   "ext": {
+    "advanced": "Advanced",
     "title": "Installed extensions",
     "ready": "Ready",
     "missing_one": "{{count}} secret missing",
