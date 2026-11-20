@@ -50,8 +50,11 @@ node "$auth" -- uvx --from copier==9.19.1 copier update --trust --defaults --ski
 if [[ $src != "$origin" ]]; then
   answer _src_path "$answers" "$origin"
 fi
+# Copier writes conflict markers only into files it changed: scan those, never project
+# content that merely quotes such a line (an email reply, a diff in a document).
 conflicts=$( { find . -name '*.rej' -not -path './.git/*'; \
-  grep -rIlE '^(<<<<<<<|>>>>>>>) ' --exclude-dir=.git --exclude-dir=node_modules . || true; } | sort -u)
+  git ls-files -z --modified --others --exclude-standard \
+    | xargs -0 grep -IlE '^(<<<<<<<|>>>>>>>) ' /dev/null 2>/dev/null || true; } | sort -u)
 [[ -z $conflicts ]] || fail "the update conflicts with local changes; nothing was applied: $(echo $conflicts)"
 to=$(answer _commit "$answers")
 git reset -q --soft "$base"
