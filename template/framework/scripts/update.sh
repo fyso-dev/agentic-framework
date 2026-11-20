@@ -37,7 +37,7 @@ src=${src:-$origin}
 if [[ -d $src ]]; then src=$(cd "$src" && pwd); fi
 base=$(git rev-parse HEAD)
 
-wt=$(mktemp -d)
+wt=$(mktemp -d "${TMPDIR:-/tmp}/fyso-update.XXXXXXXX")
 git worktree add -q --detach "$wt" HEAD >&2
 trap 'git worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
 cd "$wt"

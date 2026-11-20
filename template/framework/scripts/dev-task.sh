@@ -94,7 +94,7 @@ case "${1:-}" in
       gh auth status >/dev/null 2>&1 || fail "gh is not authenticated"
       wt remote get-url origin >/dev/null || fail "origin is required to publish"
       wt push -q -u origin "$branch"
-      body=$(mktemp); trap 'rm -f "$body"' EXIT
+      body=$(mktemp "${TMPDIR:-/tmp}/fyso-dev-task.XXXXXXXX"); trap 'rm -f "$body"' EXIT
       wt log -1 --format=%b > "$body"
       pr=$(cd "$WT" && gh pr create --base "$BASE" --head "$branch" \
         --title "$(git log -1 --format=%s)" --body-file "$body")
