@@ -49,7 +49,23 @@ async function configure(input,env=process.env,request=fetch,command=execFileSyn
     throw new SetupError('saveFailed',500);
   }finally{fs.rmSync(lock,{recursive:true,force:true});}
 }
-function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args),describeRemote=(...args)=>require('./agent-remote.cjs').describe(...args)) {
+// Framework updates from the panel (fyso-update): Copier cannot run inside the sandbox
+// (git init/clone write .git/config, and templates may hold .mcp.json), so the confined
+// Dagu step asks this unconfined service to run update.sh. Never routed by Caddy; admin
+// credentials as every call here; only a tag/branch of the project's own template source.
+const UPDATE_REF=/^[A-Za-z0-9._/-]{0,100}$/;
+let updating=false;
+function runUpdate(ref,env=process.env,command=require('node:child_process').execFile) {
+  return new Promise((resolve,reject)=>{
+    command('mise',['exec','--','framework/scripts/update.sh'],{cwd:env.FYSO_ROOT,encoding:'utf8',maxBuffer:16*1024*1024,timeout:20*60*1000,
+      env:{...env,REF:ref,SRC:''}},(error,stdout,stderr)=>{
+      const last=String(stdout||'').trim().split('\n').pop()||'';
+      if(error)return reject(Object.assign(new SetupError('updateFailed',500),{detail:String(stderr||error.message).slice(-4000)}));
+      try{resolve(JSON.parse(last));}catch{reject(Object.assign(new SetupError('updateFailed',500),{detail:String(stderr||'').slice(-4000)}));}
+    });
+  });
+}
+function createServer(env=process.env,save=configure,manage=require('./managed-mcp.cjs').operate,saveExtension=(...args)=>require('./extension-secrets.cjs').configure(...args),describeRemote=(...args)=>require('./agent-remote.cjs').describe(...args),update=runUpdate) {
   const expected=Buffer.from('Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64'));
   const origin=require('./web-origin.cjs').origin('panel',env,env.FYSO_WEB_DOMAIN||'localhost');
   return http.createServer(async(req,res)=>{
@@ -57,6 +73,22 @@ function createServer(env=process.env,save=configure,manage=require('./managed-m
     if(req.url==='/health'&&req.method==='GET')return reply(200,{ok:true});
     const supplied=Buffer.from(req.headers.authorization||'');
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return reply(401,{error:'unauthorized'});
+    if(req.url==='/internal/framework-update'){
+      if(req.method!=='POST')return reply(405,{error:'methodNotAllowed'});
+      // Internal only: a browser request carries an Origin and is refused.
+      if(req.headers.origin||req.headers['sec-fetch-site'])return reply(403,{error:'origin'});
+      if(req.headers['content-type']?.split(';')[0]!=='application/json')return reply(415,{error:'invalidInput'});
+      let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>1024)return reply(413,{error:'invalidInput'});}
+      let input;try{input=JSON.parse(body||'{}');}catch{return reply(400,{error:'invalidInput'});}
+      const keys=input&&typeof input==='object'&&!Array.isArray(input)?Object.keys(input):['?'];
+      const ref=typeof input?.ref==='string'?input.ref:'';
+      if(keys.some(k=>k!=='ref')||!UPDATE_REF.test(ref))return reply(400,{error:'invalidInput'});
+      if(updating)return reply(409,{error:'busy'});
+      updating=true;
+      try{return reply(200,await update(ref,env));}
+      catch(error){if(error.detail)console.error(error.detail);return reply(error.status||500,{error:error.code||'updateFailed',...(error.detail&&{detail:error.detail})});}
+      finally{updating=false;}
+    }
     const mcp=/^\/api\/connectors\/mcp(?:\/([a-z][a-z0-9_-]{0,31}))?$/.exec(req.url||'');
     const extension=/^\/api\/extensions\/([a-z][a-z0-9-]{1,30})\/secrets$/.exec(req.url||'');
     // Remote MCP connection commands, token included (D65): read on request, never through Dagu.
@@ -94,7 +126,7 @@ async function listenSocket(server,socket) {
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(socket,resolve);});
   fs.chmodSync(socket,0o600);
 }
-module.exports={validate,configure,createServer,listenSocket,SetupError};
+module.exports={validate,configure,createServer,listenSocket,runUpdate,SetupError};
 if(require.main===module){
   for(const name of ['FYSO_ROOT','FYSO_DATA','FYSO_OMB_PORT','FYSO_HTTP_PORT','FYSO_CONNECTOR_SETUP_SOCKET','FYSO_ADMIN_USER','FYSO_ADMIN_PASSWORD'])if(!process.env[name])throw new Error(`Missing ${name}`);
   process.umask(0o077);

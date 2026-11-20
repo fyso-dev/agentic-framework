@@ -77,6 +77,11 @@ stops with the reason unless `FYSO_CONFINE=off`.
   user's temporary folder, which the sandbox denies. Framework scripts always pass
   `"${TMPDIR:-/tmp}/…XXXXXXXX"`, and Dagu hands `TMPDIR` to its steps
   (`DAGU_ENV_PASSTHROUGH_PREFIXES`); a test enforces both. Extension scripts must do the same.
+- **Framework updates run outside the sandbox.** Copier needs `git init`/`clone` (they write
+  `.git/config`) and older templates hold `.mcp.json`; neither is possible confined. So
+  `update.sh` in a Dagu step (the panel's **Update**) asks the project's unconfined
+  connector service (`/internal/framework-update` on its private socket, admin credentials,
+  never routed by Caddy) to run the same script; it takes a ref only, never another source.
 - **`.mcp.json` is read-only inside the sandbox** (sandbox-runtime's mandatory protection,
   so an agent cannot add an MCP server). Confined Dagu steps skip it when it is unchanged and
   otherwise leave it to the next `mise run up`; extensions installed from the panel reach
