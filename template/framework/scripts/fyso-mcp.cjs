@@ -402,27 +402,70 @@ function serveStdio() {
 // Remote clients (D63). The gateway routes only /mcp here, without the web login: the
 // bearer token is the credential, compared in constant time. Browsers are refused (they
 // send Origin; CLI clients do not), which also closes DNS rebinding.
+// OAuth (D90): a token the trusted web login (own or shared) issued to this project's
+// client, for a user allowed in, is accepted too; the gateway also routes the discovery
+// documents here (protected resource on the panel host, authorization server on auth).
+// Registration (D91): the own login's client for clients that register themselves, and
+// the login's authorization answers pass through here to carry `iss`.
 const MAX_BODY = 1024 * 1024;
-function serveHttp(socket, env = process.env) {
+function serveHttp(socket, env = process.env, fetchImpl = fetch) {
   const crypto = require('node:crypto');
+  const oauth = require('./mcp-oauth.cjs');
   const token = env.FYSO_MCP_TOKEN || '';
+  const withOAuth = oauth.enabled(env);
   const off = env.FYSO_WEB_SCHEME !== 'https' ? 'Remote MCP is off: this project has no HTTPS provider extension.'
-    : token.length < 32 ? 'Remote MCP is off: run "mise run agent:remote" on the project\'s machine to create its token.' : null;
-  const expected = Buffer.from(`Bearer ${token}`);
-  const authorized = header => {
+    : token.length < 32 && !withOAuth ? 'Remote MCP is off: run "mise run agent:remote" on the project\'s machine to create its token.' : null;
+  const expected = token.length < 32 ? null : Buffer.from(`Bearer ${token}`);
+  const projectToken = header => {
     const given = Buffer.from(String(header || ''));
-    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+    return !!expected && given.length === expected.length && crypto.timingSafeEqual(given, expected);
   };
-  const server = require('node:http').createServer((req, res) => {
+  const checkOAuth = withOAuth ? oauth.verifier(env, fetchImpl) : async () => null;
+  const authorized = async header => projectToken(header) || !!(await checkOAuth(header));
+  const challenge = withOAuth ? oauth.challenge(env) : 'Bearer';
+  const server = require('node:http').createServer(async (req, res) => {
     const reply = (status, body, headers = {}) => {
       res.writeHead(status, {'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers});
       res.end(body === undefined ? '' : JSON.stringify(body));
     };
-    if (req.url === '/health') return reply(200, {ok: true, enabled: !off});
-    if (req.url !== '/mcp') return reply(404, {error: 'not found'});
+    const url = String(req.url || '').split('?')[0];
+    if (url === '/health') return reply(200, {ok: true, enabled: !off, oauth: !off && withOAuth});
+    // Public discovery documents: no credential, readable by any client.
+    if (url === oauth.RESOURCE_PATH || url === `${oauth.RESOURCE_PATH}/mcp`) {
+      if (off || !withOAuth) return reply(404, {error: 'not found'});
+      if (req.method !== 'GET') return reply(405, {error: 'Use GET.'}, {Allow: 'GET'});
+      try { return reply(200, await oauth.resourceMetadata(env, fetchImpl)); }
+      catch { return reply(502, {error: 'The web login is not answering.'}); }
+    }
+    // A shared login (D61) serves its own discovery at its own address.
+    if (url === oauth.AUTHORIZATION_SERVER_PATH) {
+      if (off || !withOAuth || oauth.shared(env)) return reply(404, {error: 'not found'});
+      if (req.method !== 'GET') return reply(405, {error: 'Use GET.'}, {Allow: 'GET'});
+      try { return reply(200, await oauth.authorizationServerMetadata(env, fetchImpl)); }
+      catch { return reply(502, {error: 'The web login is not answering.'}); }
+    }
+    // Always passed to the login: other apps of the same login sign in through it too.
+    if (oauth.AUTHORIZATION_RESPONSE_PATHS.includes(url)) {
+      const own = !off && withOAuth && !oauth.shared(env);
+      try {
+        const issuer = own ? (await oauth.discovery(env, fetchImpl)).issuer : null;
+        return await oauth.forwardAuthorization(req, res, env, issuer);
+      } catch { return res.headersSent ? res.destroy() : reply(502, {error: 'The web login is not answering.'}); }
+    }
+    if (url === oauth.REGISTRATION_PATH) {
+      if (off || !withOAuth || oauth.shared(env)) return reply(404, {error: 'not found'});
+      if (req.method !== 'POST') return reply(405, {error: 'Use POST.'}, {Allow: 'POST'});
+      const chunks = []; let size = 0;
+      for await (const chunk of req) { size += chunk.length; if (size > 64 * 1024) return reply(413, {error: 'Request too large.'}, {Connection: 'close'}); chunks.push(chunk); }
+      let request;
+      try { request = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return reply(400, {error: 'invalid_client_metadata', error_description: 'Send the client metadata as JSON.'}); }
+      const {status, body} = oauth.register(request, env);
+      return reply(status, body);
+    }
+    if (url !== '/mcp') return reply(404, {error: 'not found'});
     if (off) return reply(404, {error: off});
     if (req.headers.origin) return reply(403, {error: 'This endpoint is for MCP clients, not browsers.'});
-    if (!authorized(req.headers.authorization)) return reply(401, {error: 'Missing or wrong bearer token.'}, {'WWW-Authenticate': 'Bearer'});
+    if (!(await authorized(req.headers.authorization))) return reply(401, {error: 'Missing or wrong bearer token.'}, {'WWW-Authenticate': challenge});
     if (req.method !== 'POST') return reply(405, {error: 'Use POST.'}, {Allow: 'POST'});
     let size = 0;
     const chunks = [];

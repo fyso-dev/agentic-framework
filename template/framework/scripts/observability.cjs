@@ -52,14 +52,15 @@ function normalizeHarness(text, provider) {
   return Object.fromEntries(['input','output','cachedInput','costUsd'].map(k => [k,knownSum(usage.map(u => u[k]))]));
 }
 
-function aggregate(records) {
+const GROUP_KEY = ['bot','model','engine','billingKind','source'];
+function aggregate(records, keyFields = GROUP_KEY) {
   const seen = new Set();
   const groups = new Map();
-  const empty = () => ({turns:0,input:null,output:null,cachedInput:null,apiReportedUsd:null,subscriptionEquivalentUsd:null,estimatedApiUsd:null,unclassifiedUsd:null,missingCost:0,missingTokens:0});
+  const empty = () => ({turns:0,input:null,output:null,cachedInput:null,reasoning:null,apiReportedUsd:null,subscriptionEquivalentUsd:null,estimatedApiUsd:null,unclassifiedUsd:null,missingCost:0,missingTokens:0});
   const totals = empty();
   const add = (to, row) => {
     to.turns++;
-    for (const k of ['input','output','cachedInput']) to[k] = knownSum([to[k],row[k]]);
+    for (const k of ['input','output','cachedInput','reasoning']) to[k] = knownSum([to[k],row[k]]);
     if (row.input === null || row.output === null) to.missingTokens++;
     if (numeric(row.costUsd) === null) {to.missingCost++; return;}
     const bucket = row.billingKind === 'subscription' ? 'subscriptionEquivalentUsd' : row.billingKind === 'api' ? (row.costSource === 'estimated' ? 'estimatedApiUsd' : row.costSource === 'reported' ? 'apiReportedUsd' : 'unclassifiedUsd') : 'unclassifiedUsd';
@@ -68,15 +69,75 @@ function aggregate(records) {
   for (const row of records) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    const key = JSON.stringify([row.bot,row.model,row.billingKind,row.source]);
-    if (!groups.has(key)) groups.set(key,{...empty(),bot:row.bot,model:row.model,billingKind:row.billingKind,source:row.source});
+    const key = JSON.stringify(keyFields.map(k => row[k] ?? null));
+    if (!groups.has(key)) groups.set(key,{...empty(),...Object.fromEntries(keyFields.map(k => [k,row[k] ?? null]))});
     add(totals,row); add(groups.get(key),row);
   }
   return {totals,groups:[...groups.values()]};
 }
 
-function makeAlerts(settings, usage, runs, traces, now) {
+// D84: subscription windows as OMB reports them (GET /api/plan-usage, its 45 s cache). Only the percentage, reset
+// and check time leave OMB; no account, token or error text. A missing or closed window is `null` (unknown), never 0.
+const WINDOWS = ['fiveHour','weekly'];
+const SUBSCRIPTION_MAX_AGE_MS = 5*60*1000;
+function normalizePlanUsage(report) {
+  if (!report || typeof report !== 'object' || !Array.isArray(report.providers)) throw new Error('invalid plan usage');
+  const iso = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+  const checkedAt = iso(report.fetchedAt);
+  const text = value => typeof value === 'string' && value.length <= 80 ? value : null;
+  return report.providers.filter(p => p && typeof p === 'object' && typeof p.id === 'string').flatMap(p => WINDOWS.map(window => {
+    const w = p.ok === true && p[window] && p[window].available === true ? p[window] : null;
+    const usedPercent = w && numeric(w.usedPercent) !== null && w.usedPercent <= 100 ? w.usedPercent : null;
+    return {instanceId:p.id,engine:text(p.driver),plan:text(p.plan),window,usedPercent,resetsAt:usedPercent === null ? null : iso(w.resetsAt),checkedAt};
+  }));
+}
+
+// D88: list prices (USD per million tokens) for turns whose engine reports no amount, such as Codex.
+// framework/pricing.json is the default; project/pricing.json overrides or adds models. Unknown model: no amount.
+const RATE_KEYS = ['input','cachedInput','output'];
+function validRates(rates) {
+  return rates && typeof rates === 'object' && RATE_KEYS.every(k => numeric(rates[k]) !== null);
+}
+function loadPricing(root, warnings = []) {
+  const read = (file, optional) => {
+    try {
+      const table = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (!table || typeof table !== 'object' || !table.models || typeof table.models !== 'object') throw new Error('invalid pricing');
+      return table;
+    } catch (e) { if (!(optional && e.code === 'ENOENT')) warnings.push('invalidPricing'); return null; }
+  };
+  const base = read(path.join(__dirname, '../pricing.json'), false), local = read(path.join(root, 'project/pricing.json'), true);
+  const models = {};
+  for (const table of [base, local]) for (const [id, rates] of Object.entries(table?.models || {}))
+    if (validRates(rates)) models[id.toLowerCase()] = pick(rates, RATE_KEYS); else warnings.push('invalidPricing');
+  const tables = [base, local].filter(Boolean);
+  const sources = [...new Set(tables.flatMap(t => Object.values(t.sources || {})).filter(u => typeof u === 'string' && /^https:\/\//.test(u)))];
+  const dates = tables.map(t => t.checkedAt).filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return {models, info:{checkedAt:dates.at(-1) || null, sources, project:!!local, priced:0}};
+}
+// Cached input is a subset of input; reasoning is a subset of output (D26).
+function estimateUsd(row, models) {
+  const rates = typeof row.model === 'string' ? models[row.model.toLowerCase()] : null;
+  if (!rates || numeric(row.input) === null || numeric(row.output) === null) return null;
+  const cached = Math.min(numeric(row.cachedInput) ?? 0, row.input);
+  return ((row.input - cached) * rates.input + cached * rates.cachedInput + row.output * rates.output) / 1e6;
+}
+function applyPricing(records, pricing) {
+  for (const row of records) {
+    if (numeric(row.costUsd) !== null) continue;
+    const usd = estimateUsd(row, pricing.models);
+    if (usd === null) continue;
+    row.costUsd = usd; row.costSource = 'estimated'; pricing.info.priced++;
+  }
+  return records;
+}
+
+function makeAlerts(settings, usage, runs, traces, now, subscription = []) {
   const alerts = [];
+  // D88: optional advisory on the account's subscription window; warning only, never a stop.
+  if (numeric(settings.subscriptionPercent) !== null && settings.subscriptionPercent <= 100)
+    for (const w of subscription) if (numeric(w.usedPercent) !== null && w.usedPercent >= settings.subscriptionPercent)
+      alerts.push({kind:'subscription',value:w.usedPercent,limit:settings.subscriptionPercent,engine:w.engine || w.instanceId,window:w.window});
   if (numeric(settings.monthlyApiUsd) !== null && usage.apiReportedUsd !== null && usage.apiReportedUsd >= settings.monthlyApiUsd)
     alerts.push({kind:'budget',value:usage.apiReportedUsd,limit:settings.monthlyApiUsd});
   const failures = runs.filter(r=>['failed','aborted','rejected','partially_succeeded'].includes(r.statusLabel)).length;
@@ -97,7 +158,7 @@ async function collect(env = process.env, now = new Date()) {
   const month = now.toISOString().slice(0,7), from = `${month}-01`;
   const warnings = [], sources = {};
   const settingsPath = path.join(root,'project/observability.json');
-  let settings = {monthlyApiUsd:null,longRunSeconds:600,maxRecentFailures:1,billingKinds:{}};
+  let settings = {monthlyApiUsd:null,longRunSeconds:600,maxRecentFailures:1,subscriptionPercent:null,billingKinds:{}};
   try {settings={...settings,...JSON.parse(fs.readFileSync(settingsPath,'utf8'))};} catch (e) {if (e.code !== 'ENOENT') warnings.push('invalidSettings');}
   const billing = {...kinds,...settings.billingKinds};
   const records = [], ledger = path.join(data,'omb/usage',`${month}.jsonl`);
@@ -108,7 +169,7 @@ async function collect(env = process.env, now = new Date()) {
         const r = JSON.parse(line);
         if (!r.botId || !r.threadId || !r.at || !r.model || numeric(r.input) === null || numeric(r.output) === null) throw new Error('invalid row');
         if (r.at.slice(0,7) !== month || Date.parse(r.at) > now.getTime()) continue;
-        records.push({id:`omb:${r.at}|${r.threadId}|${r.botId}`,source:'omb',threadId:r.threadId,turnId:r.turnId,parent:r.parent,bot:r.botName || r.botId,model:r.model,
+        records.push({id:`omb:${r.at}|${r.threadId}|${r.botId}`,source:'omb',day:r.at.slice(0,10),engine:typeof r.instanceId === 'string' ? r.instanceId : 'unknown',reasoning:numeric(r.reasoning),threadId:r.threadId,turnId:r.turnId,parent:r.parent,bot:r.botName || r.botId,model:r.model,
           billingKind:['api','subscription'].includes(billing[r.instanceId]) ? billing[r.instanceId] : 'unknown',
           input:(r.usageStatus==='unavailable'||(!r.usageStatus&&!r.input&&!r.output))?null:numeric(r.input),output:(r.usageStatus==='unavailable'||(!r.usageStatus&&!r.input&&!r.output))?null:numeric(r.output),cachedInput:numeric(r.cachedInput),costUsd:numeric(r.costUsd),costSource:r.costSource || 'reported'});
       } catch {invalidRows++;}
@@ -134,6 +195,19 @@ async function collect(env = process.env, now = new Date()) {
     }
     sources.traces='ok';
   } catch {sources.traces='unavailable';}
+  // OMB reports every Claude/Codex/Grok instance; an API-key engine has no subscription window of its own.
+  const subscribed=r=>billing[r.instanceId]!=='api';
+  // The provider endpoints behind plan-usage are rate limited: reuse a check younger than SUBSCRIPTION_MAX_AGE_MS.
+  let subscription=[];
+  try {
+    const previous=JSON.parse(fs.readFileSync(path.join(data,'panel/observability.json'),'utf8')).subscription;
+    const fresh=Array.isArray(previous) && previous.length>0 && previous.every(r=>now.getTime()-Date.parse(r.checkedAt)<SUBSCRIPTION_MAX_AGE_MS && Date.parse(r.checkedAt)<=now.getTime());
+    if (fresh) subscription=previous.map(r=>pick(r,['instanceId','engine','plan','window','usedPercent','resetsAt','checkedAt']));
+    subscription=subscription.filter(subscribed);
+  } catch {}
+  if (subscription.length) sources.subscription='ok';
+  else try {subscription=normalizePlanUsage(await get(env.FYSO_OMB_PORT,'/api/plan-usage')).filter(subscribed); sources.subscription=subscription.length?'ok':'empty';}
+  catch {sources.subscription='unavailable';}
   let runs=[],runsTruncated=false;
   const auth='Basic '+Buffer.from(`${env.FYSO_ADMIN_USER}:${env.FYSO_ADMIN_PASSWORD}`).toString('base64');
   const runShape = r => ({id:r.dagRunId,dag:r.name,statusLabel:r.statusLabel,startedAt:r.startedAt,finishedAt:r.finishedAt,retries:r.autoRetryCount ?? 0,sourceThread:null,sourceTurn:null});
@@ -190,12 +264,13 @@ async function collect(env = process.env, now = new Date()) {
     }
     for (const {id,meta,usage,text,provider} of attempts) {
       const bot=isDevTask(meta.name) ? 'Builder' : meta.name;
+      const day=new Date(meta.startedAt).toISOString().slice(0,10);
       if (usage.present) {
-        for (const r of usage.rows) records.push({id:`${id}/${r.file}:${r.line}`,source:'harness',bot,model:r.model ?? r.provider,billingKind:engineKind(r.provider),
+        for (const r of usage.rows) records.push({id:`${id}/${r.file}:${r.line}`,source:'harness',day,engine:r.provider,reasoning:null,bot,model:r.model ?? r.provider,billingKind:engineKind(r.provider),
           input:r.input,output:r.output,cachedInput:r.cachedInput,costUsd:r.costUsd,costSource:'reported',runId:meta.dagRunId});
         continue;
       }
-      records.push({id,source:'harness',bot,model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...normalizeHarness(text,provider),costSource:'reported',runId:meta.dagRunId});
+      records.push({id,source:'harness',day,engine:provider,reasoning:null,bot,model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...normalizeHarness(text,provider),costSource:'reported',runId:meta.dagRunId});
     }
     sources.harness='ok';
   } catch {sources.harness='unavailable';}
@@ -203,8 +278,10 @@ async function collect(env = process.env, now = new Date()) {
   if (invalidUsageRows) warnings.push('invalidUsageRows');
   // Runs without any usage artifact still have an explicitly unknown consumption record.
   for (const run of runs.filter(r=>isDevTask(r.dag) && r.startedAt?.startsWith(month))) {
-    if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
+    if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',day:run.startedAt.slice(0,10),engine:'unknown',reasoning:null,bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
   }
+  const pricing=loadPricing(root,warnings);
+  applyPricing(records,pricing);
   const turns=new Map(records.filter(r=>r.source==='omb' && r.turnId).map(r=>[`${r.threadId}~${r.turnId}`,r]));
   const rootOf = row => {
     let current=row;
@@ -228,8 +305,9 @@ async function collect(env = process.env, now = new Date()) {
   }
   runs.sort((a,b)=>Date.parse(b.startedAt)-Date.parse(a.startedAt));
   const usage=aggregate(records);
-  return {version:1,collectedAt:now.toISOString(),from,to:now.toISOString().slice(0,10),sources,warnings:[...new Set(warnings)],invalidRows,
-    coverage:{tracesTruncated,runsTruncated},usage,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime())};
+  const daily=aggregate(records,['day','bot','model','engine']).groups;
+  return {version:2,collectedAt:now.toISOString(),from,to:now.toISOString().slice(0,10),sources,warnings:[...new Set(warnings)],invalidRows,
+    coverage:{tracesTruncated,runsTruncated},usage,daily,subscription,pricing:pricing.info,traces,runs,alerts:makeAlerts(settings,usage.totals,runs,traces,now.getTime(),subscription)};
 }
 
 if (require.main === module) {
@@ -243,4 +321,4 @@ if (require.main === module) {
     console.log(JSON.stringify({collectedAt:result.collectedAt,sources:result.sources,records:result.usage.totals.turns,durationMs:Math.round(performance.now()-started)}));
   }).catch(()=>{console.error('observability collection failed; previous snapshot retained');process.exitCode=1;});
 }
-module.exports={normalizeHarness,readUsageFiles,aggregate,makeAlerts,collect};
+module.exports={normalizeHarness,readUsageFiles,normalizePlanUsage,aggregate,makeAlerts,loadPricing,estimateUsd,applyPricing,collect};

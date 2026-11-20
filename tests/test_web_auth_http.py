@@ -242,6 +242,34 @@ class WebAuthHTTP(unittest.TestCase):
         for app in ['dagu', 'omb']:
             self.assertEqual(self.request(app, '/mcp', 'POST', {}, Authorization='Bearer fixture-mcp-token')[0], 401, app)
 
+    def test_00_remote_mcp_oauth_discovery_skips_the_login(self):
+        # D90: MCP clients read both documents without a session; only these paths reach the endpoint.
+        for path in ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']:
+            status, _, body = self.request('panel', path)
+            self.assertEqual(status, 200, path); self.assertEqual(json.loads(body)['path'], path)
+        status, _, body = self.request('auth', '/.well-known/oauth-authorization-server')
+        self.assertEqual(status, 200); self.assertEqual(json.loads(body)['path'], '/.well-known/oauth-authorization-server')
+        self.assertNotEqual(self.request('auth', '/.well-known/openid-configuration')[0], 404)
+        for app in ['dagu', 'omb']:
+            self.assertNotEqual(json.loads(self.request(app, '/.well-known/oauth-protected-resource/mcp')[2] or '{}').get('path'),
+                '/.well-known/oauth-protected-resource/mcp', app)
+
+    def test_00_remote_mcp_registration_and_authorization_answers_reach_the_endpoint(self):
+        # D91: registration and the two answers that carry the code gain `iss` in the endpoint.
+        for method, path in [('POST', '/oauth/register'), ('GET', '/authorize?client_id=x'), ('POST', '/api/oidc/authorize-complete')]:
+            status, _, body = self.request('auth', path, method, {} if method == 'POST' else None)
+            self.assertEqual(status, 200, path); self.assertEqual(json.loads(body)['path'], path)
+        for app in ['panel', 'dagu', 'omb']:
+            self.assertNotEqual(json.loads(self.request(app, '/oauth/register', 'POST', {})[2] or '{}').get('path'), '/oauth/register', app)
+
+    def test_98_authorization_answers_fall_back_to_the_login_without_the_endpoint(self):
+        # The login keeps working for every app when the MCP endpoint is down.
+        server = next(s for s in self.servers if getattr(s, 'server_address', None) == str(self.mcp_socket))
+        server.shutdown(); server.server_close(); self.servers.remove(server); self.mcp_socket.unlink(missing_ok=True)
+        status, headers, body = self.request('auth', '/authorize?client_id=x')
+        self.assertIn(status, [302, 303], body); self.assertNotIn('"path"', body or '')
+        self.assertEqual(self.request('auth', '/oauth/register', 'POST', {})[0], 502)
+
     def test_01_pages_redirect_and_apis_deny_without_browser_popup(self):
         for app in ['panel','dagu','omb']:
             status, headers, _ = self.request(app, **{'User-Agent':'Mozilla/5.0 Chrome/130.0.0.0'})

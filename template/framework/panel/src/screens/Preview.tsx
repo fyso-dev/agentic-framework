@@ -7,7 +7,8 @@ import { IconCommit, Spinner } from "../components/Icons";
 import { External, Modal } from "../components/ui";
 import { base64Utf8 } from "../lib/team";
 import { useDaguAction } from "../lib/useDaguAction";
-import { useStore } from "../store";
+import { embedded, useStore } from "../store";
+import { href } from "../lib/router";
 
 /** Visual marker only, from OMB's verb; the line itself is shown as received. */
 function marker(line: string): [string, string] {
@@ -79,9 +80,9 @@ export function Preview({ open, onClose }: { open: boolean; onClose: () => void 
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 6 }}>
             <button type="button" className="btn btn-lg btn-soft" onClick={onClose}>{t("common.close")}</button>
-            {s.project.data && (
-              <External href={s.project.data.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>
-            )}
+            {s.project.data && (embedded(s, "omb")
+              ? <a href={href.app("omb")} className="btn btn-lg btn-pri" onClick={onClose}>{t("top.openOmb")}</a>
+              : <External href={s.project.data.urls.omb} className="btn btn-lg btn-pri">{t("top.openOmb")} </External>)}
           </div>
         </div>
       </Modal>

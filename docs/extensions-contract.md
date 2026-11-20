@@ -44,7 +44,7 @@ Multiple extensions sharing a need justifies evaluating a shared primitive; it d
 | Upgrade | `mise run ext:update [<ext>]` | `copier update --trust --answers-file <f>` for one extension or each `.copier-answers.ext-*.yml`. Copier refuses a dirty tree, so when one upgrade changes files the task stops and asks for a commit before the next |
 | List | `mise run ext:list` | id, source, version (`_commit`) from each answers file |
 | Search | `mise run ext:search [text]` | catalog entries with their latest tag and install state (§8) |
-| Remove | `mise run ext:remove <ext>` | deletes the slot files of §2 and the answers file. Copier has no uninstall |
+| Remove | `mise run ext:remove <ext>`, or the panel's Uninstall (`fyso-ext-remove`, §8, D83) | deletes the slot files of §2 and the answers file. Copier has no uninstall |
 
 - Each extension's `copier.yml` sets `_answers_file: .copier-answers.ext-<ext>.yml`. The answers files **are** the list of installed extensions, versioned in git. There is no registry.
 - `src` is anything Copier accepts: `gh:org/fyso-ext-foo`, a git URL, or a local path. Pin with `--vcs-ref <tag>`. Copier saves it in the answers file, which `check-paths` scans before every snapshot: a path inside the project is stored relative, and an absolute path outside it is refused by the panel and warned about by `ext:add` (publish the extension to git instead).
@@ -59,6 +59,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Tools, env, tasks | `.config/mise/conf.d/ext-<ext>.toml` | mise (verified on 2026.11.2: env and tasks load; the file needs `mise trust`) |
 | Processes | `extensions/<ext>/process.yaml` | process-compose: `up.sh` passes one extra `-f` per file (verified: merge works and `depends_on` crosses files) |
 | Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid). Each `http://<app>.{$FYSO_WEB_DOMAIN}` site inherits the panel's web-login rule unless the project declares that app (D58) |
+| OAuth provider definitions | `extensions/<ext>/tinyauth.providers.yaml` | Native Tinyauth provider map, loaded only for extensions with a Copier answers file. Project provider IDs take precedence. Missing `${FYSO_AUTH_*}` values leave a provider pending. Project-owned app access rules still apply. |
 | Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
 | Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
@@ -66,7 +67,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
 | Setup step (optional) | `extensions/<ext>/setup.yaml` | Panel Setup checklist, `fyso-setup-check` (D51) |
-| Project switcher (optional) | `extensions/<ext>/switcher.yaml` | Panel top bar, one per project (§9, D92) |
+| Instance switcher (optional) | `extensions/<ext>/switcher.yaml` | Panel top bar, one per project (§9, D94) |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
 | Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person enables them on a bot: the panel's bot detail has one toggle per extension skill (D54), or list them in `team.yaml` by hand (not automatic, see §6) |
 | Department templates | `extensions/<ext>/teams/<slug>/team.yaml` and `extensions/<ext>/teams/<slug>/skills/**` | `fyso-bot-architect` `OP=team-templates`, listed by the panel's *Add department*; added only when a person chooses one and applies the proposed change (D82, see below) |
@@ -143,7 +144,9 @@ type Extension = {
 }
 ```
 
-`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing and upgrading go through the marketplace (§8); removing is a terminal task (§1).
+`set` is `true` when the env var is non-empty. **The value is never written** (rule: the panel never shows secret values). Installing, upgrading and uninstalling go through the marketplace workflows (§8), with no agent or model involved; `mise run ext:remove` stays available (§1).
+
+The panel re-reads `project.json`, `apps.json`, `extensions.json` and `skills.json` with the bot roster: every five seconds and on window focus, plus right after a panel install or uninstall. An extension added or removed outside the page (terminal, an agent's `fyso_ext_install`, another tab, or a panel install the person navigated away from) appears without a manual refresh. An unchanged file keeps the shown state, and a failed background read keeps the last good data.
 
 ### Guided setup (D50)
 
@@ -167,7 +170,7 @@ The step shows the description and the guided form above, and counts toward the 
 - **Skills are not enabled automatically.** `team.yaml` belongs to the project. A person enables an extension's skill per bot in the panel's bot detail (D54), or the Bot Architect adds it. The toggle writes the native entry `- file: ${FYSO_ROOT}/extensions/<ext>/skills/<name>/SKILL.md`; for a bot with a tool allow-list it also selects `mcp:<server>:*` for the extension's MCP servers, and removes that selector when switched off. Off keeps the skill entry with `enabled: false`, because OMB's team apply does not uninstall a skill that the file omits. It is available only for bots that run in the project root.
 - **Dagu subdirectories:** supported in 2.24.0 when `DAGU_DAG_DISCOVERY_RECURSIVE=true`; discovery is flat by default. Verified against [store.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store.go) and `TestRecursiveDiscoverySupportsNestedDAGOperations` / the default root-only test in [store_test.go](https://github.com/dagu-org/dagu/blob/v2.24.0/internal/persis/file/dag/store_test.go). Keep flat prefixed workflow slots in v1.
 - **Hot install reaches OpenMausBot on the next start.** OMB keeps the environment it started with: MCP servers and `BOT_*` secrets of an extension installed from the panel reach bots after `mise run up`. Processes, routes, workflows and panel data load right away.
-- **Removal is manual-ish:** `ext:remove` deletes the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
+- **Removal keeps data:** `ext:remove` and the panel's Uninstall delete the slots but not data in `.data/ext/<ext>/` or secrets in `secrets.enc.yaml`.
 
 ## 7. Test fixture and template
 
@@ -233,6 +236,12 @@ The panel takes `installed`/`version`/`update` from `extensions.json` (always cu
 
 Output: `{ id, mode, version: string | null, commit: string }`.
 
+### `fyso-ext-remove` (param `ID`) → output `result` (D83)
+
+The panel's Uninstall button on an installed card opens an in-page confirmation, then runs `ext.sh apply` with `MODE=remove`: the same removal as `ext:remove`, panel and `.mcp.json` regeneration, one commit of **only** that extension's tracked slots (`ext: remove <id> <version>`), then the same activation as an install (`mise install`; with the stack running, `process-compose project update` drops the extension's processes, and web-auth and Caddy restart). Data in `.data/ext/<ext>/` and secrets in `secrets.enc.yaml` are kept. Skills of the extension switched on in `project/bots/team.yaml` are not edited; switch them off first. One lifecycle change runs at a time in the panel.
+
+Output: `{ id, mode: "remove", version: string | null, commit: string }` (`version` is the removed one).
+
 ## 9. Extension-owned tabs and pages
 
 ### Live theme messages (SDK v1, optional)
@@ -293,9 +302,9 @@ The declaration is data. The panel runs the query itself against Dagu's run list
 
 A page that changes the runs it counts calls the SDK's `refreshBadges()` so the menu does not wait for the next poll. Old inventories without `badge` show no counter.
 
-### Project switcher (panel API 3)
+### Instance switcher (panel API 3)
 
-When several projects share one login, for example the projects of a host's hub, an extension can let people jump between their panels from the top bar:
+When several instances share one login, for example the instances behind a host's hub, an extension can let people jump between their panels from the top bar:
 
 ```yaml
 # extensions/hub/switcher.yaml
@@ -312,16 +321,16 @@ The answer is data:
 |---|---|
 | Declaration | One key, `url`: an http(s) URL without credentials, or a path starting with `/`. Anything else fails configuration generation. Only one installed extension may declare a switcher (`ext check` fails on two) |
 | Request | `GET` with `Accept: application/json`, no cache. The session cookie is sent (`credentials: include`) only when the URL is on another origin; that server must answer with `Access-Control-Allow-Origin: <panel origin>` and `Access-Control-Allow-Credentials: true` |
-| Items | At most 50; each needs a non-empty `name` and an http(s) `url` (relative URLs resolve against the panel). Others are dropped. The item on the panel's origin is marked as current |
-| Display | A chevron beside the brand opens the list. Nothing is shown when no extension declares a switcher, the request fails, or the list names no other project |
+| Items | At most 50; each needs a non-empty `name` and an http(s) `url` (relative URLs resolve against the panel). Others are dropped. The item on the panel's origin is marked as current instance |
+| Display | A chevron beside the brand opens the list. Nothing is shown when no extension declares a switcher, the request fails, or the list names no other instance |
 
-Who appears in the list is the list server's decision; the panel does not grant access, and each project still checks its own login. No extension code runs in the host.
+Who appears in the list is the list server's decision; the panel does not grant access, and each instance still checks its own login. No extension code runs in the host.
 
 ### Optional panel SDK
 
 Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
 
-Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `3`; version 2 added page counters and `refreshBadges`, version 3 the project switcher, and neither removed anything.
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `3`; version 2 added page counters and `refreshBadges`, version 3 the instance switcher, and neither removed anything.
 
 The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External`, `RelTime` and `refreshBadges`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 

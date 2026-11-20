@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../store";
-import { switcherItems, switcherRequest, type SwitcherItem } from "../lib/projectSwitcher";
+import { switcherItems, switcherRequest, type SwitcherItem } from "../lib/instanceSwitcher";
 
 /**
- * Menu beside the brand that jumps to another project (D92). It appears only when an
+ * Menu beside the brand that jumps to another instance (D94). It appears only when an
  * installed extension declares a switcher and its list answers with at least one other
- * project; any failure leaves the top bar as it was.
+ * instance; any failure leaves the top bar as it was.
  */
-export function ProjectSwitcher() {
+export function InstanceSwitcher() {
   const { t } = useTranslation();
   const s = useStore();
   const source = s.mock ? undefined : (s.extensions.data ?? []).find((ext) => ext.switcher)?.switcher?.url;
@@ -46,14 +46,14 @@ export function ProjectSwitcher() {
   return (
     <div ref={ref} className="switcher">
       <button type="button" className="icon-btn switcher-btn" aria-haspopup="true" aria-expanded={open}
-        aria-label={t("top.switchProject")} title={t("top.switchProject")} onClick={() => setOpen(!open)}>
+        aria-label={t("top.switchInstance")} title={t("top.switchInstance")} onClick={() => setOpen(!open)}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M7 10l5 5 5-5" />
         </svg>
       </button>
       {open && (
-        <nav className="menu switcher-menu" aria-label={t("top.projects")}>
-          <span className="label">{t("top.projects")}</span>
+        <nav className="menu switcher-menu" aria-label={t("top.instances")}>
+          <span className="label">{t("top.instances")}</span>
           <ul>
             {items.map((item) => (
               <li key={item.url}>

@@ -30,7 +30,7 @@ clean_exec() {
 # The age key that opens this developer's or server's secrets (setup.sh).
 admin_age_key() { printf '%s' "${MISE_SOPS_AGE_KEY_FILE:-${SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}"; }
 
-# Like clean_exec, but the command runs confined to this project's folder (D83,
+# Like clean_exec, but the command runs confined to this project's folder (D93,
 # confine.cjs): it cannot read the home folder, other projects or the shared age key.
 # FYSO_CONFINE=off runs it as clean_exec does. Same arguments: NAME=value…, then the command.
 confined_exec() {

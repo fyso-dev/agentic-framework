@@ -242,10 +242,18 @@ requires supported upstream identity integration and separate acceptance.
 
 ## Native installation and verification
 
-`mise run web-auth:install` builds the unmodified pinned source archive after
-checking its SHA-256. Go and pnpm are pinned in `mise.toml`; frontend and Go
-dependencies use the upstream lockfiles. No Docker, custom auth server or Caddy
-plugin is added. `mise run up` ensures that build exists before starting services.
+`mise run web-auth:install` installs the unmodified pinned Tinyauth (D87). On Linux it
+downloads the upstream release binary (`tinyauth-amd64`/`tinyauth-arm64`) and checks the
+SHA-256 pinned in `mise.toml`. Upstream publishes no macOS binary: the installer app
+bundles a universal one built from the pinned source tag (archive checked against
+`FYSO_TINYAUTH_SHA256`), and the task copies it into
+`${XDG_CACHE_HOME:-~/.cache}/fyso/web-auth/<version>-<source sha256>-darwin/` only when the
+bundle's version, source checksum and binary checksum match the project's pins. Without a
+matching bundle it builds that source once per machine into the same cache, with the
+pinned Go and pnpm (`FYSO_TINYAUTH_GO`, `FYSO_TINYAUTH_PNPM`, installed on demand) and the
+upstream lockfiles. Each project copies the cached binary after checking its SHA-256; a
+different pin never reuses it. No Docker, custom auth server or Caddy plugin is added.
+`mise run up` ensures the binary exists before starting services.
 
 `mise run doctor` checks the native authority and verifies unauthenticated page/API
 boundaries, including rejection of technical Basic credentials at the browser

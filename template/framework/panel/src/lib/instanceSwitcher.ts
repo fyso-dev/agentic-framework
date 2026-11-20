@@ -1,5 +1,5 @@
 /**
- * Project switcher (D92, extensions-contract §9): an installed extension names one URL in
+ * Instance switcher (D94, extensions-contract §9): an installed extension names one URL in
  * `extensions/<ext>/switcher.yaml`; it answers `{items: [{name, url}]}`. Only plain
  * http(s) links with a name are kept, so a bad answer can never become a script link.
  */

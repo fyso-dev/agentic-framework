@@ -18,17 +18,25 @@ function withExtensionApps(config, root) {
   }
   return config;
 }
-/**
- * Fyso branding of the login page (issue #83): only Tinyauth's native `ui.title` and
- * `ui.backgroundImage`. The image is embedded as a data URL so the resources file
- * server stays disabled; values the project sets under `ui` win.
- */
-function withBranding(config, dir = path.join(__dirname, '../web-auth')) {
-  const image = fs.readFileSync(path.join(dir, 'background.webp')).toString('base64');
-  config.ui = {title:'Fyso', backgroundImage:`data:image/webp;base64,${image}`, ...config.ui};
+// Provider fragments use Tinyauth's native schema. Project-owned providers take
+// precedence. A fragment with pending credentials leaves local login available.
+function withExtensionProviders(config, root, read, expand, env) {
+  const providers = { ...config.oauth?.providers };
+  for (const file of fs.globSync('extensions/*/tinyauth.providers.yaml', {cwd:root}).sort()) {
+    const extension = path.basename(path.dirname(file));
+    if (!fs.existsSync(path.join(root, `.copier-answers.ext-${extension}.yml`))) continue;
+    const fragment = read(path.join(root, file));
+    for (const [id, provider] of Object.entries(fragment || {})) {
+      if (Object.hasOwn(providers, id)) continue;
+      const required = JSON.stringify(provider).matchAll(/\$\{(FYSO_AUTH_[A-Z0-9_]+)\}/g);
+      if ([...required].some(([, name]) => !env[name])) continue;
+      Object.defineProperty(providers, id, { value: expand(provider), enumerable: true });
+    }
+  }
+  if (Object.keys(providers).length) config.oauth = { ...config.oauth, providers };
   return config;
 }
-module.exports = {withExtensionApps, withBranding};
+module.exports = {withExtensionApps, withExtensionProviders};
 
 if (require.main === module) {
   const {createRequire} = require('node:module');
@@ -45,15 +53,32 @@ if (require.main === module) {
     return value;
   };
   try {
-    const config = withBranding(withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT));
+    const config = withExtensionApps(expand(yaml.parse(fs.readFileSync(path.join(env.FYSO_ROOT, 'project/auth/tinyauth.yaml'), 'utf8'))), env.FYSO_ROOT);
+    withExtensionProviders(config, env.FYSO_ROOT, file => yaml.parse(fs.readFileSync(file, 'utf8')), expand, env);
     const runtime = path.join(env.FYSO_DATA, 'web-auth/runtime');
     fs.mkdirSync(runtime, {recursive:true, mode:0o700});
     const web = require('./web-origin.cjs');
     config.appUrl = web.origin('auth', env);
     config.server = {address:'127.0.0.1', port:Number(env.FYSO_AUTH_PORT)};
     config.database = {driver:'sqlite', path:path.join(runtime,'sessions.db')};
+    // Project identity (D92): the login shows the project's name on the design system's dark
+    // background; a ui block declared in project/auth/tinyauth.yaml wins.
+    const brand = require('./brand.cjs').resolve(env);
+    config.ui = {title: brand.name, backgroundImage: '/fyso-brand/login-background.svg', ...config.ui};
     config.labelProvider = 'none'; config.analytics = {enabled:false}; config.resources = {enabled:false};
     config.auth = {...config.auth, users:env.FYSO_AUTH_USERS.split(/[\n,]+/).filter(Boolean), secureCookie:web.scheme(env) === 'https', subdomainsEnabled:true, trustedProxies:['127.0.0.1/32']};
+    // Remote MCP sign-in (D90): this login is the OAuth server of the panel's /mcp.
+    const oauth = require('./mcp-oauth.cjs');
+    const mcpEnv = {...env, FYSO_WEB_SCHEME: web.scheme(env), FYSO_AUTH_UPSTREAM: ''};
+    if (oauth.enabled(mcpEnv)) {
+      const declared = config.oidc?.clients?.mcp || {};
+      config.oidc = {...config.oidc, privateKeyPath:path.join(runtime,'oidc/private.pem'), publicKeyPath:path.join(runtime,'oidc/public.pem'),
+        clients:{...config.oidc?.clients, mcp:oauth.tinyauthClient(mcpEnv, declared)}};
+    }
+    const panel = config.apps?.panel?.users || {};
+    // The redirect addresses the login trusts for the client: registration (D91) accepts only these.
+    const redirectUris = config.oidc?.clients?.mcp?.trustedRedirectUris || [];
+    fs.writeFileSync(oauth.accessFile(env), JSON.stringify({allow:panel.allow || '', block:panel.block || '', policy:config.auth?.acls?.policy || 'allow', redirectUris})+'\n', {mode:0o600});
     fs.writeFileSync(path.join(runtime,'config.yaml'), yaml.stringify(config), {mode:0o600});
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

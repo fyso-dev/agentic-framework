@@ -3,7 +3,7 @@
 // lists the installed extensions (docs/extensions-contract.md §5) and the marketplace (§8),
 // which installs and upgrades through the fyso-ext-catalog and fyso-ext-install workflows.
 // Each installed extension asks for its declared secrets (guided setup, D50) and runs its
-// workflows. Removing an extension stays a terminal task. The framework itself is updated
+// workflows. Uninstalling runs fyso-ext-remove after an in-page confirmation. The framework itself is updated
 // through fyso-update. Details live in tooltips; the page keeps text short.
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +11,7 @@ import { DAGS, type App, type ExtInstallResult, type UpdateResult, type Extensio
 import { ActionButton, ActionError, ActionStatus } from "../components/Action";
 import {
   AppIcon, IconApps, IconArrowUpRight, IconCheck, IconDownload, IconExternal, IconFlow, IconInfo, IconLayers,
-  IconLock, IconLockOpen, IconPlug, IconPlus, IconPuzzle, IconRefresh, IconSearch, IconTerminal, Spinner,
+  IconLock, IconLockOpen, IconPlug, IconPlus, IconPuzzle, IconRefresh, IconSearch, IconTerminal, IconTrash, Spinner,
 } from "../components/Icons";
 import { ExtensionSetup } from "../components/ExtensionSetup";
 import { ExtensionWorkflow } from "../components/ExtensionWorkflow";
@@ -80,6 +80,16 @@ function AppTile({ app }: { app: App }) {
   );
   if (off) {
     return <li><div className="ap-tile off" aria-label={t("apps.offAria", { name })}>{body}</div></li>;
+  }
+  if (app.embed) {
+    return (
+      <li>
+        <a className={`ap-tile${down ? " down" : ""}`} href={href.app(app.id)}>
+          {body}
+          <span className="sr-only">{t(`apps.health.${h}`)}</span>
+        </a>
+      </li>
+    );
   }
   return (
     <li>
@@ -172,16 +182,24 @@ type Where = "installed" | "catalog";
 type Market = {
   catalog: Action<Catalog>;
   install: Action<ExtInstallResult>;
+  remove: Action<ExtInstallResult>;
   target: { id: string; where: Where } | null;
+  /** The extension the last uninstall was for. */
+  removing: string | null;
+  /** An install or an uninstall is running: one lifecycle change at a time. */
+  busy: boolean;
   entries: MarketplaceEntry[];
   onInstall: (entry: MarketplaceEntry, where: Where) => void;
+  onRemove: (id: string) => void;
 };
 
 function useMarket(): Market {
   const s = useStore();
   const catalog = useDaguAction<Catalog>(s.backend, DAGS.extCatalog, "catalog", { loadLast: true });
   const install = useDaguAction<ExtInstallResult>(s.backend, DAGS.extInstall, "result");
+  const remove = useDaguAction<ExtInstallResult>(s.backend, DAGS.extRemove, "result");
   const [target, setTarget] = useState<Market["target"]>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   // Install state comes from extensions.json (always current), not from the last catalog read.
   const local = new Map((s.extensions.data ?? []).map((e) => [e.id, e.version]));
   const entries = (catalog.output?.extensions ?? []).map((e): MarketplaceEntry => {
@@ -192,19 +210,27 @@ function useMarket(): Market {
   const onInstall = async (entry: MarketplaceEntry, where: Where) => {
     setTarget({ id: entry.id, where });
     const result = await install.start({ ID: entry.id, MODE: entry.installed ? "update" : "add" });
-    if (result) {
-      s.reload();
-      void catalog.start();
-    }
+    // Re-read the installed list whatever the outcome: a run can change files and still fail later.
+    s.reload();
+    if (result) void catalog.start();
   };
-  return { catalog, install, target, entries, onInstall: (e, where) => void onInstall(e, where) };
+  const onRemove = async (id: string) => {
+    setRemoving(id);
+    await remove.start({ ID: id });
+    s.reload();
+  };
+  const busy = install.phase === "running" || remove.phase === "running";
+  return {
+    catalog, install, remove, target, removing, busy, entries,
+    onInstall: (e, where) => void onInstall(e, where), onRemove: (id) => void onRemove(id),
+  };
 }
 
 /** Install / update control, shared by the installed card and the catalog card. */
 function InstallControl({ entry, market, where }: { entry: MarketplaceEntry; market: Market; where: Where }) {
   const { t } = useTranslation();
-  const busy = market.install.phase === "running";
-  if (market.target?.id === entry.id && busy) {
+  const busy = market.busy;
+  if (market.target?.id === entry.id && market.install.phase === "running") {
     return <span className="ap-tag acc" role="status"><Spinner />{entry.installed ? t("market.updating") : t("market.installing")}</span>;
   }
   if (entry.error) return <span className="ap-tag">{t("market.versionsUnavailable")}</span>;
@@ -241,6 +267,8 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
   const lang = i18n.language;
   const { reload } = useStore();
   const missing = ext.secrets.filter((x) => x.required && !x.set);
+  const [confirming, setConfirming] = useState(false);
+  const removingThis = market.removing === ext.id && market.remove.phase === "running";
   const caps = [
     { n: ext.mcpServers.length, tip: t("ext.mcpTip"), Icon: IconPlug },
     { n: ext.workflows.length, tip: t("ext.workflowsTip"), Icon: IconFlow },
@@ -292,8 +320,25 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
       <div className="ap-foot">
         <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>
         <span className="grow" />
-        {entry?.update && <InstallControl entry={entry} market={market} where="installed" />}
+        {entry?.update && !confirming && <InstallControl entry={entry} market={market} where="installed" />}
+        {removingThis ? (
+          <span className="ap-tag acc" role="status"><Spinner />{t("market.removing")}</span>
+        ) : !confirming && (
+          <button type="button" className="bd-ib" disabled={market.busy} aria-label={t("market.remove", { name })} data-tip={t("market.remove", { name })}
+            onClick={() => setConfirming(true)}><IconTrash size={18} /></button>
+        )}
       </div>
+      {confirming && !removingThis && (
+        <div role="group" aria-label={t("market.removeTitle", { name })} className="card action">
+          <p><strong>{t("market.removeTitle", { name })}</strong> <span className="mute">{t("market.removeHint")}</span></p>
+          <div className="ap-foot">
+            <span className="grow" />
+            <button type="button" className="btn btn-sm btn-soft" onClick={() => setConfirming(false)}>{t("common.cancel")}</button>
+            <button type="button" className="btn btn-sm btn-soft" style={{ color: "var(--fy-down)" }} disabled={market.busy}
+              onClick={() => { setConfirming(false); market.onRemove(ext.id); }}><IconTrash size={15} />{t("market.removeConfirm")}</button>
+          </div>
+        </div>
+      )}
       {entry && <InstallOutcome entry={entry} market={market} where="installed" />}
     </li>
   );
@@ -406,6 +451,10 @@ function ExtensionsTab({ market }: { market: Market }) {
     <div role="tabpanel" id="apps-panel-ext" aria-labelledby="apps-tab-ext">
       <section aria-label={t("ext.title")}>
         <h2 className="ap-cap">{t("ext.installedTitle")} {s.extensions.status === "ok" && <span className="n">{list.length}</span>}</h2>
+        {market.remove.phase === "ok" && market.remove.output && (
+          <output className="block">{t("market.removed", { id: market.remove.output.id, commit: market.remove.output.commit })}</output>
+        )}
+        {market.removing && <ActionError action={market.remove as Action<unknown>} />}
         {s.extensions.status === "loading" ? (
           <TileSkeleton />
         ) : s.extensions.status === "error" ? (
@@ -458,9 +507,9 @@ function ExtensionsTab({ market }: { market: Market }) {
         <div className="ap-term-body">
           <CopyLine text={t("market.hintCommand")} />
           <CopyLine text="mise run ext:update" />
+          <CopyLine text="mise run ext:remove <id>" />
           <CopyLine text="mise run secrets" />
           <CopyLine text="mise run down && mise run up" />
-          <p className="mute">{t("market.removeNote")}</p>
         </div>
       </details>
     </div>

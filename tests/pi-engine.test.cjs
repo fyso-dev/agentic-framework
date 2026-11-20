@@ -43,7 +43,9 @@ test('project OMB startup selects the isolated Pi wrapper and filters inherited 
     const scripts=path.join(dir,'framework/scripts'),frameworkBin=path.join(dir,'framework/bin'),tools=path.join(dir,'tools');
     fs.mkdirSync(scripts,{recursive:true});fs.mkdirSync(frameworkBin,{recursive:true});fs.mkdirSync(tools);
     const source=path.resolve(__dirname,'../template/framework');
-    for(const name of ['lib.sh','run-omb.sh','web-origin.cjs'])fs.copyFileSync(path.join(source,'scripts',name),path.join(scripts,name));
+    for(const name of ['lib.sh','run-omb.sh','web-origin.cjs','brand.cjs'])fs.copyFileSync(path.join(source,'scripts',name),path.join(scripts,name));
+    // run-omb.sh installs the project identity (D92) before starting OMB.
+    fs.cpSync(path.join(source,'brand'),path.join(dir,'framework/brand'),{recursive:true});
     fs.copyFileSync(wrapper,path.join(frameworkBin,'pi'));fs.chmodSync(path.join(frameworkBin,'pi'),0o755);
     fs.writeFileSync(path.join(tools,'pi'),'#!/bin/sh\nprintf "REAL_PI_ARGS=%s\\n" "$*"\n',{mode:0o755});
     fs.writeFileSync(path.join(tools,'openmausbot'),'#!/bin/sh\nprintf "RESOLVED_PI=%s\\n" "$(command -v pi)"\nprintf "CANARY=%s\\n" "${FYSO_TEST_SECRET-unset}"\npi --version\n',{mode:0o755});

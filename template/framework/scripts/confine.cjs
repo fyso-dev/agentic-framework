@@ -1,4 +1,4 @@
-// Confine a process to this project's folder (D83, docs/confinement.md). The processes
+// Confine a process to this project's folder (D93, docs/confinement.md). The processes
 // that run agent code (OpenMausBot with the bots' shells, Dagu with workflow steps and
 // harness.run) start through here. The OS sandbox is Anthropic's sandbox-runtime used as
 // a library (Seatbelt on macOS, bubblewrap on Linux), pinned in mise.toml. Only the
@@ -71,7 +71,7 @@ function policy(options, env = process.env, home = os.homedir()) {
     MISE_DATA_DIR: env.MISE_DATA_DIR || path.join(home, '.local/share/mise'),
     MISE_CACHE_DIR: path.join(privateHome, '.cache/mise'), MISE_STATE_DIR: path.join(privateHome, '.local/state/mise'),
     MISE_TRUSTED_CONFIG_PATHS: root,
-    // Inside, the only age key is the project's own (D83): it opens this project's secrets only.
+    // Inside, the only age key is the project's own (D93): it opens this project's secrets only.
     MISE_SOPS_AGE_KEY_FILE: projectKey, SOPS_AGE_KEY_FILE: projectKey, FYSO_COMPOSIO_AGE_KEY_FILE: projectKey,
     FYSO_CONFINED: options.project || '1',
   };

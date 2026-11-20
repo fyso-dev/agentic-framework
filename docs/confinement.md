@@ -1,4 +1,4 @@
-# Confinement of agent processes (D83)
+# Confinement of agent processes (D93)
 
 A project's agents must not leave the project folder. OpenMausBot (the bots and their
 shells) and Dagu (workflow steps, `harness.run`) run inside an OS sandbox by default:

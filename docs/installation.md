@@ -5,16 +5,16 @@
 ## Requirements
 
 - Git with a configured author name and email. Project initialization and native configuration snapshots create local commits.
-- [mise](https://mise.jdx.dev) on `PATH` and [uv](https://docs.astral.sh/uv/) for `uvx`. The commands below use Copier 9.19.1, the verified generator version.
-- GitHub access to the private `fyso-dev/agentic-framework` repository. GitHub CLI (`gh`) is useful for authentication; an existing authenticated Git setup also works.
+- [mise](https://mise.jdx.dev) on `PATH`. The commands below run Copier 9.19.1, the verified generator version, through the pinned [uv](https://docs.astral.sh/uv/) (`uvx`) with `mise exec`, so uv needs no separate install. Generated projects pin the same uv, used by framework updates, extensions and distributions.
+- Read access to `fyso-dev/agentic-framework` over HTTPS. Public repositories (template, catalogs, skills, distributions) are read with plain Git: no GitHub account, GitHub CLI or token. Only a private repository needs Git credentials; GitHub CLI (`gh`) is one way to set them up. Publishing (pull requests) still uses `gh`.
 - Claude Code and Codex installed and signed in on the host for their respective subscription-backed bots. The default team uses both providers. Check `claude --version`, `codex --version` and the provider's login before startup; the framework does not create subscription accounts or install these coding CLIs. A signed-in provider can still reject work because of its own quota or model availability.
 - An unused block of ten ports. The default is 8400–8409. Each concurrent project needs a different block.
 
-The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI GitHub CLI, Go and pnpm through mise. The panel assets are already built.
+The complete local stack is verified on macOS. Other hosts and remote deployment are not certified by these checks. Docker is not required. The generated project pins Node, Dagu, OpenMausBot, Caddy, process-compose, sops, age, gitleaks, YAML CLI, GitHub CLI and uv through mise; Go and pnpm are installed only if a Mac has to build the web login itself (D87). The panel assets are already built.
 
-## 1. Authenticate and generate
+## 1. Authenticate (private repositories only) and generate
 
-For GitHub CLI authentication over HTTPS:
+Skip this while the template repository is public. For a private repository, authenticate Git over HTTPS, for example with GitHub CLI:
 
 ```sh
 gh auth login
@@ -24,7 +24,7 @@ gh auth setup-git
 Generate a **new project directory**, rather than running services from the template checkout:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
+mise exec aqua:astral-sh/uv@0.5.1 -- uvx --from copier==9.19.1 copier copy --trust --vcs-ref=main \
   gh:fyso-dev/agentic-framework my-project
 cd my-project
 ```
@@ -36,7 +36,7 @@ Copier asks for the project name, slug, first port and administrator name. With 
 For repeatable generation without prompts:
 
 ```sh
-uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=main \
+mise exec aqua:astral-sh/uv@0.5.1 -- uvx --from copier==9.19.1 copier copy --trust --defaults --vcs-ref=main \
   --data project_name="My project" --data project_slug=my-project \
   --data port_base=8420 --data admin_user=admin \
   gh:fyso-dev/agentic-framework my-project
@@ -69,7 +69,7 @@ For `project_slug=my-project` and `port_base=8400`:
 | Dagu | http://dagu.my-project-8400.localhost:8400 |
 | OpenMausBot | http://omb.my-project-8400.localhost:8400 |
 
-All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The first native login build runs on `mise run up` and uses pinned source and locked dependencies.
+All three share the local web session established at `auth.my-project-8400.localhost:8400`. OMB's native gateway session stays server-side; no pairing code is needed. The domain includes the project slug and port block, so cookies cannot leak between projects. Historical `*.localhost:<port>` bookmarks redirect to the canonical URLs. The native login is installed on `mise run up`: the pinned upstream binary on Linux; on macOS the binary bundled in the installer app, or, without it, a build of the pinned source with locked dependencies made once per machine and reused by later projects (D87).
 
 HTTP access is loopback-only. Remote deployment requires the separate HTTPS acceptance in Phase 6. See [web authentication](web-auth.md) for permissions, identity limitations and future providers.
 
@@ -143,7 +143,7 @@ To hand a configured project to someone else and keep sending improvements (conf
 |---|---|
 | Private repository cannot be cloned | Repository membership and `gh auth status`; configure Git credentials with `gh auth setup-git` |
 | Updates or the marketplace cannot read a private GitHub repository from the project | `mise run github:check [gh:owner/repo]`. If the host account has no access, add a read-only `FYSO_GITHUB_TOKEN` with `mise run secrets`, or set `FYSO_GITHUB_AUTH=gh` to use the host's `gh` login. Copier and catalog reads then use the `gh` credential helper for github.com only; the token never appears in arguments, URLs or Git config |
-| `mise` or `uvx` not found | Install the prerequisites and reopen a shell with their binaries on `PATH` |
+| `mise` or `uvx` not found | Install mise and reopen a shell with it on `PATH`; inside a project, `mise install` provides the pinned uv (`uvx`) |
 | SOPS cannot decrypt secrets | The age private key must match an authorized recipient; preserve the existing encrypted file |
 | Ports already in use | Choose another block for a new project; do not stop unrelated OMB or Dagu instances |
 | A bot cannot answer | `mise run doctor`, `mise run logs omb`, host provider login, quota and model availability |

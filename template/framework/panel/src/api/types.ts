@@ -21,6 +21,8 @@ export type App = {
   enabled: boolean;
   accessNote?: string;
   accessNote_i18n?: Record<string, string>;
+  /** Opens inside the panel frame at #/apps/<id> (D92); the app's gateway route must allow it. */
+  embed?: boolean;
 };
 
 export type Health = "ok" | "down" | "unknown";
@@ -54,7 +56,7 @@ export type Extension = {
   pages?: ExtensionPageRegistration[];
   /** Setup step the extension adds (`extensions/<ext>/setup.yaml`, D51). */
   setup?: { title: string; title_i18n?: Record<string, string>; description?: string; description_i18n?: Record<string, string> };
-  /** List of projects for the top bar's switcher (`extensions/<ext>/switcher.yaml`, D92). */
+  /** List of instances for the top bar's switcher (`extensions/<ext>/switcher.yaml`, D94). */
   switcher?: { url: string };
 };
 
@@ -88,7 +90,8 @@ export type Marketplace = {
 /** Output `result` of `fyso-ext-install`. */
 export type UpdateResult = { from: string | null; to: string | null; commit: string | null; changed: boolean };
 
-export type ExtInstallResult = { id: string; mode: "add" | "update"; version: string | null; commit: string };
+/** Output `result` of `fyso-ext-install` and `fyso-ext-remove` (`mode: "remove"`, `version` = the removed one). */
+export type ExtInstallResult = { id: string; mode: "add" | "update" | "remove"; version: string | null; commit: string };
 
 /** Third-party skills (D64, docs/third-party-skills.md). `GET /config/skills.json` lists the installed ones. */
 export type ThirdPartySkill = {
@@ -210,6 +213,7 @@ export const DAGS = {
   snapshot: "fyso-snapshot",
   extCatalog: "fyso-ext-catalog",
   extInstall: "fyso-ext-install",
+  extRemove: "fyso-ext-remove",
   skillsCatalog: "fyso-skills-catalog",
   skillsInstall: "fyso-skills-install",
   update: "fyso-update",

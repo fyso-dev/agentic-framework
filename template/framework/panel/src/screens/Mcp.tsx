@@ -203,7 +203,9 @@ function RemoteConnect() {
               <li key={client.id}>
                 <h3>{client.id === "other" ? t("mcp.remoteOther") : client.label}</h3>
                 {client.note && <p className="sub">{t(`mcp.remoteNote.${client.note}`)}</p>}
-                {client.commands.map((command) => <CopyLine key={command} text={command} />)}
+                {client.commands.map((command, at) => (client.note === "oauth" || client.note === "oauthHub")
+                  ? <div key={command}><p className="mute">{t(`mcp.remoteField.${["url", "clientId", "clientSecret"][at]}`)}</p><CopyLine text={command} /></div>
+                  : <CopyLine key={command} text={command} />)}
               </li>
             ))}
           </ul>

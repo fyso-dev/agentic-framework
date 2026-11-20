@@ -17,18 +17,26 @@ class InstallerDag(unittest.TestCase):
             ids = subprocess.run([sys.executable, str(ROOT / 'installer/macos/make-dag.py'), str(ROOT / 'template/mise.toml.jinja'), str(out)],
                                  check=True, capture_output=True, text=True).stdout.split()
             text = out.read_text()
-        self.assertEqual(len(ids), len(tools))
+        self.assertEqual(ids[-1], 'web_auth')
+        self.assertEqual(len(ids), len(tools) + 1)
         for step in ['generate', 'trust', *ids, 'setup', 'git', 'start']:
             self.assertRegex(step, r'^[a-zA-Z][a-zA-Z0-9_]*$')  # Dagu step id format
             self.assertIn(f'  - id: {step}\n', text)
         for tool, version in tools:
             self.assertIn(f'install "{tool}@{version}"', text)
-        # npm tools need Node first; setup waits for every tool; the first commit comes
-        # after setup so it includes .sops.yaml and the encrypted secrets.
-        self.assertRegex(text, r'id: tool_openmausbot\n    run: .*\n    depends: \[trust, tool_node\]')
-        self.assertIn(f'depends: [{", ".join(ids)}]', text)
+        # The web login is never built at install time: no Go or pnpm step (D87).
+        self.assertNotIn('core:go', text)
+        self.assertNotIn('core:pnpm', text)
+        # Tools never wait for the project; npm packages wait only for Node (D87).
+        self.assertRegex(text, r'id: tool_openmausbot\n    run: cd / && MISE_NPM_PACKAGE_MANAGER=npm MISE_NODE_VERSION=[0-9.]+ "\$MISE" install "npm:openmausbot@.*"\n    depends: \[tool_node\]')
+        self.assertRegex(text, r'id: tool_caddy\n    run: cd / && .*\n  - id:')
+        # The bundled web login reaches its step as environment variables.
+        self.assertRegex(text, r'id: web_auth\n    run: >-\n      cd "\$DIR" && FYSO_TINYAUTH_BUNDLED_BIN="\$TINYAUTH_BIN" FYSO_TINYAUTH_BUNDLED_META="\$TINYAUTH_META"\n.*run web-auth:install\n    depends: \[trust, tool_node\]')
+        # setup waits only for what it uses; start waits for every tool and the web login;
+        # the first commit comes after setup so it includes .sops.yaml and the secrets.
+        self.assertIn('depends: [trust, tool_age, tool_sops, tool_node, tool_yaml, tool_caddy]', text)
+        self.assertIn(f'depends: [git, {", ".join(ids)}]', text)
         self.assertRegex(text, r'id: git\n    run: >-\n(?:      .*\n)+    depends: \[setup\]')
-        self.assertRegex(text, r'id: start\n    run: .*\n    depends: \[git\]')
         # Parameters reach commands as environment variables, never interpolated.
         self.assertNotIn('${params.', text)
 

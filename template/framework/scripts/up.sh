@@ -27,7 +27,7 @@ for p in $(block_ports); do port_in_use "$p" && busy+=("$p"); done
 [ ${#busy[@]} -eq 0 ] || fail "ports in use: ${busy[*]}. Another program (or project) uses this block; change port_base."
 
 shared_login || framework/scripts/install-web-auth.sh
-# OMB and Dagu run confined (D83): check the sandbox and give the project its own age key.
+# OMB and Dagu run confined (D93): check the sandbox and give the project its own age key.
 if [ "${FYSO_CONFINE:-strict}" != off ]; then
   node framework/scripts/confine.cjs check
   node framework/scripts/project-key.cjs ensure

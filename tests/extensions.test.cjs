@@ -139,7 +139,7 @@ test('a page may declare a run counter as data; anything else is refused',()=>fi
     'badge: 3\n',
   ]) { page(invalid); result=invoke(); assert.equal(result.status,1,invalid); assert.match(result.stderr,/invalid page badge/); }
 }));
-test('an extension may declare one project switcher URL as data; anything else is refused',()=>fixture(({put,run})=>{
+test('an extension may declare one instance switcher URL as data; anything else is refused',()=>fixture(({put,run})=>{
   put('.copier-answers.ext-hub.yml','_src_path: fixture\n');
   const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
   const check=()=>run(['node','framework/scripts/extensions.cjs','check']);

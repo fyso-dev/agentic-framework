@@ -16,7 +16,7 @@
   "port_busy": "El bloque de puertos de {port} está reservado o en uso. Elige otro o déjalo vacío.",
   "no_ports": "No hay un bloque de puertos libre. Indica otro con --port.",
   "starting": "Preparando la instalación…",
-  "bootstrap": "Preparando mise y Dagu…",
+  "bootstrap": "Preparando las herramientas…",
   "github": "Revisando el acceso a GitHub…",
   "installing": "Instalando {name} en {folder}…",
   "checking": "Verificando el proyecto con doctor…",

@@ -1,7 +1,7 @@
 # hub — Fyso extension
 
 Connects a project to the **Fyso hub** of its host: the panel's top bar gets a menu
-beside the project name that jumps to the other projects' panels, and the Apps screen
+beside the project name that jumps to the other instances' panels, and the Apps screen
 gets a tile back to the hub's entry page.
 
 ```bash
@@ -13,7 +13,7 @@ mise run ext:add hub -- -d hub_url=https://portal.example.com
 
 | Slot | Content |
 |---|---|
-| `extensions/hub/switcher.yaml` | `url: <hub_url>/environments.json` ([contract §9](../../../../docs/extensions-contract.md#project-switcher-panel-api-3)) |
+| `extensions/hub/switcher.yaml` | `url: <hub_url>/environments.json` ([contract §9](../../../../docs/extensions-contract.md#instance-switcher-panel-api-3)) |
 | `extensions/hub/app.yaml` | Tile to `<hub_url>/` |
 
 No process, port, secret or workflow.
@@ -22,6 +22,6 @@ No process, port, secret or workflow.
 
 - Framework with panel API 3 (`framework/panel/extension-api.json`); Copier refuses an older one.
 - A hub that serves `/environments.json` to its projects' panel origins with CORS (fyso-hub
-  with the project switcher). The hub decides who sees which project: each person gets
+  with the instance switcher). The hub decides who sees which instance: each person gets
   only the environments whose `allow` list includes them. Without it the menu simply
   does not appear.

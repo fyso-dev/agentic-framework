@@ -62,7 +62,7 @@ function setup(id) {
   return step;
 }
 /**
- * Optional project switcher (D92): `extensions/<ext>/switcher.yaml` names one URL that
+ * Optional instance switcher (D94): `extensions/<ext>/switcher.yaml` names one URL that
  * returns `{items: [{name, url}]}`. The panel fetches it and lists the items under the
  * brand in the top bar; nothing from the extension is evaluated.
  */

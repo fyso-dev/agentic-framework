@@ -27,6 +27,41 @@
 	respond @crossSiteWrite 403
 }
 
+# Project identity (D92): every app's favicon paths serve the project's mark,
+# written to $FYSO_DATA/brand by framework/scripts/brand.cjs. Icons are public.
+(fyso_brand) {
+	@brandSvg path /favicon.svg /app-icon.svg
+	route @brandSvg {
+		rewrite * /icon.svg
+		root * {$FYSO_DATA}/brand
+		header Cache-Control no-cache
+		file_server
+	}
+	@brandPng path /favicon.ico /favicon-96x96.png /apple-touch-icon.png /assets/favicon.ico
+	route @brandPng {
+		rewrite * /icon.png
+		root * {$FYSO_DATA}/brand
+		header Cache-Control no-cache
+		file_server
+	}
+	@brandLogin path /fyso-brand/login-background.svg
+	route @brandLogin {
+		rewrite * /login-background.svg
+		root * {$FYSO_DATA}/brand
+		file_server
+	}
+}
+
+# Apps the panel opens in its frame (D92, app.yaml `embed: true`): their own "never frame
+# me" headers become "only the panel may frame me". Clickjacking stays blocked elsewhere.
+(fyso_framed) {
+	header {
+		-X-Frame-Options
+		Content-Security-Policy "frame-ancestors {$FYSO_WEB_SCHEME:http}://panel.{$FYSO_WEB_DOMAIN}{$FYSO_WEB_PORT_SUFFIX}"
+		defer
+	}
+}
+
 (fyso_login) {
 	route {
 		import fyso_browser_guard
@@ -60,9 +95,37 @@
 }
 
 http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	# An OAuth authorization response is a cross-site navigation. Tinyauth
+	# validates its pending session cookie, state and PKCE verifier.
+	@loginCallback {
+		method GET
+		path /api/oauth/callback/*
+	}
+	route @loginCallback {
+		reverse_proxy {$FYSO_AUTH_UPSTREAM}
+	}
+	import fyso_brand
+	import fyso_framed
 	import fyso_browser_guard
 	@internal path /api/auth/*
 	respond @internal 404
+	# Remote MCP sign-in (D90): the login's discovery document, with the PKCE method
+	# it implements, at the address MCP clients ask first.
+	# Registration (D91): the login's client for clients that register themselves.
+	@mcpAuthServer path /.well-known/oauth-authorization-server /oauth/register
+	route @mcpAuthServer {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET}
+	}
+	# The answers that send the browser back to a client gain `iss` (RFC 9207, D91).
+	# When the MCP endpoint is down they go to the login directly, without it.
+	@authorizationResponse path /authorize /api/oidc/authorize-complete
+	route @authorizationResponse {
+		reverse_proxy unix/{$FYSO_MCP_SOCKET} {$FYSO_AUTH_UPSTREAM} {
+			lb_policy first
+			lb_try_duration 2s
+			fail_duration 10s
+		}
+	}
 	reverse_proxy {$FYSO_AUTH_UPSTREAM}
 }
 
@@ -70,7 +133,10 @@ http://auth.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	# Remote MCP clients (D63) carry a bearer token instead of a web session: this
 	# route runs before the login and the endpoint checks the token itself.
-	route /mcp {
+	# OAuth (D90): the same route serves where clients learn which login issues tokens
+	# for /mcp (RFC 9728). One route: a second one changes how Caddy sorts the handles below.
+	@remoteMcp path /mcp /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/mcp
+	route @remoteMcp {
 		reverse_proxy unix/{$FYSO_MCP_SOCKET}
 	}
 	import fyso_login
@@ -227,6 +293,8 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 
 # Dagu keeps a technical Basic credential behind browser session authentication.
 http://dagu.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	import fyso_brand
+	import fyso_framed
 	import fyso_login
 	reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT} {
 		header_up Authorization "{$FYSO_DAGU_AUTH}"
@@ -236,6 +304,8 @@ http://dagu.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 # OMB's native session stays in the gateway. Browsers authenticate with the
 # project's web session; never forward their Authorization header to OMB.
 http://omb.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
+	import fyso_brand
+	import fyso_framed
 	import fyso_login
 	reverse_proxy 127.0.0.1:{$FYSO_OMB_PORT} {
 		header_up Authorization "Bearer {$FYSO_OMB_TOKEN}"

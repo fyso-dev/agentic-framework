@@ -4,10 +4,11 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_DATA FYSO_ROOT FYSO_ADMIN_USER FYSO_ADMIN_PASSWORD FYSO_DAGU_PORT FYSO_OMB_PORT OPENMAUSBOT_URL
 mkdir -p "$FYSO_DATA/dagu"
-# Workflow steps and harness.run execute agent code: Dagu runs confined (D83). Inside,
+# Workflow steps and harness.run execute agent code: Dagu runs confined (D93). Inside,
 # the age key paths below point at the project's own key.
 confined_exec \
   DAGU_HOME="$FYSO_DATA/dagu" \
+  DAGU_UI_NAVBAR_TITLE="$(node "$FYSO_ROOT/framework/scripts/brand.cjs" title)" \
   DAGU_DAGS_DIR="$FYSO_ROOT/project/workflows" \
   DAGU_WIKI_DIR="$FYSO_ROOT/project/wiki" \
   DAGU_HOST=127.0.0.1 \

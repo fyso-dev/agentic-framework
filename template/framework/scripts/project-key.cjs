@@ -1,4 +1,4 @@
-// The project's own age key (D83). Confined processes cannot read the developer's or
+// The project's own age key (D93). Confined processes cannot read the developer's or
 // server's key, which may open other projects too, so each project gets a key of its own in
 // .data/confine/age.txt and becomes one more recipient of its secrets.enc.yaml. Runs
 // outside the sandbox (from `mise run up`), with the admin key, and is idempotent:

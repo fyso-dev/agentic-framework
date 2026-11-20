@@ -46,7 +46,9 @@ test('catalog rejects invalid names and duplicate project sources instead of sug
 }));
 test('self-hosted Composio uses only the explicit encrypted project variable',()=>fixture(async({root,env})=>{
   const scripts=path.join(root,'framework/scripts');fs.mkdirSync(scripts,{recursive:true});
-  for(const name of ['run-omb.sh','lib.sh'])fs.copyFileSync(path.join(__dirname,'../template/framework/scripts',name),path.join(scripts,name));
+  for(const name of ['run-omb.sh','lib.sh','brand.cjs'])fs.copyFileSync(path.join(__dirname,'../template/framework/scripts',name),path.join(scripts,name));
+  // run-omb.sh installs the project identity (D92) before starting OMB.
+  fs.cpSync(path.join(__dirname,'../template/framework/brand'),path.join(root,'framework/brand'),{recursive:true});
   const bin=path.join(root,'bin');fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin,'openmausbot'),'#!/bin/bash\nprintf "%s|%s" "${COMPOSIO_API_KEY-unset}" "${FYSO_COMPOSIO_API_KEY-unset}"\n',{mode:0o755});
   const base={...process.env,...env,PATH:bin+path.delimiter+process.env.PATH,FYSO_DATA:path.join(root,'.data'),FYSO_OMB_WEBHOOK_PORT:'19445',FYSO_HTTP_PORT:'19440',FYSO_WEB_DOMAIN:'localhost',FYSO_DAGU_PORT:'19441',FYSO_ADMIN_USER:'fixture',FYSO_ADMIN_PASSWORD:'fixture',COMPOSIO_API_KEY:'ambient-must-not-inherit',FYSO_CONFINE:'off'};
