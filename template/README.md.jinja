@@ -36,6 +36,8 @@ mise run up
 
 Ports {{ port_base }}–{{ port_base + 9 }} belong to this project, and {{ port_base + 10 }}–{{ port_base + 19 }} to its extensions. This project never connects to another Dagu or OpenMausBot on the machine.
 
+OpenMausBot and Dagu, where bots and workflows run, are confined to this folder: they cannot read the rest of your home folder, other projects or your age key, and use only the credential file of each engine login. `mise run up` gives the project its own age key (commit `.sops.yaml` and `secrets.enc.yaml` after the first start); `mise run doctor` proves the confinement. Set `FYSO_CONFINE = "off"` in `mise.local.toml` to disable it, or open more folders with `FYSO_CONFINE_ALLOW_READ` / `FYSO_CONFINE_ALLOW_WRITE`. Details: the framework's `docs/confinement.md`.
+
 ## Build a change
 
 Ask the Builder bot in OpenMausBot, or start `fyso-dev-task` in Dagu with:

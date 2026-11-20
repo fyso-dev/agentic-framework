@@ -59,3 +59,15 @@ test('native OAuth fragments preserve project providers and skip pending credent
   fs.unlinkSync(answers);
   assert.deepEqual(withExtensionProviders(structuredClone(original), root, read, expand, env), original);
 });
+const {execFileSync}=require('node:child_process');
+let yamlBin=null;try{yamlBin=execFileSync('which',['yaml'],{encoding:'utf8'}).trim()||null;}catch{}
+test('the runtime config keeps the resources server off even if the project enables it',{skip:!yamlBin&&'yaml CLI not on PATH'},()=>{
+  const root=project({'project/auth/tinyauth.yaml':'resources:\n  enabled: true\n  path: /\nui:\n  title: Acme\nauth:\n  acls:\n    policy: deny\napps:\n  panel:\n    users:\n      allow: admin\n'});
+  const data=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-web-auth-data-'));
+  execFileSync(process.execPath,[path.resolve(__dirname,'../template/framework/scripts/web-auth-config.cjs')],{env:{...process.env,FYSO_ROOT:root,FYSO_DATA:data,FYSO_AUTH_PORT:'1',FYSO_AUTH_USERS:'admin:x',FYSO_WEB_DOMAIN:'localhost',FYSO_HTTP_PORT:'1',FYSO_WEB_SCHEME:'http'}});
+  const config=require('node:module').createRequire(fs.realpathSync(yamlBin))('yaml').parse(fs.readFileSync(path.join(data,'web-auth/runtime/config.yaml'),'utf8'));
+  assert.deepEqual(config.resources,{enabled:false});
+  assert.equal(config.ui.title,'Acme');
+  assert.ok(config.ui.backgroundImage);
+  assert.equal(config.auth.acls.policy,'deny');
+});

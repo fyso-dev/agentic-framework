@@ -152,7 +152,7 @@ export function Observability() {
 
       <div className="observ-filters">
         <label>{t("observ.period")} <select className="select" value={period} onChange={e => setPeriod(e.target.value as Period)}>{(["month", "week", "today"] as const).map(p => <option key={p} value={p}>{t(`observ.periods.${p}`)}</option>)}</select></label>
-        <label>{t("observ.bot")} <select className="select" value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{unique(daily.map(g=>g.bot)).map(b=><option key={b}>{b}</option>)}</select></label>
+        <label>{t("observ.botOrWorkflow")} <select className="select" value={bot} onChange={e => setBot(e.target.value)}><option value="">{t("observ.all")}</option>{unique(daily.map(g=>g.bot)).map(b=><option key={b}>{b}</option>)}</select></label>
         <label>{t("observ.model")} <select className="select" value={model} onChange={e => setModel(e.target.value)}><option value="">{t("observ.all")}</option>{unique(daily.map(g=>g.model)).map(m=><option key={m} value={m}>{m === "unknown" ? t("observ.unknown") : m}</option>)}</select></label>
         <label>{t("observ.engine")} <select className="select" value={engine} onChange={e => setEngine(e.target.value)}><option value="">{t("observ.all")}</option>{unique(daily.map(g=>g.engine)).map(m=><option key={m} value={m}>{engineLabel(m)}</option>)}</select></label>
       </div>
@@ -181,7 +181,7 @@ export function Observability() {
       </section>
       {(totals.missingCost > 0 || totals.missingTokens > 0) && <p className="pill pill-warn">{t("observ.coverage", {count:totals.missingCost})} · {t("observ.missingTokens", {count:totals.missingTokens})}</p>}
 
-      <section className="observ-section"><h2 className="section-title">{t("observ.usage")}</h2><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["bot","model","engine","turns","input","cache","output","reasoning","costs"].map(k=><th key={k} scope="col">{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
+      <section className="observ-section"><h2 className="section-title">{t("observ.usage")}</h2><div className="card observ-table-wrap"><table className="observ-table"><thead><tr>{["botOrWorkflow","model","engine","turns","input","cache","output","reasoning","costs"].map(k=><th key={k} scope="col">{t(`observ.${k}`)}</th>)}</tr></thead><tbody>
         {groups.map((g,i)=><tr key={i}><td>{g.bot}</td><td>{g.model === "unknown" ? t("observ.unknown") : g.model}</td><td>{engineLabel(g.engine)}</td><td>{number(g.turns)}</td><td>{number(g.input)}</td><td>{number(g.cachedInput)}</td><td>{number(g.output)}</td><td>{number(g.reasoning)}</td><td>{costDetail(g)}</td></tr>)}
       </tbody></table>{!groups.length && <p className="observ-empty">{t("observ.empty")}</p>}</div></section>
 
