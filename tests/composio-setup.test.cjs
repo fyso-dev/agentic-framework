@@ -121,3 +121,25 @@ test('remote MCP commands share the private boundary, answer POST only and never
   assert.equal(off.status,409);const text=await off.text();assert.equal(text,'{"error":"httpsRequired"}');assert.ok(!text.includes(token));
  }finally{await new Promise(resolve=>plain.close(resolve));}
 }));
+test('framework updates run outside the sandbox only for the internal admin call with a plain ref',()=>fixture(async f=>{
+ const refs=[];let release;
+ const server=createServer(f.env,undefined,undefined,undefined,undefined,async ref=>{refs.push(ref);if(ref==='slow')await new Promise(r=>{release=r;});return {from:'v1',to:ref||'v2',commit:'abc',changed:true};});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const url=`http://127.0.0.1:${server.address().port}/internal/framework-update`;
+ const admin={Authorization:'Basic '+Buffer.from('fixture:fixture').toString('base64'),'Content-Type':'application/json'};
+ const call=(headers,body,method='POST')=>fetch(url,{method,headers,body:method==='POST'?body:undefined});
+ try{
+  assert.equal((await call({'Content-Type':'application/json'},'{"ref":"v2"}')).status,401);
+  assert.equal((await call({...admin,Origin:'http://panel.localhost:19540'},'{"ref":"v2"}')).status,403,'a browser request is refused');
+  assert.equal((await call(admin,'{}','GET')).status,405);
+  assert.equal((await call({...admin,'Content-Type':'text/plain'},'{"ref":"v2"}')).status,415);
+  for(const body of ['{"ref":"v2","src":"gh:evil/template"}','{"ref":"$(id)"}','{"ref":"../x y"}','[]','nope'])assert.equal((await call(admin,body)).status,400,body);
+  assert.deepEqual(refs,[]);
+  const ok=await call(admin,'{"ref":"v2"}');assert.equal(ok.status,200);assert.deepEqual(await ok.json(),{from:'v1',to:'v2',commit:'abc',changed:true});
+  const latest=await call(admin,'{}');assert.equal(latest.status,200);
+  const slow=call(admin,'{"ref":"slow"}');await new Promise(r=>setTimeout(r,50));
+  assert.equal((await call(admin,'{"ref":"v3"}')).status,409,'one update at a time');
+  release();assert.equal((await slow).status,200);
+  assert.deepEqual(refs,['v2','','slow']);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+}));
