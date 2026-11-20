@@ -135,3 +135,13 @@ test('every framework Copier call runs on a pinned Python',()=>{
   assert.ok(calls.length>=3);
   for (const {name,line} of calls) assert.match(line,/uvx --python \d+\.\d+\.\d+ --from copier==/,name);
 });
+
+// fyso-update clones this repository inside the sandbox (Copier, confined Dagu step).
+// sandbox-runtime never lets a confined process create these paths, so a tracked one
+// makes every update from the panel fail.
+test('the repository tracks no path the sandbox forbids creating',()=>{
+  const {execFileSync}=require('node:child_process'),path=require('node:path');
+  const files=execFileSync('git',['ls-files'],{cwd:path.resolve(__dirname,'..'),encoding:'utf8'}).split('\n').filter(Boolean);
+  const forbidden=/(^|\/)(\.mcp\.json|\.gitconfig|\.gitmodules|\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.ripgreprc)$|(^|\/)\.(vscode|idea)\/|(^|\/)\.claude\/(commands|agents)\//;
+  assert.deepEqual(files.filter(f=>forbidden.test(f)),[]);
+});

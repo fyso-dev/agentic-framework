@@ -124,6 +124,8 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 The owner extension review fixes and focused verification are recorded in [business-owner extensions](owner-extensions.md).
 *What was learned while building. Feeds back into Layers 1–3.*
 
+2026-11-19: **Conditional extension pages (D95).** `visible: {api, field}` in a page file lists the page only while the extension's own API answers `true`; Fyso Biz's Identity page shows only for a project connected to Fyso Biz. Panel API 5. [Contract §9](extensions-contract.md#conditional-pages-panel-api-5-d95)
+
 2026-11-19: **Instance switcher slot (D94).** An extension declares one list URL in `extensions/<ext>/switcher.yaml`; the panel shows the list under a chevron beside the brand. The hub serves the list with CORS for its projects' panel origins, so the slot needs no hub knowledge in the core. Panel API 3. [Contract §9](extensions-contract.md#instance-switcher-panel-api-3)
 
 2026-11-19: **OMB and Dagu run confined to the project folder (D93).** Anthropic's sandbox-runtime as a library, file system and local IPC only. Findings: with the network unrestricted its macOS profile allows every Unix socket (a confined shell could drive tmux or another project's process-compose), so `confine.cjs` adds socket rules; Node's `os.uptime()` needs `kern.boottime`; Dagu puts a socket per run in `/tmp/@dagu_*`, which broke every workflow until allowed (the self-test now opens one); OpenMausBot's permission broker socket lives in `.data/omb` and limits project paths to about 50 characters on macOS. Verified on macOS with a generated project: doctor green, escape probe through Dagu denied, `fyso-snapshot` and a bot turn work. Linux unverified. [Contract](confinement.md)
