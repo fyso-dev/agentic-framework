@@ -47,12 +47,19 @@ function sources() {
   return list;
 }
 
-/** Shallow-clone one catalog and read its marketplace.yaml. */
+/**
+ * Shallow-clone one catalog and read its marketplace.yaml.
+ * Bare and without hook templates: Dagu steps run confined (D93), and sandbox-runtime
+ * always denies writes under a `.git/` folder, which a normal clone needs.
+ */
 function loadCatalog(source) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fyso-catalog-'));
   try {
-    git(['clone', '--quiet', '--depth', '1', gitUrl(source), dir]);
-    const data = read(path.join(dir, 'marketplace.yaml')) || {};
+    const repo = path.join(dir, 'catalog.git');
+    git(['-c', 'init.templateDir=', 'clone', '--quiet', '--bare', '--depth', '1', gitUrl(source), repo]);
+    const file = path.join(dir, 'marketplace.yaml');
+    fs.writeFileSync(file, git(['--git-dir', repo, 'show', 'HEAD:marketplace.yaml']));
+    const data = read(file) || {};
     const entries = Array.isArray(data.extensions) ? data.extensions : [];
     for (const e of entries) {
       if (!validId(e.id) || typeof e.src !== 'string') throw Error(`marketplace.yaml: invalid entry ${JSON.stringify(e.id)}`);

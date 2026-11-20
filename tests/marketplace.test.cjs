@@ -62,6 +62,16 @@ test('an invalid catalog entry is rejected',()=>fixture(({base,put,run})=>{
   assert.match(data.catalogs[0].error,/invalid entry/);assert.deepEqual(data.extensions,[]);
 }));
 
+test('a catalog is read from a bare clone, and one without marketplace.yaml is an error',()=>fixture(({base,put,run})=>{
+  // Confined steps cannot write under `.git/` (sandbox-runtime), so no working tree is checked out.
+  const sample=ext(base,'ext-sample',['v1.0.0']);
+  const cat=catalog(base,'cat',[{id:'sample',src:sample}]), none=repo(path.join(base,'none'),{'README.md':'x'});
+  put('project/marketplaces.yaml',JSON.stringify([none,cat]));
+  const data=JSON.parse(run('json').stdout);
+  assert.match(data.catalogs[0].error,/marketplace\.yaml/);
+  assert.deepEqual(data.extensions.map(e=>[e.id,e.latest]),[['sample','v1.0.0']]);
+}));
+
 test('gh: shorthand expands to a GitHub git URL',()=>fixture(({root})=>{
   const code="const {gitUrl}=require('./framework/scripts/marketplace.cjs');console.log(gitUrl('gh:fyso-dev/fyso-extensions'),gitUrl('/abs/path'))";
   const result=spawnSync(process.execPath,['-e',code],{cwd:root,env:{...process.env,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH},encoding:'utf8'});
