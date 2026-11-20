@@ -4,6 +4,7 @@
     "unavailable": "No se pudo verificar la sesión"
   },
   "common": {
+    "accessDenied": "No tenés permiso para acceder a esta pantalla.",
     "newTab": "(se abre en una pestaña nueva)",
     "copy": "Copiar",
     "copied": "Copiado",
@@ -923,6 +924,14 @@
     "saveTipApps": "Los accesos a aplicaciones se aplican al guardar; el resto queda pendiente hasta «Revisar y aplicar»."
   },
   "mcp": {
+    "personal": {
+      "description": "Creá una credencial individual para tu cliente MCP remoto. Al crear una nueva credencial se reemplaza la anterior.",
+      "issue": "Crear credencial",
+      "failed": "No se pudo crear la credencial de MCP remoto.",
+      "endpoint": "Dirección de MCP remoto",
+      "token": "Token Bearer. Vence {{expiry}}.",
+      "unavailable": "Las credenciales individuales de MCP remoto requieren un proyecto con HTTPS."
+    },
     "title": "Maneja el proyecto desde tu IA",
     "intro": "Conecta Claude o Codex al MCP de este proyecto para crear agentes, instalar extensiones y revisar el estado conversando.",
     "serverTip": "Nombre del servidor MCP en tu app",

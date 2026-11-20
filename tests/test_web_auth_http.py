@@ -2,6 +2,8 @@
 
 Set FYSO_TEST_TINYAUTH and FYSO_TEST_CADDY to explicit binaries. Uses only a
 temporary directory and a caller-selected, unused block (default 19800).
+For the managed-policy integration, set FYSO_TEST_BIZ_EXTENSION to a generated
+project containing the installed Biz extension with managed access enabled.
 """
 import base64
 import http.client
@@ -16,17 +18,23 @@ import threading
 import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 @unittest.skipUnless(os.environ.get('FYSO_TEST_TINYAUTH') and os.environ.get('FYSO_TEST_CADDY'), 'requires explicit native test binaries')
-class WebAuthHTTP(unittest.TestCase):
+class WebAuthFixture(unittest.TestCase):
     # People reach the gateway on its listening address; a subclass puts it behind
     # an HTTPS provider (D62), which changes the public scheme and drops the port.
     scheme = 'http'
     port_offset = 0
     web_domain = None
+
+    @classmethod
+    def setup_extra_services(cls, env):
+        pass
 
     @classmethod
     def origin(cls, app):
@@ -59,10 +67,20 @@ class WebAuthHTTP(unittest.TestCase):
         (public / 'locales').mkdir()
         (public / 'locales/es.json').write_text('{"title":"Pending"}')
         (public.parent / 'secrets.yaml').write_text('names: []')
+        (public.parent / 'authorize.caddy').write_text(
+            '@fixturePolicy path /__policy_fixture /api/dagu/__policy_fixture\n'
+            'forward_auth @fixturePolicy 127.0.0.1:{$FYSO_OMB_PORT} {\n'
+            '    uri /__policy_decision\n'
+            '    header_up X-Fyso-Policy-Host {host}\n'
+            '    header_up X-Fyso-Policy-Path {path}\n'
+            '}\n'
+        )
         shutil.copy(Path(os.environ.get('FYSO_TEST_GATEWAY_CONFIG', ROOT / 'template/Caddyfile')), cls.root / 'Caddyfile')
         config = (ROOT / 'template/project/auth/tinyauth.yaml.jinja').read_text().replace('{{ admin_user }}', 'admin')
         # A second local identity has access only to OMB; panel and Dagu remain denied.
         config = config.replace('  omb:\n    users:\n      allow: "admin"', '  omb:\n    users:\n      allow: "admin,viewer"')
+        if getattr(cls, 'biz_extension', None):
+            config = config.replace('  panel:\n    users:\n      allow: "admin"', '  panel:\n    users:\n      allow: "admin,viewer"')
         config += '\n  trustedext:\n    users:\n      allow: admin\n'
         (cls.root / 'project/auth/tinyauth.yaml').write_text(config)
         hashed = subprocess.check_output([os.environ['FYSO_TEST_CADDY'], 'hash-password', '--bcrypt-cost', '4'], input=cls.password.encode()).decode().strip()
@@ -75,6 +93,17 @@ class WebAuthHTTP(unittest.TestCase):
 
         class Echo(BaseHTTPRequestHandler):
             def do_GET(self):
+                if self.path == '/__policy_decision':
+                    allowed = (self.headers.get('Remote-User') == 'admin'
+                               and self.headers.get('Authorization') is None
+                               and self.headers.get('X-Forwarded-Method') == 'GET'
+                               and self.headers.get('X-Fyso-Policy-Path') in ('/__policy_fixture', '/api/dagu/__policy_fixture')
+                               and self.headers.get('X-Fyso-Policy-Host') in (
+                                   f'panel.{cls.domain}', f'dagu.{cls.domain}', f'omb.{cls.domain}')
+                               and 'tinyauth-session-' not in self.headers.get('Cookie', ''))
+                    self.send_response(204 if allowed else 403)
+                    self.end_headers()
+                    return
                 body = json.dumps({
                     'path': self.path,
                     'bearer': self.headers.get('Authorization') == 'Bearer fixture-mcp-token',
@@ -92,7 +121,7 @@ class WebAuthHTTP(unittest.TestCase):
 
             def log_message(self, *_):
                 pass
-        for offset in [1, 4]:
+        for offset in ([4] if getattr(cls, "dagu_binary", None) else [1, 4]):
             server = ThreadingHTTPServer(('127.0.0.1', cls.port + offset), Echo)
             cls.servers.append(server)
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -124,6 +153,7 @@ class WebAuthHTTP(unittest.TestCase):
             'FYSO_DAGU_PORT': str(cls.port + 1), 'FYSO_OMB_PORT': str(cls.port + 4),
             'FYSO_CADDY_ADMIN_PORT': str(cls.port + 8), 'FYSO_BIND': '127.0.0.1',
             'FYSO_CONNECTOR_SETUP_SOCKET': str(cls.setup_socket), 'FYSO_MCP_SOCKET': str(cls.mcp_socket), 'FYSO_DAGU_AUTH': cls.dagu_auth, 'FYSO_OMB_TOKEN': 'fixture-omb-token'}
+        cls.setup_extra_services(env)
         cls.start([os.environ['FYSO_TEST_CADDY'], 'run', '--config', str(cls.root / 'Caddyfile')], env)
         cls.wait_port(cls.port)
 
@@ -184,6 +214,7 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertEqual('Secure' in cookie, self.scheme == 'https')
         return cookie.split(';')[0]
 
+class WebAuthHTTP(WebAuthFixture):
     def test_connector_setup_uses_web_session_and_private_technical_upstream(self):
         route = '/api/composio/setup'
         self.assertEqual(self.request('panel', route, 'POST', {'apiKey':'fixture-key'})[0], 401)
@@ -208,6 +239,40 @@ class WebAuthHTTP(unittest.TestCase):
         self.assertTrue(json.loads(body)['daguCredential']); self.assertFalse(json.loads(body)['webCookieLeaked'])
         self.assertEqual(self.request('panel', '/api/agent/remote', 'POST', {}, Cookie=cookie, Origin='https://foreign.invalid')[0], 403)
         self.assertEqual(self.request('panel', '/api/agent/other', 'POST', {}, Cookie=cookie, Origin=origin)[0], 404)
+
+    def test_extension_policy_receives_authenticated_identity_before_app_credentials(self):
+        for app, path in [
+            ('panel', '/api/dagu/__policy_fixture'),
+            ('dagu', '/__policy_fixture'),
+            ('omb', '/__policy_fixture'),
+        ]:
+            with self.subTest(app=app):
+                status, _, body = self.request(app, path, cookie=self.login(), Authorization='Bearer caller')
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(body)['user'], 'admin')
+                self.assertIn(self.request(app, path, **{'Remote-User': 'admin'})[0], (302, 401))
+
+        status, _, _ = self.request('omb', '/__policy_fixture', cookie=self.login('viewer'),
+                                    **{'Remote-User': 'admin'})
+        self.assertEqual(status, 403)
+
+    def test_extension_oauth_return_accepts_cross_site_navigation_with_session(self):
+        route = '/extensions/sockext/oauth/callback?state=example&code=example'
+        navigation = {'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate'}
+        cookie = self.login()
+        status, _, body = self.request('panel', route, cookie=cookie, **navigation)
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(data['path'], '/profile/callback?state=example&code=example')
+        self.assertEqual(data['user'], 'admin')
+        self.assertFalse(data['webCookieLeaked'])
+        self.assertIn(self.request('panel', route, **navigation)[0], (302, 401))
+        self.assertEqual(self.request('panel', '/api/ext/sockext/profile/callback', cookie=cookie, **navigation)[0], 403)
+
+    def test_panel_access_without_provider_returns_no_policy(self):
+        status, _, body = self.request('panel', '/api/panel-access', cookie=self.login())
+        self.assertEqual(status, 204)
+        self.assertEqual(body, '')
 
     def test_extension_api_reaches_only_its_socket_behind_the_web_session(self):
         # D79: /api/ext/<id>/<path> → /tmp/fyso-ext-<id>-<port>.sock with the session's identity only.
@@ -394,6 +459,162 @@ class WebAuthBehindHTTPS(WebAuthHTTP):
         cookie = self.login()
         listening = f'http://panel.{self.domain}:{self.port}'
         self.assertEqual(self.request('panel', '/api/session/logout', 'POST', {}, cookie=cookie, Origin=listening)[0], 403)
+
+
+class BizPolicyGateway(WebAuthFixture):
+    scheme = 'https'
+    port_offset = 40
+    biz_extension = os.environ.get('FYSO_TEST_BIZ_EXTENSION')
+    dagu_binary = os.environ.get('FYSO_TEST_DAGU')
+
+    @classmethod
+    def setUpClass(cls):
+        if not cls.biz_extension:
+            raise unittest.SkipTest('requires a generated project with the managed Biz extension')
+        super().setUpClass()
+
+    @classmethod
+    def setup_extra_services(cls, env):
+        if cls.dagu_binary:
+            workflows = cls.root / 'workflows'
+            workflows.mkdir()
+            (workflows / 'invoice.yaml').write_text(
+                'name: invoice\nsteps:\n  - name: record\n    command: echo authorized-invoice\n'
+            )
+            cls.start([cls.dagu_binary, 'start-all'], {
+                **env, 'DAGU_HOME': str(cls.root / 'dagu'), 'DAGU_DAGS_DIR': str(workflows),
+                'DAGU_HOST': '127.0.0.1', 'DAGU_PORT': str(cls.port + 1),
+                'DAGU_SCHEDULER_PORT': str(cls.port + 2), 'DAGU_WORKER_HEALTH_PORT': str(cls.port + 3),
+                'DAGU_COORDINATOR_HOST': '127.0.0.1', 'DAGU_COORDINATOR_PORT': str(cls.port + 6),
+                'DAGU_COORDINATOR_HEALTH_PORT': str(cls.port + 7), 'DAGU_PEER_INSECURE': 'true',
+                'DAGU_AUTH_MODE': 'basic', 'DAGU_AUTH_BASIC_USERNAME': 'technical',
+                'DAGU_AUTH_BASIC_PASSWORD': 'fixture-service-password',
+            })
+            cls.wait_port(cls.port + 1, '/api/v1/health')
+        source = Path(cls.biz_extension) / 'extensions/biz'
+        installed = cls.root / 'extensions/biz'
+        installed.mkdir()
+        for filename in ('authorize.caddy', 'panel-access.caddy'):
+            shutil.copy(source / filename, installed / filename)
+        cls.permissions = {
+            'operator': {'app:panel', 'workflow:invoice:run', 'workflow:invoice:read'},
+            'reader': {'app:panel'},
+        }
+        cls.external_biz = os.environ.get('FYSO_TEST_BIZ_ORIGIN')
+        cls.biz_project = os.environ.get('FYSO_TEST_BIZ_PROJECT', 'project')
+        cls.biz_organization = 'acme' if cls.external_biz else 'fixture'
+        origin = cls.external_biz or f'http://127.0.0.1:{cls.port + 12}'
+
+        class BizFixture(BaseHTTPRequestHandler):
+            def do_GET(self):
+                parsed = urlparse(self.path)
+                if parsed.path == '/.well-known/oauth-authorization-server':
+                    return self.send_json({
+                        'authorization_endpoint': f'{origin}/oauth/authorize',
+                        'token_endpoint': f'{origin}/oauth/token',
+                        'registration_endpoint': f'{origin}/oauth/register',
+                        'code_challenge_methods_supported': ['S256'],
+                    })
+                principal = self.headers.get('Authorization', '').removeprefix('Bearer ')
+                if principal not in cls.permissions:
+                    return self.send_json({}, 401)
+                if parsed.path == '/oauth/userinfo':
+                    return self.send_json({'sub': principal, 'scope': 'framework_access', 'organization': 'fixture'})
+                query = parse_qs(parsed.query)
+                if parsed.path == '/oauth/framework-access' and query.get('organization') == ['fixture'] and query.get('project') == ['project']:
+                    permissions = cls.permissions[principal]
+                    if 'capability' in query:
+                        return self.send_json({'allowed': query['capability'][0] in permissions})
+                    return self.send_json({'capabilities': sorted(permissions)})
+                return self.send_json({}, 404)
+
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+                if self.path == '/oauth/register':
+                    return self.send_json({'client_id': 'fixture-client'}, 201)
+                if self.path == '/oauth/token':
+                    code = parse_qs(body.decode()).get('code', [''])[0]
+                    if code in cls.permissions:
+                        return self.send_json({'access_token': code, 'token_type': 'Bearer', 'expires_in': 300})
+                return self.send_json({}, 400)
+
+            def send_json(self, data, status=200):
+                body = json.dumps(data).encode()
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_):
+                pass
+
+        if not cls.external_biz:
+            biz = ThreadingHTTPServer(('127.0.0.1', cls.port + 12), BizFixture)
+            cls.servers.append(biz)
+            threading.Thread(target=biz.serve_forever, daemon=True).start()
+        socket = Path('/tmp') / f'fyso-ext-biz-{cls.port}.sock'
+        cls.addClassCleanup(lambda: socket.unlink(missing_ok=True))
+        cls.start(['node', str(source / 'gateway.cjs')], {
+            **env, 'FYSO_EXT_SOCKET': str(socket), 'FYSO_EXT_BIZ_PORT': str(cls.port + 11),
+            'FYSO_BIZ_URL': origin, 'FYSO_BIZ_ACCESS_ORGANIZATION': cls.biz_organization,
+            'FYSO_BIZ_ACCESS_PROJECT': cls.biz_project,
+        })
+        cls.wait_port(cls.port + 11, '/health')
+
+    def test_biz_policy_gateway_revocation_for_two_profiles(self):
+        def link(user, profile):
+            local = self.login(user)
+            status, headers, _ = self.request('panel', '/api/ext/biz/profile/login', 'POST', {}, cookie=local,
+                                               Origin=self.origin('panel'))
+            self.assertEqual(status, 303)
+            state = parse_qs(urlparse(headers['Location']).query)['state'][0]
+            binding = headers['Set-Cookie'].split(';', 1)[0]
+            if self.external_biz:
+                with urlopen(Request(headers['Location'], headers={'X-Test-Profile': profile}), timeout=10) as consent:
+                    callback = urlparse(json.loads(consent.read())['redirectTo'])
+                path = f'{callback.path}?{callback.query}'
+            else:
+                path = '/extensions/biz/oauth/callback?' + urlencode({'state': state, 'code': profile})
+            status, headers, _ = self.request('panel', path, cookie=f'{local}; {binding}', **{'Sec-Fetch-Site': 'cross-site'})
+            self.assertEqual(status, 303)
+            return f"{local}; {headers['Set-Cookie'].split(';', 1)[0]}"
+
+        operator = link('admin', 'operator')
+        reader = link('viewer', 'reader')
+        route = '/api/dagu/dags/invoice/enqueue'
+        status, _, body = self.request('panel', route, 'POST', {}, cookie=operator)
+        self.assertIn(status, (200, 201, 202), body)
+        self.assertEqual(self.request('panel', route, 'POST', {}, cookie=reader)[0], 403)
+        if self.dagu_binary:
+            run = json.loads(body)['dagRunId']
+            details = '/api/dagu/dag-runs/invoice/' + run
+            for _ in range(100):
+                status, _, body = self.request('panel', details, cookie=operator)
+                if status == 200 and json.loads(body)['dagRunDetails']['statusLabel'] == 'succeeded':
+                    break
+                time.sleep(.1)
+            else:
+                self.fail(f'The allowed workflow did not complete, last HTTP status {status}')
+            self.assertEqual(self.request('panel', details, cookie=reader)[0], 403)
+        status, _, body = self.request('panel', '/api/panel-access', cookie=reader)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {'capabilities': ['app:panel']})
+        if self.external_biz:
+            with urlopen(Request(self.external_biz + '/__fixture/revoke', method='POST'), timeout=10) as result:
+                self.assertEqual(result.status, 204)
+        else:
+            self.permissions['operator'].remove('workflow:invoice:run')
+        self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 403)
+
+        old_profile = reader.split('; ', 1)[1]
+        status, _, _ = self.request('panel', '/api/session/logout', 'POST', {}, cookie=reader,
+                                    Origin=self.origin('panel'))
+        self.assertIn(status, (200, 204))
+        reader_again = f"{self.login('viewer')}; {old_profile}"
+        status, _, body = self.request('panel', '/api/panel-access', cookie=reader_again)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {'capabilities': []})
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Action } from "../lib/useDaguAction";
+import { useCapability } from "../lib/access";
 import { useTimeFormat } from "../lib/time";
 import { useStore } from "../store";
 import { Spinner } from "./Icons";
@@ -89,6 +90,8 @@ export function ActionButton({ action, label, busyLabel, onRun, primary, size = 
   const running = action.phase === "running";
   const failed = action.phase === "failed";
   const pri = primary ?? (action.phase === "never" || failed);
+  const canRun = useCapability(`workflow:${action.dag}:run`);
+  if (!canRun) return null;
   return (
     <button
       type="button"
@@ -106,11 +109,12 @@ export function ActionButton({ action, label, busyLabel, onRun, primary, size = 
 export function ActionError({ action, children }: { action: AnyAction; children?: ReactNode }) {
   const { t } = useTranslation();
   const logs = useLogsUrl(action.dag);
+  const canOpenLogs = useCapability("app:dagu");
   if (action.phase !== "failed") return null;
   return (
     <p role="alert" className="action-error">
       <strong>{children ?? action.error ?? t("action.failedGeneric")}</strong>
-      <External href={logs}>{t("common.logs")} </External>
+      {canOpenLogs && <External href={logs}>{t("common.logs")} </External>}
     </p>
   );
 }

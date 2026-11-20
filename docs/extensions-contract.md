@@ -59,6 +59,10 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Tools, env, tasks | `.config/mise/conf.d/ext-<ext>.toml` | mise (verified on 2026.11.2: env and tasks load; the file needs `mise trust`) |
 | Processes | `extensions/<ext>/process.yaml` | process-compose: `up.sh` passes one extra `-f` per file (verified: merge works and `depends_on` crosses files) |
 | Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid). Each `http://<app>.{$FYSO_WEB_DOMAIN}` site inherits the panel's web-login rule unless the project declares that app (D58) |
+| Browser request authorization | `extensions/<ext>/authorize.caddy` | Caddy imports these directives inside `fyso_login`, after Tinyauth authenticates the request and before browser application handlers run. |
+| Browser OAuth return | `GET /extensions/<ext>/oauth/callback` | Caddy routes this navigation to `GET /profile/callback` on the extension's private socket after web authentication and authorization. The extension must validate and consume the OAuth state and bind it to the initiating browser. |
+| Panel permission report | `extensions/<ext>/panel-access.caddy` | A provider serves `GET /api/panel-access` after gateway authentication. HTTP 204 means unmanaged access. HTTP 200 with `{"capabilities":[]}` reports the current principal's effective permissions. The panel uses these for navigation and the gateway still checks protected requests. |
+| Remote MCP authorization | `extensions/<ext>/mcp-authorize` | An empty marker enables checks on the extension's private socket. `POST /mcp-access/check` receives `principal`, `method`, and the optional `tool`; only HTTP 204 grants access. A principal may be a project credential, a validated local user, or a delegated credential of the form `fyso-ext-<ext>.<secret>`. For delegated authentication the issuing extension receives the SHA-256 digest with method `authenticate`. Only that extension receives the digest. |
 | OAuth provider definitions | `extensions/<ext>/tinyauth.providers.yaml` | Native Tinyauth provider map, loaded only for extensions with a Copier answers file. Project provider IDs take precedence. Missing `${FYSO_AUTH_*}` values leave a provider pending. Project-owned app access rules still apply. |
 | Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
 | Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
@@ -398,3 +402,11 @@ The core then treats `https://<app>.<web_domain>` as the project's addresses
 - is the only provider of the project. Nothing detects a second one yet.
 
 Features that need HTTPS check the scheme, not a particular extension.
+
+### Managed access compatibility
+
+`framework/panel/access-api.json` version 1 marks projects with the browser
+authorization, permission report, and remote MCP authorization slots.
+Extensions that enable managed access should require this marker during
+installation. Installing a policy extension into an older gateway must not
+silently enable a mode that the gateway cannot enforce.
