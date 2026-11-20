@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 # which may not contain the GitHub credential helper yet.
 auth="$(cd "$(dirname "$0")" && pwd)/github-auth.cjs"
 action=${1:-}; shift || true
-copier() { node "$auth" -- uvx --from copier==9.19.1 copier "$@"; }
+copier() { node "$auth" -- uvx --python 3.12.7 --from copier==9.19.1 copier "$@"; }
 refresh() {
   local file
   for file in .config/mise/conf.d/ext-*.toml; do

@@ -9,7 +9,7 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 require_env FYSO_ROOT FYSO_DATA
-copier() { uvx --from copier==9.19.1 copier "$@"; }
+copier() { uvx --python 3.12.7 --from copier==9.19.1 copier "$@"; }
 dist() { node framework/scripts/dist.cjs "$@"; }
 answers=.copier-answers.dist.yml
 work="$FYSO_DATA/dist"
