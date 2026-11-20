@@ -45,12 +45,15 @@ The panel probe writes a single fixture output under `.data/dagu/spike-output`.
 
 ## Claude cwd mechanism
 
+Each bot folder keeps its MCP config as `mcp.json`, not `.mcp.json`: framework updates clone this
+repository inside the project's sandbox, which never lets a confined process create a `.mcp.json`.
+
 Use the already installed subscription CLI, without installing another copy:
 
 ```sh
 cd spikes/gateway/bot-none
 claude -p 'List the Dagu DAGs using the dagu MCP. Call dagu_read to list DAGs.' \
-  --mcp-config .mcp.json --strict-mcp-config --setting-sources '' --tools '' \
+  --mcp-config mcp.json --strict-mcp-config --setting-sources '' --tools '' \
   --allowedTools mcp__dagu__dagu_read --max-turns 3 --no-session-persistence \
   --output-format json
 ```
