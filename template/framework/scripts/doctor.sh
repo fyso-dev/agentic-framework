@@ -23,6 +23,21 @@ else
 fi
 [ "${FYSO_BIND:-127.0.0.1}" = 127.0.0.1 ] || bad "HTTP web login must remain bound to loopback"
 
+echo "Confinement"
+if [ "${FYSO_CONFINE:-strict}" = off ]; then
+  warn "OMB and Dagu are not confined (FYSO_CONFINE=off)"
+elif ! result=$(node framework/scripts/confine.cjs check 2>&1); then
+  bad "${result#confine: }"
+elif ! result=$(node framework/scripts/project-key.cjs check 2>&1); then
+  bad "${result#project-key: }"
+elif result=$(node framework/scripts/confine.cjs selftest --root "$FYSO_ROOT" --data "$FYSO_DATA" \
+    --project "${FYSO_PROJECT:-}" --port "${FYSO_HTTP_PORT:-}" --shared-key "$(admin_age_key)" \
+    --shared-key "$HOME/.config/mise/age.txt" 2>&1); then
+  ok "OMB and Dagu $result"
+else
+  bad "${result#confine: }"
+fi
+
 echo "Extensions"
 node framework/scripts/extensions.cjs check && ok "extension ports and required secrets" || bad "extension configuration failed"
 for check in extensions/*/doctor.sh; do

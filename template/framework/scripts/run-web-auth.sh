@@ -18,7 +18,7 @@ web_scheme >/dev/null
 [ -x "$FYSO_DATA/web-auth/bin/tinyauth" ] || fail "run 'mise run web-auth:install' first"
 umask 077
 mkdir -p "$FYSO_DATA/web-auth/runtime"
-FYSO_WEB_SCHEME="$(web_scheme)" node "$FYSO_ROOT/framework/scripts/web-auth-config.cjs"
+FYSO_WEB_SCHEME="$(web_scheme)" mise exec -- node "$FYSO_ROOT/framework/scripts/web-auth-config.cjs"
 cd "$FYSO_DATA/web-auth/runtime"
 clean_exec \
   TINYAUTH_CONFIGFILE="$FYSO_DATA/web-auth/runtime/config.yaml" \

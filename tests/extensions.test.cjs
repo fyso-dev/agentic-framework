@@ -139,3 +139,36 @@ test('a page may declare a run counter as data; anything else is refused',()=>fi
     'badge: 3\n',
   ]) { page(invalid); result=invoke(); assert.equal(result.status,1,invalid); assert.match(result.stderr,/invalid page badge/); }
 }));
+test('an extension may declare one instance switcher URL as data; anything else is refused',()=>fixture(({put,run})=>{
+  put('.copier-answers.ext-hub.yml','_src_path: fixture\n');
+  const invoke=()=>run(['node','-e','console.log(JSON.stringify(require("./framework/scripts/extensions.cjs").inventory([])))']);
+  const check=()=>run(['node','framework/scripts/extensions.cjs','check']);
+  let result=invoke();assert.equal(result.status,0,result.stderr);assert.equal('switcher' in JSON.parse(result.stdout)[0],false);
+  for (const url of ['https://portal.example.test/environments.json','http://portal.example.test:8480/environments.json','/hub/environments.json']) {
+    put('extensions/hub/switcher.yaml',`url: ${JSON.stringify(url)}\n`);
+    result=invoke();assert.equal(result.status,0,result.stderr);assert.deepEqual(JSON.parse(result.stdout)[0].switcher,{url});
+  }
+  for (const invalid of ['url: "javascript:alert(1)"\n','url: "//evil.test/x.json"\n','url: "https://user:pw@portal.example.test/x"\n',
+    'url: "ftp://portal.example.test/x"\n','url: 3\n','url: /x\nscript: /x.js\n','- url: /x\n','']) {
+    put('extensions/hub/switcher.yaml',invalid);result=invoke();assert.equal(result.status,1,invalid);assert.match(result.stderr,/invalid switcher/);
+    result=check();assert.equal(result.status,1,invalid);assert.match(result.stderr,/invalid switcher/);
+  }
+  put('extensions/hub/switcher.yaml','url: /a.json\n');
+  put('.copier-answers.ext-other.yml','_src_path: fixture\n');put('extensions/other/switcher.yaml','url: /b.json\n');
+  result=check();assert.equal(result.status,1);assert.match(result.stderr,/Only one extension may declare a switcher: hub, other/);
+}));
+test('an unchanged .mcp.json is left alone, and a confined process cannot rewrite it without failing',()=>fixture(({root,run})=>{
+  let result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
+  const file=path.join(root,'.mcp.json'),before=fs.statSync(file);
+  result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
+  assert.equal(fs.statSync(file).ino,before.ino,'unchanged content is not rewritten');
+  // The sandbox denies the write (D93): simulate it with a stale file in a read-only folder.
+  fs.writeFileSync(file,'{}\n');fs.chmodSync(root,0o555);
+  try {
+    result=run(['node','framework/scripts/mcp-config.cjs'],{FYSO_CONFINED:'fixture'});
+    assert.equal(result.status,0,result.stderr);assert.match(result.stderr,/regenerated on the next `mise run up`/);
+    result=run(['node','framework/scripts/mcp-config.cjs']);
+    assert.equal(result.status,1,'outside the sandbox a failed write still fails');
+  } finally {fs.chmodSync(root,0o755);}
+  assert.equal(fs.readFileSync(file,'utf8'),'{}\n');
+}));

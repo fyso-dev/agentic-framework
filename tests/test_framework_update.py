@@ -53,7 +53,7 @@ class FrameworkUpdate(unittest.TestCase):
                 env['SRC'] = '../source' if alternative else ''
                 scripts = project / 'framework/scripts'
                 scripts.mkdir(parents=True)
-                for name in ['update.sh', 'lib.sh', 'extensions.cjs']:
+                for name in ['update.sh', 'lib.sh', 'extensions.cjs', 'github-auth.cjs']:
                     shutil.copy2(ROOT / 'template/framework/scripts' / name, scripts)
                 for name, step in [('mcp-config.cjs', 'mcp'), ('panel-data.cjs', 'panel')]:
                     (scripts / name).write_text(
@@ -96,6 +96,68 @@ class FrameworkUpdate(unittest.TestCase):
                     self.assertEqual(run(['git', 'rev-parse', 'HEAD']).stdout, applied_head)
                     self.assertEqual(run(['git', 'status', '--porcelain']).stdout, '')
                     self.assertEqual(len(run(['git', 'worktree', 'list']).stdout.splitlines()), 1)
+
+    def test_conflict_scan_covers_only_files_the_update_changed(self):
+        with tempfile.TemporaryDirectory(prefix='update-scan-') as tmp:
+            base = Path(tmp)
+            source, project, toolbin = [base / name for name in ['source', 'project', 'bin']]
+            for d in (source, project, toolbin):
+                d.mkdir()
+            env = {**os.environ, 'PATH': str(toolbin) + os.pathsep + os.environ['PATH'],
+                   'GIT_AUTHOR_NAME': 'Fixture', 'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
+                   'GIT_COMMITTER_NAME': 'Fixture', 'GIT_COMMITTER_EMAIL': 'fixture@example.invalid',
+                   'REF': '', 'SRC': '', 'FYSO_PROJECT': 'update-fixture', 'FYSO_HTTP_PORT': '0'}
+
+            def run(args, cwd=project, check=True):
+                result = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+                if check:
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                return result
+
+            def commit(cwd):
+                run(['git', 'add', '.'], cwd)
+                run(['git', 'commit', '-qm', 'fixture'], cwd)
+
+            (source / 'copier.yml').write_text('_subdirectory: template\n')
+            (source / 'template').mkdir()
+            (source / 'template/.copier-answers.yml.jinja').write_text('{{ _copier_answers | to_nice_yaml -}}\n')
+            payload = source / 'template/payload.txt'
+            payload.write_text('v1\n')
+            run(['git', 'init', '-q'], source)
+            commit(source)
+            run(['git', 'tag', 'v1.0.0'], source)
+            run(COPIER + ['copy', '--trust', '--defaults', str(source), '.'])
+            scripts = project / 'framework/scripts'
+            scripts.mkdir(parents=True)
+            for name in ['update.sh', 'lib.sh', 'extensions.cjs', 'github-auth.cjs']:
+                shutil.copy2(ROOT / 'template/framework/scripts' / name, scripts)
+            for name in ['mcp-config.cjs', 'panel-data.cjs']:
+                (scripts / name).write_text('')
+            (toolbin / 'mise').write_text('#!/usr/bin/env bash\nexit 0\n')
+            (toolbin / 'mise').chmod(0o755)
+            (project / '.gitignore').write_text('.data/\n')
+            # Project content that quotes an email reply, as an imported mailbox does.
+            (project / 'project/docs').mkdir(parents=True)
+            (project / 'project/docs/mail.md').write_text('Re: hello\n>>>>>>> Hola, ¿cómo estás?\n>>>>>>>\n')
+            run(['git', 'init', '-q'])
+            commit(project)
+            payload.write_text('v2\n')
+            commit(source)
+            run(['git', 'tag', 'v2.0.0'], source)
+            result = run(['bash', 'framework/scripts/update.sh'])
+            self.assertTrue(json.loads(result.stdout)['changed'])
+            self.assertEqual((project / 'payload.txt').read_text(), 'v2\n')
+            # A real conflict in a file the update changes still stops it.
+            (project / 'payload.txt').write_text('local\n')
+            commit(project)
+            payload.write_text('v3\n')
+            commit(source)
+            run(['git', 'tag', 'v3.0.0'], source)
+            failed = run(['bash', 'framework/scripts/update.sh'], check=False)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn('conflicts with local changes', failed.stderr)
+            self.assertIn('payload.txt', failed.stderr)
+            self.assertEqual((project / 'payload.txt').read_text(), 'local\n')
 
 
 if __name__ == '__main__':

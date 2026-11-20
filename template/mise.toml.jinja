@@ -13,8 +13,13 @@ min_version = "2026.10.6"
 "aqua:gitleaks/gitleaks" = "8.30.1"
 "core:node" = "24.15.0"
 "npm:yaml" = "2.8.1"
+# OS sandbox for OMB and Dagu (D93): Seatbelt on macOS, bubblewrap on Linux.
+"npm:@anthropic-ai/sandbox-runtime" = "0.0.83"
+"aqua:BurntSushi/ripgrep" = "14.1.1"
 "aqua:cli/cli" = "2.95.0"
-# uvx runs the pinned Copier for framework updates, extensions and distributions.
+# uvx runs the pinned Copier for framework updates, extensions and distributions, on a
+# pinned Python (--python 3.12.7): confined Dagu steps cannot see the uv-managed Pythons
+# of the user's home, and the system Python may be older than Copier needs.
 "aqua:astral-sh/uv" = "0.5.1"
 
 [settings.npm]
@@ -32,6 +37,9 @@ FYSO_ADMIN_USER = "{{ admin_user }}"
 FYSO_WEB_DOMAIN = "{{ web_domain or (project_slug ~ '-' ~ port_base ~ '.localhost') }}"
 # Empty: this project runs its own web login. Otherwise the shared login it trusts (D61).
 FYSO_AUTH_UPSTREAM = "{{ auth_upstream }}"
+# OMB and Dagu run confined to this folder (D93, docs/confinement.md). "off" disables it;
+# FYSO_CONFINE_ALLOW_READ / FYSO_CONFINE_ALLOW_WRITE (paths separated by ":") open more.
+FYSO_CONFINE = "strict"
 FYSO_TINYAUTH_VERSION = "5.2.0"
 FYSO_TINYAUTH_SHA256 = "5fec14cb1a7cf43ef5c9dafc9fa9fba6fcbc2d8fd328cd5a78dd42aae4c0efde" # gitleaks:allow public source checksum
 # Upstream release binaries, used on Linux (D87).

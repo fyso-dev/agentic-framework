@@ -61,6 +61,24 @@ function setup(id) {
   if (!step.title) throw Error(`${file}: a title is required`);
   return step;
 }
+/**
+ * Optional instance switcher (D94): `extensions/<ext>/switcher.yaml` names one URL that
+ * returns `{items: [{name, url}]}`. The panel fetches it and lists the items under the
+ * brand in the top bar; nothing from the extension is evaluated.
+ */
+function switcher(id) {
+  const file = `extensions/${id}/switcher.yaml`;
+  if (!fs.existsSync(file)) return null;
+  const data = read(file);
+  const extra = data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data).filter(key => key !== 'url') : ['?'];
+  let ok = !extra.length && typeof data.url === 'string';
+  if (ok && data.url.startsWith('/')) ok = /^\/(?!\/)[^\s\\]*$/.test(data.url);
+  else if (ok) {
+    try { const url = new URL(data.url); ok = ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; } catch { ok = false; }
+  }
+  if (!ok) throw Error(`${file}: invalid switcher (expected url: an http(s) URL or a path)`);
+  return {url:data.url};
+}
 function inventory(apps, env = process.env) {
   return glob('.copier-answers.ext-*.yml').map(file => {
     const id = file.slice('.copier-answers.ext-'.length, -4);
@@ -81,7 +99,8 @@ function inventory(apps, env = process.env) {
       skills:glob(`${base}/skills/*/SKILL.md`).map(f => f.split('/').at(-2)),
       // Department templates (D82): adding one is the person's action through fyso-bot-architect OP=team-import.
       teams:glob(`${base}/teams/*/team.yaml`).map(f => f.split('/').at(-2)),
-      ...(setup(id) && {setup:setup(id)})};
+      ...(setup(id) && {setup:setup(id)}),
+      ...(switcher(id) && {switcher:switcher(id)})};
   });
 }
 function check(env = process.env) {
@@ -97,6 +116,9 @@ function check(env = process.env) {
     for (const name of missing(id,env)) errors.push(`${id}: required secret ${name} is empty`);
   }
   for (const id of installed()) {try {pages(id);} catch(error) {errors.push(error.message);}}
+  const switchers = installed().filter(id => fs.existsSync(`extensions/${id}/switcher.yaml`));
+  for (const id of switchers) {try {switcher(id);} catch(error) {errors.push(error.message);}}
+  if (switchers.length > 1) errors.push(`Only one extension may declare a switcher: ${switchers.join(', ')}`);
   return errors;
 }
 /** Same short /tmp convention as the framework's other sockets (macOS caps paths at 104 bytes). */
@@ -116,7 +138,7 @@ function run(id, command) {
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, setSource, glob, validId, secrets, missing, setup, workflows, inventory, check, extensionSocket};
+module.exports = {read, setSource, glob, validId, secrets, missing, setup, switcher, workflows, inventory, check, extensionSocket};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));

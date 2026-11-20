@@ -6,6 +6,35 @@ const numeric = value => typeof value === 'number' && Number.isFinite(value) && 
 const knownSum = values => values.some(v => numeric(v) !== null) ? values.reduce((n, v) => n + (numeric(v) ?? 0), 0) : null;
 const kinds = {claude:'subscription', codex:'subscription', chatgpt:'subscription', claudeApi:'api', openai:'api', openrouter:'api', xaiApi:'api'};
 const pick = (value, keys) => Object.fromEntries(keys.filter(k => value[k] !== undefined).map(k => [k, value[k]]));
+const isDevTask = name => ['fyso-dev-task','dev-task'].includes(name);
+const maxRunDetails = 50;
+const harnessProvider = text => /\"type\"\s*:\s*\"result\"/.test(text) ? 'claude' : /\"type\"\s*:\s*\"(?:thread.started|turn.completed)\"/.test(text) ? 'codex' : 'unknown';
+
+// Usage artifact contract (docs/observability.md): <artifacts dir>/usage/<step>.jsonl, one model call per line.
+function usageRow(line) {
+  const r = JSON.parse(line);
+  const nullable = (v, valid) => v === undefined || v === null || valid(v);
+  const count = v => Number.isInteger(v) && v >= 0;
+  if (!r || r.v !== 1 || typeof r.step !== 'string' || !r.step || typeof r.provider !== 'string' || !r.provider
+    || !nullable(r.model, v => typeof v === 'string' && v !== '') || !['input','output','cachedInput'].every(k => nullable(r[k], count))
+    || !nullable(r.costUsd, v => numeric(v) !== null)) throw new Error('invalid usage row');
+  return {provider:r.provider, model:r.model ?? null, input:r.input ?? null, output:r.output ?? null, cachedInput:r.cachedInput ?? null, costUsd:r.costUsd ?? null};
+}
+
+function readUsageFiles(dir) {
+  let entries;
+  try { entries = fs.readdirSync(path.join(dir, 'usage'), {withFileTypes:true}); } catch { return {present:false, rows:[], invalid:0}; }
+  // Regular files only: symlinks never lead the collector outside the artifact store.
+  const files = entries.filter(e => e.isFile() && e.name.endsWith('.jsonl')).map(e => e.name).sort();
+  const rows = []; let invalid = 0;
+  for (const file of files) {
+    fs.readFileSync(path.join(dir, 'usage', file), 'utf8').split('\n').forEach((line, i) => {
+      if (!line.trim()) return;
+      try { rows.push({...usageRow(line), file, line:i + 1}); } catch { invalid++; }
+    });
+  }
+  return {present:files.length > 0, rows, invalid};
+}
 
 function normalizeHarness(text, provider) {
   let events;
@@ -195,39 +224,60 @@ async function collect(env = process.env, now = new Date()) {
     if (!Array.isArray(res.dagRuns)) throw new Error('invalid runs');
     runsTruncated=!!res.nextCursor;
     runs=res.dagRuns.map(runShape);
-    for (const run of runs.filter(r=>['fyso-dev-task','dev-task'].includes(r.dag))) await origin(run);
+    for (const run of runs.filter(r=>isDevTask(r.dag))) await origin(run);
     sources.runs='ok';
   } catch {sources.runs='unavailable';}
-  let artifactFailures=0;
+  let artifactFailures=0,invalidUsageRows=0;
   const artifacts=path.join(data,'dagu/data/artifacts');
+  const engineKind = provider => ['api','subscription'].includes(billing[provider]) ? billing[provider] : 'unknown';
   try {
-    const identities=new Set();
+    const attempts=[],identities=new Set();
     for (const file of fs.globSync('**/*.meta',{cwd:artifacts})) {
       try {
         const meta=JSON.parse(fs.readFileSync(path.join(artifacts,file),'utf8'));
-        if (!['fyso-dev-task','dev-task'].includes(meta.name) || !meta.startedAt || new Date(meta.startedAt).toISOString().slice(0,7)!==month) continue;
-        // CLI-named runs may be absent from the global list of discovered DAGs.
-        if (!runs.some(r=>r.id===meta.dagRunId && r.dag===meta.name)) {
-          try {
-            const detail=await get(env.FYSO_DAGU_PORT,`/api/v1/dag-runs/${encodeURIComponent(meta.name)}/${encodeURIComponent(meta.dagRunId)}`,auth);
-            const run=runShape(detail.dagRunDetails); await origin(run); runs.push(run);
-          } catch {warnings.push('runDetailsUnavailable');}
-        }
+        if (typeof meta.name!=='string' || !meta.dagRunId || !meta.startedAt || new Date(meta.startedAt).toISOString().slice(0,7)!==month) continue;
         const id=`harness:${meta.name}/${meta.dagRunId}/${meta.attemptId}`;
         if (identities.has(id)) continue; identities.add(id);
         // Derive the artifact directory from the metadata FILE, never trust meta.dir.
         const dir=path.join(artifacts,file.slice(0,-5));
-        let text=''; try {text=fs.readFileSync(path.join(dir,'agent.txt'),'utf8');} catch {}
-        let provider=/\"type\"\s*:\s*\"result\"/.test(text) ? 'claude' : /\"type\"\s*:\s*\"(?:thread.started|turn.completed)\"/.test(text) ? 'codex' : 'unknown';
-        const usage=normalizeHarness(text,provider);
-        records.push({id,source:'harness',day:new Date(meta.startedAt).toISOString().slice(0,10),engine:provider,reasoning:null,bot:'Builder',model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...usage,costSource:'reported',runId:meta.dagRunId});
+        const usage=readUsageFiles(dir); invalidUsageRows+=usage.invalid;
+        let text='',provider='unknown';
+        if (!usage.present) {
+          try {text=fs.readFileSync(path.join(dir,'agent.txt'),'utf8');} catch {}
+          provider=harnessProvider(text);
+        }
+        // Workflows outside dev-task count only when they publish usage; dev-task keeps an explicit unknown attempt.
+        if (!usage.present && provider==='unknown' && !isDevTask(meta.name)) continue;
+        attempts.push({id,meta,usage,text,provider});
       } catch {artifactFailures++;}
+    }
+    // Runs with usage stay listed even when the bounded recent list no longer contains them.
+    const missing=[...new Map(attempts.filter(a=>!runs.some(r=>r.id===a.meta.dagRunId && r.dag===a.meta.name))
+      .sort((a,b)=>Date.parse(b.meta.startedAt)-Date.parse(a.meta.startedAt))
+      .map(a=>[`${a.meta.name}/${a.meta.dagRunId}`,a.meta])).values()];
+    if (missing.length>maxRunDetails) runsTruncated=true;
+    for (const meta of missing.slice(0,maxRunDetails)) {
+      try {
+        const detail=await get(env.FYSO_DAGU_PORT,`/api/v1/dag-runs/${encodeURIComponent(meta.name)}/${encodeURIComponent(meta.dagRunId)}`,auth);
+        const run=runShape(detail.dagRunDetails); if (isDevTask(run.dag)) await origin(run); runs.push(run);
+      } catch {warnings.push('runDetailsUnavailable');}
+    }
+    for (const {id,meta,usage,text,provider} of attempts) {
+      const bot=isDevTask(meta.name) ? 'Builder' : meta.name;
+      const day=new Date(meta.startedAt).toISOString().slice(0,10);
+      if (usage.present) {
+        for (const r of usage.rows) records.push({id:`${id}/${r.file}:${r.line}`,source:'harness',day,engine:r.provider,reasoning:null,bot,model:r.model ?? r.provider,billingKind:engineKind(r.provider),
+          input:r.input,output:r.output,cachedInput:r.cachedInput,costUsd:r.costUsd,costSource:'reported',runId:meta.dagRunId});
+        continue;
+      }
+      records.push({id,source:'harness',day,engine:provider,reasoning:null,bot,model:runs.find(r=>r.id===meta.dagRunId && r.dag===meta.name)?.model || provider,billingKind:provider === 'unknown' ? 'unknown' : 'subscription',...normalizeHarness(text,provider),costSource:'reported',runId:meta.dagRunId});
     }
     sources.harness='ok';
   } catch {sources.harness='unavailable';}
   if (artifactFailures) warnings.push('invalidArtifacts');
+  if (invalidUsageRows) warnings.push('invalidUsageRows');
   // Runs without any usage artifact still have an explicitly unknown consumption record.
-  for (const run of runs.filter(r=>['fyso-dev-task','dev-task'].includes(r.dag) && r.startedAt?.startsWith(month))) {
+  for (const run of runs.filter(r=>isDevTask(r.dag) && r.startedAt?.startsWith(month))) {
     if (!records.some(r=>r.source==='harness' && r.runId===run.id)) records.push({id:`uncovered:${run.dag}/${run.id}`,source:'harness',day:run.startedAt.slice(0,10),engine:'unknown',reasoning:null,bot:'Builder',model:'unknown',billingKind:'unknown',input:null,output:null,cachedInput:null,costUsd:null,costSource:null,runId:run.id});
   }
   const pricing=loadPricing(root,warnings);
@@ -271,4 +321,4 @@ if (require.main === module) {
     console.log(JSON.stringify({collectedAt:result.collectedAt,sources:result.sources,records:result.usage.totals.turns,durationMs:Math.round(performance.now()-started)}));
   }).catch(()=>{console.error('observability collection failed; previous snapshot retained');process.exitCode=1;});
 }
-module.exports={normalizeHarness,normalizePlanUsage,aggregate,makeAlerts,loadPricing,estimateUsd,applyPricing,collect};
+module.exports={normalizeHarness,readUsageFiles,normalizePlanUsage,aggregate,makeAlerts,loadPricing,estimateUsd,applyPricing,collect};

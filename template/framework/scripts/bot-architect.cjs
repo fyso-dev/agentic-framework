@@ -166,15 +166,49 @@ async function main(env=process.env) {
   } finally {fs.rmdirSync(lock);}
 }
 
+// Stage large package JSON through stdin; only a SHA-256 reference crosses Dagu's environment.
+function stagePackage(data, env=process.env) {
+  const limit=require('./team-template.cjs').MAX_BYTES;
+  if(!env.FYSO_DATA || !Buffer.isBuffer(data) || data.length>limit) throw new Error('too_large');
+  const pkg=JSON.parse(data.toString('utf8'));
+  require('./team-template.cjs').validate(pkg);
+  const ref=sha(data), dir=path.join(env.FYSO_DATA,'bot-architect','imports');
+  fs.mkdirSync(dir,{recursive:true,mode:0o700});
+  try {fs.writeFileSync(path.join(dir,ref),data,{flag:'wx',mode:0o600});}
+  catch(error) {if(error.code!=='EEXIST')throw error;}
+  return {packageRef:ref};
+}
+async function stageFromStdin(env=process.env) {
+  const chunks=[]; let size=0;
+  for await (const chunk of process.stdin) {
+    size+=chunk.length;
+    if(size>require('./team-template.cjs').MAX_BYTES)throw new Error('too_large');
+    chunks.push(chunk);
+  }
+  return stagePackage(Buffer.concat(chunks),env);
+}
+function stagedPackage(ref, base) {
+  if(!/^[a-f0-9]{64}$/.test(ref))throw new Error('invalid PACKAGE_REF');
+  const fd=fs.openSync(path.join(base,'imports',ref),fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    const stat=fs.fstatSync(fd);
+    if(!stat.isFile() || stat.size>require('./team-template.cjs').MAX_BYTES)throw new Error('too_large');
+    const data=fs.readFileSync(fd);
+    if(sha(data)!==ref)throw new Error('package integrity check failed');
+    return JSON.parse(data.toString('utf8'));
+  } finally {fs.closeSync(fd);}
+}
+
 // Department templates (D82): list extension packages, export one department, import one.
 async function teamTemplate(op,env,{root,base,port}) {
   const templates=require('./team-template.cjs');
   if(op==='team-templates')return {templates:templates.templates({root})};
   if(op==='team-export')return templates.exportDepartment(env.DEPARTMENT||'',{root,port,tmp:base});
   if(op!=='team-import')throw new Error('OP must be team-templates, team-export or team-import');
-  if(!!env.PACKAGE_B64===!!env.SOURCE)throw new Error('team-import needs PACKAGE_B64 or SOURCE');
+  if([env.PACKAGE_B64,env.PACKAGE_REF,env.SOURCE].filter(Boolean).length!==1)throw new Error('team-import needs PACKAGE_B64, PACKAGE_REF or SOURCE');
   if(env.SLUG && !/^[a-z0-9][a-z0-9-]{0,59}$/.test(env.SLUG))throw new Error('invalid SLUG');
   let pkg;
+  if(env.PACKAGE_REF) pkg=stagedPackage(env.PACKAGE_REF,base);
   if(env.PACKAGE_B64) {
     if(env.PACKAGE_B64.length>Math.ceil(templates.MAX_BYTES*4/3)+8)throw new Error('too_large');
     try{pkg=JSON.parse(Buffer.from(env.PACKAGE_B64,'base64').toString('utf8'));}catch{throw new Error('PACKAGE_B64 must encode one omb-team/1 package');}
@@ -190,6 +224,6 @@ async function submit(params,env=process.env) {
   return {runId,...output};
 }
 if(require.main===module) {
-  (process.argv[2]==='submit'?submit(JSON.parse(process.argv[3]||'{}')):main()).then(r=>console.log(JSON.stringify(r))).catch(e=>{console.error(e.message);process.exitCode=1;});
+  (process.argv[2]==='stage-package' ? stageFromStdin() : process.argv[2]==='submit'?submit(JSON.parse(process.argv[3]||'{}')):main()).then(r=>console.log(JSON.stringify(r))).catch(e=>{console.error(e.message);process.exitCode=1;});
 }
-module.exports={validatePatch,guardTarget};
+module.exports={validatePatch,guardTarget,stagePackage,stagedPackage};

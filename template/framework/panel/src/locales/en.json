@@ -52,7 +52,9 @@
     "openInTab": "Open in a new tab",
     "openOmb": "Open agents",
     "ombShort": "Agents",
-    "attention": "{{name}}: {{count}}"
+    "attention": "{{name}}: {{count}}",
+    "switchInstance": "Switch instance",
+    "instances": "Instances"
   },
   "nav": {
     "label": "Sections",
@@ -354,6 +356,7 @@
     "stale": "Stale data",
     "partial": "Partial coverage. Missing sources do not mean zero usage.",
     "bot": "Agent",
+    "botOrWorkflow": "Agent / workflow",
     "model": "Model",
     "all": "All",
     "costs": "Amounts by category",
@@ -371,7 +374,7 @@
     "alerts": "Project advisories",
     "noAlerts": "No thresholds exceeded in available data.",
     "alertNote": "Local advisories; no agents are stopped and no messages are sent. Settings: project/observability.json. Monetary thresholds use reported API cost only and may have incomplete coverage. The subscription threshold (subscriptionPercent) warns about the account, not the project.",
-    "usage": "Usage by agent, model and engine",
+    "usage": "Usage by agent or workflow, model and engine",
     "empty": "No records for this selection.",
     "conversations": "Conversations and delegations",
     "conversationModel": "Conversations group delegations across models and engines; they are filtered by agent and period only.",
@@ -384,7 +387,7 @@
     "sources": {
       "ledger": "Agent usage",
       "traces": "Agent traces",
-      "harness": "Agent in a workflow",
+      "harness": "Dagu workflow",
       "subscription": "Subscription usage"
     },
     "sourceState": {
@@ -396,6 +399,7 @@
       "invalidSettings": "Invalid settings; defaults were used.",
       "invalidLedgerRows": "Some usage records could not be read.",
       "invalidArtifacts": "Some artifacts could not be read.",
+      "invalidUsageRows": "Some workflow usage records could not be read.",
       "runDetailsUnavailable": "Some run details could not be read.",
       "invalidPricing": "The price table has invalid entries; they were ignored."
     },

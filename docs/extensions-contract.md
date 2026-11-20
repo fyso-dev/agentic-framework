@@ -63,6 +63,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Browser OAuth return | `GET /extensions/<ext>/oauth/callback` | Caddy routes this navigation to `GET /profile/callback` on the extension's private socket after web authentication and authorization. The extension must validate and consume the OAuth state and bind it to the initiating browser. |
 | Panel permission report | `extensions/<ext>/panel-access.caddy` | A provider serves `GET /api/panel-access` after gateway authentication. HTTP 204 means unmanaged access. HTTP 200 with `{"capabilities":[]}` reports the current principal's effective permissions. The panel uses these for navigation and the gateway still checks protected requests. |
 | Remote MCP authorization | `extensions/<ext>/mcp-authorize` | An empty marker enables checks on the extension's private socket. `POST /mcp-access/check` receives `principal`, `method`, and the optional `tool`; only HTTP 204 grants access. A principal may be a project credential, a validated local user, or a delegated credential of the form `fyso-ext-<ext>.<secret>`. For delegated authentication the issuing extension receives the SHA-256 digest with method `authenticate`. Only that extension receives the digest. |
+| OAuth provider definitions | `extensions/<ext>/tinyauth.providers.yaml` | Native Tinyauth provider map, loaded only for extensions with a Copier answers file. Project provider IDs take precedence. Missing `${FYSO_AUTH_*}` values leave a provider pending. Project-owned app access rules still apply. |
 | Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
 | Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
@@ -70,6 +71,7 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Health check | `extensions/<ext>/doctor.sh` | `mise run doctor` runs each one |
 | Secret names | `extensions/<ext>/secrets.yaml` | `run-ext.sh`, doctor, panel |
 | Setup step (optional) | `extensions/<ext>/setup.yaml` | Panel Setup checklist, `fyso-setup-check` (D51) |
+| Instance switcher (optional) | `extensions/<ext>/switcher.yaml` | Panel top bar, one per project (§9, D94) |
 | MCP servers | `extensions/<ext>/mcp.json` | merged into `.mcp.json` (§4) |
 | Skills | `extensions/<ext>/skills/<name>/SKILL.md` | OMB, when a person enables them on a bot: the panel's bot detail has one toggle per extension skill (D54), or list them in `team.yaml` by hand (not automatic, see §6) |
 | Department templates | `extensions/<ext>/teams/<slug>/team.yaml` and `extensions/<ext>/teams/<slug>/skills/**` | `fyso-bot-architect` `OP=team-templates`, listed by the panel's *Add department*; added only when a person chooses one and applies the proposed change (D82, see below) |
@@ -142,6 +144,7 @@ type Extension = {
   workflows: string[]         // names of project/workflows/ext-<ext>-*.yaml, without .yaml
   skills: string[]            // folder names under skills/
   pages: {id: string; name: string; name_i18n?: Record<string,string>; icon?: string; url: string}[]
+  switcher?: {url: string}    // from switcher.yaml (§9)
 }
 ```
 
@@ -303,11 +306,35 @@ The declaration is data. The panel runs the query itself against Dagu's run list
 
 A page that changes the runs it counts calls the SDK's `refreshBadges()` so the menu does not wait for the next poll. Old inventories without `badge` show no counter.
 
+### Instance switcher (panel API 3)
+
+When several instances share one login, for example the instances behind a host's hub, an extension can let people jump between their panels from the top bar:
+
+```yaml
+# extensions/hub/switcher.yaml
+url: https://portal.example.com/environments.json   # or a path on the panel origin
+```
+
+The answer is data:
+
+```json
+{"items": [{"name": "Auditor", "url": "https://panel.auditor.example.com/"}, {"name": "EMOS", "url": "https://panel.emos.example.com/"}]}
+```
+
+| Rule | Detail |
+|---|---|
+| Declaration | One key, `url`: an http(s) URL without credentials, or a path starting with `/`. Anything else fails configuration generation. Only one installed extension may declare a switcher (`ext check` fails on two) |
+| Request | `GET` with `Accept: application/json`, no cache. The session cookie is sent (`credentials: include`) only when the URL is on another origin; that server must answer with `Access-Control-Allow-Origin: <panel origin>` and `Access-Control-Allow-Credentials: true` |
+| Items | At most 50; each needs a non-empty `name` and an http(s) `url` (relative URLs resolve against the panel). Others are dropped. The item on the panel's origin is marked as current instance |
+| Display | A chevron beside the brand opens the list. Nothing is shown when no extension declares a switcher, the request fails, or the list names no other instance |
+
+Who appears in the list is the list server's decision; the panel does not grant access, and each instance still checks its own login. No extension code runs in the host.
+
 ### Optional panel SDK
 
 Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
 
-Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `3`; version 2 added page counters and `refreshBadges`, version 3 the project identity (D92), and neither removed anything.
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `4`; version 2 added page counters and `refreshBadges`, version 3 the instance switcher, version 4 the project identity (D92), and none removed anything.
 
 The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External`, `RelTime` and `refreshBadges`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 
@@ -315,7 +342,7 @@ This is a rendering boundary, **not a sandbox for hostile code**. Extensions are
 
 The SDK version is also declared in `framework/panel/extension-api.json` (the source of `PANEL_API_VERSION`). Copier extensions may use native `_external_data` to validate this capability before writing files. This makes compatibility explicit without coupling an extension to a framework repository layout or branch.
 
-### Project identity (panel API 3, D92)
+### Project identity (panel API 4, D92)
 
 SDK pages take the project's saved identity (accent, type and corners from `project.json` `brand`) like the panel. The core only applies the identity; editing it belongs to an extension. The SDK exports `FONTS`, `DEFAULT_ACCENT` and the `Brand`, `Look`, `Font` and `Radius` types, plus `previewLook(look)`, which shows a look on the page and on the panel around it until the next save or call. An editor saves with its own workflow that runs the core CLI `node framework/scripts/brand.cjs operate` (`OP=save`, `SETTINGS_B64` = base64 JSON `{name?, accent?, font?, radius?, icon?, loginBackground?}`; see the [panel contract](panel-contract.md)). The panel picks the saved identity up with its next `project.json` read. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) provides the editor, enabled only for a Fyso Biz session.
 

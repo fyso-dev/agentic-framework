@@ -27,6 +27,25 @@ clean_exec() {
     TMPDIR="${TMPDIR:-/tmp}" ${xdg_vars[@]+"${xdg_vars[@]}"} "$@"
 }
 
+# The age key that opens this developer's or server's secrets (setup.sh).
+admin_age_key() { printf '%s' "${MISE_SOPS_AGE_KEY_FILE:-${SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}"; }
+
+# Like clean_exec, but the command runs confined to this project's folder (D93,
+# confine.cjs): it cannot read the home folder, other projects or the shared age key.
+# FYSO_CONFINE=off runs it as clean_exec does. Same arguments: NAME=value…, then the command.
+confined_exec() {
+  local vars=()
+  while [ $# -gt 0 ] && [[ $1 =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do vars+=("$1"); shift; done
+  [ $# -gt 0 ] || fail "confined_exec: no command"
+  [ "${FYSO_CONFINE:-strict}" != off ] || clean_exec ${vars[@]+"${vars[@]}"} "$@"
+  local keys=(--shared-key "$(admin_age_key)" --shared-key "$HOME/.config/mise/age.txt")
+  clean_exec ${vars[@]+"${vars[@]}"} FYSO_CONFINE="${FYSO_CONFINE:-strict}" \
+    node "$FYSO_ROOT/framework/scripts/confine.cjs" run \
+    --root "$FYSO_ROOT" --data "$FYSO_DATA" --project "${FYSO_PROJECT:-}" --port "${FYSO_HTTP_PORT:-}" \
+    "${keys[@]}" --allow-read "${FYSO_CONFINE_ALLOW_READ:-}" --allow-write "${FYSO_CONFINE_ALLOW_WRITE:-}" \
+    -- "$@"
+}
+
 port_in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
 block_ports() {

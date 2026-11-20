@@ -65,6 +65,8 @@ export type Extension = {
   pages?: ExtensionPageRegistration[];
   /** Setup step the extension adds (`extensions/<ext>/setup.yaml`, D51). */
   setup?: { title: string; title_i18n?: Record<string, string>; description?: string; description_i18n?: Record<string, string> };
+  /** List of instances for the top bar's switcher (`extensions/<ext>/switcher.yaml`, D94). */
+  switcher?: { url: string };
 };
 
 /** Output `catalog` of `fyso-ext-catalog` (docs/extensions-contract.md §8). */
