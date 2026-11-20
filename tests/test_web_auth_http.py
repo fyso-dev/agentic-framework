@@ -578,6 +578,15 @@ class BizPolicyGateway(WebAuthFixture):
             self.permissions['operator'].remove('workflow:invoice:run')
         self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 403)
 
+        old_profile = reader.split('; ', 1)[1]
+        status, _, _ = self.request('panel', '/api/session/logout', 'POST', {}, cookie=reader,
+                                    Origin=self.origin('panel'))
+        self.assertIn(status, (200, 204))
+        reader_again = f"{self.login('viewer')}; {old_profile}"
+        status, _, body = self.request('panel', '/api/panel-access', cookie=reader_again)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {'capabilities': []})
+
 
 if __name__ == '__main__':
     unittest.main()
