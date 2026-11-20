@@ -107,3 +107,20 @@ test('only the git author identity is carried into the private home', () => fixt
     if (saved === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = saved;
   }
 }));
+
+// A confined process may write only inside the project. macOS mktemp without a template
+// ignores TMPDIR and uses the user's temporary folder, which the sandbox denies: every
+// framework script names its template under TMPDIR, and Dagu hands TMPDIR to its steps.
+test('framework scripts create temporary files under TMPDIR, which Dagu passes to steps',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const dir=path.resolve(__dirname,'../template/framework/scripts');
+  const bare=[];
+  for (const name of fs.readdirSync(dir).filter(f=>f.endsWith('.sh'))) {
+    fs.readFileSync(path.join(dir,name),'utf8').split('\n').forEach((line,i)=>{
+      if (/mktemp( -[dtuq]+)*\s*(\)|;|$|\|)/.test(line.replace(/#.*$/,''))) bare.push(`${name}:${i+1}`);
+    });
+  }
+  assert.deepEqual(bare,[],'mktemp needs an explicit "${TMPDIR:-/tmp}/…XXXXXXXX" template');
+  const dagu=fs.readFileSync(path.join(dir,'run-dagu.sh'),'utf8').match(/DAGU_ENV_PASSTHROUGH_PREFIXES=(\S+)/)[1].split(',');
+  assert.ok(dagu.includes('TMPDIR'),'Dagu steps must receive the confined TMPDIR');
+});

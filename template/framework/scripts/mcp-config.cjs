@@ -18,12 +18,23 @@ function write() {
       }
     }
   }
+  const text = JSON.stringify({mcpServers:servers},null,2)+'\n';
+  let current = null;
+  try { current = fs.readFileSync('.mcp.json','utf8'); } catch {}
+  if (current === text) return false;
   // Per process: overlapping setup checks (D80) must not share a temporary file.
   const temporary = `.mcp.json.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(temporary,JSON.stringify({mcpServers:servers},null,2)+'\n',{mode:0o600});
+    fs.writeFileSync(temporary,text,{mode:0o600});
     fs.renameSync(temporary,'.mcp.json');
+  } catch (error) {
+    // The sandbox of confined processes (D93) never lets them write .mcp.json, so an agent
+    // cannot plant an MCP server. Dagu steps leave the change to the next `mise run up`.
+    if (!['EPERM','EACCES'].includes(error.code) || !process.env.FYSO_CONFINED) throw error;
+    console.error('.mcp.json is out of date; it is regenerated on the next `mise run up`');
+    return false;
   } finally { fs.rmSync(temporary,{force:true}); }
+  return true;
 }
 module.exports = {write};
 if (require.main === module) {

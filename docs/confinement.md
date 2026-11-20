@@ -73,6 +73,14 @@ stops with the reason unless `FYSO_CONFINE=off`.
   `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) in `secrets.enc.yaml`.
 - **macOS Keychain logins** (Claude Code without `.credentials.json`) are not reachable
   from the sandbox; use the token above.
+- **Temporary files.** macOS `mktemp` without a template ignores `TMPDIR` and uses the
+  user's temporary folder, which the sandbox denies. Framework scripts always pass
+  `"${TMPDIR:-/tmp}/…XXXXXXXX"`, and Dagu hands `TMPDIR` to its steps
+  (`DAGU_ENV_PASSTHROUGH_PREFIXES`); a test enforces both. Extension scripts must do the same.
+- **`.mcp.json` is read-only inside the sandbox** (sandbox-runtime's mandatory protection,
+  so an agent cannot add an MCP server). Confined Dagu steps skip it when it is unchanged and
+  otherwise leave it to the next `mise run up`; extensions installed from the panel reach
+  `.mcp.json` then, as they already reached OpenMausBot.
 - **Dagu run sockets** are always created in `/tmp/@dagu_*` (an abstract socket on Linux).
   A confined process can reach another project's Dagu run sockets there (status and stop
   of that run), not run commands through them.

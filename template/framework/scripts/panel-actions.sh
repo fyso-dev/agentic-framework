@@ -5,7 +5,7 @@ source "$(dirname "$0")/lib.sh"
 require_env FYSO_ROOT FYSO_DATA FYSO_OMB_PORT
 omb() { openmausbot "$@" --port "$FYSO_OMB_PORT"; }
 # A private temporary file keeps previews away from versioned configuration.
-tmp=$(mktemp -d)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/fyso-panel.XXXXXXXX")
 lock=
 cleanup() {
   if [ -n "$lock" ]; then rmdir "$lock"; fi
