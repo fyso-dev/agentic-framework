@@ -32,7 +32,8 @@ if (process.argv[2] === 'config') {
   fs.mkdirSync('.data/panel', {recursive:true});
   const answers = fs.existsSync('.copier-answers.yml') ? read('.copier-answers.yml') : {};
   const framework = {commit:answers._commit ? String(answers._commit) : null, src:answers._src_path || null};
-  fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls, framework}));
+  const brandLib = require('./brand.cjs'), brand = brandLib.panel(brandLib.resolve(env), env);
+  fs.writeFileSync('.data/panel/project.json', JSON.stringify({name:env.FYSO_PROJECT_NAME, slug:env.FYSO_PROJECT, env:env.FYSO_ENV || 'local', urls, framework, brand}));
   fs.writeFileSync('.data/panel/apps.json', JSON.stringify(apps));
   require('./skills.cjs').writePanel();
   fs.writeFileSync('.data/panel/extensions.json', JSON.stringify(extensions.inventory(apps.map((app,i) => ({id:app.id,file:appFiles[i]})))));

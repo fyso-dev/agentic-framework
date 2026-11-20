@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BottomNav, SideNav, TopBar, useNavCollapsed } from "./components/Layout";
 import { useRoute, type Route } from "./lib/router";
 import { localized } from "./lib/i18n";
+import { applyFavicon, applyLook } from "./lib/brand";
 import { useTheme } from "./lib/theme";
 import { Bots } from "./screens/Bots";
 import { Connectors } from "./screens/Connectors";
@@ -21,7 +22,11 @@ export function App() {
   const [theme, toggleTheme] = useTheme();
   const s = useStore();
   const [navCollapsed, toggleNav] = useNavCollapsed();
-  const name = s.project.data?.name;
+  const brand = s.project.data?.brand;
+  const name = brand?.name ?? s.project.data?.name;
+  // Also on every screen change: a preview an extension page showed (SDK previewLook) ends with it.
+  useEffect(() => { applyLook({ accent: brand?.accent, font: brand?.font, radius: brand?.radius }); }, [brand?.accent, brand?.font, brand?.radius, route]);
+  useEffect(() => { applyFavicon(brand?.icon); }, [brand?.icon]);
   // The tab names the place first, so it stays readable when tabs are narrow: "Conectores · Acme".
   const place = placeName(route, s, i18n.language, t);
   useEffect(() => {
