@@ -2,6 +2,8 @@
 
 Set FYSO_TEST_TINYAUTH and FYSO_TEST_CADDY to explicit binaries. Uses only a
 temporary directory and a caller-selected, unused block (default 19800).
+For the managed-policy integration, set FYSO_TEST_BIZ_EXTENSION to a generated
+project containing the installed Biz extension with managed access enabled.
 """
 import base64
 import http.client
@@ -17,6 +19,7 @@ import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -466,7 +469,7 @@ class BizPolicyGateway(WebAuthFixture):
     @classmethod
     def setUpClass(cls):
         if not cls.biz_extension:
-            raise unittest.SkipTest('requires a Biz extension checkout')
+            raise unittest.SkipTest('requires a generated project with the managed Biz extension')
         super().setUpClass()
 
     @classmethod
@@ -480,7 +483,10 @@ class BizPolicyGateway(WebAuthFixture):
             'operator': {'app:panel', 'workflow:invoice:run'},
             'reader': {'app:panel'},
         }
-        origin = f'http://127.0.0.1:{cls.port + 12}'
+        cls.external_biz = os.environ.get('FYSO_TEST_BIZ_ORIGIN')
+        cls.biz_project = os.environ.get('FYSO_TEST_BIZ_PROJECT', 'project')
+        cls.biz_organization = 'acme' if cls.external_biz else 'fixture'
+        origin = cls.external_biz or f'http://127.0.0.1:{cls.port + 12}'
 
         class BizFixture(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -526,14 +532,16 @@ class BizPolicyGateway(WebAuthFixture):
             def log_message(self, *_):
                 pass
 
-        biz = ThreadingHTTPServer(('127.0.0.1', cls.port + 12), BizFixture)
-        cls.servers.append(biz)
-        threading.Thread(target=biz.serve_forever, daemon=True).start()
+        if not cls.external_biz:
+            biz = ThreadingHTTPServer(('127.0.0.1', cls.port + 12), BizFixture)
+            cls.servers.append(biz)
+            threading.Thread(target=biz.serve_forever, daemon=True).start()
         socket = Path('/tmp') / f'fyso-ext-biz-{cls.port}.sock'
         cls.addClassCleanup(lambda: socket.unlink(missing_ok=True))
         cls.start(['node', str(source / 'gateway.cjs')], {
             **env, 'FYSO_EXT_SOCKET': str(socket), 'FYSO_EXT_BIZ_PORT': str(cls.port + 11),
-            'FYSO_BIZ_URL': origin, 'FYSO_BIZ_ACCESS_ORGANIZATION': 'fixture', 'FYSO_BIZ_ACCESS_PROJECT': 'project',
+            'FYSO_BIZ_URL': origin, 'FYSO_BIZ_ACCESS_ORGANIZATION': cls.biz_organization,
+            'FYSO_BIZ_ACCESS_PROJECT': cls.biz_project,
         })
         cls.wait_port(cls.port + 11, '/health')
 
@@ -545,7 +553,12 @@ class BizPolicyGateway(WebAuthFixture):
             self.assertEqual(status, 303)
             state = parse_qs(urlparse(headers['Location']).query)['state'][0]
             binding = headers['Set-Cookie'].split(';', 1)[0]
-            path = '/extensions/biz/oauth/callback?' + urlencode({'state': state, 'code': profile})
+            if self.external_biz:
+                with urlopen(Request(headers['Location'], headers={'X-Test-Profile': profile}), timeout=10) as consent:
+                    callback = urlparse(json.loads(consent.read())['redirectTo'])
+                path = f'{callback.path}?{callback.query}'
+            else:
+                path = '/extensions/biz/oauth/callback?' + urlencode({'state': state, 'code': profile})
             status, headers, _ = self.request('panel', path, cookie=f'{local}; {binding}', **{'Sec-Fetch-Site': 'cross-site'})
             self.assertEqual(status, 303)
             return f"{local}; {headers['Set-Cookie'].split(';', 1)[0]}"
@@ -558,7 +571,11 @@ class BizPolicyGateway(WebAuthFixture):
         status, _, body = self.request('panel', '/api/panel-access', cookie=reader)
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {'capabilities': ['app:panel']})
-        self.permissions['operator'].remove('workflow:invoice:run')
+        if self.external_biz:
+            with urlopen(Request(self.external_biz + '/__fixture/revoke', method='POST'), timeout=10) as result:
+                self.assertEqual(result.status, 204)
+        else:
+            self.permissions['operator'].remove('workflow:invoice:run')
         self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 403)
 
 

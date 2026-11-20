@@ -217,3 +217,17 @@ and succeeded. Doctor passed and a real gateway login reached Biz sign-in
 while direct app and workflow access remained denied without a Biz profile.
 The fixture has no authenticated Biz grant. Real Biz authorization remains
 pending. The isolated processes are available for the next integration check.
+
+The cross-repository integration can run with the actual Biz OAuth provider
+and decision Worker backed by PGlite, plus real Caddy, Tinyauth and the
+rendered managed extension. The gateway tests run through the real code
+exchange and profile lookup. The fixture supplies the consent identity and
+native membership responses. The combined run passed, including revocation
+and isolation at the Biz decision layer and direct workflow denial at the
+gateway. Production login and a fully deployed Biz environment are outside
+this evidence.
+
+To rerun, set `FYSO_TEST_FRAMEWORK_GATEWAY` to this repository's
+`tests/test_web_auth_http.py`, point `FYSO_TEST_BIZ_EXTENSION` at a generated
+project with the managed extension installed, and set explicit Caddy and
+Tinyauth binaries. Run `worker/oauth-perfil.test.ts` in the Biz checkout.
