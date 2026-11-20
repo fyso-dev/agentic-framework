@@ -1008,6 +1008,13 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
 .ap-secret.set { background: var(--fy-ok-soft); color: var(--fy-ok); }
 .ap-secret.miss { background: var(--fy-down-soft); color: var(--fy-down); }
 .ap-secret.opt { background: var(--fy-surface-2); color: var(--fy-mute); }
+.ap-ext-advanced > summary {
+  width: fit-content; padding: 6px 10px; border-radius: var(--fy-radius-md);
+  background: var(--fy-surface-2); color: var(--fy-mute); cursor: pointer; font-size: 13px; font-weight: 700;
+}
+.ap-ext-advanced > summary:hover { color: var(--fy-text); }
+.ap-ext-advanced > summary:focus-visible { outline: 2px solid var(--fy-focus); outline-offset: 2px; }
+.ap-ext-advanced-body { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
 .ap-foot { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--fy-line); }
 .ap-foot .ap-tag { align-self: center; }
 .ap-btn { gap: 6px; }
