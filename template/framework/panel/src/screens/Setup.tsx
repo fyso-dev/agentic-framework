@@ -2,7 +2,6 @@
 // plus one step per installed extension that declares setup.yaml (D51).
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { IdentityCard } from "../components/Identity";
 import type { Engine, Extension } from "../api/types";
 import { ActionButton, ActionError, ActionStatus, useLogsUrl } from "../components/Action";
 import { ExtensionSetup } from "../components/ExtensionSetup";
@@ -307,7 +306,6 @@ export function Setup() {
           {steps}
         </section>
         <McpCard />
-        <IdentityCard />
       </main>
     );
 
@@ -341,7 +339,6 @@ export function Setup() {
       )}
       {steps}
       <McpCard />
-      <IdentityCard />
     </main>
   );
 }

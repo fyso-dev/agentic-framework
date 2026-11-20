@@ -303,13 +303,17 @@ A page that changes the runs it counts calls the SDK's `refreshBadges()` so the 
 
 Direct `ext:add` and `ext:update` activate installed tools and reload the running project before connection hooks, just like panel operations. Hooks wait for core services and their own extension processes, with a two-minute timeout.
 
-Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `2`; version 2 added page counters and `refreshBadges`, and removed nothing.
+Static HTML and any frontend stack work without an SDK. Pages that want the existing look and Dagu interactions may import native ES modules from `/assets/extension-sdk.js`, and `/assets/panel.css` for the shared styles. `PANEL_API_VERSION` is `3`; version 2 added page counters and `refreshBadges`, version 3 the project identity (D92), and neither removed anything.
 
 The SDK exports `mountExtensionPage(Component, messagesByLanguage)`, React hooks/JSX runtime, `useTranslation`, `useStore`, `botRoster` (live bots plus team-file drafts, as on the Bots screen), `useDaguAction`, `ActionButton`, `ActionStatus`, `External`, `RelTime` and `refreshBadges`. `mountExtensionPage` applies the host's language/theme and initializes the same authenticated project client inside the page. Backend requests use gateway-root URLs, so nested extension pages do not need a base tag and may keep relative asset URLs. The extension owns its resource bundles. A bundler may map `@fyso/panel`, `react` and `react/jsx-runtime` to this single hosted ES module so React is reused rather than bundled again. [fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) is an independently versioned consumer; the extension starter provides a plain HTML example.
 
 This is a rendering boundary, **not a sandbox for hostile code**. Extensions are already trusted Copier templates with executable hooks. Same-origin pages share the gateway's authenticated access; they do not receive decrypted secret values. Use the existing Dagu workflows for process-side integrations, and never pass credentials through URL parameters or browser storage.
 
 The SDK version is also declared in `framework/panel/extension-api.json` (the source of `PANEL_API_VERSION`). Copier extensions may use native `_external_data` to validate this capability before writing files. This makes compatibility explicit without coupling an extension to a framework repository layout or branch.
+
+### Project identity (panel API 3, D92)
+
+SDK pages take the project's saved identity (accent, type and corners from `project.json` `brand`) like the panel. The core only applies the identity; editing it belongs to an extension. The SDK exports `FONTS`, `DEFAULT_ACCENT` and the `Brand`, `Look`, `Font` and `Radius` types, plus `previewLook(look)`, which shows a look on the page and on the panel around it until the next save or call. An editor saves with its own workflow that runs the core CLI `node framework/scripts/brand.cjs operate` (`OP=save`, `SETTINGS_B64` = base64 JSON `{name?, accent?, font?, radius?, icon?, loginBackground?}`; see the [panel contract](panel-contract.md)). The panel picks the saved identity up with its next `project.json` read. [fyso-ext-biz-publication](https://github.com/fyso-dev/fyso-ext-biz-publication) provides the editor.
 
 ### Same-origin extension API (D79)
 

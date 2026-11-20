@@ -24,7 +24,8 @@ export function App() {
   const [navCollapsed, toggleNav] = useNavCollapsed();
   const brand = s.project.data?.brand;
   const name = brand?.name ?? s.project.data?.name;
-  useEffect(() => { applyLook({ accent: brand?.accent, font: brand?.font, radius: brand?.radius }); }, [brand?.accent, brand?.font, brand?.radius]);
+  // Also on every screen change: a preview an extension page showed (SDK previewLook) ends with it.
+  useEffect(() => { applyLook({ accent: brand?.accent, font: brand?.font, radius: brand?.radius }); }, [brand?.accent, brand?.font, brand?.radius, route]);
   useEffect(() => { applyFavicon(brand?.icon); }, [brand?.icon]);
   // The tab names the place first, so it stays readable when tabs are narrow: "Conectores · Acme".
   const place = placeName(route, s, i18n.language, t);

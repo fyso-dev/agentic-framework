@@ -1016,57 +1016,5 @@
     "versionTip": "Commit del template instalado",
     "done": "Actualizado {{from}} → {{to}} (commit {{commit}}). Si cambiaron los servicios del proyecto, reinícialo.",
     "current": "Ya estaba al día ({{to}})."
-  },
-  "identity": {
-    "title": "Identidad del proyecto",
-    "body": "nombre, color e ícono en todas las apps",
-    "edit": "Personalizar",
-    "dialogTitle": "Identidad del proyecto",
-    "name": "Nombre",
-    "nameHint": "Lo ven el panel, el login, Automatizaciones y Chat de agentes.",
-    "nameRequired": "Escribí un nombre.",
-    "accentHex": "Color en hexadecimal",
-    "accentInvalid": "El color tiene que ser un hexadecimal como #6e1fff.",
-    "icon": "Ícono",
-    "iconChange": "Elegir imagen…",
-    "iconReset": "Usar el de Fyso",
-    "iconHint": "PNG, JPG, WebP o SVG. Se guarda cuadrado, de hasta 256 px.",
-    "iconInvalid": "No se pudo leer esa imagen. Probá con un PNG o un JPG.",
-    "restartNote": "El panel, los íconos y el fondo del login cambian al guardar. El nombre del login, de Automatizaciones y de Chat de agentes cambia cuando el proyecto se reinicia. La tipografía y las esquinas aplican al panel.",
-    "cancel": "Cancelar",
-    "save": "Guardar",
-    "saving": "Guardando…",
-    "palette": "Paleta",
-    "custom": "Personalizado",
-    "palettes": {
-      "fyso": "Fyso",
-      "ocean": "Océano",
-      "teal": "Turquesa",
-      "forest": "Bosque",
-      "gold": "Oro",
-      "sunset": "Atardecer",
-      "ruby": "Rubí",
-      "graphite": "Grafito"
-    },
-    "font": "Tipografía",
-    "fonts": {
-      "fyso": "Fyso",
-      "system": "Del sistema",
-      "humanist": "Humanista",
-      "classic": "Clásica",
-      "rounded": "Redondeada"
-    },
-    "radius": "Esquinas",
-    "radii": {
-      "sharp": "Rectas",
-      "soft": "Suaves",
-      "round": "Redondeadas"
-    },
-    "background": "Fondo del login",
-    "backgroundChange": "Elegir foto…",
-    "backgroundReset": "Usar el de Fyso",
-    "backgroundHint": "Una foto o imagen grande. Se guarda en JPEG, de hasta 1600 px.",
-    "backgroundInvalid": "No se pudo usar esa imagen. Probá con un JPG o un PNG.",
-    "resetAll": "Volver todo a Fyso"
   }
 }

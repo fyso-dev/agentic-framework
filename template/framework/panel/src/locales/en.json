@@ -1016,57 +1016,5 @@
     "versionTip": "Installed template commit",
     "done": "Updated {{from}} → {{to}} (commit {{commit}}). If the project's services changed, restart the project.",
     "current": "Already up to date ({{to}})."
-  },
-  "identity": {
-    "title": "Project identity",
-    "body": "name, colour and icon in every app",
-    "edit": "Customize",
-    "dialogTitle": "Project identity",
-    "name": "Name",
-    "nameHint": "Shown by the panel, the login, Automations and Agent chat.",
-    "nameRequired": "Enter a name.",
-    "accentHex": "Colour in hexadecimal",
-    "accentInvalid": "The colour must be a hex value such as #6e1fff.",
-    "icon": "Icon",
-    "iconChange": "Choose image…",
-    "iconReset": "Use Fyso's",
-    "iconHint": "PNG, JPG, WebP or SVG. Saved square, up to 256 px.",
-    "iconInvalid": "That image could not be read. Try a PNG or a JPG.",
-    "restartNote": "The panel, the icons and the login background change on save. The name on the login, Automations and Agent chat changes when the project restarts. Typography and corners apply to the panel.",
-    "cancel": "Cancel",
-    "save": "Save",
-    "saving": "Saving…",
-    "palette": "Palette",
-    "custom": "Custom",
-    "palettes": {
-      "fyso": "Fyso",
-      "ocean": "Ocean",
-      "teal": "Teal",
-      "forest": "Forest",
-      "gold": "Gold",
-      "sunset": "Sunset",
-      "ruby": "Ruby",
-      "graphite": "Graphite"
-    },
-    "font": "Typography",
-    "fonts": {
-      "fyso": "Fyso",
-      "system": "System",
-      "humanist": "Humanist",
-      "classic": "Classic",
-      "rounded": "Rounded"
-    },
-    "radius": "Corners",
-    "radii": {
-      "sharp": "Sharp",
-      "soft": "Soft",
-      "round": "Rounded"
-    },
-    "background": "Login background",
-    "backgroundChange": "Choose photo…",
-    "backgroundReset": "Use Fyso's",
-    "backgroundHint": "A photo or large image. Saved as JPEG, up to 1600 px.",
-    "backgroundInvalid": "That image could not be used. Try a JPG or a PNG.",
-    "resetAll": "Reset everything to Fyso"
   }
 }

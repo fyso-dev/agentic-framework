@@ -3,7 +3,7 @@
 // with simulated delays.
 //
 // Scenarios: ready (default) · failed · first · empty · applyfail
-import { DAGS, type App, type Backend, type Brand, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
+import { DAGS, type App, type Backend, type Extension, type Engine, type Marketplace, type MarketplaceEntry, type Plan, type Project, type Run, type SetupCheck, type SkillCatalog, type ThirdPartySkill } from "./types";
 import { fromBase64Utf8, listedBots, parseTeam, readBots } from "../lib/team";
 
 export type Scenario = "ready" | "failed" | "first" | "empty" | "applyfail";
@@ -460,20 +460,6 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
             error: fail ? "error: the update conflicts with local changes; nothing was applied: ./Caddyfile" : undefined,
             outputs: () => ({ result: JSON.stringify({ from: "58f57cf", to: "73b74c2", commit: "1dcf4be", changed: true }) }),
           });
-          break;
-        }
-        case "fyso-brand": {
-          const input = params?.SETTINGS_B64 ? JSON.parse(fromBase64Utf8(params.SETTINGS_B64)) as Partial<Brand> : {};
-          const brand = PROJECT.brand!;
-          if (params?.OP === "save") {
-            if (input.name !== undefined) brand.name = input.name;
-            if (input.accent !== undefined) brand.accent = input.accent.toLowerCase();
-            if (input.font !== undefined) brand.font = input.font;
-            if (input.radius !== undefined) brand.radius = input.radius;
-            if (input.icon !== undefined) brand.icon = input.icon === null ? null : `data:image/png;base64,${input.icon}`;
-            if (input.loginBackground !== undefined) brand.loginBackground = input.loginBackground === null ? null : `data:image/jpeg;base64,${input.loginBackground}`;
-          }
-          add({ dag, id, createdAt, duration: 900, outcome: "succeeded", outputs: () => ({ result: JSON.stringify(brand) }) });
           break;
         }
         default:
