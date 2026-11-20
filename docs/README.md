@@ -46,6 +46,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
+| Biz-managed project access: delivery scope and identity proof | [Delivery brief](biz-access-delivery.md) |
 | Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
 | Shared-access people directory, a page of the human-requests extension, without login accounts (D76) | [people-directory.md](people-directory.md) |
 | Human requests: extension published as [fyso-ext-human-requests v0.1.0](https://github.com/fyso-dev/fyso-ext-human-requests/releases/tag/v0.1.0) in the official catalog, with inbox, structured requests, questions to the agent and a menu counter (D76; beta) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |

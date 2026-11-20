@@ -413,15 +413,46 @@ function serveHttp(socket, env = process.env, fetchImpl = fetch) {
   const oauth = require('./mcp-oauth.cjs');
   const token = env.FYSO_MCP_TOKEN || '';
   const withOAuth = oauth.enabled(env);
+  const access = require('./mcp-access.cjs').remoteAccess(ROOT, env);
   const off = env.FYSO_WEB_SCHEME !== 'https' ? 'Remote MCP is off: this project has no HTTPS provider extension.'
-    : token.length < 32 && !withOAuth ? 'Remote MCP is off: run "mise run agent:remote" on the project\'s machine to create its token.' : null;
+    : token.length < 32 && !withOAuth && !access.enabled() ? 'Remote MCP is off: run "mise run agent:remote" on the project\'s machine to create its token.' : null;
   const expected = token.length < 32 ? null : Buffer.from(`Bearer ${token}`);
   const projectToken = header => {
     const given = Buffer.from(String(header || ''));
     return !!expected && given.length === expected.length && crypto.timingSafeEqual(given, expected);
   };
   const checkOAuth = withOAuth ? oauth.verifier(env, fetchImpl) : async () => null;
-  const authorized = async header => projectToken(header) || !!(await checkOAuth(header));
+  const principal = async header => {
+    if (projectToken(header)) return {kind: 'project'};
+    const delegated = /^Bearer fyso-ext-([a-z][a-z0-9-]{1,30})\.([A-Za-z0-9_-]{43})$/.exec(String(header || ''));
+    if (delegated) {
+      const [, extension, secret] = delegated;
+      const digest = crypto.createHash('sha256').update(secret).digest('hex');
+      return await access.authenticate(extension, digest) ? {kind: 'delegated', extension, digest} : null;
+    }
+    const user = await checkOAuth(header);
+    return user ? {kind: 'user', user} : null;
+  };
+  async function answerRemote(msg, actor) {
+    const check = operation => access.authorize({principal: actor, ...operation});
+    try {
+      const {method, params} = msg ?? {};
+      if (!await check({method, tool: method === 'tools/call' ? params?.name : undefined})) {
+        return msg?.id === undefined ? undefined :
+          {jsonrpc: '2.0', id: msg.id, error: {code: -32001, message: 'Access denied by project policy.'}};
+      }
+      const reply = await answer(msg);
+      if (method === 'tools/list' && Array.isArray(reply?.result?.tools)) {
+        const entries = reply.result.tools;
+        const visible = await Promise.all(entries.map(({name}) => check({method: 'tools/call', tool: name})));
+        reply.result.tools = entries.filter((_, index) => visible[index]);
+      }
+      return reply;
+    } catch {
+      return msg?.id === undefined ? undefined :
+        {jsonrpc: '2.0', id: msg.id, error: {code: -32001, message: 'Project policy unavailable.'}};
+    }
+  }
   const challenge = withOAuth ? oauth.challenge(env) : 'Bearer';
   const server = require('node:http').createServer(async (req, res) => {
     const reply = (status, body, headers = {}) => {
@@ -465,7 +496,8 @@ function serveHttp(socket, env = process.env, fetchImpl = fetch) {
     if (url !== '/mcp') return reply(404, {error: 'not found'});
     if (off) return reply(404, {error: off});
     if (req.headers.origin) return reply(403, {error: 'This endpoint is for MCP clients, not browsers.'});
-    if (!(await authorized(req.headers.authorization))) return reply(401, {error: 'Missing or wrong bearer token.'}, {'WWW-Authenticate': challenge});
+    const actor = await principal(req.headers.authorization).catch(() => null);
+    if (!actor) return reply(401, {error: 'Missing or wrong bearer token.'}, {'WWW-Authenticate': challenge});
     if (req.method !== 'POST') return reply(405, {error: 'Use POST.'}, {Allow: 'POST'});
     let size = 0;
     const chunks = [];
@@ -480,7 +512,7 @@ function serveHttp(socket, env = process.env, fetchImpl = fetch) {
       let body;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return reply(400, {jsonrpc: '2.0', id: null, error: {code: -32700, message: 'parse error'}}); }
       const batch = Array.isArray(body);
-      const replies = (await Promise.all((batch ? body : [body]).map(answer))).filter(Boolean);
+      const replies = (await Promise.all((batch ? body : [body]).map(msg => answerRemote(msg, actor)))).filter(Boolean);
       if (!replies.length) return reply(202);
       reply(200, batch ? replies : replies[0]);
     });

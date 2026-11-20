@@ -6,10 +6,10 @@ const {spawn,spawnSync}=require('node:child_process');
 const scripts=path.resolve(__dirname,'../template/framework/scripts');
 const TOKEN='t'.repeat(43);
 
-function start(t,env) {
+function start(t,env,source=scripts) {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mcp-'));
   const socket=path.join(dir,'mcp.sock');
-  const child=spawn(process.execPath,[path.join(scripts,'fyso-mcp.cjs'),'--http',socket],{env:{PATH:process.env.PATH,HOME:process.env.HOME,...env},stdio:['ignore','ignore','pipe']});
+  const child=spawn(process.execPath,[path.join(source,'fyso-mcp.cjs'),'--http',socket],{env:{PATH:process.env.PATH,HOME:process.env.HOME,...env},stdio:['ignore','ignore','pipe']});
   t.after(()=>{child.kill();fs.rmSync(dir,{recursive:true,force:true});});
   const call=(method,urlPath,headers={},body)=>new Promise((resolve,reject)=>{
     const req=http.request({socketPath:socket,path:urlPath,method,headers:{...(body!==undefined&&{'Content-Type':'application/json'}),...headers}},res=>{
@@ -20,6 +20,47 @@ function start(t,env) {
   return ready.then(()=>({socket,call,auth:{Authorization:`Bearer ${TOKEN}`}}));
 }
 const init={jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'t',version:'0'}}};
+
+test('a private extension policy filters discovery and blocks direct remote tool calls',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mcp-policy-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const source=path.join(root,'framework/scripts');
+  fs.cpSync(scripts,source,{recursive:true});
+  fs.copyFileSync(path.resolve(scripts,'../agent-context.md'),path.join(root,'framework/agent-context.md'));
+  const extension=path.join(root,'extensions/policyfixture');
+  fs.mkdirSync(extension,{recursive:true});
+  fs.writeFileSync(path.join(extension,'mcp-authorize'),'');
+  const port='48837';
+  const socketPath=`/tmp/fyso-ext-policyfixture-${port}.sock`;
+  const seen=[];
+  const delegatedSecret='d'.repeat(43);
+  const digest=require('node:crypto').createHash('sha256').update(delegatedSecret).digest('hex');
+  const policy=http.createServer(async(req,res)=>{
+    const chunks=[];
+    for await (const chunk of req) chunks.push(chunk);
+    const operation=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    seen.push(operation);
+    if(operation.principal.kind==='delegated'&&operation.principal.digest!==digest) {
+      return res.writeHead(403).end();
+    }
+    res.writeHead(operation.method!=='tools/call'||operation.tool==='fyso_context'?204:403).end();
+  });
+  await new Promise((resolve,reject)=>policy.once('error',reject).listen(socketPath,resolve));
+  t.after(()=>{if(policy.listening)policy.close();});
+  const server=await start(t,{FYSO_WEB_SCHEME:'https',FYSO_MCP_TOKEN:TOKEN,FYSO_HTTP_PORT:port},source);
+  const list=await server.call('POST','/mcp',server.auth,{jsonrpc:'2.0',id:1,method:'tools/list'});
+  assert.deepEqual(list.body.result.tools.map(({name})=>name),['fyso_context']);
+  const execute=name=>server.call('POST','/mcp',server.auth,{jsonrpc:'2.0',id:2,method:'tools/call',params:{name}});
+  assert.equal((await execute('fyso_status')).body.error.code,-32001);
+  assert.ok((await execute('fyso_context')).body.result.structuredContent.guide);
+  assert.ok(seen.every(({principal})=>principal.kind==='project'));
+  const delegated={Authorization:`Bearer fyso-ext-policyfixture.${delegatedSecret}`};
+  assert.equal((await server.call('POST','/mcp',delegated,init)).status,200);
+  assert.equal((await server.call('POST','/mcp',{Authorization:`Bearer fyso-ext-policyfixture.${'x'.repeat(43)}`},init)).status,401);
+  assert.ok(!JSON.stringify(seen).includes(delegatedSecret));
+  await new Promise(resolve=>policy.close(resolve));
+  assert.equal((await execute('fyso_context')).body.error.code,-32001);
+});
 
 test('the project token grants remote Dagu tools and an OpenMausBot conversation',async t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-remote-fixture-'));

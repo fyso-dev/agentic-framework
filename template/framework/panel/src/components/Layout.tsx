@@ -132,13 +132,13 @@ function Attention() {
   );
 }
 
-export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean; toggleNav: () => void }) {
+export function TopBar(props: ThemeProps & { route: Route; visible: (id: string) => boolean; navCollapsed: boolean; toggleNav: () => void }) {
   const { t, i18n } = useTranslation();
   const { project, apps } = useStore();
   const p = project.data;
   const embedded = (id: string) => !!apps.data?.some((app) => app.id === id && app.enabled && app.embed);
   const route = props.route;
-  const openApp = route.name === "app" ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
+  const openApp = route.name === "app" && props.visible(`app:${route.id}`) ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
   return (
     <header className="topbar">
       <button type="button" className="icon-btn nav-toggle only-desktop" onClick={props.toggleNav} aria-expanded={!props.navCollapsed}
@@ -173,7 +173,7 @@ export function TopBar(props: ThemeProps & { route: Route; navCollapsed: boolean
       <span className="only-desktop">
         <ThemeButton {...props} />
       </span>
-      {p && openApp?.id !== "omb" && (embedded("omb") ? (
+      {p && props.visible("app:omb") && openApp?.id !== "omb" && (embedded("omb") ? (
         <a href={href.app("omb")} className="btn btn-pri">
           <span className="only-desktop">{t("top.openOmb")}</span>
           <span className="only-mobile">{t("top.ombShort")}</span>
@@ -199,6 +199,8 @@ const ITEMS: NavItem[] = [
   { id: "apps", href: href.apps, icon: IconApps },
 ];
 
+const mcpItem: NavItem = { id: "mcp", href: href.mcp, icon: IconPlug, label: "MCP" };
+
 const extensionItems = (extensions:Extension[],lang:string):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
@@ -209,11 +211,11 @@ function section(r:Route) {
 /** Apps that open inside the panel (D92) get their own menu entries, after the panel's sections. */
 const appItems = (apps:App[],lang:string):NavItem[] => apps.filter(app=>app.enabled&&app.embed).map(app=>({id:`app:${app.id}`,href:href.app(app.id),label:localized(lang,app.name,app.name_i18n),icon:(p:{size?:number})=><AppIcon name={app.icon} size={p.size} />}));
 
-export function SideNav({ route, collapsed }: { route: Route; collapsed: boolean }) {
+export function SideNav({ route, collapsed, visible, showMcp }: { route: Route; collapsed: boolean; showMcp: boolean; visible: (id: string) => boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
-  const apps = appItems(s.apps.data ?? [], i18n.language);
-  const items = [...ITEMS,...apps,...extensionItems(s.extensions.data??[],i18n.language)];
+  const apps = appItems(s.apps.data ?? [], i18n.language).filter(({ id }) => visible(id));
+  const items = [...ITEMS,...(showMcp ? [mcpItem] : []),...apps,...extensionItems(s.extensions.data??[],i18n.language)].filter(({ id }) => visible(id));
   const firstApp = apps[0]?.id;
   const open = openSteps(s);
   const unapplied = unappliedCount(s);
@@ -272,10 +274,10 @@ export function useNavCollapsed(): [boolean, () => void] {
   return [collapsed, toggle];
 }
 
-export function BottomNav({ route }: { route: Route }) {
+export function BottomNav({ route, visible, showMcp }: { route: Route; showMcp: boolean; visible: (id: string) => boolean }) {
   const { t, i18n } = useTranslation();
   const s = useStore();
-  const items = [...ITEMS,...extensionItems(s.extensions.data??[],i18n.language)];
+  const items = [...ITEMS,...(showMcp ? [mcpItem] : []),...extensionItems(s.extensions.data??[],i18n.language)].filter(({ id }) => visible(id));
   const open = loadingSteps(s) || s.noData ? 0 : openSteps(s);
   const extensionBadges = useExtensionBadges(s.extensions.data ?? [], !s.mock);
   const badges: Record<NavItem["id"], [number, string]> = {
