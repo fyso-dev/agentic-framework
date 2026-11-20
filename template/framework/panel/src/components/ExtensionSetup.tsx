@@ -3,6 +3,7 @@
 // with SOPS; the panel never reads them back.
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { useCapability } from "../lib/access";
 import type { Extension } from "../api/types";
 import { localized } from "../lib/i18n";
 import { isExample, parseEnvBlock } from "../lib/envBlock";
@@ -14,6 +15,7 @@ const masked = { WebkitTextSecurity: "disc", height: "auto", minHeight: "5.5em",
 
 export function ExtensionSetup({ ext, onSaved }: { ext: Extension; onSaved: () => void }) {
   const { t, i18n } = useTranslation();
+  const canConfigure = useCapability(`action:extension:${ext.id}:configure`);
   const names = ext.secrets.map((x) => x.name);
   const missing = ext.secrets.some((x) => x.required && !x.set);
   const links = [...new Set(ext.secrets.map((x) => x.url).filter((u): u is string => !!u))];
@@ -54,7 +56,7 @@ export function ExtensionSetup({ ext, onSaved }: { ext: Extension; onSaved: () =
     }
   }
 
-  if (ext.secrets.length === 0) return null;
+  if (!canConfigure || ext.secrets.length === 0) return null;
   const fields = ext.secrets.map((x) => {
     const desc = x.description ? localized(i18n.language, x.description, x.description_i18n) : undefined;
     return (
