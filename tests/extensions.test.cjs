@@ -157,3 +157,18 @@ test('an extension may declare one instance switcher URL as data; anything else 
   put('.copier-answers.ext-other.yml','_src_path: fixture\n');put('extensions/other/switcher.yaml','url: /b.json\n');
   result=check();assert.equal(result.status,1);assert.match(result.stderr,/Only one extension may declare a switcher: hub, other/);
 }));
+test('an unchanged .mcp.json is left alone, and a confined process cannot rewrite it without failing',()=>fixture(({root,run})=>{
+  let result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
+  const file=path.join(root,'.mcp.json'),before=fs.statSync(file);
+  result=run(['node','framework/scripts/mcp-config.cjs']);assert.equal(result.status,0,result.stderr);
+  assert.equal(fs.statSync(file).ino,before.ino,'unchanged content is not rewritten');
+  // The sandbox denies the write (D93): simulate it with a stale file in a read-only folder.
+  fs.writeFileSync(file,'{}\n');fs.chmodSync(root,0o555);
+  try {
+    result=run(['node','framework/scripts/mcp-config.cjs'],{FYSO_CONFINED:'fixture'});
+    assert.equal(result.status,0,result.stderr);assert.match(result.stderr,/regenerated on the next `mise run up`/);
+    result=run(['node','framework/scripts/mcp-config.cjs']);
+    assert.equal(result.status,1,'outside the sandbox a failed write still fails');
+  } finally {fs.chmodSync(root,0o755);}
+  assert.equal(fs.readFileSync(file,'utf8'),'{}\n');
+}));
