@@ -14,6 +14,10 @@ const PROJECT: Project = {
   env: "local",
   urls: { dagu: "http://dagu.localhost:8400", omb: "http://omb.localhost:8400" },
   framework: { commit: "58f57cf", src: "https://github.com/fyso-dev/agentic-framework.git" },
+  brand: {
+    name: "Foo project", accent: "#6e1fff", font: "fyso", radius: "soft", icon: null, loginBackground: null,
+    defaults: { name: "Foo project", accent: "#6e1fff", font: "fyso", radius: "soft" },
+  },
 };
 
 const TEAM = `# This project's bots, in OpenMausBot's native team file format (PLAN §5).
@@ -334,7 +338,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
     async getObservability() { throw new Error("Observability requires the real stack"); },
     async getProject() {
       await sleep(150);
-      return PROJECT;
+      return { ...PROJECT, brand: PROJECT.brand && { ...PROJECT.brand } };
     },
     async getTeam() {
       await sleep(200);

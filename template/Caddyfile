@@ -44,10 +44,12 @@
 		header Cache-Control no-cache
 		file_server
 	}
-	@brandLogin path /fyso-brand/login-background.svg
+	# The project's photo when it has one, the drawn background otherwise.
+	@brandLogin path /fyso-brand/login-background /fyso-brand/login-background.svg
 	route @brandLogin {
-		rewrite * /login-background.svg
 		root * {$FYSO_DATA}/brand
+		try_files /login-background.jpg /login-background.svg
+		header Cache-Control no-cache
 		file_server
 	}
 }
@@ -139,6 +141,7 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	route @remoteMcp {
 		reverse_proxy unix/{$FYSO_MCP_SOCKET}
 	}
+	import fyso_brand
 	import fyso_login
 	handle /api/session {
 		rewrite * /api/context/user

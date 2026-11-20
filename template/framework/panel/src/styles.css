@@ -1103,3 +1103,6 @@ a.ap-tile:hover .ap-go, a.ap-tile:focus-visible .ap-go { opacity: 1; }
 /* Design system titles (ui-board-title, ui-dialog-title): Demo 700, tight tracking. */
 .page-head h1, .h1, .bots-list-head h1, .bd-title h2, .ap-head h1 { font-family: var(--font-display); letter-spacing: -.015em; }
 .modal-head h2, .empty-title { font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 22px; }
+
+/* ── Project identity (D92) ─────────────────────────────────────────────── */
+.logo-custom { height: 28px; object-fit: contain; border-radius: 6px; }
