@@ -63,7 +63,7 @@ apply() {
   for file in .config/mise/conf.d/ext-*.toml; do [ ! -f "$file" ] || mise trust -q "$file"; done
   if live; then
     require_env FYSO_OMB_PORT
-    MISE_YES=1 mise install >&2
+    install_tools
     pc project update >&2
     pc process restart caddy >&2
     node framework/scripts/managed-mcp.cjs

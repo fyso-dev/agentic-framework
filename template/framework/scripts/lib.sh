@@ -5,6 +5,13 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+# Install pinned tools only when one is missing. Panel steps run confined (D93), where
+# any real `mise install` fails: it always rebuilds shims and runtime symlinks in the
+# user's mise data folder, outside the project, which the sandbox cannot write.
+install_tools() {
+  mise install --dry-run-code >/dev/null 2>&1 || MISE_YES=1 mise install >&2
+}
+
 require_env() {
   local v
   for v in "$@"; do

@@ -18,7 +18,7 @@ refresh() {
 }
 # Load tools, processes and routes before a hook can contact its own service.
 activate() {
-  MISE_YES=1 mise install >&2
+  install_tools
   if stack_running; then
     pc project update >&2
     # The login authority reads app access at startup (D58); sessions survive the restart.
