@@ -10,7 +10,7 @@
 //          --shared-key <age key file> (repeatable) --allow-read <path> --allow-write <path>
 // Without the sandbox a confined process does not start: only FYSO_CONFINE=off runs it plainly.
 'use strict';
-const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), crypto = require('node:crypto');
 const {execFileSync, spawn} = require('node:child_process');
 const {pathToFileURL} = require('node:url');
 
@@ -64,8 +64,13 @@ function policy(options, env = process.env, home = os.homedir()) {
     }
   }
   const sockets = projectSockets(options);
+  // Temporary files live outside the project: sandbox-runtime always denies writes to
+  // `.git/hooks` and `.git/config` beneath the project, so no temporary git repository
+  // (Copier's update, a catalog or skill clone) could be created inside it, and git would
+  // climb to the project's own repository instead. One folder per project, owned by us.
+  const scratch = path.join(real('/tmp'), `fyso-confine-${crypto.createHash('sha256').update(root).digest('hex').slice(0, 12)}`);
   const vars = {
-    HOME: privateHome, TMPDIR: path.join(privateHome, 'tmp'),
+    HOME: privateHome, TMPDIR: scratch,
     XDG_CONFIG_HOME: path.join(privateHome, '.config'), XDG_CACHE_HOME: path.join(privateHome, '.cache'),
     XDG_DATA_HOME: path.join(privateHome, '.local/share'), XDG_STATE_HOME: path.join(privateHome, '.local/state'),
     MISE_DATA_DIR: env.MISE_DATA_DIR || path.join(home, '.local/share/mise'),
@@ -77,10 +82,10 @@ function policy(options, env = process.env, home = os.homedir()) {
   };
   for (const engine of ENGINES) vars[engine.env] = path.join(privateHome, engine.dir);
   return {
-    root, data, privateHome, projectKey, credentials, sockets, vars,
+    root, data, privateHome, scratch, projectKey, credentials, sockets, vars,
     denyRead,
-    allowRead: [...new Set([root, ...toolchain(env, home, denyRead), ...credentials.map(c => c.target), ...options.allowRead.map(p => path.resolve(p))])],
-    allowWrite: [...new Set([root, ...credentials.map(c => c.target), ...options.allowWrite.map(p => path.resolve(p))])],
+    allowRead: [...new Set([root, scratch, ...toolchain(env, home, denyRead), ...credentials.map(c => c.target), ...options.allowRead.map(p => path.resolve(p))])],
+    allowWrite: [...new Set([root, scratch, ...credentials.map(c => c.target), ...options.allowWrite.map(p => path.resolve(p))])],
   };
 }
 
@@ -127,8 +132,9 @@ async function runtime() {
 
 // The private home: state, caches and logins of confined processes stay in the project.
 function prepareHome(p) {
-  for (const dir of ['', 'tmp', '.cache', '.config/mise', '.local/share', '.local/state'])
+  for (const dir of ['', '.cache', '.config/mise', '.local/share', '.local/state'])
     fs.mkdirSync(path.join(p.privateHome, dir), {recursive:true, mode:0o700});
+  scratchDir(p.scratch);
   if (!fs.existsSync(p.projectKey)) fail(`no project age key at ${p.projectKey}; run 'mise run up' (it creates it)`);
   link(p.projectKey, path.join(p.privateHome, '.config/mise/age.txt'));
   for (const c of p.credentials) {
@@ -141,6 +147,15 @@ function prepareHome(p) {
   const gitconfig = path.join(p.privateHome, '.gitconfig');
   if (identity) fs.writeFileSync(gitconfig, `# Written by confine.cjs from the user's git identity.\n[user]\n${identity}`, {mode:0o600});
   else fs.rmSync(gitconfig, {force:true});
+}
+// /tmp is shared: the folder must be a real directory of ours, private, never a link
+// someone else planted.
+function scratchDir(dir) {
+  try { fs.mkdirSync(dir, {mode:0o700}); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+  const st = fs.lstatSync(dir);
+  if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid()))
+    fail(`${dir} is not a private folder of this user; remove it and try again`);
+  if ((st.mode & 0o077) !== 0) fs.chmodSync(dir, 0o700);
 }
 function gitIdentity() {
   const lines = [];
@@ -298,7 +313,7 @@ async function selftest(argv) {
   });
 }
 
-module.exports = {policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity, ENGINES};
+module.exports = {policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity, scratchDir, ENGINES};
 
 if (require.main === module) {
   const [mode, ...rest] = process.argv.slice(2);
