@@ -99,7 +99,7 @@ fi
 # not restarted here (it runs this workflow): 'mise run down && mise run up' applies
 # changes to the framework's own processes.
 # Always activate, including no-change retries after an earlier activation failure.
-MISE_YES=1 mise install >&2
+install_tools
 node framework/scripts/mcp-config.cjs >&2
 node framework/scripts/panel-data.cjs config >&2
 if stack_running; then
