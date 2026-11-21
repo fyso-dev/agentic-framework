@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity } = require('../template/framework/scripts/confine.cjs');
+const { policy, parseArgs, macosSocketRules, sandboxConfig, gitIdentity, scratchDir } = require('../template/framework/scripts/confine.cjs');
 
 function fixture(fn) {
   const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'confine-')));
@@ -17,10 +17,38 @@ test('a project reads and writes its folder; home, siblings and shared keys are 
   const p = policy({ root, project: 'demo', port: '8400', sharedKeys: [shared], allowRead: [], allowWrite: [] }, { PATH: '/usr/bin' }, home);
   assert.deepEqual(p.denyRead, [home, path.join(home, 'projects'), shared]);
   assert.ok(p.allowRead.includes(root));
-  assert.deepEqual(p.allowWrite, [root]);
+  assert.deepEqual(p.allowWrite, [root, p.scratch]);
   assert.equal(p.vars.HOME, path.join(root, '.data/confine/home'));
   assert.equal(p.vars.SOPS_AGE_KEY_FILE, path.join(root, '.data/confine/age.txt'));
   assert.equal(p.vars.FYSO_COMPOSIO_AGE_KEY_FILE, p.vars.SOPS_AGE_KEY_FILE);
+}));
+
+test('temporary files go to a private folder outside the project, one per project', () => fixture(home => {
+  // sandbox-runtime denies `.git/hooks` and `.git/config` beneath the project: a temporary
+  // git repository (Copier update, catalog clone) must be created outside it.
+  const root = path.join(home, 'demo'), other = path.join(home, 'other');
+  const p = policy({ root, sharedKeys: [], allowRead: [], allowWrite: [] }, { PATH: '' }, home);
+  const q = policy({ root: other, sharedKeys: [], allowRead: [], allowWrite: [] }, { PATH: '' }, home);
+  assert.equal(p.vars.TMPDIR, p.scratch);
+  assert.ok(!p.scratch.startsWith(root + path.sep));
+  assert.equal(path.dirname(p.scratch), fs.realpathSync('/tmp'));
+  assert.match(path.basename(p.scratch), /^fyso-confine-[0-9a-f]{12}$/);
+  assert.notEqual(p.scratch, q.scratch);
+  assert.ok(p.allowRead.includes(p.scratch) && p.allowWrite.includes(p.scratch));
+}));
+
+test('the temporary folder is created private and a planted link is refused', () => fixture(home => {
+  const dir = path.join(home, 'scratch');
+  scratchDir(dir);
+  assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+  scratchDir(dir); // an existing folder of ours is fine
+  const link = path.join(home, 'planted');
+  fs.symlinkSync(home, link);
+  const { spawnSync } = require('node:child_process');
+  const code = `require(${JSON.stringify(path.resolve(__dirname, '../template/framework/scripts/confine.cjs'))}).scratchDir(${JSON.stringify(link)})`;
+  const result = spawnSync(process.execPath, ['-e', code], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not a private folder/);
 }));
 
 test('only engine credential files are shared, not their folders', () => fixture(home => {
