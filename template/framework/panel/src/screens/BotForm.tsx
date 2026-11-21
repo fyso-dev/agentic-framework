@@ -1,10 +1,10 @@
 // Bot detail (B1.3): one bot in three tabs — Perfil, Instrucciones, Conectores —
-// and one Save for everything. team.yaml fields go to the local draft (applied later
-// with "Revisar y aplicar"); app grants are planned and applied by fyso-app-access.
+// and one Accept action. The native team plan validates the form before applying it.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Engine, RuntimeBot } from "../api/types";
+import { DAGS, type ApplyResult, type Engine, type Plan, type RuntimeBot } from "../api/types";
 import type { Observation } from "../api/observability";
+import { ActionError } from "../components/Action";
 import { BotAccess, useAppAccess, useMcpInventory, type Level } from "../components/BotAccess";
 import {
   IconAlert, IconArrowUpRight, IconBack, IconBolt, IconBulb, IconChat, IconCommit, IconDoc, IconHand, IconLayers,
@@ -13,9 +13,10 @@ import {
 import { Avatar, Modal, Switch } from "../components/ui";
 import { botActivity } from "../lib/bot-activity";
 import { accessFor, ensurePiHumanRequestOrigin, piHumanRequestOriginBlocked, selectServer, type ToolScope } from "../lib/connector-access";
+import { useDaguAction } from "../lib/useDaguAction";
 import { go, href, type BotTab } from "../lib/router";
 import {
-  byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
+  base64Utf8, byteLength, extensionSkillFile, thirdPartySkillFile, NAME_MAX, parseTeam, readBots, removeBot, serializeTeam,
   SOUL_MAX_BYTES, SOUL_WARN_BYTES, soulFileLabel, teamNames, invalidTeamRemoval, appliedTeamForRemoval, upsertBot, type Approval, type Bot,
 } from "../lib/team";
 import { useStore } from "../store";
@@ -124,7 +125,10 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
 
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState<"team" | "apps" | null>(null);
+  const savingRef = useRef(false);
+  const plan = useDaguAction<Plan>(s.backend, DAGS.botsPlan, "plan");
+  const apply = useDaguAction<ApplyResult>(s.backend, DAGS.botsApply, "apply");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const soulRef = useRef<HTMLTextAreaElement>(null);
 
@@ -143,6 +147,8 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
     || approval !== initial.approval || soul !== initial.soul || uses !== initial.uses || scopeChanged || skillsChanged;
   const appsDirty = Object.keys(appChanges).length > 0;
   const dirty = teamDirty || appsDirty;
+  const draftBlocksSave = teamDirty && s.draft !== null;
+  const canSave = !draftBlocksSave && s.draftReady && s.team.status === "ok";
 
   const nameError = (v: string): string | undefined => {
     const n = v.trim();
@@ -165,40 +171,61 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
     setName(initial.name); setTitle(initial.title); setTeam(initial.team); setEngine(initial.engine); setModel(initial.model);
     setApproval(initial.approval); setSoul(initial.soul); setUses(initial.uses);
     setScope(runtime ? runtime.toolScope : bot?.tools); setScopeChanged(false); setAppChanges({}); setSkillsOn({});
-    setErrors({}); setSaveFailed(false);
+    setErrors({}); setSaveFailed(null);
+    plan.reset(); apply.reset();
   };
 
   const save = async () => {
+    if (savingRef.current || !canSave || s.team.data === undefined) return;
     const next: Errors = { name: nameError(name), soul: soulError(bytes), model: model ? undefined : t("form.errModel"), team: invalidTeamRemoval(appliedTeam, team) ? t("form.teamLeave") : undefined };
     setErrors(next);
     if (next.name || next.model || next.team) { pickTab("perfil"); return; }
     if (next.soul) { pickTab("instrucciones"); requestAnimationFrame(() => soulRef.current?.focus()); return; }
-    setSaving(true); setSaveFailed(false);
-    let index = bot?.index ?? null;
-    if (teamDirty) {
-      const doc = parseTeam(s.workingText ?? "version: 1\nbots: []\n");
-      const soulChanged = bot?.soul.kind === "file" ? soul.trim() !== "" : soul !== initial.soul;
-      const previousName = index === null ? undefined : doc.getIn(["bots", index, "was"]);
-      const declaredName = s.baseBots.find((entry) => entry.name === bot?.name)?.name
-        ?? s.baseBots.find((entry) => entry.name === previousName)?.name;
-      upsertBot(doc, index, {
-        name, title, approval, team,
-        model: engine ? `${engine}/${model}` : model,
-        soulText: soulChanged ? soul : null,
-        usesWorkflows: uses,
-        ...(scopeChanged ? { tools: scope || {} } : {}),
-        skills: extSkills.map((k) => ({ file: k.file, on: (uses || !k.needsRoot) && skillOn(k.file) })),
-      }, declaredName);
-      if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
-      s.setDraft(serializeTeam(doc));
-      setScopeChanged(false); setSkillsOn({});
+
+    savingRef.current = true;
+    setSaving(true); setSaveFailed(null);
+    plan.reset(); apply.reset();
+    try {
+      let index = bot?.index ?? null;
+      let params: Record<string, string> | undefined;
+      if (teamDirty) {
+        const base = s.team.data;
+        const doc = parseTeam(base);
+        const soulChanged = bot?.soul.kind === "file" ? soul.trim() !== "" : soul !== initial.soul;
+        upsertBot(doc, index, {
+          name, title, approval, team,
+          model: engine ? `${engine}/${model}` : model,
+          soulText: soulChanged ? soul : null,
+          usesWorkflows: uses,
+          ...(scopeChanged ? { tools: scope || {} } : {}),
+          skills: extSkills.map((k) => ({ file: k.file, on: (uses || !k.needsRoot) && skillOn(k.file) })),
+        }, bot?.name);
+        if (index === null) index = readBots(doc).find((b) => b.name === name.trim())?.index ?? null;
+        const proposed = serializeTeam(doc);
+        if (proposed !== base) {
+          params = { TEAM_B64: base64Utf8(proposed), TEAM_BASE_B64: base64Utf8(base) };
+          const preview = await plan.start(params);
+          // This form never authorizes removals. The apply workflow also enforces its revision check.
+          if (!preview || preview.deleted > 0) { setSaveFailed("team"); return; }
+        }
+      }
+      if (appsDirty) {
+        if (!await apps.save(appChanges)) { setSaveFailed("apps"); return; }
+        setAppChanges({});
+      }
+      if (params) {
+        if (!await apply.start(params)) { setSaveFailed("team"); return; }
+        await s.afterApply(false);
+        if (!bot && index !== null) go(href.botTab(index, current));
+      }
+      setScopeChanged(false);
+      setSkillsOn({});
+    } catch {
+      setSaveFailed("team");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    if (appsDirty) {
-      const ok = await apps.save(appChanges);
-      if (ok) setAppChanges({}); else setSaveFailed(true);
-    }
-    setSaving(false);
-    if (!bot && index !== null) go(href.botTab(index, current));
   };
 
   const remove = () => {
@@ -248,7 +275,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         <div className="bd-toolbar">
           {omb && <a href={omb} target="_blank" rel="noopener noreferrer" className="bd-ib" aria-label={t("detail.chat")} data-tip={t("detail.chat")}><IconChat size={18} /></a>}
           {bot && omb && <span className="bd-sep" aria-hidden="true" />}
-          {bot && <button type="button" className="bd-ib danger tip-r" aria-label={t("form.delete")} data-tip={t("form.delete")} onClick={() => setConfirmDelete(true)}><IconTrash size={18} /></button>}
+          {bot && <button type="button" className="bd-ib danger tip-r" aria-label={t("form.delete")} data-tip={t("form.delete")} disabled={saving} onClick={() => setConfirmDelete(true)}><IconTrash size={18} /></button>}
         </div>
       </div>
 
@@ -263,7 +290,7 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         ))}
       </div>
 
-      <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${current}`}>
+      <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${current}`} inert={saving}>
         {current === "perfil" && (
           <div className="bd-panel">
             <div className="bd-ident">
@@ -393,14 +420,19 @@ export function BotDetail({ bot, tab, runtime, observation }: { bot: Bot | null;
         )}
       </div>
 
+      {saveFailed === "team" && (
+        <>
+          <ActionError action={plan} />
+          <ActionError action={apply} />
+        </>
+      )}
       {(dirty || saving || saveFailed) && (
         <div role="status" className="bd-savebar">
           {saveFailed ? <IconAlert size={16} className="bd-savebar-err" /> : <span className="bd-dot" aria-hidden="true" />}
-          <p>{t(saveFailed ? "detail.saveFailed" : bot ? "detail.unsaved" : "form.newTitle")}</p>
+          <p>{t(saveFailed === "apps" ? "detail.saveFailed" : saveFailed ? "detail.applyFailed" : saving ? "preview.applying" : draftBlocksSave ? "detail.resolveDraft" : "detail.unsaved")}</p>
           {bot && <button type="button" className="bd-ib" aria-label={t("detail.discard")} data-tip={t("detail.discard")} onClick={discard} disabled={saving}><IconUndo size={18} /></button>}
-          <button type="button" className="btn btn-pri bd-save" onClick={() => void save()} disabled={saving} aria-busy={saving}
-            data-tip={appsDirty ? t("detail.saveTipApps") : t("form.saveNote")}>
-            {saving && <Spinner />}{t("form.save")}
+          <button type="button" className="btn btn-pri bd-save" onClick={() => void save()} disabled={saving || !canSave} aria-busy={saving}>
+            {saving && <Spinner />}{t("form.accept")}
           </button>
         </div>
       )}

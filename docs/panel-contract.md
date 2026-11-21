@@ -154,6 +154,8 @@ The panel parses and writes `team.yaml` with the `yaml` package's `Document` API
 - `tools`
 - `team` (OMB department, D81): chosen from the file's `teams:`, the departments bots and rooms already name and those the runtime reports, or typed; empty removes the key. OMB keeps a bot in its team when `team:` is removed, so the form says so.
 
+In the agent form, **Accept** validates the inputs and runs the native team plan and apply with the same proposed declaration and base. Application access changes use their existing plan and apply workflow from the same action. If a team draft is pending, resolve it before accepting individual team-file edits. Department changes, imports and bot removals continue through the team draft and its explicit review. Failed actions keep the form values for retry.
+
 The Bots list groups bots by team: bots without a team first, under OMB's "General", then the file's `teams:` order and any other team the runtime reports. A department declared in `teams:` stays listed while empty. The list's department button declares a new one (name up to 60 characters, unique without case, never "General"; optional inline shared instructions up to 24,000 bytes), and each department heading edits its inline shared instructions; a brief kept in a file shows its path read-only. Both write the local draft, count as pending changes and apply through the native plan (`team "X": create · brief set`). Drafts are matched with the file and with live bots by name and team first, then by name, so moving a bot shows as a pending change of that bot. Only the team-less chief (the default MausBot) is hidden; a team's chief is listed. `chief`, `manages`, brief files and `rooms:` are edited in `team.yaml` only; renaming and deleting a department happen in OMB.
 
 *Add department* (D82) lists the department templates of installed extensions (`fyso-bot-architect` `OP=team-templates`): name, extension, shared instructions, agents, group chats and skill count, and a note when the department already exists (its agents and rooms are replaced). Choosing one runs `OP=team-import SOURCE=extension:<ext>/<slug>`, which commits the skill files under `project/bots/teams/<slug>/` and returns `proposedTeamYaml`; the panel sets it as the draft, so the person reviews and applies it through the normal plan. It is disabled while another draft is open. Errors such as `name_taken: <bot>` are shown as received.
@@ -203,8 +205,8 @@ Import uses the existing `fyso-bot-architect` Dagu enqueue/poll/output contract 
 `Bot.tools` reads the effective native team-file allow/deny selection, including
 team defaults. `BotInput.tools` is optional: omission preserves the existing YAML
 node. An explicit change writes only that node and preserves other bot fields,
-file references and unrelated profiles. Native draft preview/apply remains the
-existing `fyso-bots-plan` / `fyso-bots-apply` workflow, not an immediate API patch.
+file references and unrelated profiles. Accept uses the existing
+`fyso-bots-plan` and `fyso-bots-apply` workflows.
 The live native scope is used for initial form visibility when there is no draft;
 subsequent roster polling never overwrites a connector selection the person edited.
 

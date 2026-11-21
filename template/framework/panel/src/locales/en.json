@@ -257,8 +257,7 @@
     "deleteShort": "Delete",
     "deleteTitle": "Delete “{{name}}”?",
     "deleteBody": "The bot is marked for removal. Applying the changes permanently deletes the bot and its conversation history in Agents.",
-    "saveNote": "Saving does not apply: it stays pending until “Review and apply”.",
-    "save": "Save",
+    "accept": "Accept",
     "errors_one": "Check {{count}} field before saving.",
     "errors_other": "Check {{count}} fields before saving.",
     "errNameRequired": "Enter a name.",
@@ -601,6 +600,7 @@
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Tags",
+    "allInstalled": "All catalog extensions are installed.",
     "catalogTitle": "Catalog",
     "search": "Search",
     "searchLabel": "Search extensions",
@@ -922,7 +922,8 @@
     "unsaved": "Unsaved",
     "discard": "Discard",
     "saveFailed": "Could not save the accesses",
-    "saveTipApps": "Application accesses apply on save; everything else stays pending until “Review and apply”."
+    "applyFailed": "Could not apply the agent changes",
+    "resolveDraft": "Apply or discard the team draft first"
   },
   "mcp": {
     "personal": {

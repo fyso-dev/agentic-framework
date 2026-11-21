@@ -112,6 +112,10 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-21: The individual agent form accepts edits in one action using the native plan and apply workflows. Pending team drafts and bot removal continue through explicit review. [Panel contract](panel-contract.md#4-editing-teamyaml-in-the-browser)
+
+2026-11-21: The panel uses extension IDs from the installed inventory to exclude those cards from catalog discovery. Available extensions drive the catalog count and search. Updates and install results are shown on the installed card. Verified in Chrome with the panel mock backend.
+
 2026-11-16: Fyso Biz's OAuth server already accepts native-app clients (dynamic registration, PKCE, RFC 8252 loopback with any port), so the menu bar app signs in on its own `127.0.0.1` callback and hands the grant to the Biz extension of a new instance. [D86](PLAN.md#2-decisions-log).
 
 2026-11-16: One-way Biz model (D89). Two-way synchronization let a project overwrite the Biz team, and a legacy download whose local name differed from Biz flipped the name and committed on every sync. Biz is now the source of truth: a department is published once to create its team, later local changes are proposals an admin decides on fyso.biz, and the Biz name wins on every sync. End to end against a local Biz: publish v1, propose, accept, pull v2; a second proposal rejected with its reason left Biz on v2. The panel in a browser and applying the pull in OMB remain unverified. [fyso-ext-biz #6](https://github.com/fyso-dev/fyso-ext-biz/pull/6) · [fyso-business #622](https://github.com/fyso-dev/fyso-business/pull/622)

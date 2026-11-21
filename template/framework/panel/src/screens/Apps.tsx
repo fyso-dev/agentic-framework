@@ -176,20 +176,17 @@ function OpenTab() {
 
 // ── Extensions ──────────────────────────────────────────────────────────────
 
-/** Which card started the install: the installed card or the catalog card. */
-type Where = "installed" | "catalog";
-
 type Market = {
   catalog: Action<Catalog>;
   install: Action<ExtInstallResult>;
   remove: Action<ExtInstallResult>;
-  target: { id: string; where: Where } | null;
+  target: string | null;
   /** The extension the last uninstall was for. */
   removing: string | null;
   /** An install or an uninstall is running: one lifecycle change at a time. */
   busy: boolean;
   entries: MarketplaceEntry[];
-  onInstall: (entry: MarketplaceEntry, where: Where) => void;
+  onInstall: (entry: MarketplaceEntry) => void;
   onRemove: (id: string) => void;
 };
 
@@ -207,8 +204,8 @@ function useMarket(): Market {
     const version = local.get(e.id) ?? null;
     return { ...e, installed: local.has(e.id), version, update: local.has(e.id) && newer(e.latest, version) };
   });
-  const onInstall = async (entry: MarketplaceEntry, where: Where) => {
-    setTarget({ id: entry.id, where });
+  const onInstall = async (entry: MarketplaceEntry) => {
+    setTarget(entry.id);
     const result = await install.start({ ID: entry.id, MODE: entry.installed ? "update" : "add" });
     // Re-read the installed list whatever the outcome: a run can change files and still fail later.
     s.reload();
@@ -222,15 +219,15 @@ function useMarket(): Market {
   const busy = install.phase === "running" || remove.phase === "running";
   return {
     catalog, install, remove, target, removing, busy, entries,
-    onInstall: (e, where) => void onInstall(e, where), onRemove: (id) => void onRemove(id),
+    onInstall: (entry) => void onInstall(entry), onRemove: (id) => void onRemove(id),
   };
 }
 
 /** Install / update control, shared by the installed card and the catalog card. */
-function InstallControl({ entry, market, where }: { entry: MarketplaceEntry; market: Market; where: Where }) {
+function InstallControl({ entry, market }: { entry: MarketplaceEntry; market: Market }) {
   const { t } = useTranslation();
   const busy = market.busy;
-  if (market.target?.id === entry.id && market.install.phase === "running") {
+  if (market.target === entry.id && market.install.phase === "running") {
     return <span className="ap-tag acc" role="status"><Spinner />{entry.installed ? t("market.updating") : t("market.installing")}</span>;
   }
   if (entry.error) return <span className="ap-tag">{t("market.versionsUnavailable")}</span>;
@@ -239,16 +236,16 @@ function InstallControl({ entry, market, where }: { entry: MarketplaceEntry; mar
     return <span className="ap-tag ok"><IconCheck size={13} />{t("market.installedShort")}</span>;
   }
   return (
-    <button type="button" className="btn btn-pri ap-btn" data-tip={t("market.commitTip")} disabled={busy} onClick={() => market.onInstall(entry, where)}>
+    <button type="button" className="btn btn-pri ap-btn" data-tip={t("market.commitTip")} disabled={busy} onClick={() => market.onInstall(entry)}>
       {entry.update ? <><IconDownload size={16} />{t("market.update", { version: entry.latest })}</> : <><IconPlus size={16} />{t("market.installShort")}</>}
     </button>
   );
 }
 
-/** Install outcome under the card that ran it. */
-function InstallOutcome({ entry, market, where }: { entry: MarketplaceEntry; market: Market; where: Where }) {
+/** The outcome follows the extension when installation moves it to the installed list. */
+function InstallOutcome({ entry, market }: { entry: MarketplaceEntry; market: Market }) {
   const { t } = useTranslation();
-  if (market.target?.id !== entry.id || market.target.where !== where) return null;
+  if (market.target !== entry.id) return null;
   const out = market.install.phase === "ok" ? market.install.output : undefined;
   return (
     <>
@@ -323,7 +320,6 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
           <div className="ap-foot">
             <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>
             <span className="grow" />
-            {entry?.update && !confirming && <InstallControl entry={entry} market={market} where="installed" />}
             {removingThis ? (
               <span className="ap-tag acc" role="status"><Spinner />{t("market.removing")}</span>
             ) : !confirming && (
@@ -342,9 +338,10 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
               </div>
             </div>
           )}
-          {entry && <InstallOutcome entry={entry} market={market} where="installed" />}
         </div>
       </details>
+      {entry?.update && !confirming && <InstallControl entry={entry} market={market} />}
+      {entry && <InstallOutcome entry={entry} market={market} />}
     </li>
   );
 }
@@ -380,9 +377,9 @@ function MarketCard({ entry, market }: { entry: MarketplaceEntry; market: Market
           </a>
         )}
         <span className="grow" />
-        <InstallControl entry={entry} market={market} where="catalog" />
+        <InstallControl entry={entry} market={market} />
       </div>
-      <InstallOutcome entry={entry} market={market} where="catalog" />
+      <InstallOutcome entry={entry} market={market} />
     </li>
   );
 }
@@ -446,10 +443,12 @@ function ExtensionsTab({ market }: { market: Market }) {
   const list = s.extensions.data ?? [];
   const data = market.catalog.output;
   const byId = new Map(market.entries.map((e) => [e.id, e]));
+  const installedIds = new Set(list.map((extension) => extension.id));
+  const available = market.entries.filter((entry) => !installedIds.has(entry.id));
   const q = query.trim().toLowerCase();
   const shown = q
-    ? market.entries.filter((e) => [e.id, e.name, e.description, ...e.tags].some((v) => v.toLowerCase().includes(q)))
-    : market.entries;
+    ? available.filter((e) => [e.id, e.name, e.description, ...e.tags].some((v) => v.toLowerCase().includes(q)))
+    : available;
   const refreshing = market.catalog.phase === "running";
   const names = data?.catalogs.map((c) => c.name).join(", ");
   return (
@@ -475,9 +474,9 @@ function ExtensionsTab({ market }: { market: Market }) {
 
       <section aria-label={t("market.title")}>
         <div className="ap-cat-head">
-          <h2 className="ap-cap">{t("market.catalogTitle")} {data && <span className="n">{data.extensions.length}</span>}</h2>
+          <h2 className="ap-cap">{t("market.catalogTitle")} {data && <span className="n">{available.length}</span>}</h2>
           <span className="grow" />
-          {market.entries.length > 0 && (
+          {available.length > 0 && (
             <label className="ap-search">
               <IconSearch size={16} />
               <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("market.search")} aria-label={t("market.searchLabel")} />
@@ -496,8 +495,8 @@ function ExtensionsTab({ market }: { market: Market }) {
         ))}
         {!data ? (
           <p className="ap-empty mute">{t("market.never")}</p>
-        ) : market.entries.length === 0 ? (
-          <p className="ap-empty mute">{t("market.empty")}</p>
+        ) : available.length === 0 ? (
+          <p className="ap-empty mute">{t(market.entries.length ? "market.allInstalled" : "market.empty")}</p>
         ) : shown.length === 0 ? (
           <p className="ap-empty mute">{t("market.noMatch")}</p>
         ) : (
