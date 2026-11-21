@@ -204,7 +204,17 @@ const ITEMS: NavItem[] = [
 
 const mcpItem: NavItem = { id: "mcp", href: href.mcp, icon: IconPlug, label: "MCP" };
 
-const extensionItems = (extensions:Extension[],lang:string,shown:(ext:string,page:string,conditional:boolean)=>boolean):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).filter(page=>shown(ext.id,page.id,!!page.visible)).map(page=>({id:`extension:${ext.id}:${page.id}`,href:href.extension(ext.id,page.id),label:localized(lang,page.name,page.name_i18n),icon:(p:{size?:number})=><AppIcon name={page.icon ?? "apps"} size={p.size} />})));
+const extensionItems = (extensions:Extension[],lang:string,shown:(ext:string,page:string,conditional:boolean)=>boolean):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).filter(page=>shown(ext.id,page.id,!!page.visible)).map(page=>{
+  const icon = page.icon ?? "apps";
+  return {
+    id: `extension:${ext.id}:${page.id}`,
+    href: href.extension(ext.id,page.id),
+    label: localized(lang,page.name,page.name_i18n),
+    icon: ({size = 18}) => icon.startsWith(`/extensions/${ext.id}/panel/`)
+      ? <img src={icon} alt="" width={size} height={size} style={{objectFit:"contain"}} />
+      : <AppIcon name={icon} size={size} />,
+  };
+}));
 function section(r:Route) {
   if(r.name === "extension")return `extension:${r.extensionId}:${r.pageId}`;
   if(r.name === "app")return `app:${r.id}`;

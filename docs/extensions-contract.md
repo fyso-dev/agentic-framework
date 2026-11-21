@@ -278,6 +278,8 @@ url: /extensions/example/panel/index.html
 
 The file stem is its page ID and follows the extension ID naming rule. The entry must be an existing `.html` file strictly below the same extension's `panel/` directory. Invalid paths, private slots and missing entries fail configuration generation. Labels may be strings or language maps. The extension inventory adds `pages: {id, name, name_i18n?, icon?, url}[]`; old inventories without this property contribute no pages.
 
+A page icon can be a generic icon name or the path of an existing PNG or WebP in the same extension's `panel/` directory, such as `/extensions/example/panel/icon.png`. The panel displays that image beside the page label in navigation.
+
 The host derives navigation entries from installed registrations and serves `#/extensions/<ext>/<page>`. It embeds the declared page with a standard same-origin iframe, passing `lang`, `theme` and `page` query parameters. Multiple extensions/pages require no core changes. Removing the extension removes its entries on the next configuration reload. Opening an uninstalled page displays a generic unavailable state. Caddy permits GET/HEAD on public page assets; other extension paths return 404. No new backend or plugin evaluator is involved.
 
 ### Page counters (panel API 2)
