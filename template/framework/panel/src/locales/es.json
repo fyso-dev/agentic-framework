@@ -257,8 +257,7 @@
     "deleteShort": "Eliminar",
     "deleteTitle": "¿Eliminar “{{name}}”?",
     "deleteBody": "El bot quedará marcado para eliminar. Al aplicar los cambios, Agentes eliminará definitivamente el bot y su historial de conversaciones.",
-    "saveNote": "Guardar no aplica: queda pendiente hasta “Revisar y aplicar”.",
-    "save": "Guardar",
+    "accept": "Aceptar",
     "errors_one": "Revisa {{count}} campo antes de guardar.",
     "errors_other": "Revisa {{count}} campos antes de guardar.",
     "errNameRequired": "Escribe un nombre.",
@@ -601,6 +600,7 @@
     "hint": "Instalar crea un commit solo con los archivos de la extensión; actualizar trabaja sobre una copia limpia del último commit. Ninguno toca tus cambios sin commit, y ambos cargan procesos y rutas sin reiniciar. También desde la terminal:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Etiquetas",
+    "allInstalled": "Ya instalaste todas las extensiones del catálogo.",
     "catalogTitle": "Catálogo",
     "search": "Buscar",
     "searchLabel": "Buscar extensiones",
@@ -922,7 +922,8 @@
     "unsaved": "Sin guardar",
     "discard": "Descartar",
     "saveFailed": "No se pudieron guardar los accesos",
-    "saveTipApps": "Los accesos a aplicaciones se aplican al guardar; el resto queda pendiente hasta «Revisar y aplicar»."
+    "applyFailed": "No se pudieron aplicar los cambios del agente",
+    "resolveDraft": "Aplica o descarta el borrador del equipo primero"
   },
   "mcp": {
     "personal": {

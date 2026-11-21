@@ -48,7 +48,7 @@ export type Store = {
   stepsTotal: number;
   anyFailed: boolean;
   noData: boolean;
-  afterApply(): void;
+  afterApply(clearDraft?: boolean): Promise<void>;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -266,11 +266,13 @@ export function StoreProvider({ loaded, children }: { loaded: LoadedBackend; chi
   const anyFailed = values.includes("failed");
   const noData = check.phase === "never" && snapshot.phase === "never";
 
-  const afterApply = useCallback(() => {
-    setDraft(null);
-    void refreshRoster();
+  const afterApply = useCallback(async (clearDraft = true) => {
+    if (clearDraft) setDraft(null);
+    await rosterRefresh.current;
+    const freshRoster = refreshRoster();
     void snapshot.reload();
     void check.start();
+    await freshRoster;
   }, [setDraft, refreshRoster, snapshot.reload, check.start]);
 
 

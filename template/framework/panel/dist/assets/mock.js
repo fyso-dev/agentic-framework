@@ -1,4 +1,4 @@
-import{Ft as e,It as t,Lt as n,Nt as r,qt as i}from"./Action.js";var a={name:`Foo project`,slug:`foo-project`,env:`local`,urls:{dagu:`http://dagu.localhost:8400`,omb:`http://omb.localhost:8400`},framework:{commit:`58f57cf`,src:`https://github.com/fyso-dev/agentic-framework.git`},brand:{name:`Foo project`,accent:`#6e1fff`,font:`fyso`,radius:`soft`,icon:null,loginBackground:null,defaults:{name:`Foo project`,accent:`#6e1fff`,font:`fyso`,radius:`soft`}}},o=`# This project's bots, in OpenMausBot's native team file format (PLAN §5).
+import{Ft as e,It as t,Lt as n,Nt as r,qt as i}from"./botRoster.js";var a={name:`Foo project`,slug:`foo-project`,env:`local`,urls:{dagu:`http://dagu.localhost:8400`,omb:`http://omb.localhost:8400`},framework:{commit:`58f57cf`,src:`https://github.com/fyso-dev/agentic-framework.git`},brand:{name:`Foo project`,accent:`#6e1fff`,font:`fyso`,radius:`soft`,icon:null,loginBackground:null,defaults:{name:`Foo project`,accent:`#6e1fff`,font:`fyso`,radius:`soft`}}},o=`# This project's bots, in OpenMausBot's native team file format (PLAN §5).
 # Fine-tune instructions and memory in OpenMausBot; structure lives here (PLAN D13).
 version: 1
 
