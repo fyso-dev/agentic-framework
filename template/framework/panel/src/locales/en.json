@@ -597,6 +597,7 @@
     "versionsUnavailable": "Versions could not be checked",
     "githubAccess": "This project's host cannot access the GitHub repository. Check its account or configure a read credential with access to that repository.",
     "done": "{{id}} {{version}} is installed and committed ({{commit}}). If it needs keys, set them on its card, under Installed.",
+    "upToDate": "{{id}} was already at {{version}}, the latest release: nothing changed.",
     "hint": "Installing commits only the extension's files; upgrading works on a clean copy of the last commit. Neither touches your uncommitted changes, and both load processes and routes without a restart. From the terminal too:",
     "hintCommand": "mise run ext:add <id>",
     "tags": "Tags",

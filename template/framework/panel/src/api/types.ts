@@ -102,7 +102,8 @@ export type Marketplace = {
 export type UpdateResult = { from: string | null; to: string | null; commit: string | null; changed: boolean };
 
 /** Output `result` of `fyso-ext-install` and `fyso-ext-remove` (`mode: "remove"`, `version` = the removed one). */
-export type ExtInstallResult = { id: string; mode: "add" | "update" | "remove"; version: string | null; commit: string };
+/** `changed: false` (an update that found nothing newer): no commit was made and `commit` is null. */
+export type ExtInstallResult = { id: string; mode: "add" | "update" | "remove"; version: string | null; from?: string | null; changed?: boolean; commit: string | null };
 
 /** Third-party skills (D64, docs/third-party-skills.md). `GET /config/skills.json` lists the installed ones. */
 export type ThirdPartySkill = {

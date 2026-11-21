@@ -112,7 +112,9 @@ case "$action" in
         "$id" "$version" "$(git rev-parse --short HEAD)"
       exit 0
     fi
+    changed=false
     if [ "$mode" = add ]; then
+      changed=true
       [ ! -e "$answers" ] || fail "$id is already installed"
       EXT_APPLY=1 "$0" add "$id" -- --defaults >&2
       version=$(read_version "$answers")
@@ -124,6 +126,7 @@ case "$action" in
       git diff --cached --quiet -- "${existing[@]}" || git commit -q -m "ext: add $id ${version}" -- "${existing[@]}" >&2
     else
       [ -e "$answers" ] || fail "$id is not installed"
+      from=$(read_version "$answers")
       # A running project always has uncommitted state (bot memory), and Copier refuses
       # to update a dirty tree. Upgrade in a clean worktree of HEAD, then fast-forward.
       wt=$(mktemp -d "${TMPDIR:-/tmp}/fyso-ext-update.XXXXXXXX")
@@ -136,21 +139,26 @@ case "$action" in
         set_source "$wt/$answers" "$(cd "$src" && pwd)"
         git -C "$wt" commit -q -m "tmp: absolute extension source" -- "$answers" >&2
       fi
-      (cd "$wt" && copier update --trust --defaults --answers-file "$answers" >&2)
+      # Update to the version the catalog offers (the panel showed it), as `add` does.
+      # A source that is not the catalog's keeps Copier's choice: its newest release.
+      ref=$(node framework/scripts/marketplace.cjs resolve "$id" 2>/dev/null) || ref=''
+      if [ -n "$ref" ] && [ "${ref%%$'\t'*}" = "$src" ]; then ref=${ref#*$'\t'}; else ref=''; fi
+      (cd "$wt" && copier update --trust --defaults --answers-file "$answers" ${ref:+--vcs-ref "$ref"} >&2)
       version=$(read_version "$wt/$answers")
       if [[ $src == .* && -d $src ]]; then
         set_source "$wt/$answers" "$src"
         git -C "$wt" reset -q --soft HEAD~1
       fi
       git -C "$wt" add -A >&2
-      git -C "$wt" diff --cached --quiet || git -C "$wt" commit -q -m "ext: update $id ${version}" >&2
+      git -C "$wt" diff --cached --quiet || { git -C "$wt" commit -q -m "ext: update $id ${version}" >&2; changed=true; }
       git merge -q --ff-only "$(git -C "$wt" rev-parse HEAD)" >&2 \
         || fail "uncommitted changes in $id's files block the upgrade; commit or discard them"
       refresh >&2
     fi
     activate
-    node -e 'console.log(JSON.stringify({id:process.argv[1],mode:process.argv[2],version:process.argv[3]||null,commit:process.argv[4]}))' \
-      "$id" "$mode" "$version" "$(git rev-parse --short HEAD)"
+    # `changed: false`: already up to date, nothing was committed; `commit` is then null.
+    node -e 'const [id,mode,version,from,changed,commit]=process.argv.slice(1);console.log(JSON.stringify({id,mode,version:version||null,from:from||null,changed:changed==="true",commit:changed==="true"?commit:null}))' \
+      "$id" "$mode" "$version" "${from:-}" "$changed" "$(git rev-parse --short HEAD)"
     ;;
   configured)
     # After the panel saved this extension's secrets (D50): restart its processes and run

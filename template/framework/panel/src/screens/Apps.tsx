@@ -252,7 +252,9 @@ function InstallOutcome({ entry, market }: { entry: MarketplaceEntry; market: Ma
       <ActionError action={market.install as Action<unknown>} />
       {out && (
         <div role="status" className="ap-done">
-          <p className="mute">{t("market.done", { id: out.id, version: out.version ?? "", commit: out.commit })}</p>
+          <p className="mute">{out.changed === false
+            ? t("market.upToDate", { id: out.id, version: out.version ?? "" })
+            : t("market.done", { id: out.id, version: out.version ?? "", commit: out.commit ?? "" })}</p>
         </div>
       )}
     </>

@@ -26,17 +26,22 @@ function version(tag) {
   const m = /^v?(\d+(?:\.\d+)*)(?:-|$)/.exec(tag || '');
   return m ? m[1].split('.').map(Number) : null;
 }
+/** A release: `v1.2.0`, not a pre-release such as `v1.3.0-beta.1`. */
+const stable = tag => /^v?\d+(?:\.\d+)*$/.test(tag || '');
 function compare(a, b) {
   const x = version(a), y = version(b);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     const d = (x[i] ?? 0) - (y[i] ?? 0);
     if (d) return d;
   }
-  return 0;
+  // Same numbers: a pre-release comes before its release (v1.3.0-beta.1 < v1.3.0).
+  return Number(stable(a)) - Number(stable(b));
 }
+/** The newest release. Pre-releases are left out, as Copier does without --prereleases,
+ *  so the version the panel offers is the one an install or update gets. */
 function latestTag(src) {
   const tags = git(['ls-remote', '--tags', '--refs', gitUrl(src)]).split('\n')
-    .map(line => line.split('refs/tags/')[1]).filter(t => t && version(t));
+    .map(line => line.split('refs/tags/')[1]).filter(t => t && stable(t));
   return tags.sort(compare).at(-1) ?? null;
 }
 
@@ -120,7 +125,7 @@ function resolve(id) {
   throw Error([`${id} is not in any catalog of project/marketplaces.yaml`, ...errors].join('\n'));
 }
 
-module.exports = {gitUrl, version, compare, collect, resolve};
+module.exports = {gitUrl, version, stable, compare, collect, resolve};
 if (require.main === module) {
   try {
     const [cmd, arg] = process.argv.slice(2);
