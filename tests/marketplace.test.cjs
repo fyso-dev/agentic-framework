@@ -72,6 +72,21 @@ test('a catalog is read from a bare clone, and one without marketplace.yaml is a
   assert.deepEqual(data.extensions.map(e=>[e.id,e.latest]),[['sample','v1.0.0']]);
 }));
 
+test('pre-releases are not offered, and an installed pre-release updates to its release',()=>fixture(({base,put,run})=>{
+  // Copier skips pre-releases without --prereleases: offering one would promise a version
+  // the update does not install.
+  const beta=ext(base,'ext-beta',['v1.2.0','v1.3.0-beta.1']);
+  const final=ext(base,'ext-final',['v1.3.0-beta.1','v1.3.0']);
+  const cat=catalog(base,'cat',[{id:'beta',src:beta},{id:'final',src:final}]);
+  put('project/marketplaces.yaml',JSON.stringify([cat]));
+  put('.copier-answers.ext-beta.yml','_commit: v1.2.0\n_src_path: '+beta+'\n');
+  put('.copier-answers.ext-final.yml','_commit: v1.3.0-beta.1\n_src_path: '+final+'\n');
+  const [b,f]=JSON.parse(run('json').stdout).extensions;
+  assert.equal(b.latest,'v1.2.0');assert.equal(b.update,false);
+  assert.equal(f.latest,'v1.3.0');assert.equal(f.update,true);
+  assert.equal(run('resolve','beta').stdout.trim(),`${beta}\tv1.2.0`);
+}));
+
 test('gh: shorthand expands to a GitHub git URL',()=>fixture(({root})=>{
   const code="const {gitUrl}=require('./framework/scripts/marketplace.cjs');console.log(gitUrl('gh:fyso-dev/fyso-extensions'),gitUrl('/abs/path'))";
   const result=spawnSync(process.execPath,['-e',code],{cwd:root,env:{...process.env,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH},encoding:'utf8'});

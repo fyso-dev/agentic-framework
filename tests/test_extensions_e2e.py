@@ -102,11 +102,22 @@ class ExtensionsE2E(unittest.TestCase):
             (project / 'state/unrelated.txt').write_text('work in progress\n')
             apply = ['mise', 'exec', '--', 'framework/scripts/ext.sh', 'apply', 'update', 'sample']
             result = json.loads(run(*apply, cwd=project))
-            self.assertEqual((result['id'], result['mode'], result['version']), ('sample', 'update', 'v3'))
+            self.assertEqual((result['id'], result['mode'], result['version'], result['from'], result['changed']), ('sample', 'update', 'v3', 'v2', True))
+            self.assertTrue(result['commit'])
             self.assertEqual((project / 'extensions/sample/public/index.html').read_text(), 'sample v3\n')
             self.assertIn('ext: update sample v3', run('git', 'log', '-1', '--format=%s', cwd=project))
             self.assertEqual(run('git', 'status', '--porcelain', cwd=project).strip(), '?? state/unrelated.txt')
             self.assertEqual(run('git', 'worktree', 'list', cwd=project).count('\n'), 1)
+            # A pre-release is neither offered nor installed; updating reports no change and no commit.
+            page.write_text('sample v4 beta\n')
+            commit(ext, 'v4 beta')
+            run('git', 'tag', 'v4-beta.1', cwd=ext)
+            head = run('git', 'rev-parse', '--short', 'HEAD', cwd=project).strip()
+            self.assertIn('installed v3', run('mise', 'run', 'ext:search', 'sample', cwd=project))
+            same = json.loads(run(*apply, cwd=project))
+            self.assertEqual((same['version'], same['from'], same['changed'], same['commit']), ('v3', 'v3', False, None))
+            self.assertEqual(run('git', 'rev-parse', '--short', 'HEAD', cwd=project).strip(), head)
+            self.assertEqual((project / 'extensions/sample/public/index.html').read_text(), 'sample v3\n')
             # A local edit to one of the extension's own files blocks the fast-forward.
             page.write_text('sample v4\n')
             commit(ext, 'v4')

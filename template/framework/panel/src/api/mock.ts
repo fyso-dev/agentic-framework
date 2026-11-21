@@ -409,7 +409,7 @@ export function createMockBackend(scenario: Scenario): Backend & { initialDraft:
           add({
             dag, id, createdAt, duration: 3800, outcome: fail ? "failed" : "succeeded",
             error: fail ? "error: the project has uncommitted changes; commit or discard them before upgrading" : undefined,
-            outputs: () => ({ result: JSON.stringify({ id: ext, mode: params?.MODE ?? "add", version: latest, commit: "5e0c1aa" }) }),
+            outputs: () => ({ result: JSON.stringify({ id: ext, mode: params?.MODE ?? "add", version: latest, changed: true, commit: "5e0c1aa" }) }),
             onDone: () => {
               installed.add(ext);
               if (latest) versions.set(ext, latest);
