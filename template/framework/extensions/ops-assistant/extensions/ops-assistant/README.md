@@ -22,6 +22,24 @@ Bots → a bot → Profile → Skills). Describe the routine; the bot asks what 
 shows the workflow as a preview, creates it only after your yes, tests it and tells
 you when it runs next.
 
+## Extension maintenance
+
+In **Automations**, run `ext-ops-assistant-maintenance` with the extension ID
+in `EXTENSION` and a sanitized error description in `REPORT`. Choose the
+operation that matches the failed step:
+
+- `recover` resumes activation when Copier already installed or updated the
+  extension. It refreshes project config, retries tool installation, reloads
+  the running stack through the normal extension lifecycle.
+- `add` retries installation using the project's marketplace catalog.
+- `update` retries the upgrade using the installed extension's Copier source.
+
+These operations run as the project's service user on the host. The workflow
+runs `doctor` after a successful operation. The report
+stays in the maintenance run. Inspect the `fyso-ext-install` child for the
+result and its logs. Grant `ext-ops-assistant-maintenance` explicitly to the
+maintenance bot's scoped Dagu MCP if it should be able to run these operations.
+
 ## Monthly spend cap per bot
 
 Add the caps to `project/observability.json` (the file the Observability page

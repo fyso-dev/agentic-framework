@@ -45,6 +45,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
+| Recover a failed extension installation or update from the host | [Operations assistant](owner-extensions.md#ops-assistant) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
 | Biz-managed project access: delivery scope and identity proof | [Delivery brief](biz-access-delivery.md) |
@@ -111,6 +112,12 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+On 2026-11-21, an isolated project recovered an installed extension through
+the authenticated Dagu API and passed `doctor`. Dagu rejected an operation
+outside the maintenance allowlist with HTTP 400. The extension install DAG
+passes the project age key path explicitly so mise can load its encrypted
+configuration on the host. [Operations assistant](owner-extensions.md#ops-assistant)
 
 2026-11-21: The individual agent form accepts edits in one action using the native plan and apply workflows. Pending team drafts and bot removal continue through explicit review. [Panel contract](panel-contract.md#4-editing-teamyaml-in-the-browser)
 

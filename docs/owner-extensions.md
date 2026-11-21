@@ -126,6 +126,21 @@ which already includes native Dagu run history, without another collector or AI.
 Default schedules: Monday 08:00 digest, daily 09:00 spend checks, server time.
 Both can be changed or disabled through Copier answers. Digest language is ES/EN.
 
+`ext-ops-assistant-maintenance` is a manual workflow for extension installation
+and update errors. Dagu validates a fixed operation and extension ID before
+calling `fyso-ext-install` on the project host. The sanitized report stays in
+the parent run. `add` and `update` reuse the catalog and Copier lifecycle.
+`recover` refreshes and activates an already installed version. The parent
+runs `doctor` after each successful operation. This covers failures after
+Copier saves the version but before runtime activation completes. Grant the maintenance workflow explicitly to a
+bot through a scoped Dagu MCP to pre-authorize these three operations.
+
+An extension can ship its own fix as a native workflow in `project/workflows/`,
+for example `ext-example-fix-index.yaml`. Define the operation in that workflow
+and use typed parameters for its specific target. Grant that exact system
+workflow to the bot's Dagu scope after reviewing the extension version.
+Installing an extension does not grant its fix workflows to a scoped bot.
+
 Caps live in project-owned `project/observability.json`, under `botMonthlyUsd`
 (bot names or `*`) and `botMonthlyUsdBasis` (`api` default or `all`). API cost,
 estimated API cost and subscription equivalents remain distinguishable. Unknown
