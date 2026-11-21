@@ -1,7 +1,8 @@
 # ops-assistant extension
 
-A weekly digest workflow, the `automate-this` skill and a monthly spend-cap alert per
-bot, all over the framework's existing observability export and Dagu. Contract,
+A weekly digest, a manual project maintenance workflow, the `automate-this` skill
+and a monthly spend-cap alert per bot, using existing framework workflows and
+observability. Contract,
 decision (D70) and evidence: the framework's `docs/owner-extensions.md`.
 
 From a generated project:

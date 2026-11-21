@@ -1,0 +1,37 @@
+description: Recover project extension installation and updates
+type: graph
+max_active_runs: 1
+params:
+  - name: OPERATION
+    type: string
+    enum: [recover, add, update]
+    default: recover
+    description: Recover activation, retry installation, or retry an update.
+  - name: EXTENSION
+    type: string
+    required: true
+    pattern: '^[a-z][a-z0-9-]{1,30}$'
+    description: Extension catalog ID or installed ID for a host operation.
+  - name: REPORT
+    type: string
+    required: true
+    min_length: 1
+    max_length: 12000
+    pattern: '\S'
+    description: Describe the error, expected behavior and relevant sanitized logs.
+working_dir: ${FYSO_ROOT}
+env:
+  - MISE_SOPS_AGE_KEY_FILE: ${FYSO_COMPOSIO_AGE_KEY_FILE}
+steps:
+  - id: extension
+    action: dag.run
+    with:
+      dag: fyso-ext-install
+      params:
+        ID: ${params.EXTENSION}
+        MODE: ${params.OPERATION}
+    output: HOST_RESULT
+
+  - id: verify
+    depends: [extension]
+    command: mise run doctor
