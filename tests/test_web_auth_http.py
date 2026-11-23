@@ -638,6 +638,9 @@ class BizPolicyGateway(WebAuthFixture):
         extension = Path(self.biz_extension) / 'extensions/biz'
         self.assertTrue((extension / 'feedback.cjs').is_file(),
                         'FYSO_TEST_BIZ_EXTENSION must point to a feedback-capable Biz installation')
+        page_asset = extension / 'panel/feedback.html'
+        self.assertTrue(page_asset.is_file(), 'requires the built Biz feedback page')
+        shutil.copytree(page_asset.parent, self.root / 'extensions/biz/panel')
 
         route = '/api/ext/biz/profile/feedback'
         report_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'
@@ -649,8 +652,21 @@ class BizPolicyGateway(WebAuthFixture):
                 f'# Feedback\n\n- ID: {feedback_id}\n\n## Title\n\nFailure\n\n'
                 '## Component\n\nPanel\n\n## Description and evidence\n\nEvidence\n')
 
+        operator_permissions = self.permissions['operator']
+        page_permission = 'page:extension:biz'
+        operator_permissions.add(page_permission)
+        self.addCleanup(operator_permissions.discard, page_permission)
         operator = self.link_biz_profile('admin', 'operator')
         reader = self.link_biz_profile('viewer', 'reader')
+        page = '/extensions/biz/panel/feedback.html'
+        self.assertEqual(self.request('panel', page, cookie=reader)[0], 403)
+        status, _, body = self.request('panel', page, cookie=operator)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body.encode(), page_asset.read_bytes())
+        operator_permissions.remove(page_permission)
+        self.assertEqual(self.request('panel', page, cookie=operator)[0], 403)
+        operator_permissions.add(page_permission)
+
         preview = route + '?id=' + report_id
         origin = self.origin('panel')
         data = {'id': report_id, 'title': 'Reviewed', 'body': 'Sanitized'}
