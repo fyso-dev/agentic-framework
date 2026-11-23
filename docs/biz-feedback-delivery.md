@@ -72,12 +72,13 @@ the instance.
 
 ## Checkpoint
 
-On 2026-11-23, the [Framework check passed](https://github.com/fyso-dev/agentic-framework/actions/runs/45203780135/job/137793893688)
-for AF revision `291d404` and [SonarCloud Code Analysis was cancelled](https://github.com/fyso-dev/agentic-framework/pull/120/checks?check_run_id=137794252094).
+On 2026-11-23, the [Framework check passed](https://github.com/fyso-dev/agentic-framework/actions/runs/45204238329/job/137795506572)
+for AF revision `d346b56` and [SonarCloud Code Analysis was cancelled](https://github.com/fyso-dev/agentic-framework/pull/120/checks?check_run_id=137795951139).
 GitHub reports an analysis failure with zero annotations. The base revision
-`00326ea` also has a cancelled SonarCloud analysis. The background task API
-returned HTTP 401 without authentication. An authorized SonarCloud user must
-inspect the failed background task's error details to diagnose the cancellation.
+`00326ea` also has a cancelled SonarCloud analysis. The unauthenticated
+background task API did not expose the task details. An authorized SonarCloud
+user must inspect the failed background task's error details to diagnose the
+cancellation.
 Keep the merge pending until the cause is addressed and required checks pass.
 
 The framework gateway integration test passed with real Caddy and Tinyauth
