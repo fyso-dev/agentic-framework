@@ -35,16 +35,20 @@ an additional release.
 - Install the updated Biz extension in a Biz-managed AF project. Grant
   `app:panel`, `page:extension:biz`, and `action:feedback:submit`
   to the appropriate project access level.
-- Open **Report to Fyso**, load a report by its path or UUID, and review
-  the content before sending. The extension saves the receipt under
-  `.data/ext/biz/feedback/`. GitHub applies its repository visibility rules
-  when the person follows the receipt URL.
+- Follow the [report submission instructions](agent-surface.md#instance-feedback-format).
+  The extension saves the receipt under `.data/ext/biz/feedback/`.
 
 ## Isolated validation
 
 Use a generated AF project with isolated ports and data, the coordinated
 extension revision, and a local Biz fixture. Validate the backend separately
 with an isolated database and simulated GitHub writes.
+
+For the gateway fixture, use the [native binary settings](web-auth.md#native-installation-and-verification)
+for `tests/test_web_auth_http.py`. Set `FYSO_TEST_BIZ_EXTENSION` to the generated
+project root with the feedback-capable Biz extension installed and leave
+`FYSO_TEST_BIZ_ORIGIN` unset. The fixture builds the panel inventory from the
+installed page declaration and reads it through Caddy before opening the page.
 
 - A signed-in authorized project member can preview and send an existing
   report. A revoked or denied member and a cross-origin request are rejected.

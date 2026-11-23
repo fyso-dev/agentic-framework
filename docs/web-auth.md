@@ -273,6 +273,7 @@ It verifies one-session routing, rejected forged identities, technical credentia
 replacement, cookie stripping, app ACLs, retry protection, logout replay denial,
 cross-origin requests and authority failure. Real Dagu/OMB and browser evidence
 are reported separately in the [delivery evidence](../artifacts/delivery-evidence/web-auth/README.md).
+For the optional Biz feedback case, see its [fixture prerequisites](biz-feedback-delivery.md#isolated-validation).
 
 ## Sources
 

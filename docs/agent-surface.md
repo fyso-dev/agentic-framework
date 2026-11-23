@@ -78,15 +78,14 @@ data, full logs, and private instance identifiers.
 
 The instance owner reviews the report and confirms whether it concerns AF, an
 extension, or project configuration. In a Biz-managed project, open **Report to
-Fyso**, paste the local report path, review the title and body, and choose
-**Send to GitHub**. The Biz administrator grants `action:feedback:submit` to
-the appropriate project access level. The panel also requires the usual
-`app:panel` and `page:extension:biz` grants. A correction can identify the
-original local report to add a comment to the same issue. The extension displays
-the GitHub receipt and caches it in project runtime data. A correction verified
-in an instance remains local until the upstream fix and its release are confirmed.
+Fyso**, load the local report by path or UUID, review the title and body, and
+choose **Send to GitHub**. A correction can identify the original local report
+to add a comment to the same issue. The extension displays the GitHub receipt.
+GitHub applies its repository visibility rules when the person follows the receipt URL.
+A verified local correction can be reported before the upstream fix is available.
 
-See [Biz feedback delivery](biz-feedback-delivery.md) for setup and verification.
+See [Biz feedback activation](biz-feedback-delivery.md#production-activation)
+for the required extension revision and project access grants.
 
 ### Understanding the project (D57)
 
