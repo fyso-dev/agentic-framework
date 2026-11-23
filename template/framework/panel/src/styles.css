@@ -248,10 +248,12 @@ code, .mono { font-family: var(--font-mono); }
 .fy-dark .logo-on-light { display: none; }
 .fy-dark .logo-on-dark { display: block; }
 .brand-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.env-badge {
+.env-badge, .edition-badge {
   height: 22px; padding: 0 8px; display: inline-flex; align-items: center; border-radius: var(--fy-radius-pill);
   background: var(--fy-surface-2); color: var(--fy-mute); font-family: var(--font-mono); font-size: 11px;
 }
+.edition-badge { flex: none; font-weight: 700; }
+.edition-pro { background: var(--fy-accent-soft); color: var(--fy-on-accent-soft); }
 .state-pill { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--fy-radius-pill); font-weight: 700; }
 .seg { display: inline-flex; padding: 2px; border-radius: var(--fy-radius-pill); background: var(--fy-surface-2); }
 .seg button {

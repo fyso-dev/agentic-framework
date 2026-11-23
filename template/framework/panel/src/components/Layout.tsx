@@ -136,8 +136,9 @@ function Attention() {
 
 export function TopBar(props: ThemeProps & { route: Route; visible: (id: string) => boolean; navCollapsed: boolean; toggleNav: () => void }) {
   const { t, i18n } = useTranslation();
-  const { project, apps } = useStore();
+  const { project, apps, extensions } = useStore();
   const p = project.data;
+  const edition = extensions.data?.some((ext) => ext.id === "biz") ? "pro" : "free";
   const embedded = (id: string) => !!apps.data?.some((app) => app.id === id && app.enabled && app.embed);
   const route = props.route;
   const openApp = route.name === "app" && props.visible(`app:${route.id}`) ? apps.data?.find((app) => app.id === route.id && app.enabled && app.embed) : undefined;
@@ -154,6 +155,7 @@ export function TopBar(props: ThemeProps & { route: Route; visible: (id: string)
           <img className="logo logo-on-dark" src={markWhiteUrl} alt="" width={28} />
         </>}
         <span className="brand-name">{p?.brand?.name ?? p?.name ?? t("top.logo")}</span>
+        {extensions.data && <span className={`edition-badge edition-${edition}`}>{t(`top.edition.${edition}`)}</span>}
       </a>
       <InstanceSwitcher />
       {openApp && (
@@ -205,7 +207,10 @@ const ITEMS: NavItem[] = [
 const mcpItem: NavItem = { id: "mcp", href: href.mcp, icon: IconPlug, label: "MCP" };
 
 const extensionItems = (extensions:Extension[],lang:string,shown:(ext:string,page:string,conditional:boolean)=>boolean):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).filter(page=>shown(ext.id,page.id,!!page.visible)).map(page=>{
-  const icon = page.icon ?? "apps";
+  // Existing Biz installs register the overview with the generic workflow icon.
+  const icon = ext.id === "biz" && page.id === "overview" && page.icon === "workflow"
+    ? "briefcase"
+    : page.icon ?? "apps";
   return {
     id: `extension:${ext.id}:${page.id}`,
     href: href.extension(ext.id,page.id),
