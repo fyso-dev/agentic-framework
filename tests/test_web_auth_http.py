@@ -50,6 +50,7 @@ class WebAuthFixture(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix='fyso-web-auth-')
         cls.root = Path(cls.tmp.name)
+        cls.panel_data = cls.root / '.data'
         cls.port = int(os.environ.get('FYSO_TEST_AUTH_PORT_BASE', '19800')) + cls.port_offset
         cls.domain = cls.web_domain or f'security-{cls.port}.localhost'
         cls.processes = []
@@ -61,7 +62,8 @@ class WebAuthFixture(unittest.TestCase):
         for folder in ['project/auth', 'project/apps', 'extensions', 'panel', 'runtime']:
             (cls.root / folder).mkdir(parents=True)
         (cls.root / 'panel/index.html').write_text('<!doctype html><title>Protected panel</title>')
-        (cls.root / 'panel/project.json').write_text('{"name":"Security fixture"}')
+        (cls.panel_data / 'panel').mkdir(parents=True)
+        (cls.panel_data / 'panel/project.json').write_text('{"name":"Security fixture"}')
         public = cls.root / 'extensions/example-pages/panel'
         public.mkdir(parents=True)
         (public / 'index.html').write_text('<!doctype html><title>Extension</title>')
@@ -147,7 +149,7 @@ class WebAuthFixture(unittest.TestCase):
         subprocess.run(['node', str(ROOT / 'template/framework/scripts/web-auth-config.cjs')], env=config_env, check=True)
         cls.auth_env = {**os.environ, 'TINYAUTH_CONFIGFILE':str(cls.root / 'web-auth/runtime/config.yaml')}
         cls.start_auth()
-        env = {**os.environ, 'FYSO_ROOT': str(cls.root), 'FYSO_DATA': str(cls.root),
+        env = {**os.environ, 'FYSO_ROOT': str(cls.root), 'FYSO_DATA': str(cls.panel_data),
             'XDG_CONFIG_HOME':str(cls.root / 'caddy-config'), 'XDG_DATA_HOME':str(cls.root / 'caddy-data'),
             'FYSO_PANEL_ROOT': str(cls.root / 'panel'), 'FYSO_HTTP_PORT': str(cls.port),
             'FYSO_WEB_DOMAIN': cls.domain, 'FYSO_AUTH_UPSTREAM': f'127.0.0.1:{cls.port + 9}',
@@ -648,11 +650,10 @@ class BizPolicyGateway(WebAuthFixture):
             ['node', str(ROOT / 'template/framework/scripts/panel-data.cjs'), 'config'],
             cwd=self.root, check=True, timeout=30,
             env={**os.environ, 'PATH': str(self.root / 'bin') + os.pathsep + os.environ['PATH'],
-                 'FYSO_ROOT': str(self.root), 'FYSO_DATA': str(self.root / '.data'),
+                 'FYSO_ROOT': str(self.root), 'FYSO_DATA': str(self.panel_data),
                  'FYSO_WEB_DOMAIN': self.domain, 'FYSO_HTTP_PORT': str(self.port),
                  'FYSO_WEB_SCHEME': self.scheme},
         )
-        shutil.copyfile(self.root / '.data/panel/extensions.json', self.root / 'panel/extensions.json')
 
         route = '/api/ext/biz/profile/feedback'
         report_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'

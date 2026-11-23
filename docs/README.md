@@ -44,7 +44,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | macOS menu bar app and `fyso` CLI: one native app lists, opens, creates, switches, starts and stops instances; Biz edition with sign-in hand-off, signing/notarization, updates from GitHub Releases (D85, D86) | [ADR 0003](adr/0003-menu-bar-app.md) · [installer.md](installer.md#menu-bar-app-and-cli--d85) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
-| Instance feedback: report issues and corrections to GitHub through Biz | [Agent surface](agent-surface.md#instance-feedback-format) · [Delivery brief](biz-feedback-delivery.md) |
+| Instance feedback: report issues and corrections to GitHub through Biz | [Agent surface](agent-surface.md#instance-feedback-format) · [Coordinated delivery and activation](biz-feedback-delivery.md) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |

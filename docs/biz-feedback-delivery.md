@@ -7,16 +7,30 @@ Testable beta. A signed-in person authorized by Biz can review a local
 The existing Biz extension provides the page and uses the person's
 project-bound browser session. Biz checks the current assignment and
 publishes to `fyso-dev/agentic-framework`. D75 continues to govern local
-agent feedback capture. Deployment and publication are outside this beta.
+agent feedback capture.
 
-## Setup
+## Coordinated changes
+
+- [Fyso Business backend](https://github.com/fyso-dev/fyso-business/tree/feat/af-feedback)
+  owns authorization, the feedback ledger, and GitHub App writes.
+- [Fyso Biz extension](https://github.com/fyso-dev/fyso-ext-biz/tree/feat/af-feedback)
+  owns the panel page, project-bound session, and local receipt.
+
+Review the coordinated PRs and require green checks before merging. Workers
+Builds automatically deploys the Biz backend after merge to `main`. Monitor
+that build and verify the deployed revision. After the extension merge,
+install or update from the reviewed Git revision in the target projects.
+This rollout uses the existing deployment and extension update paths without
+an additional release.
+
+## Production activation
 
 - Install a GitHub App on `fyso-dev/agentic-framework` with repository
   permission **Issues: Read and write**. Set `AF_FEEDBACK_APP_ID`,
   `AF_FEEDBACK_INSTALLATION_ID`, and the PEM secret
   `AF_FEEDBACK_PRIVATE_KEY` in the Biz backend.
-- Apply Biz directory migration `0014_framework_feedback.sql` before
-  enabling the backend route. The ledger stores the organization, project,
+- Confirm Biz directory migration `0014_framework_feedback.sql` is applied
+  before enabling submissions. The ledger stores the organization, project,
   report UUID and GitHub receipt.
 - Install the updated Biz extension in a Biz-managed AF project. Grant
   `app:panel`, `page:extension:biz`, and `action:feedback:submit`
@@ -26,15 +40,23 @@ agent feedback capture. Deployment and publication are outside this beta.
   `.data/ext/biz/feedback/`. GitHub applies its repository visibility rules
   when the person follows the receipt URL.
 
-## Acceptance
+## Isolated validation
+
+Use a generated AF project with isolated ports and data, the coordinated
+extension revision, and a local Biz fixture. Validate the backend separately
+with an isolated database and simulated GitHub writes.
 
 - A signed-in authorized project member can preview and send an existing
   report. A revoked or denied member and a cross-origin request are rejected.
 - Concurrent sends create a single issue. A subsequent request returns
   the stored receipt. Corrections with a published original add a comment
   to its issue.
-- The generated project passes `mise run doctor`. A controlled GitHub
-  smoke confirms the App installation, issue and comment.
+- The generated project passes `mise run doctor`.
+
+After deployment and activation, a controlled smoke from an authorized
+Biz-managed instance confirms that the central repository receives an issue
+and then a correction comment on that issue, with both receipts returned to
+the instance.
 
 ## Checkpoint
 
