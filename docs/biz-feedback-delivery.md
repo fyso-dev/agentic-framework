@@ -11,9 +11,9 @@ agent feedback capture.
 
 ## Coordinated changes
 
-- [Fyso Business backend](https://github.com/fyso-dev/fyso-business/tree/feat/af-feedback)
+- [Fyso Business backend](https://github.com/fyso-dev/fyso-business/pull/631)
   owns authorization, the feedback ledger, and GitHub App writes.
-- [Fyso Biz extension](https://github.com/fyso-dev/fyso-ext-biz/tree/feat/af-feedback)
+- [Fyso Biz extension](https://github.com/fyso-dev/fyso-ext-biz/pull/17)
   owns the panel page, project-bound session, and local receipt.
 
 Review the coordinated PRs and require green checks before merging. Workers
@@ -28,10 +28,10 @@ an additional release.
 - Install a GitHub App on `fyso-dev/agentic-framework` with repository
   permission **Issues: Read and write**. Set `AF_FEEDBACK_APP_ID`,
   `AF_FEEDBACK_INSTALLATION_ID`, and the PEM secret
-  `AF_FEEDBACK_PRIVATE_KEY` in the Biz backend.
-- Confirm Biz directory migration `0014_framework_feedback.sql` is applied
-  before enabling submissions. The ledger stores the organization, project,
-  report UUID and GitHub receipt.
+  `AF_FEEDBACK_PRIVATE_KEY` as Worker secrets in the Biz backend.
+- Apply the feedback ledger and recovery migrations before enabling submissions.
+  Follow the [Biz activation runbook](https://github.com/fyso-dev/fyso-business/blob/main/docs/runbooks/activacion-framework-feedback.md)
+  for the current migration sequence and the recovery procedure.
 - Install the updated Biz extension in a Biz-managed AF project. Grant
   `app:panel`, `page:extension:biz`, and `action:feedback:submit`
   to the appropriate project access level.
@@ -75,9 +75,6 @@ The Git snapshot was recorded after initializing the fixture repository, and
 the hook still reported a fetch failure with the fixture Biz URL. A real
 GitHub App submission remains pending.
 
-If GitHub may have accepted a request whose response Biz could not persist,
-the ledger retains a pending reservation. Before releasing it, an operator
-must reconcile against GitHub using the `af-feedback` marker, the SHA-256
-of `organization/project/report` with both UUIDs lowercased. If an
-issue or comment exists, store its number and URL in the reservation. Clear
-the reservation only after confirming the write did not occur.
+Biz retains a pending reservation after an ambiguous response from GitHub.
+Use the activation runbook to recover the receipt from a confirmed issue
+or comment before allowing a new publication.
