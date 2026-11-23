@@ -4,6 +4,8 @@ Set FYSO_TEST_TINYAUTH and FYSO_TEST_CADDY to explicit binaries. Uses only a
 temporary directory and a caller-selected, unused block (default 19800).
 For the managed-policy integration, set FYSO_TEST_BIZ_EXTENSION to a generated
 project containing the installed Biz extension with managed access enabled.
+The separate feedback test requires the feedback-capable extension and uses
+the local Biz fixture (leave FYSO_TEST_BIZ_ORIGIN unset).
 """
 import base64
 import http.client
@@ -498,15 +500,8 @@ class BizPolicyGateway(WebAuthFixture):
             rendered = source / filename
             slot = source / ("{{ '" + filename + "' if biz_access_project else '' }}.slotjinja")
             shutil.copy(rendered if rendered.exists() else slot, installed / filename)
-        cls.feedback_route = '/api/ext/biz/profile/feedback'
-        cls.feedback_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'
         cls.feedback_issue = 'https://github.com/fyso-dev/agentic-framework/issues/24'
         cls.feedback_posts = []
-        folder = cls.root / 'project/wiki/feedback'
-        folder.mkdir(parents=True)
-        (folder / (cls.feedback_id + '.md')).write_text(
-            f'# Feedback\n\n- ID: {cls.feedback_id}\n\n## Title\n\nFailure\n\n'
-            '## Component\n\nPanel\n\n## Description and evidence\n\nEvidence\n')
         cls.permissions = {
             'operator': {'app:panel', 'workflow:invoice:run', 'workflow:invoice:read', 'action:feedback:submit'},
             'reader': {'app:panel'},
@@ -547,10 +542,12 @@ class BizPolicyGateway(WebAuthFixture):
                     code = parse_qs(body.decode()).get('code', [''])[0]
                     if code in cls.permissions:
                         return self.send_json({'access_token': code, 'token_type': 'Bearer', 'expires_in': 300})
-                if self.path == '/oauth/framework-feedback?organization=fixture&project=project':
+                if urlparse(self.path).path == '/oauth/framework-feedback':
+                    cls.feedback_posts.append(json.loads(body))
+                    if self.path != '/oauth/framework-feedback?organization=fixture&project=project':
+                        return self.send_json({}, 400)
                     if self.headers.get('Authorization') != 'Bearer operator':
                         return self.send_json({}, 403)
-                    cls.feedback_posts.append(json.loads(body))
                     return self.send_json({'number': 24, 'url': cls.feedback_issue}, 201)
                 return self.send_json({}, 400)
 
@@ -578,26 +575,26 @@ class BizPolicyGateway(WebAuthFixture):
         })
         cls.wait_port(cls.port + 11, '/health')
 
-    def test_biz_policy_gateway_revocation_for_two_profiles(self):
-        def link(user, profile):
-            local = self.login(user)
-            status, headers, _ = self.request('panel', '/api/ext/biz/profile/login', 'POST', {}, cookie=local,
-                                               Origin=self.origin('panel'))
-            self.assertEqual(status, 303)
-            state = parse_qs(urlparse(headers['Location']).query)['state'][0]
-            binding = headers['Set-Cookie'].split(';', 1)[0]
-            if self.external_biz:
-                with urlopen(Request(headers['Location'], headers={'X-Test-Profile': profile}), timeout=10) as consent:
-                    callback = urlparse(json.loads(consent.read())['redirectTo'])
-                path = f'{callback.path}?{callback.query}'
-            else:
-                path = '/extensions/biz/oauth/callback?' + urlencode({'state': state, 'code': profile})
-            status, headers, _ = self.request('panel', path, cookie=f'{local}; {binding}', **{'Sec-Fetch-Site': 'cross-site'})
-            self.assertEqual(status, 303)
-            return f"{local}; {headers['Set-Cookie'].split(';', 1)[0]}"
+    def link_biz_profile(self, user, profile):
+        local = self.login(user)
+        status, headers, _ = self.request('panel', '/api/ext/biz/profile/login', 'POST', {}, cookie=local,
+                                           Origin=self.origin('panel'))
+        self.assertEqual(status, 303)
+        state = parse_qs(urlparse(headers['Location']).query)['state'][0]
+        binding = headers['Set-Cookie'].split(';', 1)[0]
+        if self.external_biz:
+            with urlopen(Request(headers['Location'], headers={'X-Test-Profile': profile}), timeout=10) as consent:
+                callback = urlparse(json.loads(consent.read())['redirectTo'])
+            path = f'{callback.path}?{callback.query}'
+        else:
+            path = '/extensions/biz/oauth/callback?' + urlencode({'state': state, 'code': profile})
+        status, headers, _ = self.request('panel', path, cookie=f'{local}; {binding}', **{'Sec-Fetch-Site': 'cross-site'})
+        self.assertEqual(status, 303)
+        return f"{local}; {headers['Set-Cookie'].split(';', 1)[0]}"
 
-        operator = link('admin', 'operator')
-        reader = link('viewer', 'reader')
+    def test_biz_policy_gateway_revocation_for_two_profiles(self):
+        operator = self.link_biz_profile('admin', 'operator')
+        reader = self.link_biz_profile('viewer', 'reader')
         route = '/api/dagu/dags/invoice/enqueue'
         status, _, body = self.request('panel', route, 'POST', {}, cookie=operator)
         self.assertIn(status, (200, 201, 202), body)
@@ -620,28 +617,7 @@ class BizPolicyGateway(WebAuthFixture):
             with urlopen(Request(self.external_biz + '/__fixture/revoke', method='POST'), timeout=10) as result:
                 self.assertEqual(result.status, 204)
         else:
-            if not self.external_biz and (Path(self.biz_extension) / 'extensions/biz/feedback.cjs').exists():
-            preview = self.feedback_route + '?id=' + self.feedback_id
-            self.assertEqual(self.request('panel', preview, cookie=reader)[0], 403)
-            status, _, body = self.request('panel', preview, cookie=operator)
-            self.assertEqual(status, 200)
-            self.assertEqual(json.loads(body)['body'], 'Component: Panel\n\nEvidence')
-            data = {'id': self.feedback_id, 'title': 'Reviewed', 'body': 'Sanitized'}
-            self.assertEqual(self.request('panel', self.feedback_route, 'POST', data, cookie=reader,
-                                          Origin=self.origin('panel'))[0], 403)
-            self.assertEqual(self.request('panel', self.feedback_route, 'POST', data, cookie=operator,
-                                          Origin='https://foreign.example')[0], 403)
-            status, _, body = self.request('panel', self.feedback_route, 'POST', data, cookie=operator,
-                                            Origin=self.origin('panel'))
-            self.assertEqual(status, 200)
-            self.assertEqual(json.loads(body)['url'], self.feedback_issue)
-            self.assertEqual(self.feedback_posts, [data])
-            status, _, body = self.request('panel', preview, cookie=operator)
-            self.assertEqual(status, 200)
-            self.assertEqual(json.loads(body)['receipt']['number'], 24)
-            self.permissions['operator'].remove('action:feedback:submit')
-            self.assertEqual(self.request('panel', preview, cookie=operator)[0], 403)
-        self.permissions['operator'].remove('workflow:invoice:run')
+            self.permissions['operator'].remove('workflow:invoice:run')
         self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 403)
 
         old_profile = reader.split('; ', 1)[1]
@@ -652,6 +628,53 @@ class BizPolicyGateway(WebAuthFixture):
         status, _, body = self.request('panel', '/api/panel-access', cookie=reader_again)
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {'capabilities': []})
+
+    def test_biz_feedback_revocation_blocks_submission(self):
+        if self.external_biz:
+            self.skipTest('requires the local Biz fixture to observe upstream feedback requests')
+        extension = Path(self.biz_extension) / 'extensions/biz'
+        self.assertTrue((extension / 'feedback.cjs').is_file(),
+                        'FYSO_TEST_BIZ_EXTENSION must point to a feedback-capable Biz installation')
+
+        route = '/api/ext/biz/profile/feedback'
+        report_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'
+        unsent_id = '28056ceb-01f7-45d2-a813-4bb5c2446311'
+        folder = self.root / 'project/wiki/feedback'
+        folder.mkdir(parents=True)
+        for feedback_id in (report_id, unsent_id):
+            (folder / (feedback_id + '.md')).write_text(
+                f'# Feedback\n\n- ID: {feedback_id}\n\n## Title\n\nFailure\n\n'
+                '## Component\n\nPanel\n\n## Description and evidence\n\nEvidence\n')
+
+        operator = self.link_biz_profile('admin', 'operator')
+        reader = self.link_biz_profile('viewer', 'reader')
+        preview = route + '?id=' + report_id
+        origin = self.origin('panel')
+        data = {'id': report_id, 'title': 'Reviewed', 'body': 'Sanitized'}
+        self.assertEqual(self.request('panel', preview, cookie=reader)[0], 403)
+        status, _, body = self.request('panel', preview, cookie=operator)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)['body'], 'Component: Panel\n\nEvidence')
+        self.assertEqual(self.request('panel', route, 'POST', data, cookie=reader, Origin=origin)[0], 403)
+        self.assertEqual(self.request('panel', route, 'POST', data, cookie=operator,
+                                      Origin='https://foreign.example')[0], 403)
+        status, _, body = self.request('panel', route, 'POST', data, cookie=operator, Origin=origin)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)['url'], self.feedback_issue)
+        self.assertEqual(self.feedback_posts, [data])
+        status, _, body = self.request('panel', preview, cookie=operator)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)['receipt']['number'], 24)
+
+        unsent_preview = route + '?id=' + unsent_id
+        self.assertEqual(self.request('panel', unsent_preview, cookie=operator)[0], 200)
+        self.permissions['operator'].remove('action:feedback:submit')
+        self.addCleanup(self.permissions['operator'].add, 'action:feedback:submit')
+        self.assertEqual(self.request('panel', unsent_preview, cookie=operator)[0], 403)
+        status, _, body = self.request('panel', route, 'POST', {**data, 'id': unsent_id},
+                                       cookie=operator, Origin=origin)
+        self.assertEqual(status, 403, body)
+        self.assertEqual(self.feedback_posts, [data])
 
 
 if __name__ == '__main__':
