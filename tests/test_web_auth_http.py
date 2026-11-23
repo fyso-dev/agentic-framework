@@ -542,9 +542,12 @@ class BizPolicyGateway(WebAuthFixture):
                     code = parse_qs(body.decode()).get('code', [''])[0]
                     if code in cls.permissions:
                         return self.send_json({'access_token': code, 'token_type': 'Bearer', 'expires_in': 300})
-                if urlparse(self.path).path == '/oauth/framework-feedback':
+                parsed = urlparse(self.path)
+                if parsed.path == '/oauth/framework-feedback':
                     cls.feedback_posts.append(json.loads(body))
-                    if self.path != '/oauth/framework-feedback?organization=fixture&project=project':
+                    if parse_qs(parsed.query, keep_blank_values=True) != {
+                        'organization': ['fixture'], 'project': ['project'],
+                    }:
                         return self.send_json({}, 400)
                     if self.headers.get('Authorization') != 'Bearer operator':
                         return self.send_json({}, 403)
