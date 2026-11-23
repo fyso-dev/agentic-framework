@@ -15,6 +15,8 @@ agent feedback capture.
   owns authorization, the feedback ledger, and GitHub App writes.
 - [Fyso Biz extension](https://github.com/fyso-dev/fyso-ext-biz/pull/17)
   owns the panel page, project-bound session, and local receipt.
+- [Fyso Agentic Framework](https://github.com/fyso-dev/agentic-framework/pull/120)
+  owns the instance feedback contract and gateway integration coverage.
 
 Review the coordinated PRs and require green checks before merging. Workers
 Builds automatically deploys the Biz backend after merge to `main`. Monitor
@@ -31,7 +33,8 @@ an additional release.
   `AF_FEEDBACK_PRIVATE_KEY` as Worker secrets in the Biz backend.
 - Apply the feedback ledger and recovery migrations before enabling submissions.
   Follow the [Biz activation runbook](https://github.com/fyso-dev/fyso-business/blob/main/docs/runbooks/activacion-framework-feedback.md)
-  for the current migration sequence and the recovery procedure.
+  for the current migration sequence and the recovery procedure. During
+  pre-merge review, use the [runbook at the reviewed Biz revision](https://github.com/fyso-dev/fyso-business/blob/8ab9246be56178990cf868b6a22058d041b097e1/docs/runbooks/activacion-framework-feedback.md).
 - Install the updated Biz extension in a Biz-managed AF project. Grant
   `app:panel`, `page:extension:biz`, and `action:feedback:submit`
   to the appropriate project access level.

@@ -475,6 +475,13 @@ class BizPolicyGateway(WebAuthFixture):
     def setUpClass(cls):
         if not cls.biz_extension:
             raise unittest.SkipTest('requires a generated project with the managed Biz extension')
+        source = Path(cls.biz_extension) / 'extensions/biz'
+        for filename in ('authorize.caddy', 'panel-access.caddy'):
+            if not (source / filename).is_file():
+                raise RuntimeError(
+                    f'FYSO_TEST_BIZ_EXTENSION requires a generated project with managed access '
+                    f'enabled and a rendered extensions/biz/{filename}'
+                )
         super().setUpClass()
 
     @classmethod
@@ -499,9 +506,7 @@ class BizPolicyGateway(WebAuthFixture):
         installed = cls.root / 'extensions/biz'
         installed.mkdir()
         for filename in ('authorize.caddy', 'panel-access.caddy'):
-            rendered = source / filename
-            slot = source / ("{{ '" + filename + "' if biz_access_project else '' }}.slotjinja")
-            shutil.copy(rendered if rendered.exists() else slot, installed / filename)
+            shutil.copy(source / filename, installed / filename)
         cls.feedback_issue = 'https://github.com/fyso-dev/agentic-framework/issues/24'
         cls.feedback_posts = []
         cls.permissions = {
@@ -638,8 +643,10 @@ class BizPolicyGateway(WebAuthFixture):
         if self.external_biz:
             self.skipTest('requires the local Biz fixture to observe upstream feedback requests')
         extension = Path(self.biz_extension) / 'extensions/biz'
-        if not (extension / 'feedback.cjs').is_file():
-            self.skipTest('requires a feedback-capable Biz installation')
+        self.assertTrue(
+            (extension / 'feedback.cjs').is_file(),
+            'FYSO_TEST_BIZ_EXTENSION requires a feedback-capable Biz installation with extensions/biz/feedback.cjs',
+        )
         page_asset = extension / 'panel/feedback.html'
         self.assertTrue(page_asset.is_file(), 'requires the built Biz feedback page')
         installed = self.root / 'extensions/biz'
