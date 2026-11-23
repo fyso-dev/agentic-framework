@@ -41,6 +41,53 @@ Both come from the project's generated `.mcp.json` (sources: `framework/mcp.json
 
 **Problem feedback (D75).** `fyso_feedback` accepts a title, description and optional component and creates a separate UUID-named page in `project/wiki/feedback/` through Dagu's native wiki operation. It returns the page path after Dagu confirms the write. This records feedback for human review; it does not send a notification or create an external issue. Agents must omit secrets and personal data. Dagu must be reachable. New default bots with explicit allow-lists include `mcp:fyso:fyso_feedback`; existing project-owned bot configurations are preserved and need that selector added explicitly if they do not already allow `mcp:fyso:*`.
 
+### Instance feedback format
+
+Use `fyso_feedback` with a short title that identifies the symptom or change.
+Set `component` to the affected framework area or extension slug when known.
+Paste the following Markdown into `description`. Record unknowns explicitly
+and omit the correction section when there is no proposed or applied fix.
+
+```markdown
+## Context
+- Kind: issue | correction
+- Framework version or revision:
+- Extension version, if applicable:
+- Environment: OS, architecture, and relevant runtime or engine
+- Related report: local feedback page or upstream issue, if available
+
+## Behavior
+- Observed:
+- Expected:
+- Impact:
+- Reproduction steps:
+- Evidence: sanitized error excerpt or check result
+
+## Correction
+- Status: proposed | applied locally | verified locally
+- Cause: confirmed or suspected, with supporting evidence
+- Change: summary and affected files or safe patch reference
+- Verification: checks run, results, and checks still pending
+```
+
+Create a correction report as a new page and link the original report when
+available. Use the framework revision from the instance's Copier answers
+(`_commit`) when available. Record relevant local changes to framework files.
+Use relative paths and sanitized excerpts. Leave out credentials, personal
+data, full logs, and private instance identifiers.
+
+The instance owner reviews the report and confirms whether it concerns AF, an
+extension, or project configuration. In a Biz-managed project, open **Report to
+Fyso**, paste the local report path, review the title and body, and choose
+**Send to GitHub**. The Biz administrator grants `action:feedback:submit` to
+the appropriate project access level. The panel also requires the usual
+`app:panel` and `page:extension:biz` grants. A correction can identify the
+original local report to add a comment to the same issue. The extension displays
+the GitHub receipt and caches it in project runtime data. A correction verified
+in an instance remains local until the upstream fix and its release are confirmed.
+
+See [Biz feedback delivery](biz-feedback-delivery.md) for setup and verification.
+
 ### Understanding the project (D57)
 
 `initialize.instructions` is the operating guide followed by a **brief of this project**: its declared bots, project workflows, extensions, apps, wiki size and MCP servers. `fyso_project` returns the full map and names the files worth reading; `fyso_files` and `fyso_file_read` read them. All three read the repository only, so they answer with the stack stopped.

@@ -44,6 +44,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | macOS menu bar app and `fyso` CLI: one native app lists, opens, creates, switches, starts and stops instances; Biz edition with sign-in hand-off, signing/notarization, updates from GitHub Releases (D85, D86) | [ADR 0003](adr/0003-menu-bar-app.md) · [installer.md](installer.md#menu-bar-app-and-cli--d85) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
+| Instance feedback: report issues and corrections to GitHub through Biz | [Agent surface](agent-surface.md#instance-feedback-format) · [Delivery brief](biz-feedback-delivery.md) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
@@ -111,6 +112,8 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+The [feedback gateway fixture](biz-feedback-delivery.md#checkpoint) verified individual Biz sessions, permission revocation, cross-origin rejection and feedback receipt storage.
 
 2026-11-21: The individual agent form accepts edits in one action using the native plan and apply workflows. Pending team drafts and bot removal continue through explicit review. [Panel contract](panel-contract.md#4-editing-teamyaml-in-the-browser)
 

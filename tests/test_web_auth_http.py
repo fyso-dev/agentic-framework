@@ -495,9 +495,20 @@ class BizPolicyGateway(WebAuthFixture):
         installed = cls.root / 'extensions/biz'
         installed.mkdir()
         for filename in ('authorize.caddy', 'panel-access.caddy'):
-            shutil.copy(source / filename, installed / filename)
+            rendered = source / filename
+            slot = source / ("{{ '" + filename + "' if biz_access_project else '' }}.slotjinja")
+            shutil.copy(rendered if rendered.exists() else slot, installed / filename)
+        cls.feedback_route = '/api/ext/biz/profile/feedback'
+        cls.feedback_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'
+        cls.feedback_issue = 'https://github.com/fyso-dev/agentic-framework/issues/24'
+        cls.feedback_posts = []
+        folder = cls.root / 'project/wiki/feedback'
+        folder.mkdir(parents=True)
+        (folder / (cls.feedback_id + '.md')).write_text(
+            f'# Feedback\n\n- ID: {cls.feedback_id}\n\n## Title\n\nFailure\n\n'
+            '## Component\n\nPanel\n\n## Description and evidence\n\nEvidence\n')
         cls.permissions = {
-            'operator': {'app:panel', 'workflow:invoice:run', 'workflow:invoice:read'},
+            'operator': {'app:panel', 'workflow:invoice:run', 'workflow:invoice:read', 'action:feedback:submit'},
             'reader': {'app:panel'},
         }
         cls.external_biz = os.environ.get('FYSO_TEST_BIZ_ORIGIN')
@@ -536,6 +547,11 @@ class BizPolicyGateway(WebAuthFixture):
                     code = parse_qs(body.decode()).get('code', [''])[0]
                     if code in cls.permissions:
                         return self.send_json({'access_token': code, 'token_type': 'Bearer', 'expires_in': 300})
+                if self.path == '/oauth/framework-feedback?organization=fixture&project=project':
+                    if self.headers.get('Authorization') != 'Bearer operator':
+                        return self.send_json({}, 403)
+                    cls.feedback_posts.append(json.loads(body))
+                    return self.send_json({'number': 24, 'url': cls.feedback_issue}, 201)
                 return self.send_json({}, 400)
 
             def send_json(self, data, status=200):
@@ -604,7 +620,28 @@ class BizPolicyGateway(WebAuthFixture):
             with urlopen(Request(self.external_biz + '/__fixture/revoke', method='POST'), timeout=10) as result:
                 self.assertEqual(result.status, 204)
         else:
-            self.permissions['operator'].remove('workflow:invoice:run')
+            if not self.external_biz and (Path(self.biz_extension) / 'extensions/biz/feedback.cjs').exists():
+            preview = self.feedback_route + '?id=' + self.feedback_id
+            self.assertEqual(self.request('panel', preview, cookie=reader)[0], 403)
+            status, _, body = self.request('panel', preview, cookie=operator)
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)['body'], 'Component: Panel\n\nEvidence')
+            data = {'id': self.feedback_id, 'title': 'Reviewed', 'body': 'Sanitized'}
+            self.assertEqual(self.request('panel', self.feedback_route, 'POST', data, cookie=reader,
+                                          Origin=self.origin('panel'))[0], 403)
+            self.assertEqual(self.request('panel', self.feedback_route, 'POST', data, cookie=operator,
+                                          Origin='https://foreign.example')[0], 403)
+            status, _, body = self.request('panel', self.feedback_route, 'POST', data, cookie=operator,
+                                            Origin=self.origin('panel'))
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)['url'], self.feedback_issue)
+            self.assertEqual(self.feedback_posts, [data])
+            status, _, body = self.request('panel', preview, cookie=operator)
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)['receipt']['number'], 24)
+            self.permissions['operator'].remove('action:feedback:submit')
+            self.assertEqual(self.request('panel', preview, cookie=operator)[0], 403)
+        self.permissions['operator'].remove('workflow:invoice:run')
         self.assertEqual(self.request('panel', route, 'POST', {}, cookie=operator)[0], 403)
 
         old_profile = reader.split('; ', 1)[1]
