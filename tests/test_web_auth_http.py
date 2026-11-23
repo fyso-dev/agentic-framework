@@ -638,8 +638,8 @@ class BizPolicyGateway(WebAuthFixture):
         if self.external_biz:
             self.skipTest('requires the local Biz fixture to observe upstream feedback requests')
         extension = Path(self.biz_extension) / 'extensions/biz'
-        self.assertTrue((extension / 'feedback.cjs').is_file(),
-                        'FYSO_TEST_BIZ_EXTENSION must point to a feedback-capable Biz installation')
+        if not (extension / 'feedback.cjs').is_file():
+            self.skipTest('requires a feedback-capable Biz installation')
         page_asset = extension / 'panel/feedback.html'
         self.assertTrue(page_asset.is_file(), 'requires the built Biz feedback page')
         installed = self.root / 'extensions/biz'
