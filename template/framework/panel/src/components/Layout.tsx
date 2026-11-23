@@ -207,10 +207,7 @@ const ITEMS: NavItem[] = [
 const mcpItem: NavItem = { id: "mcp", href: href.mcp, icon: IconPlug, label: "MCP" };
 
 const extensionItems = (extensions:Extension[],lang:string,shown:(ext:string,page:string,conditional:boolean)=>boolean):NavItem[] => extensions.flatMap(ext=>(ext.pages??[]).filter(page=>shown(ext.id,page.id,!!page.visible)).map(page=>{
-  // Existing Biz installs register the overview with the generic workflow icon.
-  const icon = ext.id === "biz" && page.id === "overview" && page.icon === "workflow"
-    ? "briefcase"
-    : page.icon ?? "apps";
+  const icon = page.icon ?? "apps";
   return {
     id: `extension:${ext.id}:${page.id}`,
     href: href.extension(ext.id,page.id),
