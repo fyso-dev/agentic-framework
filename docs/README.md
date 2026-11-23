@@ -113,7 +113,7 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
-The [feedback gateway fixture](biz-feedback-delivery.md#checkpoint) verified individual Biz sessions, permission revocation, cross-origin rejection and feedback receipt storage.
+See the [feedback delivery checkpoint](biz-feedback-delivery.md#checkpoint) for gateway verification and deployment status.
 
 2026-11-21: The individual agent form accepts edits in one action using the native plan and apply workflows. Pending team drafts and bot removal continue through explicit review. [Panel contract](panel-contract.md#4-editing-teamyaml-in-the-browser)
 

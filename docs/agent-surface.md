@@ -80,7 +80,8 @@ The instance owner reviews the report and confirms whether it concerns AF, an
 extension, or project configuration. In a Biz-managed project, open **Report to
 Fyso**, load the local report by path or UUID, review the title and body, and
 choose **Send to GitHub**. A correction can identify the original local report
-to add a comment to the same issue. The extension displays the GitHub receipt.
+to add a comment to its published GitHub issue. The extension displays the
+receipt and saves it under `.data/ext/biz/feedback/`.
 GitHub applies its repository visibility rules when the person follows the receipt URL.
 A verified local correction can be reported before the upstream fix is available.
 

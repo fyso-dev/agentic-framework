@@ -27,19 +27,14 @@ an additional release.
 
 ## Production activation
 
-- Install a GitHub App on `fyso-dev/agentic-framework` with repository
-  permission **Issues: Read and write**. Set `AF_FEEDBACK_APP_ID`,
-  `AF_FEEDBACK_INSTALLATION_ID`, and the PEM secret
-  `AF_FEEDBACK_PRIVATE_KEY` as Worker secrets in the Biz backend.
-- Apply the feedback ledger and recovery migrations before enabling submissions.
+- Configure the GitHub App and apply the feedback migrations before enabling submissions.
   Follow the [Biz activation runbook](https://github.com/fyso-dev/fyso-business/blob/main/docs/runbooks/activacion-framework-feedback.md)
-  for the current migration sequence and the recovery procedure. During
-  pre-merge review, use the [runbook at the reviewed Biz revision](https://github.com/fyso-dev/fyso-business/blob/8ab9246be56178990cf868b6a22058d041b097e1/docs/runbooks/activacion-framework-feedback.md).
+  for activation and for recovery before retrying an ambiguous GitHub write.
+  During pre-merge review, use the [runbook at the reviewed Biz revision](https://github.com/fyso-dev/fyso-business/blob/8ab9246be56178990cf868b6a22058d041b097e1/docs/runbooks/activacion-framework-feedback.md).
 - Install the updated Biz extension in a Biz-managed AF project. Grant
   `app:panel`, `page:extension:biz`, and `action:feedback:submit`
   to the appropriate project access level.
 - Follow the [report submission instructions](agent-surface.md#instance-feedback-format).
-  The extension saves the receipt under `.data/ext/biz/feedback/`.
 
 ## Isolated validation
 
@@ -49,9 +44,19 @@ with an isolated database and simulated GitHub writes.
 
 For the gateway fixture, use the [native binary settings](web-auth.md#native-installation-and-verification)
 for `tests/test_web_auth_http.py`. Set `FYSO_TEST_BIZ_EXTENSION` to the generated
-project root with the feedback-capable Biz extension installed and leave
-`FYSO_TEST_BIZ_ORIGIN` unset. The fixture builds the panel inventory from the
-installed page declaration and reads it through Caddy before opening the page.
+project root with managed access enabled. The installed extension must include
+`extensions/biz/authorize.caddy` and `extensions/biz/panel-access.caddy` rendered
+by the normal install, plus `extensions/biz/feedback.cjs` and the built feedback
+page with its page declaration. Leave `FYSO_TEST_BIZ_ORIGIN` unset and select the
+feedback case explicitly:
+
+```sh
+python3 tests/test_web_auth_http.py BizPolicyGateway.test_biz_feedback_revocation_blocks_submission
+```
+
+The fixture builds the panel inventory from the installed page declaration and
+reads it through Caddy before opening the page. Confirm the selected case ran
+and was not skipped.
 
 - A signed-in authorized project member can preview and send an existing
   report. A revoked or denied member and a cross-origin request are rejected.
@@ -77,7 +82,3 @@ gateway reached ready and the Biz Partner post-start hook returned an error.
 The Git snapshot was recorded after initializing the fixture repository, and
 the hook still reported a fetch failure with the fixture Biz URL. A real
 GitHub App submission remains pending.
-
-Biz retains a pending reservation after an ambiguous response from GitHub.
-Use the activation runbook to recover the receipt from a confirmed issue
-or comment before allowing a new publication.
