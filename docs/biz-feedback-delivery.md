@@ -72,6 +72,12 @@ the instance.
 
 ## Checkpoint
 
+On 2026-11-23, GitHub reported that the Framework checks passed and
+[SonarCloud Code Analysis was cancelled](https://github.com/fyso-dev/agentic-framework/pull/120/checks?check_run_id=137792720029)
+for AF revision `a8c9813`. The check reported an analysis failure without
+annotations or a cause. Keep the merge pending until the SonarCloud background
+task has been diagnosed and the required checks pass.
+
 The framework gateway integration test passed with real Caddy and Tinyauth
 and an isolated Biz fixture. Backend tests exercise the migration against
 SQLite and simulate GitHub to verify concurrent sends, corrections and retries.
