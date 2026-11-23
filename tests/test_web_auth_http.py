@@ -640,7 +640,24 @@ class BizPolicyGateway(WebAuthFixture):
                         'FYSO_TEST_BIZ_EXTENSION must point to a feedback-capable Biz installation')
         page_asset = extension / 'panel/feedback.html'
         self.assertTrue(page_asset.is_file(), 'requires the built Biz feedback page')
-        shutil.copytree(page_asset.parent, self.root / 'extensions/biz/panel')
+        installed = self.root / 'extensions/biz'
+        shutil.copytree(page_asset.parent, installed / 'panel')
+        shutil.copytree(extension / 'pages', installed / 'pages')
+        (self.root / '.copier-answers.ext-biz.yml').write_text('{}\n')
+        inventory_script = ROOT / 'template/framework/scripts/extensions.cjs'
+        inventory = json.loads(subprocess.check_output(
+            ['node', '-e', 'console.log(JSON.stringify(require(process.argv[1]).inventory([])))',
+             str(inventory_script)],
+            cwd=self.root, text=True, timeout=30,
+        ))
+        biz = next(entry for entry in inventory if entry['id'] == 'biz')
+        feedback_pages = [
+            entry for entry in biz['pages']
+            if entry.get('name_i18n', {}).get('en', entry['name']) == 'Report to Fyso'
+        ]
+        self.assertEqual(len(feedback_pages), 1, biz['pages'])
+        page = feedback_pages[0]['url']
+        self.assertEqual(page, '/extensions/biz/panel/feedback.html')
 
         route = '/api/ext/biz/profile/feedback'
         report_id = '28056ceb-01f7-45d2-a813-4bb5c2446310'
@@ -658,7 +675,6 @@ class BizPolicyGateway(WebAuthFixture):
         self.addCleanup(operator_permissions.discard, page_permission)
         operator = self.link_biz_profile('admin', 'operator')
         reader = self.link_biz_profile('viewer', 'reader')
-        page = '/extensions/biz/panel/feedback.html'
         self.assertEqual(self.request('panel', page, cookie=reader)[0], 403)
         status, _, body = self.request('panel', page, cookie=operator)
         self.assertEqual(status, 200, body)
