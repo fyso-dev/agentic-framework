@@ -1,0 +1,11 @@
+_min_copier_version: "9.19.1"
+_answers_file: .copier-answers.ext-pack-software-production.yml
+_templates_suffix: .slotjinja
+github_repo:
+  type: str
+  default: ""
+  help: "GitHub repository the bots work on, as owner/repo. Empty is allowed: set it later in extensions/pack-software-production/github.yaml."
+_exclude:
+  - copier.yml
+  - /README.md
+  - .git

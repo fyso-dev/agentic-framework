@@ -26,6 +26,6 @@ jobs:
           for suite in tests/owner-extensions.test.cjs tests/skills.test.cjs; do
             if [ -f "$suite" ]; then suites+=("$suite"); fi
           done
-          node --test "${suites[@]}" tests/github-auth.test.cjs tests/fyso-mcp.test.cjs tests/extensions.test.cjs tests/marketplace.test.cjs tests/bot-form-connectors.test.cjs tests/panel-bot-removal.test.cjs tests/bot-architect.test.cjs tests/team-models.test.cjs tests/bot-roster.test.cjs tests/team-template.test.cjs
+          node --test "${suites[@]}" tests/github-auth.test.cjs tests/fyso-mcp.test.cjs tests/extensions.test.cjs tests/marketplace.test.cjs tests/bot-form-connectors.test.cjs tests/panel-bot-removal.test.cjs tests/bot-architect.test.cjs tests/team-models.test.cjs tests/bot-roster.test.cjs tests/team-template.test.cjs tests/pack-software-production.test.cjs
       - run: bash scripts/check-paths.sh
       - run: git diff --check

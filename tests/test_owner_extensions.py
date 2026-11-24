@@ -28,6 +28,7 @@ EXPECTED = {
     'owner-loop': {'skills': ['ask-owner', 'notify-owner', 'request-key'],
                    'workflows': ['ext-owner-loop-ask', 'ext-owner-loop-notify'], 'mcp': [], 'pages': []},
     'pack-accounting': {'skills': [], 'workflows': [], 'mcp': [], 'pages': []},
+    'pack-software-production': {'skills': [], 'workflows': [], 'mcp': [], 'pages': []},
 }
 
 
