@@ -30,6 +30,8 @@ test('temporary files go to a private folder outside the project, one per projec
   const p = policy({ root, sharedKeys: [], allowRead: [], allowWrite: [] }, { PATH: '' }, home);
   const q = policy({ root: other, sharedKeys: [], allowRead: [], allowWrite: [] }, { PATH: '' }, home);
   assert.equal(p.vars.TMPDIR, p.scratch);
+  // Claude Code ignores TMPDIR; without this its Bash tool fails with EPERM on /tmp/claude-<uid>.
+  assert.equal(p.vars.CLAUDE_CODE_TMPDIR, p.scratch);
   assert.ok(!p.scratch.startsWith(root + path.sep));
   assert.equal(path.dirname(p.scratch), fs.realpathSync('/tmp'));
   assert.match(path.basename(p.scratch), /^fyso-confine-[0-9a-f]{12}$/);
@@ -151,6 +153,7 @@ test('framework scripts create temporary files under TMPDIR, which Dagu passes t
   assert.deepEqual(bare,[],'mktemp needs an explicit "${TMPDIR:-/tmp}/…XXXXXXXX" template');
   const dagu=fs.readFileSync(path.join(dir,'run-dagu.sh'),'utf8').match(/DAGU_ENV_PASSTHROUGH_PREFIXES=(\S+)/)[1].split(',');
   assert.ok(dagu.includes('TMPDIR'),'Dagu steps must receive the confined TMPDIR');
+  assert.ok(dagu.includes('CLAUDE_CODE_TMPDIR'),'Dagu steps that run Claude Code must receive its temporary folder');
 });
 
 // Confined Dagu steps cannot see the uv-managed Pythons of the user's home; without a

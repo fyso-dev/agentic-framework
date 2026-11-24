@@ -70,7 +70,9 @@ function policy(options, env = process.env, home = os.homedir()) {
   // climb to the project's own repository instead. One folder per project, owned by us.
   const scratch = path.join(real('/tmp'), `fyso-confine-${crypto.createHash('sha256').update(root).digest('hex').slice(0, 12)}`);
   const vars = {
-    HOME: privateHome, TMPDIR: scratch,
+    // Claude Code ignores TMPDIR: its Bash tool writes /tmp/claude-<uid>/ and
+    // /tmp/claude-<id>-cwd unless CLAUDE_CODE_TMPDIR points elsewhere.
+    HOME: privateHome, TMPDIR: scratch, CLAUDE_CODE_TMPDIR: scratch,
     XDG_CONFIG_HOME: path.join(privateHome, '.config'), XDG_CACHE_HOME: path.join(privateHome, '.cache'),
     XDG_DATA_HOME: path.join(privateHome, '.local/share'), XDG_STATE_HOME: path.join(privateHome, '.local/state'),
     MISE_DATA_DIR: env.MISE_DATA_DIR || path.join(home, '.local/share/mise'),

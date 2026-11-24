@@ -77,6 +77,9 @@ stops with the reason unless `FYSO_CONFINE=off`.
   user's temporary folder, which the sandbox denies. Framework scripts always pass
   `"${TMPDIR:-/tmp}/…XXXXXXXX"`, and Dagu hands `TMPDIR` to its steps
   (`DAGU_ENV_PASSTHROUGH_PREFIXES`); a test enforces both. Extension scripts must do the same.
+  Claude Code ignores `TMPDIR` too: its Bash tool writes `/tmp/claude-<uid>/` and
+  `/tmp/claude-<id>-cwd`, so every command of a confined bot failed with `EPERM`. The
+  sandbox sets `CLAUDE_CODE_TMPDIR` to the same private folder, and Dagu passes it on.
 - **Framework updates run outside the sandbox.** Copier needs `git init`/`clone` (they write
   `.git/config`) and older templates hold `.mcp.json`; neither is possible confined. So
   `update.sh` in a Dagu step (the panel's **Update**) asks the project's unconfined
