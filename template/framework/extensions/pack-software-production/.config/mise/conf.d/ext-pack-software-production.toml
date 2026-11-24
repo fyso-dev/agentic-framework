@@ -1,0 +1,4 @@
+# No extra tool. The check validates the department template as an omb-team/1 package.
+[tasks."pack-software-production:check"]
+description = "Validate the software production department template (changes nothing)"
+run = "bash extensions/pack-software-production/doctor.sh"

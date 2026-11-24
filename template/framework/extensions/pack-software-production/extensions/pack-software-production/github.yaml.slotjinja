@@ -1,0 +1,10 @@
+# GitHub Issues the department works on. Rendered at install from the github_repo question.
+# The bots read this file for the repository and the state labels; doctor.sh checks the access.
+# Only a person adds the `approved` label: the Software Developer does not start without it.
+repo: "{{ github_repo }}"
+labels:
+  needs_info: needs-info      # Requirements Intake: data is missing, a person must answer
+  plan_review: plan-review    # Software Planner: plan posted as a comment, waiting for a person
+  approved: approved          # set by a person only: the Software Developer may start
+  in_progress: in-progress    # Software Developer: branch and work in progress
+  in_review: in-review        # Software Developer: draft PR open, Code Reviewer checks it
