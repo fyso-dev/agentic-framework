@@ -8,7 +8,10 @@ cd "${FYSO_ROOT:?}"
 node -e '
   const t = require("./framework/scripts/team-template.cjs");
   const pkg = t.extensionPackage("pack-software-production", "produccion-software");
-  const team = require("yaml").parse(pkg.team);
+  // Same resolution as team-template.cjs: the yaml library ships with the pinned mise `yaml` CLI.
+  const {createRequire} = require("node:module"), fs = require("node:fs"), {execFileSync} = require("node:child_process");
+  const yaml = createRequire(fs.realpathSync(execFileSync("which", ["yaml"], {encoding: "utf8"}).trim()))("yaml");
+  const team = yaml.parse(pkg.team);
   if (team.version !== 1) throw new Error("team.yaml: version must be 1");
   if (team.bots.length !== 5) throw new Error(`team.yaml: expected 5 bots, found ${team.bots.length}`);
   for (const bot of team.bots) {
