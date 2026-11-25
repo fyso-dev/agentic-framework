@@ -89,9 +89,18 @@ case "$action" in
     # Panel install/upgrade (fyso-ext-install): one commit per change, then load
     # the new processes and routes into the running stack. Prints JSON.
     mode=${1:-${MODE:-}}; id=${2:-${ID:-}}
-    [[ $mode =~ ^(add|update|remove)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update|remove> <id>'
+    [[ $mode =~ ^(add|update|remove|recover)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update|remove|recover> <id>'
     answers=".copier-answers.ext-$id.yml"
     read_version() { node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._commit || "")' "$1"; }
+    if [ "$mode" = recover ]; then
+      [ -f "$answers" ] || fail "$id is not installed"
+      version=$(read_version "$answers")
+      refresh >&2
+      activate
+      node -e 'console.log(JSON.stringify({id:process.argv[1],mode:"recover",version:process.argv[2]||null,commit:process.argv[3]}))' \
+        "$id" "$version" "$(git rev-parse --short HEAD)"
+      exit 0
+    fi
     if [ "$mode" = remove ]; then
       # Panel uninstall (fyso-ext-remove): the same removal as `ext:remove`, then one
       # commit of only this extension's slots. Data in .data/ext/<id> and secrets stay.

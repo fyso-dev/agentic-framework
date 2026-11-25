@@ -1,5 +1,5 @@
 name: fyso-ext-install
-description: Panel ext-install (install or upgrade one extension from the marketplace, D31)
+description: Install, upgrade or resume activation of a project extension
 labels:
   - fyso=system
 type: graph
@@ -9,6 +9,7 @@ params:
   - MODE: add
 env:
   - ROOT: ${FYSO_ROOT}
+  - MISE_SOPS_AGE_KEY_FILE: ${FYSO_COMPOSIO_AGE_KEY_FILE}
 working_dir: ${ROOT}
 steps:
   # mise exec: Dagu steps start from a cleared environment (ports, secrets, tools).
