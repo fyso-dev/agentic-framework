@@ -51,6 +51,19 @@ test('unmatched rows stay provisional while project configuration is refreshing'
   assert.equal(unmatchedVersion(row,recorded,true),'syncing');
   assert.equal(unmatchedVersion(row,missing,true),'native');
 });
+test('the default MausBot is configured in OpenMausBot, not reported as synchronizing',async()=>{
+  const {botRoster,unmatchedVersion}=await load();
+  const recorded={commit:'abc',bots:[{name:'MausBot',team:'',project:true,snapshot:true}]};
+  const [chief]=botRoster([],[native('chief','MausBot'),native('copy','MausBot')],['MausBot']);
+  assert.equal(chief.defaultChief,false,'an ambiguous name is not the default chief');
+  const [only]=botRoster([],[native('chief','MausBot')],['MausBot']);
+  assert.equal(only.defaultChief,true);
+  assert.equal(unmatchedVersion(only,recorded,true),'chief');
+  assert.equal(unmatchedVersion(only,recorded,false),'chief');
+  const [lead]=botRoster([],[{...native('lead','MausBot'),section:'Sales'}],['MausBot']);
+  assert.equal(lead.defaultChief,false,'a team chief stays a project bot');
+  assert.notEqual(unmatchedVersion(lead,recorded,true),'chief');
+});
 test('native avatar metadata survives the roster join and only native attachment paths are usable',async()=>{
   const {botRoster}=await load();
   const {botAvatarSrc,botAvatarColor}=await import('../template/framework/panel/src/lib/botAvatar.ts');

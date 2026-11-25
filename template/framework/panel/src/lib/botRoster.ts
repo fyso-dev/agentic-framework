@@ -11,10 +11,12 @@ export type RosterRow = {
   model: string;
   appearance?: BotAppearance;
   configuration?: BotRow;
+  /** OpenMausBot's default MausBot: configured in OpenMausBot, never in the panel's form. */
+  defaultChief?: boolean;
 };
 
 /** Native IDs identify live rows; only unique names can link to a team-file form. */
-export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null): RosterRow[] {
+export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null, defaultChiefs: string[] = []): RosterRow[] {
   const fromConfig = (row: BotRow): RosterRow => ({
     key: `config-${row.bot.index}-${row.bot.name}-${row.state}`,
     team: row.bot.team, name: row.bot.name, title: row.bot.title, model: row.bot.model, configuration: row,
@@ -40,6 +42,7 @@ export function botRoster(configuration: BotRow[], runtime: RuntimeBot[] | null)
       title: pending ? config.bot.title : bot.title || "",
       model: pending ? config.bot.model : [bot.modelSelection?.instanceId, bot.modelSelection?.model].filter(Boolean).join("/"),
       configuration: config,
+      defaultChief: unique && !bot.section && defaultChiefs.includes(bot.name),
     };
   });
   // Unapplied drafts remain visible. An unchanged declaration must not resurrect
@@ -68,8 +71,12 @@ export function versionStatus(row: RosterRow, inventory: import('../api/types').
   return recorded?.project ? 'project' : recorded?.snapshot ? 'snapshot' : 'native';
 }
 
-/** A committed bot missing from the current form data is still synchronizing. */
+/**
+ * A committed bot missing from the current form data is still synchronizing, except
+ * the default MausBot: the form never lists it, so it is configured in OpenMausBot.
+ */
 export function unmatchedVersion(row: RosterRow, inventory: import('../api/types').BotVersioning | undefined, synchronized: boolean) {
+  if (row.defaultChief) return 'chief';
   const status = versionStatus(row, inventory);
   if (status === 'project') return 'syncing';
   return synchronized ? status : 'unknown';
