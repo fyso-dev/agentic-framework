@@ -113,6 +113,14 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-24: Biz-managed instances. `Fyso Biz.app` now lists the signed-in person's
+assigned Biz projects and binds the new instance to the selected project. The
+extension applies that project's teams. The core locks those bots through
+`project/bots/managed.json`, and the person can still add their own bots. A
+generated stack verified the refusals and the allowed operations through the real
+Dagu and OpenMausBot, and `doctor` passed. Live acceptance with fyso.biz remains.
+[Delivery](biz-access-delivery.md#managed-instance-from-a-biz-project)
+
 See the [feedback delivery checkpoint](biz-feedback-delivery.md#checkpoint) for gateway verification and deployment status.
 
 2026-11-21: The individual agent form accepts edits in one action using the native plan and apply workflows. Pending team drafts and bot removal continue through explicit review. [Panel contract](panel-contract.md#4-editing-teamyaml-in-the-browser)

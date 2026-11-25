@@ -93,6 +93,20 @@ An extension writes **only** these paths. It never edits a file that another tem
 
 One department template per directory, in OpenMausBot's own team file format: `team.yaml` declares exactly one `teams:` entry, the bots whose `team:` is that department and its rooms, with no `cwd`, machine path, `chief` or `manages`. Skill entries are relative, `skills/<bot-slug>/<skill>/SKILL.md`, and each file lives beside `team.yaml`. Limits: 512 KB and 64 skills ([department templates](team-templates.md)). `extensions.json` lists the slugs as `teams`; `OP=team-templates` lists an invalid template with its error, and it cannot be added. The extension never writes `project/bots/team.yaml`: adding a department is the person's action (`OP=team-import SOURCE=extension:<ext>/<slug>`), which copies the skills to `project/bots/teams/<slug>/` and opens the proposed `team.yaml` as a draft.
 
+### Managed bots (`project/bots/managed.json`)
+
+An extension that keeps departments in sync with an outside source of truth, such as
+Fyso Biz (D89), can lock those bots in the project. `framework/scripts/managed-bots.cjs`
+`record({root, owner, teamYaml, departments, bots})` digests each named bot's declared
+entry from the team file about to be applied. A referenced `file` contributes its
+content. The function replaces the owner's record and commits only `managed.json`.
+The core then refuses any change that differs from the record. This covers Bot
+Architect `update` and `delete`, the panel's team-wide plan and apply, and
+`OP=team-import` of a managed department. New bots and the person's own bots remain
+editable. The owner changes its bots by recording first and then applying the same
+declaration. No request parameter can bypass this check. Without the file, no bot is
+managed.
+
 ### `app.yaml`
 
 Same shape as `project/apps/*/app.yaml` (panel-contract §1). `url` is required and is usually the extension's route, e.g. `http://sample.localhost:${FYSO_HTTP_PORT}`. `panel-data.cjs` replaces `${VAR}` with values from `FYSO_*` env vars only.
@@ -412,3 +426,7 @@ authorization, permission report, and remote MCP authorization slots.
 Extensions that enable managed access should require this marker during
 installation. Installing a policy extension into an older gateway must not
 silently enable a mode that the gateway cannot enforce.
+
+The local `framework/scripts/ext.sh apply add <id> -- -d key=value ...` passes Copier
+answers to the panel's install path. The menu bar app uses this path to bind a new
+instance to its Biz project. The Dagu workflow does not accept answers.

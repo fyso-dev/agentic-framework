@@ -20,6 +20,8 @@ else
 fi
 node framework/scripts/render-team.cjs "$team" "$FYSO_ROOT/project/bots" > "$tmp/rendered.yaml"
 review_team() {
+  # Bots an extension manages (managed-bots.cjs) must stay exactly as recorded.
+  node framework/scripts/managed-bots.cjs check "$team" >&2 || fail 'the change touches a managed bot; change it at its source'
   cp project/bots/team.yaml "$tmp/current.yaml"
   if [ -n "${TEAM_BASE_B64:-}" ]; then
     node -e 'process.stdout.write(Buffer.from(process.env.TEAM_BASE_B64,"base64"))' > "$tmp/draft-base.yaml"
