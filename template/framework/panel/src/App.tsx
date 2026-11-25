@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BottomNav, SideNav, TopBar, useNavCollapsed } from "./components/Layout";
+import { PanelAccessContext, pageCapability, routePage, usePanelAccess } from "./lib/access";
 import { useRoute, type Route } from "./lib/router";
 import { localized } from "./lib/i18n";
 import { applyFavicon, applyLook } from "./lib/brand";
@@ -12,6 +13,7 @@ import { Apps } from "./screens/Apps";
 import { Observability } from "./screens/Observability";
 import { ExtensionPage } from "./screens/ExtensionPage";
 import { AppFrame } from "./screens/AppFrame";
+import { ManagedMcp } from "./screens/ManagedMcp";
 import { Mcp } from "./screens/Mcp";
 import { Setup } from "./screens/Setup";
 import { useStore, type Store } from "./store";
@@ -21,6 +23,9 @@ export function App() {
   const route = useRoute();
   const [theme, toggleTheme] = useTheme();
   const s = useStore();
+  const access = usePanelAccess(Boolean(s.mock));
+  const visible = (id: string) => access.capabilities === null ||
+    (access.capabilities.has("app:panel") && access.capabilities.has(pageCapability(id)));
   const [navCollapsed, toggleNav] = useNavCollapsed();
   const brand = s.project.data?.brand;
   const name = brand?.name ?? s.project.data?.name;
@@ -51,7 +56,9 @@ export function App() {
       screen = <ExtensionPage extensionId={route.extensionId} pageId={route.pageId} theme={theme} />;
       break;
     case "mcp":
-      screen = <Mcp />;
+      screen = access.capabilities === null
+        ? <Mcp />
+        : <ManagedMcp credentialPath={access.remoteCredentialPath} />;
       break;
     case "apps":
       screen = <Apps tab={route.tab ?? "open"} />;
@@ -63,8 +70,12 @@ export function App() {
       screen = <Setup />;
   }
 
+  if (!visible(routePage(route))) {
+    screen = <main className="workspace"><p role="status">{t(access.loading ? "common.loading" : "common.accessDenied")}</p></main>;
+  }
+
   return (
-    <>
+    <PanelAccessContext.Provider value={access}>
       {/* Hash routing: the skip link moves focus instead of changing the hash. */}
       <a
         href="#main"
@@ -76,7 +87,7 @@ export function App() {
       >
         {t("common.skip")}
       </a>
-      <TopBar theme={theme} toggleTheme={toggleTheme} route={route} navCollapsed={navCollapsed} toggleNav={toggleNav} />
+      <TopBar visible={visible} theme={theme} toggleTheme={toggleTheme} route={route} navCollapsed={navCollapsed} toggleNav={toggleNav} />
       {s.project.status === "error" && (
         <div role="alert" className="banner banner-down" style={{ margin: "16px 24px 0", borderRadius: "var(--fy-radius-lg)" }}>
           <p className="grow">
@@ -87,11 +98,11 @@ export function App() {
       )}
       <div className={`shell${route.name === "app" ? " shell-app" : ""}`} id="main" tabIndex={-1} style={{ outline: "none" }}>
 
-        <SideNav route={route} collapsed={navCollapsed} />
+        <SideNav showMcp={access.capabilities !== null} visible={visible} route={route} collapsed={navCollapsed} />
         {screen}
       </div>
-      <BottomNav route={route} />
-    </>
+      <BottomNav showMcp={access.capabilities !== null} visible={visible} route={route} />
+    </PanelAccessContext.Provider>
   );
 }
 

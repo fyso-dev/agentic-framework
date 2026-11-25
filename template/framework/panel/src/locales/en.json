@@ -4,6 +4,7 @@
     "unavailable": "Could not verify the session"
   },
   "common": {
+    "accessDenied": "You do not have access to this screen.",
     "newTab": "(opens in a new tab)",
     "copy": "Copy",
     "copied": "Copied",
@@ -33,6 +34,7 @@
   },
   "top": {
     "logo": "Fyso",
+    "edition": { "free": "Free", "pro": "Pro" },
     "env": {
       "local": "local",
       "server": "server"
@@ -445,6 +447,7 @@
     "pricingSource": "Price source"
   },
   "ext": {
+    "advanced": "Advanced",
     "title": "Installed extensions",
     "ready": "Ready",
     "missing_one": "{{count}} secret missing",
@@ -923,6 +926,14 @@
     "saveTipApps": "Application accesses apply on save; everything else stays pending until “Review and apply”."
   },
   "mcp": {
+    "personal": {
+      "description": "Create an individual credential for your remote MCP client. Creating a new credential replaces the previous one.",
+      "issue": "Create credential",
+      "failed": "Could not create the remote MCP credential.",
+      "endpoint": "Remote MCP address",
+      "token": "Bearer token. Expires {{expiry}}.",
+      "unavailable": "Individual remote MCP credentials require an HTTPS project."
+    },
     "title": "Run the project from your AI",
     "intro": "Connect Claude or Codex to this project's MCP to create agents, install extensions and check its status by chatting.",
     "serverTip": "MCP server name in your app",

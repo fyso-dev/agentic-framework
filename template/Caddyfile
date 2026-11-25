@@ -93,6 +93,8 @@
 			}
 		}
 		request_header @upstream Cookie "(^|;[ \t]*)tinyauth-session-[^=;]+=[^;]*" ""
+		# Extension authorization runs on the authenticated request before any app handler.
+		import {$FYSO_ROOT}/extensions/*/authorize.caddy
 	}
 }
 
@@ -146,6 +148,16 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 	handle /api/session {
 		rewrite * /api/context/user
 		reverse_proxy {$FYSO_AUTH_UPSTREAM}
+	}
+	@panelAccess {
+		method GET
+		path /api/panel-access
+	}
+	handle @panelAccess {
+		route {
+			import {$FYSO_ROOT}/extensions/*/panel-access.caddy
+			respond 204
+		}
 	}
 	handle /api/session/logout {
 		@logout method POST
@@ -270,6 +282,15 @@ http://panel.{$FYSO_WEB_DOMAIN}:{$FYSO_HTTP_PORT} {
 		reverse_proxy 127.0.0.1:{$FYSO_DAGU_PORT} {
 			header_up Authorization "{$FYSO_DAGU_AUTH}"
 		}
+	}
+	# A top-level OAuth return needs a navigation path outside the cross-site API guard.
+	@extensionOAuthCallback {
+		method GET
+		path_regexp extensionOAuthCallback ^/extensions/([a-z][a-z0-9-]{1,30})/oauth/callback$
+	}
+	handle @extensionOAuthCallback {
+		rewrite * /profile/callback?{query}
+		reverse_proxy unix//tmp/fyso-ext-{re.extensionOAuthCallback.1}-{$FYSO_HTTP_PORT}.sock
 	}
 	# Only extension-owned public page assets are exposed, never other slots.
 	@extensionPage path_regexp extensionPage ^/extensions/[a-z][a-z0-9-]{1,30}/panel/([A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$

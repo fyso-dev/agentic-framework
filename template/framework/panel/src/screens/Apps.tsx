@@ -297,49 +297,54 @@ function ExtensionCard({ ext, entry, market }: { ext: Extension; entry?: Marketp
           ))}
         </ul>
       )}
-      {ext.secrets.length > 0 && (
-        <ul className="ap-chips" aria-label={t("ext.secrets")}>
-          {ext.secrets.map((x) => {
-            const desc = x.description ? localized(lang, x.description, x.description_i18n) : undefined;
-            const state = x.set ? t("ext.secretSet") : x.required ? t("ext.secretMissing") : t("ext.secretOptional");
-            const tip = desc ? `${state} · ${desc}` : state;
-            return (
-              <li key={x.name} className={`ap-secret ${x.set ? "set" : x.required ? "miss" : "opt"}`} data-tip={tip}>
-                {x.set ? <IconLock size={12} /> : <IconLockOpen size={12} />}{x.name}<span className="sr-only"> {state}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {ext.workflows.length > 0 && (
-        <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-          {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
-        </ul>
-      )}
-      <ExtensionSetup ext={ext} onSaved={reload} />
-      <div className="ap-foot">
-        <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>
-        <span className="grow" />
-        {entry?.update && !confirming && <InstallControl entry={entry} market={market} where="installed" />}
-        {removingThis ? (
-          <span className="ap-tag acc" role="status"><Spinner />{t("market.removing")}</span>
-        ) : !confirming && (
-          <button type="button" className="bd-ib" disabled={market.busy} aria-label={t("market.remove", { name })} data-tip={t("market.remove", { name })}
-            onClick={() => setConfirming(true)}><IconTrash size={18} /></button>
-        )}
-      </div>
-      {confirming && !removingThis && (
-        <div role="group" aria-label={t("market.removeTitle", { name })} className="card action">
-          <p><strong>{t("market.removeTitle", { name })}</strong> <span className="mute">{t("market.removeHint")}</span></p>
+      <details className="ap-ext-advanced">
+        <summary>{t("ext.advanced")}</summary>
+        <div className="ap-ext-advanced-body">
+          {ext.secrets.length > 0 && (
+            <ul className="ap-chips" aria-label={t("ext.secrets")}>
+              {ext.secrets.map((x) => {
+                const desc = x.description ? localized(lang, x.description, x.description_i18n) : undefined;
+                const state = x.set ? t("ext.secretSet") : x.required ? t("ext.secretMissing") : t("ext.secretOptional");
+                const tip = desc ? `${state} · ${desc}` : state;
+                return (
+                  <li key={x.name} className={`ap-secret ${x.set ? "set" : x.required ? "miss" : "opt"}`} data-tip={tip}>
+                    {x.set ? <IconLock size={12} /> : <IconLockOpen size={12} />}{x.name}<span className="sr-only"> {state}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {ext.workflows.length > 0 && (
+            <ul aria-label={t("ext.workflows", { count: ext.workflows.length })} style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {ext.workflows.map((dag) => <ExtensionWorkflow key={dag} dag={dag} />)}
+            </ul>
+          )}
+          <ExtensionSetup ext={ext} onSaved={reload} />
           <div className="ap-foot">
+            <span className="ap-tag" data-tip={t("ext.versionTip")}>{ext.version ?? t("ext.noVersion")}</span>
             <span className="grow" />
-            <button type="button" className="btn btn-sm btn-soft" onClick={() => setConfirming(false)}>{t("common.cancel")}</button>
-            <button type="button" className="btn btn-sm btn-soft" style={{ color: "var(--fy-down)" }} disabled={market.busy}
-              onClick={() => { setConfirming(false); market.onRemove(ext.id); }}><IconTrash size={15} />{t("market.removeConfirm")}</button>
+            {entry?.update && !confirming && <InstallControl entry={entry} market={market} where="installed" />}
+            {removingThis ? (
+              <span className="ap-tag acc" role="status"><Spinner />{t("market.removing")}</span>
+            ) : !confirming && (
+              <button type="button" className="bd-ib" disabled={market.busy} aria-label={t("market.remove", { name })} data-tip={t("market.remove", { name })}
+                onClick={() => setConfirming(true)}><IconTrash size={18} /></button>
+            )}
           </div>
+          {confirming && !removingThis && (
+            <div role="group" aria-label={t("market.removeTitle", { name })} className="card action">
+              <p><strong>{t("market.removeTitle", { name })}</strong> <span className="mute">{t("market.removeHint")}</span></p>
+              <div className="ap-foot">
+                <span className="grow" />
+                <button type="button" className="btn btn-sm btn-soft" onClick={() => setConfirming(false)}>{t("common.cancel")}</button>
+                <button type="button" className="btn btn-sm btn-soft" style={{ color: "var(--fy-down)" }} disabled={market.busy}
+                  onClick={() => { setConfirming(false); market.onRemove(ext.id); }}><IconTrash size={15} />{t("market.removeConfirm")}</button>
+              </div>
+            </div>
+          )}
+          {entry && <InstallOutcome entry={entry} market={market} where="installed" />}
         </div>
-      )}
-      {entry && <InstallOutcome entry={entry} market={market} where="installed" />}
+      </details>
     </li>
   );
 }

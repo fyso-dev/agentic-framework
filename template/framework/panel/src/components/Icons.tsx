@@ -132,6 +132,8 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
       return <IconChecklist size={size} />;
     case "workflow":
       return <IconWorkflow size={size} />;
+    case "briefcase":
+      return <IconBriefcase size={size} />;
     case "bot":
       return <IconBot size={size} />;
     case "chat":
@@ -155,6 +157,7 @@ export function AppIcon({ name, size }: { name: string; size?: number }) {
 
 // Bot detail (B1.3): one stroke weight, one size per context.
 const icon = (d: string) => (p: P) => <Svg {...p}><path d={d} /></Svg>;
+const IconBriefcase = (p: P) => <Svg {...p}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M3 12a20 20 0 0 0 18 0M12 13v2" /></Svg>;
 export const IconChat = icon("M20 11.5a7.5 7.5 0 0 1-11 6.6L4 19.5l1.4-4.6A7.5 7.5 0 1 1 20 11.5z");
 export const IconTrash = icon("M5 7h14M10 11v5M14 11v5M7 7l.8 11.2a2 2 0 0 0 2 1.8h4.4a2 2 0 0 0 2-1.8L17 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7");
 export const IconPerson = icon("M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 19.5a7 7 0 0 1 14 0");

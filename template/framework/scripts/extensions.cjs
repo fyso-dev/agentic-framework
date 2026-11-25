@@ -55,7 +55,12 @@ function pages(id) {
     if(!fs.existsSync('.'+data.url))throw new Error(`${file}: missing page entry`);
     if(typeof data.name!=='string' && (!data.name || typeof data.name!=='object' || Array.isArray(data.name) || !Object.values(data.name).length || Object.values(data.name).some(v=>typeof v!=='string')))throw new Error(`${file}: invalid page name`);
     const name=typeof data.name==='string'?{name:data.name}:{name:data.name.es||data.name.en||Object.values(data.name)[0],name_i18n:data.name};
-    return {id:pageId,...name,url:data.url,icon:data.icon||'apps',...(data.badge!==undefined&&{badge:badge(file,data.badge)}),...(data.visible!==undefined&&{visible:visibility(file,id,data.visible)})};
+    const icon=data.icon||'apps';
+    if(typeof icon!=='string')throw new Error(`${file}: invalid page icon`);
+    if(icon.includes('/') && (!icon.startsWith(`/extensions/${id}/panel/`) || !/^\/extensions\/[a-z][a-z0-9-]{1,30}\/panel\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:png|webp)$/.test(icon) || !fs.existsSync('.'+icon))) {
+      throw new Error(`${file}: invalid page icon asset`);
+    }
+    return {id:pageId,...name,url:data.url,icon,...(data.badge!==undefined&&{badge:badge(file,data.badge)}),...(data.visible!==undefined&&{visible:visibility(file,id,data.visible)})};
   });
 }
 /** Optional Setup step an extension adds (D51): `extensions/<ext>/setup.yaml` with a title and description. */
