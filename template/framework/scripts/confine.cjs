@@ -229,6 +229,9 @@ function sandboxConfig(p) {
     // No allowedDomains: the network is not restricted. On Linux the seccomp filter that
     // blocks every Unix socket is off; linuxSockets() limits them through the file system.
     network: {allowAllUnixSockets: process.platform === 'linux'},
+    // macOS: Go programs (gh) verify TLS through com.apple.trustd.agent. The network is
+    // already open here, so this adds no new way out.
+    enableWeakerNetworkIsolation: process.platform === 'darwin',
     allowPty: true,
     filesystem: {
       denyRead: [...p.denyRead, ...linux.denyRead],
