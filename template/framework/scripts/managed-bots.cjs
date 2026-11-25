@@ -10,6 +10,9 @@ const {createRequire} = require('node:module');
 
 const FILE = 'project/bots/managed.json';
 const ROOT_VAR = '${FYSO_ROOT}';
+// Team files write `${FYSO_ROOT}` unquoted inside flow maps, which YAML cannot parse;
+// parse with a marker (as render-team.cjs does) and restore the variable in every string.
+const MARKER = '__FYSO_PATH_ROOT__';
 const key = name => String(name ?? '').trim().toLowerCase();
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -21,6 +24,19 @@ function yamlModule() {
     catch { yamlLib = require('yaml'); }
   }
   return yamlLib;
+}
+
+function restore(value) {
+  if (typeof value === 'string') return value.replaceAll(MARKER, ROOT_VAR);
+  if (Array.isArray(value)) return value.map(restore);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, restore(v)]));
+}
+
+/** The declared bots of a team file, with `${FYSO_ROOT}` kept as written. */
+function declaredBots(teamText) {
+  const team = restore(yamlModule().parse(String(teamText).replaceAll(ROOT_VAR, MARKER)) || {});
+  return Array.isArray(team.bots) ? team.bots : [];
 }
 
 function sorted(value) {
@@ -92,8 +108,7 @@ function guardDepartment(root, department) {
 function checkTeam(root, teamText) {
   const owners = read(root).owners;
   if (!Object.keys(owners).length) return;
-  const team = yamlModule().parse(teamText) || {};
-  const bots = Array.isArray(team.bots) ? team.bots : [];
+  const bots = declaredBots(teamText);
   for (const [owner, record] of Object.entries(owners)) {
     for (const [name, digest] of Object.entries(record?.bots || {})) {
       const entries = bots.filter(bot => key(bot?.name) === key(name));
@@ -110,8 +125,7 @@ function checkTeam(root, teamText) {
 function record({root, owner, teamYaml, departments = [], bots = [], git = (...args) => execFileSync('git', args, {cwd: root, encoding: 'utf8'})}) {
   if (!/^[a-z][a-z0-9-]{1,30}$/.test(owner || '')) throw new Error('invalid owner');
   if (git('status', '--porcelain', '--', FILE).trim()) throw new Error('uncommitted_changes');
-  const team = yamlModule().parse(teamYaml) || {};
-  const declared = Array.isArray(team.bots) ? team.bots : [];
+  const declared = declaredBots(teamYaml);
   const digests = {};
   for (const name of bots) {
     const entries = declared.filter(bot => key(bot?.name) === key(name));
