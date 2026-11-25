@@ -273,20 +273,39 @@ func showAuthorization(_ url: String) {
 }
 
 /// What `create` did; the Biz steps are nil in the core edition.
-struct Created { let item: Instance; var bizSession: Bool? = nil; var bizExtension: Bool? = nil }
+struct Created { let item: Instance; var bizSession: Bool? = nil; var bizExtension: Bool? = nil; var bizProject: BizProject? = nil }
+
+/// Why `create` stopped before the form, for the CLI and the menu.
+var createStopped: String? = nil
 
 /// The bundled installer (D35) creates the instance: the same form, workflow and registry write.
 /// Blocks until it exits; a new registry entry becomes the current instance. The Biz edition then
 /// hands its Fyso Biz session to the new project and installs the Biz extension there (D86).
-func createInstance() -> Created? {
+func createInstance(project requested: String? = nil, choose: ([BizProject]) -> BizProject? = chooseBizProject) -> Created? {
+    createStopped = nil
     // Biz: a session must be ready before the form, so the new project starts connected.
     if edition == "biz" && !bizSessionReady() { _ = try? bizLogin(open: showAuthorization) }
     if edition == "biz" && !bizSessionReady() { return nil }
+    // A person with assigned Biz projects creates the instance for one of them: it starts bound
+    // to that project (its access levels) and receives the project's teams.
+    var project: BizProject? = nil
+    if edition == "biz" {
+        let assigned = bizProjects() ?? []
+        if let requested {
+            guard let match = assigned.first(where: { $0.id == requested.lowercased() }) else { createStopped = "cli.biz_project_unknown"; return nil }
+            project = match
+        } else if assigned.count == 1 { project = assigned[0] }
+        else if assigned.count > 1 {
+            guard let picked = choose(assigned) else { createStopped = "cli.biz_project_choose"; return nil }
+            project = picked
+        }
+    }
     guard let item = runInstaller() else { return nil }
     guard edition == "biz" else { return Created(item: item) }
     var result = Created(item: item)
+    result.bizProject = project
     result.bizSession = handOffBizSession(to: item)
-    result.bizExtension = installBizExtension(item) == 0
+    result.bizExtension = installBizExtension(item, project: project) == 0
     return result
 }
 
@@ -517,14 +536,81 @@ func handOffBizSession(to item: Instance) -> Bool {
     return true
 }
 
+// MARK: - Fyso Biz projects: the framework projects an administrator assigned to this person
+
+struct BizProject { let id: String; let name: String; let level: String; let organization: String }
+
+/// One tool call on Biz's MCP server (Streamable HTTP) with the app's own grant. The answer
+/// may come as JSON or as one server-sent event; nil when unreachable or refused.
+func bizMcpCall(_ tool: String, _ arguments: [String: Any], token: String) -> [String: Any]? {
+    var session: String? = nil
+    func post(_ body: [String: Any]) -> [String: Any]? {
+        guard let url = URL(string: bizOrigin + "/mcp"), let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.httpMethod = "POST"; req.httpBody = data
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("Fyso/\(appVersion)", forHTTPHeaderField: "User-Agent")
+        if let session { req.setValue(session, forHTTPHeaderField: "Mcp-Session-Id") }
+        let done = DispatchSemaphore(value: 0)
+        var answer: [String: Any]? = nil
+        httpSession.dataTask(with: req) { data, response, _ in
+            defer { done.signal() }
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return }
+            if let id = http.value(forHTTPHeaderField: "Mcp-Session-Id") { session = id }
+            guard let data, let text = String(data: data, encoding: .utf8) else { answer = [:]; return }
+            let json = text.split(separator: "\n").last(where: { $0.hasPrefix("data:") }).map { String($0.dropFirst(5)) } ?? text
+            answer = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
+        }.resume()
+        done.wait()
+        return answer
+    }
+    guard post(["jsonrpc": "2.0", "id": 1, "method": "initialize", "params": [
+        "protocolVersion": "2025-06-18", "capabilities": [:], "clientInfo": ["name": "fyso-app", "version": appVersion]]]) != nil else { return nil }
+    _ = post(["jsonrpc": "2.0", "method": "notifications/initialized"])
+    guard let reply = post(["jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": tool, "arguments": arguments]]),
+          let result = reply["result"] as? [String: Any], result["isError"] as? Bool != true else { return nil }
+    if let structured = result["structuredContent"] as? [String: Any] { return structured }
+    let text = (result["content"] as? [[String: Any]])?.first(where: { $0["type"] as? String == "text" })?["text"] as? String
+    return text.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
+}
+
+/// The signed-in person's assigned projects; nil when Biz does not answer (an older Biz without
+/// the tool creates an unmanaged instance, as before).
+func bizProjects() -> [BizProject]? {
+    guard let token = readJSON(bizGrantFile)?["accessToken"] as? String,
+          let answer = bizMcpCall("proyectos_framework", [:], token: token),
+          let organization = answer["organizacion"] as? String, organization.range(of: "^[a-z0-9][a-z0-9-]{0,62}$", options: .regularExpression) != nil,
+          let list = answer["proyectos"] as? [[String: Any]] else { return nil }
+    return list.compactMap { p in
+        guard let id = (p["proyecto_id"] as? String)?.lowercased(),
+              id.range(of: "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$", options: .regularExpression) != nil else { return nil }
+        return BizProject(id: id, name: p["nombre"] as? String ?? id, level: (p["nivel"] as? [String: Any])?["nombre"] as? String ?? "", organization: organization)
+    }
+}
+
+/// The menu asks which project when there are several (a native list; Cancel creates nothing).
+/// The CLI passes `--project <id>` instead.
+func chooseBizProject(_ projects: [BizProject]) -> BizProject? {
+    if testMode { return nil }
+    let labels = projects.map { $0.level.isEmpty ? $0.name : "\($0.name) — \($0.level)" }
+    let script = ["on run argv", "set picked to choose from list (items 2 thru -1 of argv) with prompt (item 1 of argv)",
+                  "if picked is false then return \"\"", "return item 1 of picked", "end run"]
+    let (_, out) = run("/usr/bin/osascript", script.flatMap { ["-e", $0] } + [t("biz.choose_project")] + labels, timeout: 900)
+    return labels.firstIndex(of: out.trimmingCharacters(in: .whitespacesAndNewlines)).map { projects[$0] }
+}
+
 /// Install fyso-ext-biz (public catalog id `biz`) in the project. The production origin uses the
 /// panel's own install path (one commit, services reloaded); another origin passes biz_url.
-func installBizExtension(_ item: Instance) -> Int32 {
+func installBizExtension(_ item: Instance, project: BizProject? = nil) -> Int32 {
     let answers = item.folder + "/.copier-answers.ext-biz.yml"
     if FileManager.default.fileExists(atPath: answers) { return 0 }
+    // Bound to a Biz project: managed access (the extension's `biz_access_*` answers).
+    let managed = project.map { ["-d", "biz_access_organization=\($0.organization)", "-d", "biz_access_project=\($0.id)"] } ?? []
     let code = bizOrigin == defaultBizOrigin
-        ? runMise(item, ["exec", "--", "framework/scripts/ext.sh", "apply", "add", "biz"], label: "ext add biz")
-        : runMise(item, ["run", "ext:add", "biz", "--", "--defaults", "-d", "biz_url=\(bizOrigin)"], label: "ext add biz")
+        ? runMise(item, ["exec", "--", "framework/scripts/ext.sh", "apply", "add", "biz"] + (managed.isEmpty ? [] : ["--"] + managed), label: "ext add biz")
+        : runMise(item, ["run", "ext:add", "biz", "--", "--defaults", "-d", "biz_url=\(bizOrigin)"] + managed, label: "ext add biz")
     guard code != 0, FileManager.default.fileExists(atPath: answers) else { return code }
     // Installed, but its connection hook failed: on a stack that has just started (and reloads
     // its gateway during the install) the first Bot Architect call can lose its answer. Its hook
@@ -653,10 +739,20 @@ func cli(_ args: [String]) -> Int32 {
     case "create", "new":
         say(t("cli.creating"))
         if edition == "biz" && !bizSessionReady() { say(t("cli.biz_login_first")) }
-        guard let created = createInstance() else {
+        // `create --project <id>`: the Biz project to bind when the person has several.
+        let projectIndex = rest.firstIndex(of: "--project")
+        let requested = projectIndex.flatMap { rest.indices.contains($0 + 1) ? rest[$0 + 1] : nil }
+        if projectIndex != nil && requested == nil { return fail(t("cli.biz_project_choose")) }
+        let created = createInstance(project: requested) { projects in
+            for p in projects { say("  \(p.id)  \(p.name)\(p.level.isEmpty ? "" : " (\(p.level))")") }
+            return nil
+        }
+        guard let created else {
+            if let stopped = createStopped { return fail(t(stopped)) }
             return fail(edition == "biz" && !bizSessionReady() ? t("cli.biz_login_needed") : t("cli.create_failed", ["log": installerLog]))
         }
         say(t("cli.created", ["name": created.item.name]))
+        if let project = created.bizProject { say(t("cli.biz_project", ["project": project.name, "level": project.level])) }
         if created.bizSession == false { return fail(t("cli.biz_handoff_failed")) }
         if created.bizExtension == false { return fail(t("cli.biz_ext_failed", ["log": created.item.log])) }
         if created.bizExtension == true { say(t("cli.biz_ready", ["name": created.item.name])) }
@@ -798,6 +894,7 @@ final class Model: ObservableObject {
         creating = true
         DispatchQueue.global().async {
             let created = createInstance()
+            if created == nil, createStopped == "cli.biz_project_unknown" { notify(t("cli.biz_project_unknown")) }
             if let created {
                 if created.bizExtension == false || created.bizSession == false { notify(t("notify.biz_failed", ["name": created.item.name])) }
                 else { notify(t(created.bizExtension == true ? "notify.created_biz" : "notify.created", ["name": created.item.name])) }
