@@ -60,6 +60,10 @@ An extension writes **only** these paths. It never edits a file that another tem
 | Processes | `extensions/<ext>/process.yaml` | process-compose: `up.sh` passes one extra `-f` per file (verified: merge works and `depends_on` crosses files) |
 | Routes | `extensions/<ext>/Caddyfile` | Caddy: `import {$FYSO_ROOT}/extensions/*/Caddyfile` (verified: an empty glob is valid). Each `http://<app>.{$FYSO_WEB_DOMAIN}` site inherits the panel's web-login rule unless the project declares that app (D58) |
 | OAuth provider definitions | `extensions/<ext>/tinyauth.providers.yaml` | Native Tinyauth provider map, loaded only for extensions with a Copier answers file. Project provider IDs take precedence. Missing `${FYSO_AUTH_*}` values leave a provider pending. Project-owned app access rules still apply. |
+| Browser request authorization | `extensions/<ext>/authorize.caddy` | Caddy imports these directives inside `fyso_login`, after Tinyauth authenticates the request and before browser application handlers run. |
+| Browser OAuth return | `GET /extensions/<ext>/oauth/callback` | Caddy routes this navigation to `GET /profile/callback` on the extension's private socket after web authentication and authorization. The extension must validate and consume the OAuth state and bind it to the initiating browser. |
+| Panel permission report | `extensions/<ext>/panel-access.caddy` | A provider serves `GET /api/panel-access` after gateway authentication. HTTP 204 means unmanaged access. HTTP 200 with `{"capabilities":[]}` reports the current principal's effective permissions. The panel uses these for navigation and the gateway still checks protected requests. |
+| Remote MCP authorization | `extensions/<ext>/mcp-authorize` | An empty marker enables checks on the extension's private socket. `POST /mcp-access/check` receives `principal`, `method`, and the optional `tool`; only HTTP 204 grants access. A principal may be a project credential, a validated local user, or a delegated credential of the form `fyso-ext-<ext>.<secret>`. For delegated authentication the issuing extension receives the SHA-256 digest with method `authenticate`. Only that extension receives the digest. |
 | Page declarations | `extensions/<ext>/pages/*.yaml` | Generic panel navigation (§9) |
 | Public page assets | `extensions/<ext>/panel/**` | Authenticated Caddy static file server (§9) |
 | Panel tile | `extensions/<ext>/app.yaml` | `panel-data.cjs` → `apps.json`, with `group: "extension"` |
@@ -88,6 +92,20 @@ An extension writes **only** these paths. It never edits a file that another tem
 ### `teams/<slug>/` (D82)
 
 One department template per directory, in OpenMausBot's own team file format: `team.yaml` declares exactly one `teams:` entry, the bots whose `team:` is that department and its rooms, with no `cwd`, machine path, `chief` or `manages`. Skill entries are relative, `skills/<bot-slug>/<skill>/SKILL.md`, and each file lives beside `team.yaml`. Limits: 512 KB and 64 skills ([department templates](team-templates.md)). `extensions.json` lists the slugs as `teams`; `OP=team-templates` lists an invalid template with its error, and it cannot be added. The extension never writes `project/bots/team.yaml`: adding a department is the person's action (`OP=team-import SOURCE=extension:<ext>/<slug>`), which copies the skills to `project/bots/teams/<slug>/` and opens the proposed `team.yaml` as a draft.
+
+### Managed bots (`project/bots/managed.json`)
+
+An extension that keeps departments in sync with an outside source of truth, such as
+Fyso Biz (D89), can lock those bots in the project. `framework/scripts/managed-bots.cjs`
+`record({root, owner, teamYaml, departments, bots})` digests each named bot's declared
+entry from the team file about to be applied. A referenced `file` contributes its
+content. The function replaces the owner's record and commits only `managed.json`.
+The core then refuses any change that differs from the record. This covers Bot
+Architect `update` and `delete`, the panel's team-wide plan and apply, and
+`OP=team-import` of a managed department. New bots and the person's own bots remain
+editable. The owner changes its bots by recording first and then applying the same
+declaration. No request parameter can bypass this check. Without the file, no bot is
+managed.
 
 ### `app.yaml`
 
@@ -274,6 +292,8 @@ url: /extensions/example/panel/index.html
 
 The file stem is its page ID and follows the extension ID naming rule. The entry must be an existing `.html` file strictly below the same extension's `panel/` directory. Invalid paths, private slots and missing entries fail configuration generation. Labels may be strings or language maps. The extension inventory adds `pages: {id, name, name_i18n?, icon?, url}[]`; old inventories without this property contribute no pages.
 
+A page icon can be a generic icon name or the path of an existing PNG or WebP in the same extension's `panel/` directory, such as `/extensions/example/panel/icon.png`. The panel displays that image beside the page label in navigation.
+
 The host derives navigation entries from installed registrations and serves `#/extensions/<ext>/<page>`. It embeds the declared page with a standard same-origin iframe, passing `lang`, `theme` and `page` query parameters. Multiple extensions/pages require no core changes. Removing the extension removes its entries on the next configuration reload. Opening an uninstalled page displays a generic unavailable state. Caddy permits GET/HEAD on public page assets; other extension paths return 404. No new backend or plugin evaluator is involved.
 
 ### Page counters (panel API 2)
@@ -398,3 +418,15 @@ The core then treats `https://<app>.<web_domain>` as the project's addresses
 - is the only provider of the project. Nothing detects a second one yet.
 
 Features that need HTTPS check the scheme, not a particular extension.
+
+### Managed access compatibility
+
+`framework/panel/access-api.json` version 1 marks projects with the browser
+authorization, permission report, and remote MCP authorization slots.
+Extensions that enable managed access should require this marker during
+installation. Installing a policy extension into an older gateway must not
+silently enable a mode that the gateway cannot enforce.
+
+The local `framework/scripts/ext.sh apply add <id> -- -d key=value ...` passes Copier
+answers to the panel's install path. The menu bar app uses this path to bind a new
+instance to its Biz project. The Dagu workflow does not accept answers.

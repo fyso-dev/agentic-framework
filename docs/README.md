@@ -21,7 +21,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 
 | Topic | Where |
 |---|---|
-| Decisions log (D1–D89; D6, D9, D22 superseded; D16 resolved by D20; D82's two-way sync amended by D89) | [PLAN §2](PLAN.md#2-decisions-log) |
+| Decisions log (D1–D97; D6, D9, D22 superseded; D16 resolved by D20; D82's two-way sync amended by D89) | [PLAN §2](PLAN.md#2-decisions-log) |
 | Architecture decision records | [adr/0001-spikes.md](adr/0001-spikes.md): Phase 0 results and D19–D21 · [adr/0002-extension-marketplace.md](adr/0002-extension-marketplace.md): marketplace, Devbox and Composio alternatives compared (D31) · [ADR 0004](adr/0004-biz-publication-relay.md): managed Biz publication relay |
 
 ## Layer 2 — Architecture
@@ -44,9 +44,12 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | macOS menu bar app and `fyso` CLI: one native app lists, opens, creates, switches, starts and stops instances; Biz edition with sign-in hand-off, signing/notarization, updates from GitHub Releases (D85, D86) | [ADR 0003](adr/0003-menu-bar-app.md) · [installer.md](installer.md#menu-bar-app-and-cli--d85) |
 | Configuration (native formats only) | [PLAN §5](PLAN.md#5-configuration--native-formats-only) |
 | Versioning: snapshot, memory, replication | [PLAN §6](PLAN.md#6-versioning--the-simple-model) |
+| Instance feedback: issue and correction format, local evidence and GitHub submission through Biz | [Agent surface](agent-surface.md#instance-feedback-format) · [Delivery brief](biz-feedback-delivery.md) |
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
+| Recover a failed extension installation or update from the host | [Operations assistant](owner-extensions.md#ops-assistant) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
+| Biz-managed project access: delivery scope and identity proof | [Delivery brief](biz-access-delivery.md) |
 | Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
 | Shared-access people directory, a page of the human-requests extension, without login accounts (D76) | [people-directory.md](people-directory.md) |
 | Human requests: extension published as [fyso-ext-human-requests v0.1.0](https://github.com/fyso-dev/fyso-ext-human-requests/releases/tag/v0.1.0) in the official catalog, with inbox, structured requests, questions to the agent and a menu counter (D76; beta) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
@@ -77,6 +80,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Discord extension: published [v0.1.0](https://github.com/fyso-dev/fyso-ext-discord/releases/tag/v0.1.0), official catalog; a project agent answers in Discord channels and threads through a discord.js bridge to `openmausbot run`, configured from the panel's Discord page (D96) | [discord-extension.md](discord-extension.md) |
 | Business-owner opt-in extensions: office documents, deliverables, knowledge skills, operations, owner loop and accounting sample (D66–D72) | [owner-extensions.md](owner-extensions.md) |
 | Project distributions: publish a prepared project (configuration, documents, memory, chosen secrets) and install/update it in client projects (D56) | [distribution.md](distribution.md) · step-by-step: [guide-share-project.md](guide-share-project.md) |
+| Slack channel bridge (local opt-in Copier extension; D97) | [Decision](PLAN.md#2-decisions-log) · [verification](#layer-5--findings-and-log) |
 | Fyso Biz integration (independent Copier repository; D39) | [fyso-dev/fyso-ext-biz](https://github.com/fyso-dev/fyso-ext-biz) |
 | Native teams and Biz work delivery: beta scope, acceptance and checkpoint | [teams-biz-delivery.md](teams-biz-delivery.md) |
 | Department templates: `omb-team/1` packages, core import/export, extension `teams/` slot (D82); one-way Biz sync: publish once, then change proposals decided on fyso.biz, Biz name always wins (D89) | [team-templates.md](team-templates.md) |
@@ -111,6 +115,30 @@ Development workflow: [Bounded delivery](bounded-delivery.md) — critical integ
 Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PLAN.md#11-risks).
 
 ## Layer 5 — Findings and log
+
+2026-11-24: Biz-managed instances. `Fyso Biz.app` now lists the signed-in person's
+assigned Biz projects and binds the new instance to the selected project. The
+extension receives that project's teams. The core locks those bots through
+`project/bots/managed.json`, and the person can still add their own bots. The app CLI
+test against a fake Biz MCP, the managed-bot unit tests and the real Caddy/Tinyauth
+gateway suite passed. Generated-stack acceptance with a real Biz is pending.
+[Delivery](biz-access-delivery.md#managed-instance-from-a-biz-project)
+
+A gateway test with real Caddy and Tinyauth verified individual Biz sessions,
+permission revocation, cross-origin rejection and feedback receipt storage
+against a Biz fixture. [Feedback delivery](biz-feedback-delivery.md)
+
+Instance feedback uses the existing D75 wiki pages for both issues and
+corrections. The [report format](agent-surface.md#instance-feedback-format)
+links local evidence, corrections and upstream references when available.
+
+On 2026-11-21, an isolated project recovered an installed extension through
+the authenticated Dagu API and passed `doctor`. Dagu rejected an operation
+outside the maintenance allowlist with HTTP 400. The extension install DAG
+passes the project age key path explicitly so mise can load its encrypted
+configuration on the host. [Operations assistant](owner-extensions.md#ops-assistant)
+
+2026-11-21: Slack channel bridge (D97). The local `fyso-ext-slack` source installs into a generated project through Copier and uses a workspace app manifest with Socket Mode. Node 24 checks covered channel management, continuing a thread, replaying a deferred reply and confining attachment credentials to Slack. The generated project detected the workflow and both required secrets. Workspace acceptance and a green project doctor remain pending app installation and credentials. [Decision](PLAN.md#2-decisions-log)
 
 2026-11-16: Fyso Biz's OAuth server already accepts native-app clients (dynamic registration, PKCE, RFC 8252 loopback with any port), so the menu bar app signs in on its own `127.0.0.1` callback and hands the grant to the Biz extension of a new instance. [D86](PLAN.md#2-decisions-log).
 
