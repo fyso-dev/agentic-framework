@@ -178,6 +178,7 @@
     "runtimeOpen": "Open agents",
     "configurationTitle": "Configuration and drafts",
     "version": {
+      "chief": "Configured in Agents",
       "syncing": "Refreshing configuration",
       "project": "In project",
       "snapshot": "In snapshot",
@@ -190,6 +191,7 @@
     "versionUnavailable": "Git status could not be verified. Import is disabled.",
     "versionHint": "“In project” and “In snapshot” indicate a definition saved in the latest commit; later native edits may not be saved.",
     "importDirtyHint": "Project configuration has uncommitted changes. Commit or discard them before importing.",
+    "chiefHint": "This is OpenMausBot's main agent. Change its instructions, memory and connectors in Agents; its model and approval live in project/bots/team.yaml.",
     "editAction": "Edit",
     "team": {
       "none": "General",

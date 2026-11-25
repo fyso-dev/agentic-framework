@@ -11,7 +11,7 @@ import { unappliedCount } from "../components/Layout";
 import { Avatar, Modal } from "../components/ui";
 import { go, href } from "../lib/router";
 import { accessFor } from "../lib/connector-access";
-import { byteLength, parseTeam, readTeams, serializeTeam, soulFileLabel, splitModel, teamNames, upsertTeam, TEAM_BRIEF_MAX_BYTES, TEAM_NAME_MAX, type BotState, type Team } from "../lib/team";
+import { byteLength, isDefaultChief, parseTeam, readBots, readTeams, serializeTeam, soulFileLabel, splitModel, teamNames, upsertTeam, TEAM_BRIEF_MAX_BYTES, TEAM_NAME_MAX, type BotState, type Team } from "../lib/team";
 import { botRoster, groupByTeam, unmatchedVersion } from "../lib/botRoster";
 import { useDaguAction } from "../lib/useDaguAction";
 import { ActionStatus, ActionError } from "../components/Action";
@@ -66,8 +66,9 @@ export function Bots({ review, index, tab, native }: { review: boolean; index?: 
   };
   const runtime = s.runtimeBots.data ?? null;
   const runtimeError = s.runtimeBots.status === "error";
-  const rows = botRoster(s.rows, s.mock ? null : runtime);
   const teams = useMemo((): Team[] => { try { return s.workingText ? readTeams(parseTeam(s.workingText)) : []; } catch { return []; } }, [s.workingText]);
+  const defaultChiefs = useMemo((): string[] => { try { return s.workingText ? readBots(parseTeam(s.workingText)).filter(isDefaultChief).map((b) => b.name) : []; } catch { return []; } }, [s.workingText]);
+  const rows = botRoster(s.rows, s.mock ? null : runtime, defaultChiefs);
   const groups = groupByTeam(rows, teams.map((x) => x.name));
   const grouped = groups.some((g) => g.team);
   const inventory = s.botVersioning.status === "ok" ? s.botVersioning.data : undefined;
@@ -393,6 +394,7 @@ function NativeBot({ row, version, importing, onImport }: { row: ReturnType<type
       </div>
       <div className="bd-panel" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <span className="bd-mchip" style={{ alignSelf: "flex-start" }}>{modelId || "—"}</span>
+        {version === "chief" && <p className="note">{t("bots.chiefHint")}</p>}
         {s.draft && <p className="note">{t("bots.importDraftHint")}</p>}
         {s.botVersioning.data?.projectDirty && <p className="note">{t("bots.importDirtyHint")}</p>}
         {importing.phase !== "never" && <div><ActionStatus action={importing} /><ActionError action={importing} /></div>}

@@ -178,6 +178,7 @@
     "runtimeOpen": "Abrir agentes",
     "configurationTitle": "Configuración y borradores",
     "version": {
+      "chief": "Se configura en Agentes",
       "syncing": "Actualizando configuración",
       "project": "En el proyecto",
       "snapshot": "En snapshot",
@@ -190,6 +191,7 @@
     "versionUnavailable": "No se pudo verificar el estado en Git. La importación está deshabilitada.",
     "versionHint": "“En el proyecto” y “En snapshot” indican una definición guardada en el último commit; los cambios posteriores del agente pueden no estar guardados.",
     "importDirtyHint": "La configuración del proyecto tiene cambios sin commit. Haz commit de ellos o descártalos antes de importar.",
+    "chiefHint": "Es el agente principal de OpenMausBot. Cambia sus instrucciones, memoria y conectores en Agentes; su modelo y aprobación están en project/bots/team.yaml.",
     "editAction": "Editar",
     "team": {
       "none": "General",
