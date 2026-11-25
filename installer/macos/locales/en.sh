@@ -48,6 +48,8 @@ STEP_tool_node='Node.js'
 STEP_tool_yaml='YAML'
 STEP_tool_cli='GitHub CLI'
 STEP_tool_uv='uv (Copier runner)'
+STEP_tool_sandbox_runtime='Agent sandbox'
+STEP_tool_ripgrep='File search'
 
 STEP_web_auth='Sign-in'
 
