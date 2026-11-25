@@ -72,5 +72,9 @@
   "cli.biz_signed_out": "Sesión de Fyso Biz cerrada en esta Mac.",
   "cli.biz_none": "Sin sesión de Fyso Biz. Usa \"fyso biz-login\".",
   "cli.up_to_date": "Fyso {{version}} está al día.",
-  "cli.update_unreachable": "No se pudo comprobar si hay una versión nueva. Revisa tu conexión."
+  "cli.update_unreachable": "No se pudo comprobar si hay una versión nueva. Revisa tu conexión.",
+  "cli.biz_project_choose": "Tienes varios proyectos de Fyso Biz asignados. Elige uno con: fyso create --project <id>",
+  "cli.biz_project_unknown": "Ese proyecto de Fyso Biz no está asignado a tu cuenta.",
+  "cli.biz_project": "Vinculada al proyecto de Fyso Biz {{project}} ({{level}}).",
+  "biz.choose_project": "¿Para qué proyecto de Fyso Biz es esta instancia?"
 }

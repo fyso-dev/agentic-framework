@@ -89,7 +89,16 @@ case "$action" in
     # Panel install/upgrade (fyso-ext-install): one commit per change, then load
     # the new processes and routes into the running stack. Prints JSON.
     mode=${1:-${MODE:-}}; id=${2:-${ID:-}}
-    [[ $mode =~ ^(add|update|remove|recover)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update|remove|recover> <id>'
+    [[ $mode =~ ^(add|update|remove|recover)$ && $id =~ ^[a-z][a-z0-9-]{1,30}$ ]] || fail 'Usage: ext.sh apply <add|update|remove|recover> <id> [-- -d key=value ...]'
+    # A local caller (the menu bar app) may pass Copier answers to `add`: only `-d key=value` pairs.
+    data=()
+    if [ "$#" -gt 2 ]; then
+      shift 2; [ "$1" = -- ] && shift
+      while [ "$#" -gt 0 ]; do
+        [[ $mode == add && $1 == -d && ${2:-} =~ ^[a-z][a-z0-9_]{0,63}=[^[:cntrl:]]{0,200}$ ]] || fail 'apply passes only -d key=value answers to add'
+        data+=(-d "$2"); shift 2
+      done
+    fi
     answers=".copier-answers.ext-$id.yml"
     read_version() { node -e 'console.log(require("./framework/scripts/extensions.cjs").read(process.argv[1])._commit || "")' "$1"; }
     if [ "$mode" = recover ]; then
@@ -123,7 +132,7 @@ case "$action" in
     fi
     if [ "$mode" = add ]; then
       [ ! -e "$answers" ] || fail "$id is already installed"
-      EXT_APPLY=1 "$0" add "$id" -- --defaults >&2
+      EXT_APPLY=1 "$0" add "$id" -- --defaults ${data[@]+"${data[@]}"} >&2
       version=$(read_version "$answers")
       # Commit only this extension's slots (docs/extensions-contract.md §2), never other work.
       slots=("$answers" ".config/mise/conf.d/ext-$id.toml" "extensions/$id")

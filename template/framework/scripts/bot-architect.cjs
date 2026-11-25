@@ -30,6 +30,8 @@ function validatePatch(input,root) {
 function guardTarget(bot,action,patch={}) {
   if(!bot) throw new Error('exact bot ID was not found');
   if(key(bot.name)==='bot architect') throw new Error('Bot Architect cannot change its own active profile');
+  // A bot an extension manages from its source of truth (managed-bots.cjs) changes there.
+  require('./managed-bots.cjs').guardBot(process.env.FYSO_ROOT||process.cwd(),bot.name);
   if(action==='delete' && (bot.chiefOfStaff || protectedNames.has(key(bot.name)))) throw new Error('framework/chief bots cannot be deleted');
   if(patch.name && key(patch.name)!==key(bot.name) && (bot.chiefOfStaff || protectedNames.has(key(bot.name)))) throw new Error('framework/chief bots cannot be renamed');
   if(action==='delete' && (bot.busy || bot.waitingForTeammates || (bot.activity && bot.activity!=='idle') || (bot.tasks||[]).some(t=>t.busy))) throw new Error('the bot is active; wait until it is idle');
@@ -213,6 +215,10 @@ async function teamTemplate(op,env,{root,base,port}) {
     if(env.PACKAGE_B64.length>Math.ceil(templates.MAX_BYTES*4/3)+8)throw new Error('too_large');
     try{pkg=JSON.parse(Buffer.from(env.PACKAGE_B64,'base64').toString('utf8'));}catch{throw new Error('PACKAGE_B64 must encode one omb-team/1 package');}
   }
+  // A managed department is imported by its owner only (managed-bots.cjs), never through this surface.
+  const source=/^extension:([a-z][a-z0-9-]{1,30})\/([a-z0-9][a-z0-9-]{0,59})$/.exec(env.SOURCE||'');
+  const department=pkg?.departamento ?? (source ? templates.extensionPackage(source[1],source[2],{root}).departamento : '');
+  if(department)require('./managed-bots.cjs').guardDepartment(root,department);
   const lock=path.join(base,'.lock');fs.mkdirSync(lock);
   try {
     return await templates.importPackage(pkg||null,{source:env.SOURCE||undefined,slug:env.SLUG||undefined,root});

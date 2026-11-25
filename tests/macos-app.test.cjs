@@ -105,6 +105,17 @@ async function fakeBiz() {
           && p.redirect_uri === seen.authorize.redirect_uri;
         return ok ? send(200, {access_token: 'access-1', token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-1'}) : send(400, {error: 'invalid_grant'});
       }
+      // Streamable HTTP MCP: initialize opens a session; tools/call answers as one SSE event.
+      if (url.pathname === '/mcp' && seen.projects) {
+        if (req.headers.authorization !== 'Bearer access-1') return send(401, {});
+        const m = JSON.parse(body);
+        if (m.method === 'initialize') { res.writeHead(200, {'content-type': 'application/json', 'mcp-session-id': 's-1'}); return res.end(JSON.stringify({jsonrpc: '2.0', id: m.id, result: {protocolVersion: '2025-06-18', capabilities: {}}})); }
+        if (req.headers['mcp-session-id'] !== 's-1') return send(400, {});
+        if (m.method === 'notifications/initialized') { res.writeHead(202); return res.end(); }
+        seen.calls = [...(seen.calls || []), m.params];
+        res.writeHead(200, {'content-type': 'text/event-stream'});
+        return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc: '2.0', id: m.id, result: {content: [{type: 'text', text: JSON.stringify(seen.projects)}]}})}\n\n`);
+      }
       if (url.pathname === '/oauth/userinfo') return req.headers.authorization === 'Bearer access-1' ? send(200, {name: 'Ana', email: 'ana@example.com'}) : send(401, {});
       send(404, {});
     });
@@ -156,6 +167,46 @@ printf '47930\\t%s\\n' "${made}" >> "$FYSO_HOME/projects.tsv"
     assert.strictEqual(fs.readFileSync(path.join(made, 'ext-add.args'), 'utf8').trim(), `biz --defaults -d biz_url=${biz.origin}`);
     const status = await fyso(['biz-status'], env);
     assert.match(status.out, /sign in again/);
+  } finally {
+    biz.server.close();
+  }
+});
+
+test('a person with several Biz projects binds the new instance to the one chosen', {skip}, async () => {
+  const biz = await fakeBiz();
+  const env = {FYSO_EDITION: 'biz', FYSO_BIZ_URL: biz.origin};
+  const ventas = '0b6f1c1e-3c55-4a43-9a3e-5c1f0f6f4a11', soporte = '7d2e1a40-1b2c-4d3e-8f90-112233445566';
+  biz.seen.projects = {organizacion: 'acme', proyectos: [
+    {proyecto_id: ventas, nombre: 'Ventas', nivel: {id: 'n1', nombre: 'Operador'}, equipos: [{equipo_id: 'e1', nombre: 'Ventas'}]},
+    {proyecto_id: soporte, nombre: 'Soporte', nivel: {id: 'n2', nombre: 'Operador'}, equipos: []}]};
+  const made = path.join(tmp, 'bizmanaged');
+  fs.writeFileSync(path.join(contents, 'Resources/fyso-installer.sh'), `#!/bin/bash
+set -e
+mkdir -p "${made}"
+printf 'project_name: Biz Managed\\nproject_slug: bizmanaged\\nport_base: 47940\\n' > "${made}/.copier-answers.yml"
+printf 'echo "$*" > ext-add.args\\n' > "${made}/record.sh"
+printf '[tasks."ext:add"]\\nrun = "bash record.sh"\\n' > "${made}/mise.toml"
+printf '47940\\t%s\\n' "${made}" >> "$FYSO_HOME/projects.tsv"
+`);
+  try {
+    assert.strictEqual((await fyso(['biz-login'], env, browse)).code, 0);
+    // Several projects and no choice: nothing is created; the CLI lists them.
+    const unchosen = await fyso(['create'], {...env, MISE_TRUSTED_CONFIG_PATHS: made});
+    assert.notStrictEqual(unchosen.code, 0);
+    assert.match(unchosen.out, new RegExp(ventas));
+    assert.match(unchosen.out + unchosen.err, /--project/);
+    assert.ok(!fs.existsSync(made), 'no instance without a project');
+    // An unassigned id is refused before the form.
+    const unknown = await fyso(['create', '--project', 'ffffffff-ffff-4fff-8fff-ffffffffffff'], {...env, MISE_TRUSTED_CONFIG_PATHS: made});
+    assert.notStrictEqual(unknown.code, 0);
+    assert.match(unknown.out + unknown.err, /not assigned/);
+    // The chosen project binds the extension to it (managed access).
+    const created = await fyso(['create', '--project', ventas.toUpperCase()], {...env, MISE_TRUSTED_CONFIG_PATHS: made});
+    assert.strictEqual(created.code, 0, created.out + created.err);
+    assert.match(created.out, /Ventas \(Operador\)/);
+    assert.strictEqual(fs.readFileSync(path.join(made, 'ext-add.args'), 'utf8').trim(),
+      `biz --defaults -d biz_url=${biz.origin} -d biz_access_organization=acme -d biz_access_project=${ventas}`);
+    assert.ok(biz.seen.calls.every(c => c.name === 'proyectos_framework'));
   } finally {
     biz.server.close();
   }
