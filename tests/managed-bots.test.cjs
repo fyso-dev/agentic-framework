@@ -13,8 +13,7 @@ bots:
   - name: Vendedor
     team: Ventas
     model: claude/sonnet
-    soul:
-      file: \${FYSO_ROOT}/project/bots/teams/ventas/souls/vendedor.md
+    soul: { file: \${FYSO_ROOT}/project/bots/teams/ventas/souls/vendedor.md }
   - name: Propio
     model: claude/sonnet
     soul: ${soul}
