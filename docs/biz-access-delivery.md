@@ -238,3 +238,70 @@ operator's authorized execution reached `succeeded`. The reader could neither
 start that workflow nor read the operator's run, and revocation immediately
 blocked another start. The control-plane identity and consent are still
 fixture-managed.
+
+## Managed instance from a Biz project
+
+### Outcome and delivery level
+
+Testable beta. An administrator builds a department locally and publishes it to
+Fyso Biz (D89). In Biz, the administrator links published teams to a framework
+project and assigns a person a level. That person signs in to `Fyso Biz.app`,
+creates an instance, and selects one of their assigned projects. The instance
+starts bound to that project, with the linked teams already applied. The bots
+from Biz are read-only in that instance. The person can add their own bots and
+change them within their level's permissions.
+
+### Contracts
+
+- **Biz MCP tool `proyectos_framework`** (the app's `mcp` grant). Optional input is
+  `proyecto_id`. It returns `{organizacion, proyectos: [{proyecto_id, nombre,
+  nivel: {id, nombre}, equipos: [{equipo_id, nombre}]}]}` and includes only
+  the caller's active assignments in the grant's organization.
+- **Biz project teams.** A new migration links `framework_proyectos` to published
+  teams using organization RLS. The Project access screen lets an administrator
+  choose them.
+- **Managed bots (framework core, generic).** `project/bots/managed.json` lists, per
+  owner, the departments and the rendered native entry digest of each bot.
+  `framework/scripts/managed-bots.cjs` records it, and the core refuses a change
+  that differs from it. This covers Bot Architect update and delete, team-wide
+  panel plan and apply, and `team-import` over a managed department. An owner can
+  change its bots only by recording new digests in a commit first, so no request
+  parameter can bypass the check.
+- **Biz extension.** When managed access is enabled, the connection hook reads the
+  project's teams. It pulls each team, records the managed bots, and applies the
+  proposed team through the framework's panel apply.
+- **App.** After sign-in, `create` lists the person's projects. It selects the only
+  project or asks the person to choose one. It then installs the extension with
+  `biz_access_organization` and `biz_access_project`.
+
+### Acceptance
+
+- A generated instance created through the app CLI with a local Biz is bound to the
+  selected project and runs the linked team's bots.
+- For a restricted level, Bot Architect creates a bot, refuses to update or delete
+  a Biz bot, and accepts changes to the person's own bot. A team-wide apply that
+  changes a Biz bot is refused.
+- A project without the extension and an administrator's authoring project, which
+  has no managed access, keep their current behavior.
+- Framework, extension and Biz unit tests pass, and the generated project passes
+  `mise run doctor`.
+
+### Checkpoint
+
+Framework, extension (fyso-ext-biz #18) and Biz (fyso-business #632) CI passed.
+In a generated project with the real Dagu and OpenMausBot, a Biz department was
+recorded and applied through the panel workflows. Bot Architect refused update and
+delete of its bot. The panel plan refused a change to that bot and accepted a change
+to the person's own bot. `team-import` refused the managed department. `doctor`
+passed. The real team files' unquoted `${FYSO_ROOT}` exposed a parser bug, which is
+now covered by the tests. In this agent session, Dagu steps could not spawn `which`
+with the session's full `PATH`, and Xcode's `git` could not write its cache. Both
+are environment findings that occur outside this change. Live acceptance with
+fyso.biz, after migration 0006, is the remaining step.
+
+### Exclusions
+
+Automatic re-pull of later Biz versions. The administrator level applies them from
+the Teams screen. Locking a managed department's skill files beyond `team-import`
+is also excluded. Selecting a project in the app's GUI menu is limited to the
+`swiftDialog` list, and the CLI takes `--project`.
