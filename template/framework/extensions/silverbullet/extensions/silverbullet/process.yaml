@@ -7,10 +7,11 @@ processes:
         command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/doctor.sh editor
       initial_delay_seconds: 2
       period_seconds: 5
+      timeout_seconds: 10
       failure_threshold: 6
-    # A failed probe stops the process (seen while the extension is reapplied): start it again.
+    # A failed probe or a dependency restart stops the process: always start it again.
     availability:
-      restart: on_failure
+      restart: always
       backoff_seconds: 3
   # Import (D59): receives the folder or zip a person picks, before the AI workflow reads it.
   ext-silverbullet-upload:
@@ -20,7 +21,8 @@ processes:
         command: framework/scripts/run-ext.sh silverbullet -- bash extensions/silverbullet/doctor.sh upload
       initial_delay_seconds: 2
       period_seconds: 5
+      timeout_seconds: 10
       failure_threshold: 6
     availability:
-      restart: on_failure
+      restart: always
       backoff_seconds: 3
