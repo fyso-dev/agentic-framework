@@ -127,7 +127,13 @@ processes:
     command: framework/scripts/run-ext.sh sample -- bash -c 'exec miniserve --port "$FYSO_EXT_SAMPLE_PORT" extensions/sample/public'
     readiness_probe:
       exec: { command: framework/scripts/run-ext.sh sample -- extensions/sample/doctor.sh }
+      timeout_seconds: 10
+    availability:
+      restart: always
+      backoff_seconds: 3
 ```
+
+**Survive a loaded host.** Give every probe `timeout_seconds` (process-compose defaults to 1 s) and every process `restart: always`. A dependency restart sends SIGTERM, the process exits 0, and `on_failure` would leave it stopped.
 
 **Keep `$VARS` away from process-compose's shell.** process-compose stores the command as written and runs it with `bash -c` and the environment of the last `mise run up`. An extension installed from the panel is loaded with `process-compose project update`, so that environment lacks its port and secrets. Put variables in single quotes after `run-ext.sh` (or in a script started by it), and run readiness probes through `run-ext.sh` too.
 
