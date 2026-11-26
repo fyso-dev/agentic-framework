@@ -113,6 +113,13 @@ Details and exit criteria: [PLAN §10](PLAN.md#10-phases). Risks: [PLAN §11](PL
 
 ## Layer 5 — Findings and log
 
+2026-11-25: Stack recovery under host load. process-compose probes had no `timeout_seconds`
+(default 1 s), so on a loaded host (load average 40–60) `health.sh` was killed, `web-auth` was
+restarted, and Caddy and the apps got SIGTERM, exited 0 and stayed `Completed`, because
+`restart: on_failure` ignores a clean exit. The gateway returned 502 until someone restarted it by
+hand. `process-compose.yaml` now gives every probe `timeout_seconds: 10` and every service
+`restart: always`. Seen on a generated project on macOS.
+
 2026-11-24: Biz-managed instances. `Fyso Biz.app` now lists the signed-in person's
 assigned Biz projects and binds the new instance to the selected project. The
 extension applies that project's teams. The core locks those bots through
