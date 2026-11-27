@@ -86,12 +86,14 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
 - **Errors:** 401 token rejected, 403 no access or not an admin (`admin_required`), 404 no setup yet, 409 version conflict (Biz's current version is shown), 413 bundle over 50 MiB, a checksum mismatch aborts before anything changes.
 - The recipients are the public keys members register in Biz (`mise run dist:key` prints one). Secret values never reach Biz in the clear.
 
+**Secrets pending.** If the delivered secrets are not encrypted for this installation's key (it is not yet a recipient), `dist:add` / `dist:update` do not fail: everything else is installed, no secret is written, a warning is printed and `.data/dist/secrets-pending.json` (`{names, since}`, local, untracked) records it. `dist:status` prints `Secrets: pending ...` and `dist:plan --json` reports `"pending": true`. Once the publisher republishes with this key (it is registered in Biz, or listed in `recipients`), the next `dist:update` writes the secrets and removes the file.
+
 ## 7. dist:plan
 
 `mise run dist:plan [repo|biz] [version] [--json]` shows what `dist:add` / `dist:update` would do and changes nothing (the distribution is fetched into a temporary directory that is deleted afterwards; with Biz it downloads the bundle). Once a distribution is installed its source is used; before that give the repository, or `biz` (the default when `FYSO_DIST_BIZ_URL` is set).
 
 - **files.added / replaced / removed:** replaced files carry `local_edits`: `uncommitted` (working tree differs from `HEAD`, or untracked) and/or `committed` (`HEAD` differs from what the installed version delivered; on the first install any differing local file counts). These edits are lost on `add`/`update` (§3 keeps only the patch in `.data/dist/`). Extension port lines are ignored in the comparison: ports are rebound per installation. Removed = in the installed version's manifest, not in the new one, and present here.
-- **secrets:** names that would be written (new or changed value). `decryptable: false` means this installation's key is not a recipient, so all names are listed.
+- **secrets:** names that would be written (new or changed value). `decryptable: false` means this installation's key is not a recipient, so all names are listed and `pending` is `true`.
 - **extensions, bots, mcp_servers:** what the project does not have yet (`extensions.removed`: delivered earlier and dropped now).
 - **contents:** the full sets the incoming version carries (`extensions`, `mcp_servers`, `bots`), whether or not they exist locally. An item already here and identical to the setup is in `contents` but not in `added`, so a caller can tell it came with the distribution.
 
@@ -105,7 +107,7 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
     "replaced": [{"path": "project/wiki/index.md", "local_edits": ["uncommitted"]}],
     "removed": ["project/bots/extra.md"]
   },
-  "secrets": {"names": ["API_KEY"], "decryptable": true},
+  "secrets": {"names": ["API_KEY"], "decryptable": true, "pending": false},
   "extensions": {"added": [], "removed": []},
   "bots": {"added": ["Soporte"]},
   "mcp_servers": {"added": []},

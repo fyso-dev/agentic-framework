@@ -391,7 +391,7 @@ class BizDistributionTests(DistBase):
         self.assertEqual(self.tree_state(c), before, "dist:plan must not change anything")
         self.assertEqual((plan["mode"], plan["transport"], plan["version"]), ("add", "biz", "v1"))
         self.assertEqual(plan["files"]["replaced"], [{"path": "project/wiki/guide.md", "local_edits": ["committed"]}])
-        self.assertEqual(plan["secrets"], {"names": ["API_KEY"], "decryptable": True})
+        self.assertEqual(plan["secrets"], {"names": ["API_KEY"], "decryptable": True, "pending": False})
         self.assertEqual(plan["extensions"]["added"], [])
         self.assertEqual(plan["bots"]["added"], [])
         self.assertEqual(plan["mcp_servers"]["added"], [])
@@ -458,6 +458,37 @@ class BizDistributionTests(DistBase):
         # Tokens never reach output; every request carried the bearer token.
         self.assertFalse(any(FakeBiz.TOKEN in text for text in self.tokens))
         self.assertTrue(all(h.get("Authorization") == f"Bearer {FakeBiz.TOKEN}" for _, _, h in self.biz.requests))
+
+    def test_secrets_pending_until_this_key_is_a_recipient(self):
+        p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
+        write(p, "project/wiki/index.md", "# v1\n")
+        write(p, "project/distribution.yaml", "repo: biz\nsecrets: [API_KEY]\n")
+        self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "pp", "API_KEY": "key-1"})
+        self.commit(p, pe, "publisher v1")
+        other = self.tmp / "other.age"
+        mise("age-keygen", "-o", str(other), cwd=self.tmp)
+        self.biz.recipients = [mise("age-keygen", "-y", str(other), cwd=self.tmp).stdout.strip()]
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+
+        # The client is not a recipient yet: everything else installs, secrets are pending.
+        self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "cp"})
+        self.commit(c, ce, "client init")
+        plan = json.loads(self.run_dist(c, ce, "plan", "--json").stdout)
+        self.assertEqual((plan["secrets"]["decryptable"], plan["secrets"]["pending"]), (False, True))
+        result = self.run_dist(c, ce, "add", "biz")
+        self.assertIn("NOT written", result.stderr)
+        self.assertEqual((c / "project/wiki/index.md").read_text(), "# v1\n")
+        self.assertNotIn("API_KEY", self.decrypt(c, ce))
+        self.assertTrue((c / ".data/dist/secrets-pending.json").exists())
+        self.assertIn("Secrets:      pending", self.run_dist(c, ce, "status").stdout)
+
+        # The admin republishes with the client's key: the next update writes them and clears pending.
+        self.biz.recipients.append(self.client_key)
+        self.assertIn("published v2", self.run_dist(p, pe, "publish").stdout)
+        self.run_dist(c, ce, "update")
+        self.assertEqual(self.decrypt(c, ce)["API_KEY"], "key-1")
+        self.assertFalse((c / ".data/dist/secrets-pending.json").exists())
+        self.assertNotIn("pending", self.run_dist(c, ce, "status").stdout)
 
     def test_errors_are_clear_and_failed_upload_is_forgotten(self):
         p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env

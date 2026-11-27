@@ -12,7 +12,7 @@ const ANSWERS='.copier-answers.dist.yml';
 // Biz transport: `repo: biz` in project/distribution.yaml. The publisher keeps a git mirror of the
 // distribution; clients unbundle what Biz serves into BIZ_SRC. Both are relative to the project
 // root, which is also what the (tracked) answers file records as the Copier source: no machine path.
-const BIZ_MIRROR='.data/dist/biz-mirror',BIZ_SRC='.data/dist/biz-source',BIZ_ROUTE='/oauth/framework-access';
+const PENDING='.data/dist/secrets-pending.json',BIZ_MIRROR='.data/dist/biz-mirror',BIZ_SRC='.data/dist/biz-source',BIZ_ROUTE='/oauth/framework-access';
 // Per-instance credentials are never sent: the Dagu technical password (D19) and web users.
 const PRIVATE=new Set(['FYSO_ADMIN_PASSWORD','FYSO_AUTH_USERS']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -380,7 +380,18 @@ function teamSource() {
 /** Received secrets overwrite this project's values with the same name, re-encrypted for it. */
 function secrets() {
   if(!fs.existsSync(SECRETS))return;
-  const incoming=decrypt(SECRETS);
+  let incoming;
+  try {incoming=decrypt(SECRETS);}
+  catch {
+    // Not a recipient yet: install everything else and remember it (the next update retries).
+    const listed=names(readYaml(SECRETS)).filter(name=>name!=='sops'&&NAME.test(name)&&!PRIVATE.has(name));
+    fs.mkdirSync(path.dirname(PENDING),{recursive:true});
+    fs.writeFileSync(PENDING,JSON.stringify({names:listed,since:new Date().toISOString()}));
+    console.warn(`warning: the received secrets (${listed.join(', ')}) are not encrypted for this installation's key, so they were NOT written. `
+      +'Give your public key (mise run dist:key) to the publisher; the next dist:update installs them.');
+    return;
+  }
+  fs.rmSync(PENDING,{force:true});
   for(const name of Object.keys(incoming))if(PRIVATE.has(name)||!NAME.test(name))delete incoming[name];
   if(!fs.existsSync('secrets.enc.yaml'))fail('run `mise run setup` first: the received secrets go into secrets.enc.yaml');
   const current=decrypt('secrets.enc.yaml');
@@ -448,6 +459,7 @@ async function status() {
   if(!fs.existsSync(ANSWERS)){console.log('No distribution installed (mise run dist:add <repo>).');return;}
   const answers=readYaml(ANSWERS)||{},current=answers._commit||'?';
   console.log(`Distribution: ${isBiz(answers)?'Biz (managed setup)':answers._src_path}\nVersion:      ${current}`);
+  if(fs.existsSync(PENDING))console.log(`Secrets:      pending, not decryptable by this key: ${(JSON.parse(fs.readFileSync(PENDING,'utf8')).names||[]).join(', ')}`);
   let tags;
   if(isBiz(answers)) {
     // Read-only: the bundle goes to a temporary directory, not to the cache `update` uses.
@@ -537,15 +549,15 @@ function planAgainst(src,target,current,scratch) {
   const now=new Set(delivered);
   const removed=old.filter(file=>file!==SECRETS&&!now.has(file)&&fs.existsSync(file)).sort();
   // Secrets: names are readable without a key; values only to a recipient.
-  let secrets={names:[],decryptable:true};
+  let secrets={names:[],decryptable:true,pending:false};
   if(next.has(SECRETS)) {
     const file=path.join(scratch,'incoming.sops.yaml');
     fs.writeFileSync(file,blob(src,next.get(SECRETS)));
     const listed=names(readYaml(file)).filter(name=>name!=='sops'&&NAME.test(name)&&!PRIVATE.has(name));
     try {
       const incoming=decrypt(file),mine=fs.existsSync('secrets.enc.yaml')?decrypt('secrets.enc.yaml'):{};
-      secrets={names:listed.filter(name=>mine[name]!==incoming[name]),decryptable:true};
-    } catch {secrets={names:listed,decryptable:false};}
+      secrets={names:listed.filter(name=>mine[name]!==incoming[name]),decryptable:true,pending:false};
+    } catch {secrets={names:listed,decryptable:false,pending:true};}
   }
   // Extensions and bots: what this project does not have yet / loses.
   const local=new Set([...fs.globSync('.copier-answers.ext-*.yml').map(f=>/^\.copier-answers\.ext-(.+)\.yml$/.exec(f)[1]),
