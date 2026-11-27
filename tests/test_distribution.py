@@ -44,6 +44,7 @@ class FakeBiz:
         self.setup = None            # dict(version, body, sha256, manifest)
         self.recipients = []
         self.deny = False
+        self.put_error = None        # (status, payload) answered to PUT /setup
         self.requests = []
         biz = self
 
@@ -81,6 +82,8 @@ class FakeBiz:
                     s = biz.setup
                     return self.reply(200, s["body"], {"Content-Type": "application/octet-stream", "ETag": '"e"',
                                                        "X-Setup-Version": s["version"], "X-Setup-Sha256": s["sha256"]})
+                if method == "PUT" and route == "/setup" and biz.put_error:
+                    return self.error(biz.put_error[0], **biz.put_error[1])
                 if method == "PUT" and route == "/setup":
                     version = self.headers.get("X-Setup-Version", "")
                     current = biz.setup["version"] if biz.setup else "v0"
@@ -461,6 +464,36 @@ class BizDistributionTests(DistBase):
         self.biz.deny = True
         result = self.run_dist(c, ce, "plan", "--json", check=False)
         self.assertIn("Biz denied access", result.stderr)
+
+    def prepare_publisher(self, bots=1):
+        p, pe = self.publisher, self.publisher_env
+        team = "version: 1\nbots:\n" + "".join(f"  - name: bot-{i:04d}-{'x' * 30}\n" for i in range(bots))
+        write(p, "project/bots/team.yaml", team)
+        write(p, "project/distribution.yaml", "repo: biz\n")
+        self.commit(p, pe, "publisher")
+
+    def test_oversized_summary_fails_locally_and_leaves_no_version(self):
+        p, pe = self.publisher, self.publisher_env
+        self.prepare_publisher(bots=400)
+        result = self.run_dist(p, pe, "publish", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("summary is too large for Biz", result.stderr)
+        self.assertFalse([r for r in self.biz.requests if r[0] == "PUT"], "nothing was uploaded")
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: one\n")
+        self.commit(p, pe, "smaller")
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+
+    def test_manifest_too_large_from_biz_is_clear_and_rolled_back(self):
+        p, pe = self.publisher, self.publisher_env
+        self.prepare_publisher()
+        self.biz.put_error = (400, {"error": "manifest_too_large"})
+        result = self.run_dist(p, pe, "publish", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("manifest_too_large", result.stderr)
+        self.assertIn("refused the setup summary", result.stderr)
+        self.assertIsNone(self.biz.setup)
+        self.biz.put_error = None
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
 
 
 class DistributionUnitTests(unittest.TestCase):
