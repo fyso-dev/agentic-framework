@@ -434,5 +434,32 @@ installation. Installing a policy extension into an older gateway must not
 silently enable a mode that the gateway cannot enforce.
 
 The local `framework/scripts/ext.sh apply add <id> -- -d key=value ...` passes Copier
-answers to the panel's install path. The menu bar app uses this path to bind a new
-instance to its Biz project. The Dagu workflow does not accept answers.
+answers to the panel's install path. The menu bar app uses this path to connect a new
+instance to its Biz organization (and, only for an older Biz, to a project). The Dagu workflow does not accept answers.
+
+### Proposed policy capability slot
+
+Status: proposal, not implemented. A policy extension such as Fyso Biz can report a
+person's framework freedom as capability strings through the panel permission report
+and remote MCP authorization slots above. Those slots already carry any string. The
+core enforces only the capabilities it understands today, so the table lists what a
+generic capability gate would need. Following "grow extensibility before
+functionality", the core would add one generic contract, not Biz-specific flags: a
+capability check that a core action calls before it runs, answered by the same
+provider. Each row is a core action that would call it.
+
+| Capability (provider-defined strings) | Core action that needs a hook | Today |
+| --- | --- | --- |
+| `framework:shell`, `framework:shell:ask` | Shell and command execution by an agent or the panel, including confirmation when `:ask` | Not gated; the sandbox ([confinement](confinement.md)) is the only limit |
+| `framework:publish` | Publishing a running panel through the managed relay ([ADR 0004](adr/0004-biz-publication-relay.md)) | Not gated by policy |
+| `framework:ai:standard`, `framework:ai:high` | Engine and model choice for bots and Bot Architect | Not gated |
+| `framework:extensions:catalog`, `framework:extensions:any` | `ext.sh apply add` and the panel's Extensions install, catalog versus any source | Not gated by policy |
+| `framework:mcp_servers:catalog`, `framework:mcp_servers:any` | Adding project MCP servers (`project/mcp.json`) and panel-created connectors | Not gated by policy |
+| `framework:bots:create` | Bot Architect `create` | Existing managed-bot lock only |
+| `framework:machine:read`, `framework:machine:write`, `:ask` | File access by agents outside `project/` | Sandbox only |
+
+Open decisions before any enforcement: whether the check is a synchronous call to the
+provider or a cached permission report, how a `:ask` confirmation reaches the person,
+and the fail-closed behavior when the provider is down. Record the decision in the
+PLAN decisions log or in an ADR when implementing. Extensions must not present these
+levels as enforced until the core hook exists.

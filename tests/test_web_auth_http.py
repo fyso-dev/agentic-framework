@@ -581,7 +581,9 @@ class BizPolicyGateway(WebAuthFixture):
         cls.start(['node', str(source / 'gateway.cjs')], {
             **env, 'FYSO_EXT_SOCKET': str(socket), 'FYSO_EXT_BIZ_PORT': str(cls.port + 11),
             'FYSO_BIZ_URL': origin, 'FYSO_BIZ_ACCESS_ORGANIZATION': cls.biz_organization,
-            'FYSO_BIZ_ACCESS_PROJECT': cls.biz_project,
+            # Access is by department: the project is the legacy form, set only when asked for
+            # (FYSO_TEST_BIZ_PROJECT; an empty value runs the gateway without one).
+            **({'FYSO_BIZ_ACCESS_PROJECT': cls.biz_project} if cls.biz_project else {}),
         })
         cls.wait_port(cls.port + 11, '/health')
 

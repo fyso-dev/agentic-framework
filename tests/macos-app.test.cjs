@@ -106,7 +106,7 @@ async function fakeBiz() {
         return ok ? send(200, {access_token: 'access-1', token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-1'}) : send(400, {error: 'invalid_grant'});
       }
       // Streamable HTTP MCP: initialize opens a session; tools/call answers as one SSE event.
-      if (url.pathname === '/mcp' && seen.projects) {
+      if (url.pathname === '/mcp' && seen.tools) {
         if (req.headers.authorization !== 'Bearer access-1') return send(401, {});
         const m = JSON.parse(body);
         if (m.method === 'initialize') { res.writeHead(200, {'content-type': 'application/json', 'mcp-session-id': 's-1'}); return res.end(JSON.stringify({jsonrpc: '2.0', id: m.id, result: {protocolVersion: '2025-06-18', capabilities: {}}})); }
@@ -114,7 +114,10 @@ async function fakeBiz() {
         if (m.method === 'notifications/initialized') { res.writeHead(202); return res.end(); }
         seen.calls = [...(seen.calls || []), m.params];
         res.writeHead(200, {'content-type': 'text/event-stream'});
-        return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc: '2.0', id: m.id, result: {content: [{type: 'text', text: JSON.stringify(seen.projects)}]}})}\n\n`);
+        // A tool this Biz does not offer answers as a tool error (an older Biz).
+        const payload = seen.tools[m.params.name];
+        const result = payload ? {content: [{type: 'text', text: JSON.stringify(payload)}]} : {isError: true, content: [{type: 'text', text: 'unknown tool'}]};
+        return res.end(`event: message\ndata: ${JSON.stringify({jsonrpc: '2.0', id: m.id, result})}\n\n`);
       }
       if (url.pathname === '/oauth/userinfo') return req.headers.authorization === 'Bearer access-1' ? send(200, {name: 'Ana', email: 'ana@example.com'}) : send(401, {});
       send(404, {});
@@ -172,13 +175,47 @@ printf '47930\\t%s\\n' "${made}" >> "$FYSO_HOME/projects.tsv"
   }
 });
 
-test('a person with several Biz projects binds the new instance to the one chosen', {skip}, async () => {
+test('a person with departments connects with the organization only, no project', {skip}, async () => {
   const biz = await fakeBiz();
   const env = {FYSO_EDITION: 'biz', FYSO_BIZ_URL: biz.origin};
   const ventas = '0b6f1c1e-3c55-4a43-9a3e-5c1f0f6f4a11', soporte = '7d2e1a40-1b2c-4d3e-8f90-112233445566';
-  biz.seen.projects = {organizacion: 'acme', proyectos: [
+  const lider = {id: 'lider', name: 'Líder', custom: false, levels: {objetivos: 2, agentes: 2, fuentes: 2}};
+  biz.seen.tools = {
+    departamentos_framework: {organizacion: 'acme', departamentos: [
+      {departamento_id: ventas, nombre: 'Ventas', rol: lider, equipos: [{equipo_id: 'e1', nombre: 'Ventas'}]},
+      {departamento_id: soporte, nombre: 'Soporte', rol: {...lider, id: 'miembro', name: 'Miembro'}, equipos: []}]},
+    // Still offered by Biz until its deprecation; the app must not need it.
+    proyectos_framework: {organizacion: 'acme', proyectos: [{proyecto_id: ventas, nombre: 'Ventas', nivel: {id: 'n1', nombre: 'Operador'}, equipos: []}]}};
+  const made = path.join(tmp, 'bizdepartments');
+  fs.writeFileSync(path.join(contents, 'Resources/fyso-installer.sh'), `#!/bin/bash
+set -e
+mkdir -p "${made}"
+printf 'project_name: Biz Departments\\nproject_slug: bizdepartments\\nport_base: 47950\\n' > "${made}/.copier-answers.yml"
+printf 'echo "$*" > ext-add.args\\n' > "${made}/record.sh"
+printf '[tasks."ext:add"]\\nrun = "bash record.sh"\\n' > "${made}/mise.toml"
+printf '47950\\t%s\\n' "${made}" >> "$FYSO_HOME/projects.tsv"
+`);
+  try {
+    assert.strictEqual((await fyso(['biz-login'], env, browse)).code, 0);
+    // No project chooser: one call creates the instance, bound to the organization only.
+    const created = await fyso(['create'], {...env, MISE_TRUSTED_CONFIG_PATHS: made});
+    assert.strictEqual(created.code, 0, created.out + created.err);
+    assert.match(created.out, /Ventas \(Líder\), Soporte \(Miembro\)/);
+    assert.strictEqual(fs.readFileSync(path.join(made, 'ext-add.args'), 'utf8').trim(),
+      `biz --defaults -d biz_url=${biz.origin} -d biz_access_organization=acme`);
+    assert.ok(biz.seen.calls.every(c => c.name === 'departamentos_framework'));
+  } finally {
+    biz.server.close();
+  }
+});
+
+test('an older Biz without departments falls back to binding the instance to a project', {skip}, async () => {
+  const biz = await fakeBiz();
+  const env = {FYSO_EDITION: 'biz', FYSO_BIZ_URL: biz.origin};
+  const ventas = '0b6f1c1e-3c55-4a43-9a3e-5c1f0f6f4a11', soporte = '7d2e1a40-1b2c-4d3e-8f90-112233445566';
+  biz.seen.tools = {proyectos_framework: {organizacion: 'acme', proyectos: [
     {proyecto_id: ventas, nombre: 'Ventas', nivel: {id: 'n1', nombre: 'Operador'}, equipos: [{equipo_id: 'e1', nombre: 'Ventas'}]},
-    {proyecto_id: soporte, nombre: 'Soporte', nivel: {id: 'n2', nombre: 'Operador'}, equipos: []}]};
+    {proyecto_id: soporte, nombre: 'Soporte', nivel: {id: 'n2', nombre: 'Operador'}, equipos: []}]}};
   const made = path.join(tmp, 'bizmanaged');
   fs.writeFileSync(path.join(contents, 'Resources/fyso-installer.sh'), `#!/bin/bash
 set -e
@@ -206,7 +243,7 @@ printf '47940\\t%s\\n' "${made}" >> "$FYSO_HOME/projects.tsv"
     assert.match(created.out, /Ventas \(Operador\)/);
     assert.strictEqual(fs.readFileSync(path.join(made, 'ext-add.args'), 'utf8').trim(),
       `biz --defaults -d biz_url=${biz.origin} -d biz_access_organization=acme -d biz_access_project=${ventas}`);
-    assert.ok(biz.seen.calls.every(c => c.name === 'proyectos_framework'));
+    assert.deepStrictEqual([...new Set(biz.seen.calls.map(c => c.name))].sort(), ['departamentos_framework', 'proyectos_framework']);
   } finally {
     biz.server.close();
   }
