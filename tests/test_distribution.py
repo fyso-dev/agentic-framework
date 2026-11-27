@@ -348,7 +348,7 @@ class BizDistributionTests(DistBase):
 
     def test_publish_add_republish_for_new_recipient_update_and_plan(self):
         p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
-        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n")
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n    soul: { file: ${FYSO_ROOT}/x.md }\n")
         write(p, "project/bots/extra.md", "removed in v2\n")
         write(p, "project/wiki/index.md", "# v1\n")
         write(p, "project/wiki/guide.md", "guide v1\n")
@@ -382,7 +382,7 @@ class BizDistributionTests(DistBase):
         self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "cp"})
         # Already local and identical to the setup: in contents, not in added.
         write(c, "project/mcp.json", json.dumps({"mcpServers": {"docs": {"url": "http://x"}}}))
-        write(c, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n")
+        write(c, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n    soul: { file: ${FYSO_ROOT}/x.md }\n")
         write(c, "extensions/wiki/README.md", "wiki\n")
         write(c, "project/wiki/guide.md", "client edit\n")
         self.commit(c, ce, "client init")
@@ -413,7 +413,7 @@ class BizDistributionTests(DistBase):
         write(p, "project/wiki/index.md", "# v2\n")
         write(p, "project/wiki/new.md", "new\n")
         (p / "project/bots/extra.md").unlink()
-        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n  - name: Soporte\n")
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n    soul: { file: ${FYSO_ROOT}/x.md }\n  - name: Soporte\n")
         self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "pp", "API_KEY": "key-2"})
         self.commit(p, pe, "publisher v2")
         self.assertIn("published v2", self.run_dist(p, pe, "publish").stdout)

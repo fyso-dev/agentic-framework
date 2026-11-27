@@ -28,6 +28,9 @@ const sopsEncrypt=(args,text,options={})=>{
   finally{fs.rmSync(dir,{recursive:true,force:true});}
 };
 const readYaml=file=>require('./extensions.cjs').read(file);
+// Team files write `${FYSO_ROOT}` unquoted inside flow maps (the template's own does), which YAML cannot parse:
+// parse with a marker, as managed-bots.cjs does. Only bot names are read from it.
+const readTeam=file=>require('./extensions.cjs').parse(fs.readFileSync(file,'utf8').replaceAll('${FYSO_ROOT}','__FYSO_PATH_ROOT__'));
 
 /** Where a committed project file goes in the distribution, or null when it stays here. */
 function target(file) {
@@ -172,7 +175,7 @@ function bizSummary(template,secretNames) {
   const mcp=read('project/mcp.json'),team=read('project/bots/team.yaml');
   return {framework:manifest.framework??null,files_count:manifest.files.length,extensions:extensionIds(manifest.files),
     mcp_servers:mcp?Object.keys(JSON.parse(fs.readFileSync(mcp,'utf8')).mcpServers||{}):[],
-    bots:team?botNames(readYaml(team)):[],secrets:secretNames};
+    bots:team?botNames(readTeam(team)):[],secrets:secretNames};
 }
 const botNames=team=>(team?.bots||[]).map(bot=>bot?.name).filter(name=>typeof name==='string');
 const extensionIds=files=>[...new Set(files.map(file=>/^extensions\/([^/]+)\//.exec(file)?.[1]||/^\.copier-answers\.ext-(.+)\.yml$/.exec(file)?.[1]).filter(Boolean))].sort();
@@ -551,8 +554,8 @@ function planAgainst(src,target,current,scratch) {
     removed:extensionIds(old).filter(id=>!extensionIds(delivered).includes(id)&&local.has(id))};
   const delivery=file=>{const tmp=path.join(scratch,path.basename(file));fs.writeFileSync(tmp,blob(src,next.get(file)));return tmp;};
   const teamFile=next.has('state/bots/team.yaml')&&delivered.includes('state/bots/team.yaml')?'state/bots/team.yaml':'project/bots/team.yaml';
-  const mine=new Set(['project/bots/team.yaml','state/bots/team.yaml'].filter(f=>fs.existsSync(f)).flatMap(f=>botNames(readYaml(f))));
-  const incomingBots=next.has(teamFile)?botNames(readYaml(delivery(teamFile))):[];
+  const mine=new Set(['project/bots/team.yaml','state/bots/team.yaml'].filter(f=>fs.existsSync(f)).flatMap(f=>botNames(readTeam(f))));
+  const incomingBots=next.has(teamFile)?botNames(readTeam(delivery(teamFile))):[];
   const bots={added:incomingBots.filter(name=>!mine.has(name))};
   const mcpNow=fs.existsSync('project/mcp.json')?names(JSON.parse(fs.readFileSync('project/mcp.json','utf8')).mcpServers):[];
   const incomingMcp=next.has('project/mcp.json')?names(JSON.parse(blob(src,next.get('project/mcp.json')).toString('utf8')).mcpServers):[];
