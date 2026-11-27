@@ -466,4 +466,4 @@ levels as enforced until the core hook exists.
 
 ## Distribution transport from an extension (Biz)
 
-An extension can drive `mise run dist:*` against Fyso Biz without any new slot: its `.config/mise/conf.d/ext-<id>.toml` sets `FYSO_DIST_BIZ_URL` and `FYSO_DIST_BIZ_TOKEN_CMD` (a command that prints a fresh access token), and the project's `project/distribution.yaml` uses `repo: biz`. Commands: `dist:key`, `dist:plan [biz] [version] --json` (read-only), `dist:add biz [version]`, `dist:update [version]`, `dist:publish`. Details and the plan JSON: [distribution.md](distribution.md) §6-7.
+An extension can drive `mise run dist:*` against Fyso Biz without any new slot: its `.config/mise/conf.d/ext-<id>.toml` sets `FYSO_DIST_BIZ_URL`, `FYSO_DIST_BIZ_ORGANIZATION` (the tenant slug) and `FYSO_DIST_BIZ_TOKEN_CMD` (a command that prints a fresh access token), and the project's `project/distribution.yaml` uses `repo: biz`. Commands: `dist:key`, `dist:plan [biz] [version] --json` (read-only), `dist:add biz [version]`, `dist:update [version]`, `dist:publish`. Details and the plan JSON: [distribution.md](distribution.md) §6-7.

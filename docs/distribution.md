@@ -78,6 +78,7 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
 | Variable | Meaning |
 |---|---|
 | `FYSO_DIST_BIZ_URL` | Biz base URL (the OAuth worker); endpoints live under `/oauth/framework-access` |
+| `FYSO_DIST_BIZ_ORGANIZATION` | The organization's tenant slug; sent as `?organization=<slug>` on every request (Biz answers 400 `invalid_access_request` without it). All three variables are required |
 | `FYSO_DIST_BIZ_TOKEN_CMD` | A shell command that prints a fresh access token (`framework_access` scope). Run once per command; the token is never logged |
 
 - **Publish:** the distribution repository is built exactly as in §2 in a local mirror, `.data/dist/biz-mirror` (a git repo with tags `vN`; on first use it is cloned from Biz's current bundle so versions keep counting). Recipients are the age keys from `GET /recipients` merged with `recipients:` in the yaml, plus the publisher's own. Nothing changed in files **and** recipients → nothing published; recipients changed → secrets are re-encrypted and a new version is published. The mirror is bundled (`git bundle create --all`) and sent with `PUT /setup` and the headers `X-Setup-Version`, `X-Setup-Sha256` and `X-Setup-Manifest` (base64 JSON summary without the file list: `framework`, `files_count`, `extensions`, `mcp_servers`, `bots`, `secrets`; names only, at most 8 KiB encoded, otherwise the publish fails locally; Biz's `manifest_too_large` is reported clearly). If Biz refuses the upload, the new version is forgotten locally so the next publish builds it again.

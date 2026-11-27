@@ -89,8 +89,8 @@ function frameworkVersion() {
  * `fetchImpl` is injectable for tests.
  */
 function bizClient(env=process.env,fetchImpl=globalThis.fetch) {
-  const base=String(env.FYSO_DIST_BIZ_URL||'').replace(/\/+$/,''),command=env.FYSO_DIST_BIZ_TOKEN_CMD;
-  if(!base||!command)fail('the Biz transport needs FYSO_DIST_BIZ_URL and FYSO_DIST_BIZ_TOKEN_CMD (the Biz extension sets them)');
+  const base=String(env.FYSO_DIST_BIZ_URL||'').replace(/\/+$/,''),command=env.FYSO_DIST_BIZ_TOKEN_CMD,organization=String(env.FYSO_DIST_BIZ_ORGANIZATION||'').trim();
+  if(!base||!command||!organization)fail('the Biz transport needs FYSO_DIST_BIZ_URL, FYSO_DIST_BIZ_TOKEN_CMD and FYSO_DIST_BIZ_ORGANIZATION (the Biz extension sets them)');
   let token=null;
   const bearer=()=>{
     if(token)return token;
@@ -100,7 +100,7 @@ function bizClient(env=process.env,fetchImpl=globalThis.fetch) {
   };
   const request=async(method,route,{headers={},body}={})=>{
     let response;
-    try {response=await fetchImpl(`${base}${BIZ_ROUTE}${route}`,{method,body,headers:{...headers,Authorization:`Bearer ${bearer()}`}});}
+    try {response=await fetchImpl(`${base}${BIZ_ROUTE}${route}?organization=${encodeURIComponent(organization)}`,{method,body,headers:{...headers,Authorization:`Bearer ${bearer()}`}});}
     catch(error) {fail(`Biz is not reachable (${error.cause?.code||error.message})`);}
     const bytes=Buffer.from(await response.arrayBuffer());
     if(response.status>=400) {

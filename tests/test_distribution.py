@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import threading
+from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import shutil
@@ -39,6 +40,7 @@ def write(root, rel, text):
 class FakeBiz:
     """The three Biz endpoints dist.cjs talks to (setup GET/PUT, recipients), over real HTTP."""
     TOKEN = "fixture-access-token"
+    ORG = "acme"
 
     def __init__(self):
         self.setup = None            # dict(version, body, sha256, manifest)
@@ -69,7 +71,12 @@ class FakeBiz:
                 biz.requests.append((method, self.path, dict(self.headers)))
                 if self.headers.get("Authorization") != f"Bearer {FakeBiz.TOKEN}":
                     return self.error(401, error="unauthorized")
-                route = self.path.removeprefix("/oauth/framework-access")
+                route, _, query = self.path.removeprefix("/oauth/framework-access").partition("?")
+                org = parse_qs(query).get("organization", [""])[0]
+                if not org:
+                    return self.error(400, error="invalid_access_request")
+                if org != FakeBiz.ORG:
+                    return self.error(403, error="access_denied")
                 if biz.deny and route == "/setup" and method == "GET":
                     return self.error(403, error="access_denied")
                 if method == "GET" and route == "/recipients":
@@ -329,7 +336,8 @@ class BizDistributionTests(DistBase):
         self.biz = FakeBiz()
         self.addCleanup(self.biz.stop)
         for env in (self.publisher_env, self.client_env):
-            env.update(FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}")
+            env.update(FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}",
+                       FYSO_DIST_BIZ_ORGANIZATION=FakeBiz.ORG)
         self.tokens = []
 
     def run_dist(self, root, env, *args, check=True):
@@ -461,6 +469,12 @@ class BizDistributionTests(DistBase):
         bad = dict(ce, FYSO_DIST_BIZ_TOKEN_CMD="false")
         result = mise(str(c / "framework/scripts/dist.sh"), "plan", "--json", cwd=c, env=bad, check=False)
         self.assertIn("did not print an access token", result.stderr)
+        missing = {k: v for k, v in ce.items() if k != "FYSO_DIST_BIZ_ORGANIZATION"}
+        result = mise(str(c / "framework/scripts/dist.sh"), "plan", "--json", cwd=c, env=missing, check=False)
+        self.assertIn("FYSO_DIST_BIZ_ORGANIZATION", result.stderr)
+        other = dict(ce, FYSO_DIST_BIZ_ORGANIZATION="other-org")
+        result = mise(str(c / "framework/scripts/dist.sh"), "plan", "--json", cwd=c, env=other, check=False)
+        self.assertIn("Biz denied access", result.stderr)
         self.biz.deny = True
         result = self.run_dist(c, ce, "plan", "--json", check=False)
         self.assertIn("Biz denied access", result.stderr)
