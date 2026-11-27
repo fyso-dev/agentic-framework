@@ -3,12 +3,16 @@
 // template; clients receive it with `copier copy`/`copier recopy` (its files win), then
 // merge the delivered memory into their own with `git merge-file --union`.
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {execFileSync,spawnSync}=require('node:child_process');
 
 const CONFIG='project/distribution.yaml';
 const DIST='state/dist',MANIFEST=`${DIST}/manifest.json`,SECRETS=`${DIST}/secrets.sops.yaml`,MEMORY=`${DIST}/memory`;
 const ANSWERS='.copier-answers.dist.yml';
+// Biz transport: `repo: biz` in project/distribution.yaml. The publisher keeps a git mirror of the
+// distribution; clients unbundle what Biz serves into BIZ_SRC. Both are relative to the project
+// root, which is also what the (tracked) answers file records as the Copier source: no machine path.
+const BIZ_MIRROR='.data/dist/biz-mirror',BIZ_SRC='.data/dist/biz-source',BIZ_ROUTE='/oauth/framework-access';
 // Per-instance credentials are never sent: the Dagu technical password (D19) and web users.
 const PRIVATE=new Set(['FYSO_ADMIN_PASSWORD','FYSO_AUTH_USERS']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -55,8 +59,10 @@ function config() {
   if(!Array.isArray(recipients)||!recipients.every(key=>typeof key==='string'&&/^age1[0-9a-z]+$/.test(key)))fail(`${CONFIG}: recipients must be age public keys (age1…)`);
   const blocked=secrets.filter(name=>PRIVATE.has(name));
   if(blocked.length)fail(`${CONFIG}: ${blocked.join(', ')} belong to each installation and are never sent`);
-  if(secrets.length&&!recipients.length)fail(`${CONFIG}: sending secrets needs the clients' public keys in recipients (they print it with 'mise run dist:key')`);
-  return {repo:data.repo.trim(),secrets,recipients};
+  const repo=data.repo.trim(),biz=repo==='biz';
+  // With Biz the recipients come from the server too, so the yaml list may be empty.
+  if(secrets.length&&!recipients.length&&!biz)fail(`${CONFIG}: sending secrets needs the clients' public keys in recipients (they print it with 'mise run dist:key')`);
+  return {repo,biz,secrets,recipients};
 }
 
 /** Copier understands gh:/gl:; git needs the full URL. */
@@ -77,6 +83,99 @@ function frameworkVersion() {
   try {return String(readYaml('.copier-answers.yml')?._commit||'')||null;} catch {return null;}
 }
 
+/**
+ * HTTP to Biz through a small adapter: base URL and a command that prints a fresh access token
+ * come from the environment (the Biz extension provides both). The token is never logged.
+ * `fetchImpl` is injectable for tests.
+ */
+function bizClient(env=process.env,fetchImpl=globalThis.fetch) {
+  const base=String(env.FYSO_DIST_BIZ_URL||'').replace(/\/+$/,''),command=env.FYSO_DIST_BIZ_TOKEN_CMD;
+  if(!base||!command)fail('the Biz transport needs FYSO_DIST_BIZ_URL and FYSO_DIST_BIZ_TOKEN_CMD (the Biz extension sets them)');
+  let token=null;
+  const bearer=()=>{
+    if(token)return token;
+    const result=spawnSync(command,{shell:true,encoding:'utf8',env});
+    if(result.status!==0||!result.stdout.trim())fail('FYSO_DIST_BIZ_TOKEN_CMD did not print an access token; reconnect to Biz');
+    return token=result.stdout.trim();
+  };
+  const request=async(method,route,{headers={},body}={})=>{
+    let response;
+    try {response=await fetchImpl(`${base}${BIZ_ROUTE}${route}`,{method,body,headers:{...headers,Authorization:`Bearer ${bearer()}`}});}
+    catch(error) {fail(`Biz is not reachable (${error.cause?.code||error.message})`);}
+    const bytes=Buffer.from(await response.arrayBuffer());
+    if(response.status>=400) {
+      let code='';try {code=JSON.parse(bytes.toString('utf8')).error||'';} catch {/* not JSON */}
+      let detail='';try {detail=JSON.parse(bytes.toString('utf8')).current||'';} catch {/* not JSON */}
+      fail(bizMessage(response.status,code,detail));
+    }
+    return {status:response.status,headers:response.headers,body:bytes};
+  };
+  return {request};
+}
+
+function bizMessage(status,code,current) {
+  if(status===401)return 'Biz rejected the access token; reconnect to Biz';
+  if(status===403)return code==='admin_required'?'publishing a setup needs an organization admin in Biz'
+    :'Biz denied access: this person has no admin role or department, or lost access';
+  if(status===404)return 'Biz has no setup published yet for this organization';
+  if(status===409)return `version conflict: Biz already has ${current||'a newer version'}; publish a version greater than that`;
+  if(status===413)return 'the setup is too large for Biz (limit 50 MiB)';
+  return `Biz answered ${status}${code?` (${code})`:''}`;
+}
+
+const sha256=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+
+/** Download the setup bundle, verify its checksum and unbundle it into `dest` (a git repo with tags). */
+async function bizDownload(client,dest) {
+  const response=await client.request('GET','/setup');
+  const expected=String(response.headers.get('x-setup-sha256')||'').toLowerCase();
+  if(!expected||sha256(response.body)!==expected)fail('the downloaded setup does not match its checksum; nothing was installed');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-bundle-'));
+  try {
+    const file=path.join(dir,'setup.bundle');
+    fs.writeFileSync(file,response.body);
+    fs.rmSync(dest,{recursive:true,force:true});
+    fs.mkdirSync(path.dirname(dest),{recursive:true});
+    git(['clone','-q',file,dest]);
+    git(['-C',dest,'remote','remove','origin']);
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  return response.headers.get('x-setup-version');
+}
+
+async function bizRecipients(client) {
+  const response=await client.request('GET','/recipients');
+  const list=JSON.parse(response.body.toString('utf8')).recipients||[];
+  return list.map(entry=>entry.age_public_key).filter(key=>/^age1[0-9a-z]+$/.test(key));
+}
+
+/** The publisher's mirror: a git repo continuing Biz's history, so versions keep counting up. */
+async function bizMirror(client) {
+  const mirror=path.resolve(BIZ_MIRROR);
+  if(!fs.existsSync(path.join(mirror,'.git'))) {
+    try {await bizDownload(client,mirror);}
+    catch(error) {
+      if(!/no setup published/.test(error.message))throw error;
+      fs.mkdirSync(mirror,{recursive:true});
+      git(['init','-q','-b','main',mirror]);
+    }
+  } else if(spawnSync('git',['-C',mirror,'rev-parse','-q','--verify','HEAD']).status===0) {
+    git(['-C',mirror,'reset','-q','--hard']);git(['-C',mirror,'clean','-fdxq']);
+  }
+  return mirror;
+}
+
+/** What Biz displays about a setup: the manifest plus names only (never values). */
+function bizSummary(template,secretNames) {
+  const manifest=JSON.parse(fs.readFileSync(path.join(template,MANIFEST),'utf8'));
+  const read=rel=>{const file=path.join(template,rel);return fs.existsSync(file)?file:null;};
+  const mcp=read('project/mcp.json'),team=read('project/bots/team.yaml');
+  return {...manifest,extensions:extensionIds(manifest.files),
+    mcp_servers:mcp?Object.keys(JSON.parse(fs.readFileSync(mcp,'utf8')).mcpServers||{}):[],
+    bots:team?botNames(readYaml(team)):[],secrets:secretNames};
+}
+const botNames=team=>(team?.bots||[]).map(bot=>bot?.name).filter(name=>typeof name==='string');
+const extensionIds=files=>[...new Set(files.map(file=>/^extensions\/([^/]+)\//.exec(file)?.[1]||/^\.copier-answers\.ext-(.+)\.yml$/.exec(file)?.[1]).filter(Boolean))].sort();
+
 const COPIER_YML=`# Fyso project distribution (D56). Generated by \`mise run dist:publish\`; do not edit here.
 # Install:  mise run dist:add <this repository>    Update:  mise run dist:update
 _min_copier_version: "9.4.0"
@@ -88,13 +187,22 @@ _preserve_symlinks: true
 _exclude: [".git", ".DS_Store"]
 `;
 
-function publish(requested) {
-  const {repo,secrets,recipients}=config();
+async function publish(requested) {
+  const {repo,biz,secrets,recipients:listed}=config();
   if(git(['status','--porcelain','--','project','state','extensions']).toString().trim())
     console.error('note: uncommitted changes are not published (run `mise run snapshot` or commit them first)');
-  const work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
-  try {
+  let client=null,recipients=listed,work;
+  if(biz) {
+    client=bizClient();
+    // Everyone Biz knows is a recipient; a person who registers later is added on the next publish.
+    if(secrets.length)recipients=[...new Set([...listed,...await bizRecipients(client)])];
+    if(secrets.length&&!recipients.length)fail('nobody has registered an age key in Biz yet (members run `mise run dist:key`, the Biz extension registers it)');
+    work=await bizMirror(client);
+  } else {
+    work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
     git(['clone','-q',cloneUrl(repo),work]);
+  }
+  try {
     const previousSecrets=path.join(work,'template',SECRETS);
     const previous=fs.existsSync(previousSecrets)?fs.readFileSync(previousSecrets):null;
     // Rebuild from scratch, so files removed here disappear from the distribution too.
@@ -143,9 +251,28 @@ function publish(requested) {
     const version=nextVersion(requested,tags);
     git(['-C',work,'commit','-q','-m',`Distribution ${version}`]);
     git(['-C',work,'tag',version]);
-    git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
-    console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${repo}`);
-  } finally {fs.rmSync(work,{recursive:true,force:true});}
+    if(biz) {
+      try {await bizUpload(client,work,version,bizSummary(template,secrets));}
+      catch(error) {
+        // Not published: forget the version here so the next publish builds it again.
+        git(['-C',work,'tag','-d',version]);
+        if(tags.length)git(['-C',work,'reset','-q','--hard','HEAD~1']);else git(['-C',work,'update-ref','-d','HEAD']);
+        throw error;
+      }
+    } else git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
+    console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${biz?'Biz':repo}`);
+  } finally {if(!biz)fs.rmSync(work,{recursive:true,force:true});}
+}
+
+async function bizUpload(client,work,version,summary) {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-bundle-'));
+  try {
+    const file=path.join(dir,'setup.bundle');
+    git(['-C',work,'bundle','create','-q',file,'--all']);
+    const body=fs.readFileSync(file);
+    await client.request('PUT','/setup',{body,headers:{'Content-Type':'application/octet-stream','X-Setup-Version':version,
+      'X-Setup-Sha256':sha256(body),'X-Setup-Manifest':Buffer.from(JSON.stringify(summary)).toString('base64')}});
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 }
 
 function sameSecrets(previous,picked,recipients,work) {
@@ -304,33 +431,165 @@ function mergeMemory(base) {
   for(const bot of [...changed].sort())console.log(bot);
 }
 
-function status() {
+const versionKey=tag=>tag.slice(1).split('.').map(Number);
+function latestTag(tags) {
+  return [...tags].sort((a,b)=>{const x=versionKey(a),y=versionKey(b);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0);return 0;}).pop()||null;
+}
+const versionTags=lines=>lines.filter(tag=>/^v\d+(\.\d+){0,2}$/.test(tag));
+const isBiz=answers=>answers?._src_path===BIZ_SRC;
+
+async function status() {
   if(!fs.existsSync(ANSWERS)){console.log('No distribution installed (mise run dist:add <repo>).');return;}
   const answers=readYaml(ANSWERS)||{},current=answers._commit||'?';
-  console.log(`Distribution: ${answers._src_path}\nVersion:      ${current}`);
-  const remote=spawnSync('git',['ls-remote','--tags',cloneUrl(String(answers._src_path))],{encoding:'utf8'});
-  if(remote.status!==0){console.log('Latest:       unknown (repository not reachable)');return;}
-  const tags=remote.stdout.split('\n').map(line=>/refs\/tags\/(v\d+(?:\.\d+){0,2})$/.exec(line)).filter(Boolean).map(match=>match[1]);
-  const key=tag=>tag.slice(1).split('.').map(Number);
-  const latest=tags.sort((a,b)=>{const x=key(a),y=key(b);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0);return 0;}).pop();
+  console.log(`Distribution: ${isBiz(answers)?'Biz (managed setup)':answers._src_path}\nVersion:      ${current}`);
+  let tags;
+  if(isBiz(answers)) {
+    // Read-only: the bundle goes to a temporary directory, not to the cache `update` uses.
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-status-'));
+    try {await bizDownload(bizClient(),path.join(dir,'src'));tags=versionTags(git(['-C',path.join(dir,'src'),'tag','--list']).toString().split('\n'));}
+    catch(error) {console.log(`Latest:       unknown (${error.user?error.message:'Biz not reachable'})`);return;}
+    finally {fs.rmSync(dir,{recursive:true,force:true});}
+  } else {
+    const remote=spawnSync('git',['ls-remote','--tags',cloneUrl(String(answers._src_path))],{encoding:'utf8'});
+    if(remote.status!==0){console.log('Latest:       unknown (repository not reachable)');return;}
+    tags=remote.stdout.split('\n').map(line=>/refs\/tags\/(v\d+(?:\.\d+){0,2})$/.exec(line)?.[1]).filter(Boolean);
+  }
+  const latest=latestTag(tags);
   console.log(`Latest:       ${latest||'?'}${latest&&latest!==current?'  → mise run dist:update':''}`);
 }
 
-if(require.main===module) {
+// Ports are rebound per installation, so a port-only difference is not a local edit.
+const normalize=(file,text)=>/^\.config\/mise\/conf\.d\/ext-[^/]+\.toml$|^\.copier-answers\.ext-[^/]+\.yml$/.test(file)
+  ?text.replace(/^(FYSO_EXT_[A-Z0-9_]*_PORT\s*=|extension_port:).*$/gm,'$1'):text;
+const blobSha=bytes=>crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+
+/** path → blob sha of a tree (empty when the ref has no such tree, e.g. no commit yet). */
+function tree(dir,ref,prefix) {
+  const result=spawnSync('git',['-C',dir,'ls-tree','-r','-z','--full-tree',ref,...(prefix?['--',prefix]:[])],{maxBuffer:1<<28});
+  const map=new Map();
+  if(result.status!==0)return map;
+  for(const line of result.stdout.toString('utf8').split('\0').filter(Boolean)) {
+    const [meta,file]=line.split('\t');map.set(prefix&&file.startsWith(prefix)?file.slice(prefix.length):file,meta.split(' ')[2]);
+  }
+  return map;
+}
+const blob=(dir,sha)=>git(['-C',dir,'cat-file','blob',sha]);
+const names=obj=>Object.keys(obj||{}).sort();
+
+/**
+ * Read-only preview of what `dist:add` / `dist:update` would do. The distribution is fetched into a
+ * temporary directory; nothing in the project changes. Arguments: [repo] [version] [--json].
+ */
+async function plan(args) {
+  const json=args.includes('--json'),positional=args.filter(arg=>arg!=='--json');
+  const installed=fs.existsSync(ANSWERS)?readYaml(ANSWERS)||{}:null;
+  let repo=installed?String(installed._src_path):null,version=null;
+  for(const arg of positional) {
+    if(/^v?\d+(\.\d+){0,2}$/.test(arg))version=arg.startsWith('v')?arg:`v${arg}`;
+    else if(installed)fail('a distribution is already installed: usage dist:plan [version] [--json]');
+    else repo=arg;
+  }
+  if(!repo&&process.env.FYSO_DIST_BIZ_URL)repo='biz';
+  if(!repo)fail('usage: dist:plan [<repo>|biz] [version] [--json]');
+  const biz=repo==='biz'||repo===BIZ_SRC;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-plan-')),src=path.join(dir,'src');
+  try {
+    if(biz)await bizDownload(bizClient(),src);else git(['clone','-q',cloneUrl(repo),src]);
+    const tags=versionTags(git(['-C',src,'tag','--list']).toString().split('\n'));
+    const target=version||latestTag(tags);
+    if(!target||!tags.includes(target))fail(version?`${version} is not published`:'the distribution has no versions');
+    const current=installed?._commit||null;
+    const result=planAgainst(src,target,current,dir);
+    const output={mode:installed?'update':'add',transport:biz?'biz':'git',source:biz?'biz':repo,current,version:target,up_to_date:current===target,...result};
+    if(json)console.log(JSON.stringify(output,null,2));else printPlan(output);
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+}
+
+function planAgainst(src,target,current,scratch) {
+  const prefix='template/',next=tree(src,target,prefix),base=current&&tags(src).includes(current)?tree(src,current,prefix):new Map();
+  const manifest=JSON.parse(blob(src,next.get(MANIFEST)).toString('utf8'));
+  const old=base.has(MANIFEST)?JSON.parse(blob(src,base.get(MANIFEST)).toString('utf8')).files||[]:[];
+  const delivered=(manifest.files||[]).filter(file=>file!==SECRETS);
+  const head=new Map([...tree('.','HEAD')]);
+  const dirty=new Set(git(['status','--porcelain','-z','--untracked-files=all']).toString('utf8').split('\0').filter(Boolean)
+    .map(entry=>entry.slice(3)));
+  const added=[],replaced=[];
+  for(const file of delivered) {
+    const sha=next.get(file);
+    if(!sha||!fs.existsSync(file)||!fs.statSync(file).isFile()){if(sha)added.push(file);continue;}
+    const mine=fs.readFileSync(file),theirs=blob(src,sha);
+    if(normalize(file,mine.toString('latin1'))===normalize(file,theirs.toString('latin1')))continue;
+    const edits=[],committedSha=head.get(file);
+    if(dirty.has(file)||!committedSha)edits.push('uncommitted');
+    if(committedSha) {
+      const was=base.get(file);
+      const same=was&&(committedSha===was||normalize(file,blob('.',committedSha).toString('latin1'))===normalize(file,blob(src,was).toString('latin1')));
+      if(!same)edits.push('committed');
+    }
+    replaced.push({path:file,local_edits:edits});
+  }
+  const now=new Set(delivered);
+  const removed=old.filter(file=>file!==SECRETS&&!now.has(file)&&fs.existsSync(file)).sort();
+  // Secrets: names are readable without a key; values only to a recipient.
+  let secrets={names:[],decryptable:true};
+  if(next.has(SECRETS)) {
+    const file=path.join(scratch,'incoming.sops.yaml');
+    fs.writeFileSync(file,blob(src,next.get(SECRETS)));
+    const listed=names(readYaml(file)).filter(name=>name!=='sops'&&NAME.test(name)&&!PRIVATE.has(name));
+    try {
+      const incoming=decrypt(file),mine=fs.existsSync('secrets.enc.yaml')?decrypt('secrets.enc.yaml'):{};
+      secrets={names:listed.filter(name=>mine[name]!==incoming[name]),decryptable:true};
+    } catch {secrets={names:listed,decryptable:false};}
+  }
+  // Extensions and bots: what this project does not have yet / loses.
+  const local=new Set([...fs.globSync('.copier-answers.ext-*.yml').map(f=>/^\.copier-answers\.ext-(.+)\.yml$/.exec(f)[1]),
+    ...(fs.existsSync('extensions')?fs.readdirSync('extensions'):[])]);
+  const extensions={added:extensionIds(delivered).filter(id=>!local.has(id)),
+    removed:extensionIds(old).filter(id=>!extensionIds(delivered).includes(id)&&local.has(id))};
+  const delivery=file=>{const tmp=path.join(scratch,path.basename(file));fs.writeFileSync(tmp,blob(src,next.get(file)));return tmp;};
+  const teamFile=next.has('state/bots/team.yaml')&&delivered.includes('state/bots/team.yaml')?'state/bots/team.yaml':'project/bots/team.yaml';
+  const mine=new Set(['project/bots/team.yaml','state/bots/team.yaml'].filter(f=>fs.existsSync(f)).flatMap(f=>botNames(readYaml(f))));
+  const bots={added:next.has(teamFile)?botNames(readYaml(delivery(teamFile))).filter(name=>!mine.has(name)):[]};
+  const mcpNow=fs.existsSync('project/mcp.json')?names(JSON.parse(fs.readFileSync('project/mcp.json','utf8')).mcpServers):[];
+  const mcp_servers={added:next.has('project/mcp.json')?names(JSON.parse(blob(src,next.get('project/mcp.json')).toString('utf8')).mcpServers).filter(n=>!mcpNow.includes(n)):[]};
+  const mine_framework=frameworkVersion();
+  return {framework:{published:manifest.framework||null,local:mine_framework},
+    files:{added:added.sort(),replaced:replaced.sort((a,b)=>a.path.localeCompare(b.path)),removed},secrets,extensions,bots,mcp_servers};
+}
+const tags=src=>git(['-C',src,'tag','--list']).toString().split('\n').filter(Boolean);
+
+function printPlan(p) {
+  const list=(title,items,format=x=>x)=>{if(items.length){console.log(`${title} (${items.length}):`);for(const item of items)console.log(`  ${format(item)}`);}};
+  console.log(`${p.mode==='add'?'Install':'Update'} ${p.source}: ${p.current||'(nothing installed)'} → ${p.version}${p.up_to_date?' (already at this version; local edits would still be replaced)':''}`);
+  list('Files added',p.files.added);
+  list('Files replaced',p.files.replaced,f=>f.local_edits.length?`${f.path}   LOCAL EDITS LOST (${f.local_edits.join(', ')})`:f.path);
+  list('Files removed',p.files.removed);
+  list(p.secrets.decryptable?'Secrets written':'Secrets written (cannot be read with this key; all listed)',p.secrets.names);
+  list('Extensions added',p.extensions.added);list('Extensions removed',p.extensions.removed);
+  list('Bots added',p.bots.added);list('MCP servers added',p.mcp_servers.added);
+  if(p.framework.published&&p.framework.local&&p.framework.published!==p.framework.local)
+    console.log(`Note: published with framework ${p.framework.published}, this project has ${p.framework.local}`);
+  console.log('Nothing was changed.');
+}
+
+if(require.main===module) (async()=>{
   const [command,arg]=process.argv.slice(2);
   try {
-    if(command==='publish')publish(arg);
+    if(command==='publish')await publish(arg);
     else if(command==='prune')prune(arg);
     else if(command==='secrets')secrets();
     else if(command==='ports')ports(arg);
     else if(command==='team-source')teamSource();
     else if(command==='merge-memory')mergeMemory(arg);
-    else if(command==='status')status();
+    else if(command==='status')await status();
+    else if(command==='plan')await plan(process.argv.slice(3));
+    else if(command==='biz-fetch'){await bizDownload(bizClient(),path.resolve(BIZ_SRC));console.log(BIZ_SRC);}
+    else if(command==='is-biz')process.exit(fs.existsSync(ANSWERS)&&isBiz(readYaml(ANSWERS))?0:1);
     else if(command==='clone-url')console.log(cloneUrl(arg));
-    else fail('usage: dist.cjs <publish [version]|prune <base>|secrets|merge-memory <base>|status>');
+    else fail('usage: dist.cjs <publish [version]|plan [repo] [version] [--json]|prune <base>|secrets|merge-memory <base>|status|biz-fetch|is-biz>');
   } catch(error) {
     console.error(`error: ${error.user?error.message:(error.stderr?.toString()||error.message)}`);
     process.exit(1);
   }
-}
-module.exports={target,cloneUrl,nextVersion,union,config,ports};
+})();
+module.exports={target,cloneUrl,nextVersion,union,config,ports,bizClient,bizMessage};

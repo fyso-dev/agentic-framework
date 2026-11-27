@@ -4,8 +4,12 @@ Real git, Copier 9.19.1 (uvx), SOPS and age; no running stack (the client has ne
 started, so `up` would restore bots and memory from git).
 Run: python3 -m unittest tests.test_distribution -v
 """
+import base64
+import hashlib
 import json
 import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import shutil
 import subprocess
@@ -32,8 +36,80 @@ def write(root, rel, text):
     path.write_text(text)
 
 
+class FakeBiz:
+    """The three Biz endpoints dist.cjs talks to (setup GET/PUT, recipients), over real HTTP."""
+    TOKEN = "fixture-access-token"
+
+    def __init__(self):
+        self.setup = None            # dict(version, body, sha256, manifest)
+        self.recipients = []
+        self.deny = False
+        self.requests = []
+        biz = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def reply(self, status, body=b"", headers=None):
+                self.send_response(status)
+                for key, value in (headers or {}).items():
+                    self.send_header(key, value)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def error(self, status, **payload):
+                self.reply(status, json.dumps(payload).encode(), {"Content-Type": "application/json"})
+
+            def handle_any(self, method):
+                length = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(length) if length else b""
+                biz.requests.append((method, self.path, dict(self.headers)))
+                if self.headers.get("Authorization") != f"Bearer {FakeBiz.TOKEN}":
+                    return self.error(401, error="unauthorized")
+                route = self.path.removeprefix("/oauth/framework-access")
+                if biz.deny and route == "/setup" and method == "GET":
+                    return self.error(403, error="access_denied")
+                if method == "GET" and route == "/recipients":
+                    people = [{"person_id": str(i), "age_public_key": key, "registered_at": "2026-11-27T00:00:00Z"}
+                              for i, key in enumerate(biz.recipients)]
+                    return self.reply(200, json.dumps({"recipients": people, "etag": "r"}).encode(), {"Content-Type": "application/json"})
+                if method == "GET" and route == "/setup":
+                    if not biz.setup:
+                        return self.error(404, error="no_setup")
+                    s = biz.setup
+                    return self.reply(200, s["body"], {"Content-Type": "application/octet-stream", "ETag": '"e"',
+                                                       "X-Setup-Version": s["version"], "X-Setup-Sha256": s["sha256"]})
+                if method == "PUT" and route == "/setup":
+                    version = self.headers.get("X-Setup-Version", "")
+                    current = biz.setup["version"] if biz.setup else "v0"
+                    if int(version[1:]) <= int(current[1:]):
+                        return self.error(409, error="version_conflict", current=current)
+                    if hashlib.sha256(body).hexdigest() != self.headers.get("X-Setup-Sha256"):
+                        return self.error(400, error="bad_sha")
+                    biz.setup = {"version": version, "body": body, "sha256": self.headers["X-Setup-Sha256"],
+                                 "manifest": json.loads(base64.b64decode(self.headers["X-Setup-Manifest"]))}
+                    return self.reply(201, json.dumps({"version": version, "etag": "e"}).encode(), {"Content-Type": "application/json"})
+                return self.error(404, error="not_found")
+
+            def do_GET(self):
+                self.handle_any("GET")
+
+            def do_PUT(self):
+                self.handle_any("PUT")
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def stop(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
 @unittest.skipUnless(shutil.which("mise") and shutil.which("uvx"), "needs mise and uvx")
-class DistributionTests(unittest.TestCase):
+class DistBase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="fyso-dist-"))
         self.repo = self.tmp / "dist.git"
@@ -77,6 +153,15 @@ class DistributionTests(unittest.TestCase):
     def dist(self, root, env, *args):
         return mise(str(root / "framework/scripts/dist.sh"), *args, cwd=root, env=env)
 
+    def tree_state(self, root):
+        """Everything observable in a project: git status plus the content of every file (incl. .data)."""
+        status = subprocess.run(["git", "status", "--porcelain", "--ignored"], cwd=root, capture_output=True, text=True).stdout
+        files = {str(f.relative_to(root)): hashlib.sha256(f.read_bytes()).hexdigest()
+                 for f in sorted(root.rglob("*")) if f.is_file() and ".git" not in f.relative_to(root).parts}
+        return status, files
+
+
+class DistributionTests(DistBase):
     def test_local_users_encrypt_from_node(self):
         root, env = self.publisher, self.publisher_env
         self.secrets(root, env, {"FYSO_ADMIN_PASSWORD": "fixture-technical-password"})
@@ -209,6 +294,172 @@ class DistributionTests(unittest.TestCase):
         result = mise(str(p / "framework/scripts/dist.sh"), "publish", cwd=p, env=pe, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("never sent", result.stderr)
+
+
+    def test_plan_git_transport_is_read_only_and_accurate(self):
+        p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
+        write(p, "project/wiki/index.md", "v1\n")
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n")
+        write(p, "project/distribution.yaml", f"repo: {self.repo}\n")
+        self.commit(p, pe, "v1")
+        self.dist(p, pe, "publish")
+        self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "x"})
+        write(c, "project/wiki/index.md", "mine\n")
+        self.commit(c, ce, "client")
+        before = self.tree_state(c)
+        plan = json.loads(self.dist(c, ce, "plan", "../dist.git", "--json").stdout)
+        self.assertEqual(self.tree_state(c), before)
+        self.assertEqual((plan["mode"], plan["transport"], plan["version"], plan["current"]), ("add", "git", "v1", None))
+        self.assertEqual(plan["files"]["replaced"], [{"path": "project/wiki/index.md", "local_edits": ["committed"]}])
+        self.assertIn("project/bots/team.yaml", plan["files"]["added"])
+        self.assertEqual(plan["bots"]["added"], ["Ventas"])
+        self.assertIn("LOCAL EDITS LOST", self.dist(c, ce, "plan", "../dist.git").stdout)
+        self.dist(c, ce, "add", "../dist.git")
+        # After install nothing is replaced until the publisher changes something.
+        plan = json.loads(self.dist(c, ce, "plan", "--json").stdout)
+        self.assertEqual((plan["mode"], plan["up_to_date"], plan["files"]["replaced"]), ("update", True, []))
+
+
+class BizDistributionTests(DistBase):
+    def setUp(self):
+        super().setUp()
+        self.biz = FakeBiz()
+        self.addCleanup(self.biz.stop)
+        for env in (self.publisher_env, self.client_env):
+            env.update(FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}")
+        self.tokens = []
+
+    def run_dist(self, root, env, *args, check=True):
+        result = mise(str(root / "framework/scripts/dist.sh"), *args, cwd=root, env=env, check=check)
+        self.tokens.append(result.stdout + result.stderr)
+        return result
+
+    def test_publish_add_republish_for_new_recipient_update_and_plan(self):
+        p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n")
+        write(p, "project/bots/extra.md", "removed in v2\n")
+        write(p, "project/wiki/index.md", "# v1\n")
+        write(p, "project/wiki/guide.md", "guide v1\n")
+        write(p, "project/mcp.json", json.dumps({"mcpServers": {"docs": {"url": "http://x"}}}))
+        write(p, ".copier-answers.ext-wiki.yml", "_src_path: gh:org/fyso-ext-wiki\nextension_port: 29830\n")
+        write(p, "extensions/wiki/README.md", "wiki\n")
+        write(p, "project/distribution.yaml", "repo: biz\nsecrets: [API_KEY]\n")
+        self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "pp", "API_KEY": "key-1"})
+        self.commit(p, pe, "publisher v1")
+
+        # Nobody registered a key yet: a clear error, nothing uploaded.
+        result = self.run_dist(p, pe, "publish", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nobody has registered", result.stderr)
+        self.assertIsNone(self.biz.setup)
+
+        self.biz.recipients = [self.client_key]
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+        sent = self.biz.setup
+        self.assertEqual(sent["version"], "v1")
+        self.assertEqual(sent["manifest"]["bots"], ["Ventas"])
+        self.assertEqual(sent["manifest"]["extensions"], ["wiki"])
+        self.assertEqual(sent["manifest"]["mcp_servers"], ["docs"])
+        self.assertEqual(sent["manifest"]["secrets"], ["API_KEY"])
+        self.assertIn("project/wiki/index.md", sent["manifest"]["files"])
+        self.assertNotIn(b"key-1", sent["body"])
+        self.assertIn("no changes", self.run_dist(p, pe, "publish").stdout)
+
+        # Client: plan (read-only), add.
+        self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "cp"})
+        write(c, "project/wiki/guide.md", "client edit\n")
+        self.commit(c, ce, "client init")
+        before = self.tree_state(c)
+        plan = json.loads(self.run_dist(c, ce, "plan", "--json").stdout)
+        self.assertEqual(self.tree_state(c), before, "dist:plan must not change anything")
+        self.assertEqual((plan["mode"], plan["transport"], plan["version"]), ("add", "biz", "v1"))
+        self.assertEqual(plan["files"]["replaced"], [{"path": "project/wiki/guide.md", "local_edits": ["committed"]}])
+        self.assertEqual(plan["secrets"], {"names": ["API_KEY"], "decryptable": True})
+        self.assertEqual(plan["extensions"]["added"], ["wiki"])
+        self.assertEqual(plan["bots"]["added"], ["Ventas"])
+        self.assertEqual(plan["mcp_servers"]["added"], ["docs"])
+        self.run_dist(c, ce, "add", "biz")
+        answers = (c / ".copier-answers.dist.yml").read_text()
+        self.assertIn("_src_path: .data/dist/biz-source", answers)
+        self.assertNotIn(str(self.tmp), answers)
+        self.assertIn("_commit: v1", answers)
+        self.assertEqual((c / "project/wiki/index.md").read_text(), "# v1\n")
+        self.assertEqual(self.decrypt(c, ce)["API_KEY"], "key-1")
+        self.assertIn("Biz (managed setup)", self.run_dist(c, ce, "status").stdout)
+
+        # v2: files change AND a second person registers a key.
+        key2 = self.tmp / "second.age"
+        mise("age-keygen", "-o", str(key2), cwd=self.tmp)
+        public2 = mise("age-keygen", "-y", str(key2), cwd=self.tmp).stdout.strip()
+        self.biz.recipients = [self.client_key, public2]
+        write(p, "project/wiki/index.md", "# v2\n")
+        write(p, "project/wiki/new.md", "new\n")
+        (p / "project/bots/extra.md").unlink()
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n  - name: Soporte\n")
+        self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "pp", "API_KEY": "key-2"})
+        self.commit(p, pe, "publisher v2")
+        self.assertIn("published v2", self.run_dist(p, pe, "publish").stdout)
+        self.assertIn("Latest:       v2  → mise run dist:update", self.run_dist(c, ce, "status").stdout)
+
+        # The client edits locally: one committed, one uncommitted.
+        write(c, "project/wiki/guide.md", "client edit 2\n")
+        self.commit(c, ce, "client edit")
+        write(c, "project/wiki/index.md", "# uncommitted\n")
+        before = self.tree_state(c)
+        plan = json.loads(self.run_dist(c, ce, "plan", "--json").stdout)
+        self.assertEqual(self.tree_state(c), before, "dist:plan must not change anything")
+        self.assertEqual((plan["mode"], plan["current"], plan["version"], plan["up_to_date"]), ("update", "v1", "v2", False))
+        self.assertEqual(plan["files"]["added"], ["project/wiki/new.md"])
+        self.assertEqual(plan["files"]["removed"], ["project/bots/extra.md"])
+        self.assertEqual(plan["files"]["replaced"], [
+            {"path": "project/bots/team.yaml", "local_edits": []},
+            {"path": "project/wiki/guide.md", "local_edits": ["committed"]},
+            {"path": "project/wiki/index.md", "local_edits": ["uncommitted"]}])
+        self.assertEqual(plan["secrets"]["names"], ["API_KEY"])
+        self.assertEqual(plan["bots"]["added"], ["Soporte"])
+        self.assertEqual(plan["extensions"], {"added": [], "removed": []})
+
+        self.run_dist(c, ce, "update")
+        self.assertEqual((c / "project/wiki/index.md").read_text(), "# v2\n")
+        self.assertFalse((c / "project/bots/extra.md").exists())
+        self.assertEqual(self.decrypt(c, ce)["API_KEY"], "key-2")
+        self.assertIn("_commit: v2", (c / ".copier-answers.dist.yml").read_text())
+        self.assertIn("_src_path: .data/dist/biz-source", (c / ".copier-answers.dist.yml").read_text())
+
+        # Recipients changed, files did not: re-encrypted and published as v3.
+        key3 = self.tmp / "third.age"
+        mise("age-keygen", "-o", str(key3), cwd=self.tmp)
+        self.biz.recipients.append(mise("age-keygen", "-y", str(key3), cwd=self.tmp).stdout.strip())
+        self.assertIn("published v3", self.run_dist(p, pe, "publish").stdout)
+        self.assertIn("no changes", self.run_dist(p, pe, "publish").stdout)
+        self.run_dist(c, ce, "update")
+        self.assertIn("_commit: v3", (c / ".copier-answers.dist.yml").read_text())
+        self.assertEqual(self.decrypt(c, ce)["API_KEY"], "key-2")
+
+        # Tokens never reach output; every request carried the bearer token.
+        self.assertFalse(any(FakeBiz.TOKEN in text for text in self.tokens))
+        self.assertTrue(all(h.get("Authorization") == f"Bearer {FakeBiz.TOKEN}" for _, _, h in self.biz.requests))
+
+    def test_errors_are_clear_and_failed_upload_is_forgotten(self):
+        p, pe, c, ce = self.publisher, self.publisher_env, self.client, self.client_env
+        write(p, "project/wiki/index.md", "x\n")
+        write(p, "project/distribution.yaml", "repo: biz\n")
+        self.commit(p, pe, "init")
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+        write(p, "project/wiki/index.md", "y\n")
+        self.commit(p, pe, "change")
+        real, self.biz.setup = self.biz.setup, dict(self.biz.setup, version="v9")
+        result = self.run_dist(p, pe, "publish", "v3", check=False)
+        self.assertIn("version conflict: Biz already has v9", result.stderr)
+        self.biz.setup = real
+        self.assertIn("published v2", self.run_dist(p, pe, "publish").stdout)
+        # A bad token command and a refused download.
+        bad = dict(ce, FYSO_DIST_BIZ_TOKEN_CMD="false")
+        result = mise(str(c / "framework/scripts/dist.sh"), "plan", "--json", cwd=c, env=bad, check=False)
+        self.assertIn("did not print an access token", result.stderr)
+        self.biz.deny = True
+        result = self.run_dist(c, ce, "plan", "--json", check=False)
+        self.assertIn("Biz denied access", result.stderr)
 
 
 class DistributionUnitTests(unittest.TestCase):

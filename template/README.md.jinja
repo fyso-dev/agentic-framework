@@ -88,6 +88,7 @@ mise run dist:publish                                  # committed files only; t
 # Client (its own project, after `mise run setup`):
 mise run dist:key                                      # public key, if it will receive secrets
 mise run dist:add gh:org/acme-fyso                     # install
+mise run dist:plan                                     # preview what add/update would change (read-only; --json)
 mise run dist:status                                   # installed vs latest version
 mise run dist:update                                   # or the fyso-dist-update workflow in Dagu
 ```

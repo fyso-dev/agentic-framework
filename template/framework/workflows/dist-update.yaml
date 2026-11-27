@@ -3,6 +3,8 @@ name: fyso-dist-update
 # Owned by the framework; project/workflows/fyso-dist-update.yaml links here.
 # fetch: snapshot, then Copier recopy (the distribution's files win) and received secrets.
 # merge-memory: three-way union of the delivered memory into each bot's own memory.
+# A project installed from Biz needs FYSO_DIST_BIZ_URL and FYSO_DIST_BIZ_TOKEN_CMD in its mise environment
+# (the Biz extension sets them); `mise exec` below passes them on.
 # apply: bots, extensions and memory into the running services, then one commit.
 description: Update this project from its distribution
 labels:

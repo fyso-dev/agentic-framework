@@ -3,8 +3,9 @@
 # documents and bot memory as a versioned Copier template; other projects install it and
 # update from it. The distribution's files win; delivered memory merges with local memory.
 #   dist.sh publish [version]       publisher: export committed files to project/distribution.yaml's repo
-#   dist.sh add <repo> [version]    client: install a distribution
+#   dist.sh add <repo|biz> [version]  client: install a distribution (`biz`: the organization's setup in Biz)
 #   dist.sh update [version]        client: fetch, merge-memory, apply (fyso-dist-update runs these steps)
+#   dist.sh plan [repo|biz] [version] [--json]   read-only preview of add/update
 #   dist.sh status | key
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -26,6 +27,8 @@ live() {
 fetch() {  # fetch <add|update> [repo] [version]
   local mode=$1 repo=${2:-} version=${3:-}
   mkdir -p "$work"
+  # Biz: refresh the local copy of the setup first, so a network failure changes nothing.
+  if [ "$mode" = update ] && dist is-biz; then dist biz-fetch >/dev/null; fi
   if live; then
     # Record what the bots learned before the distribution replaces their configuration.
     framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memory && framework/scripts/snapshot.sh commit
@@ -125,6 +128,7 @@ case "$action" in
     [ "$#" -gt 0 ] || fail 'Usage: mise run dist:add <repo> [version]'
     [ ! -f "$answers" ] || fail "a distribution is already installed; use 'mise run dist:update'"
     repo=$1
+    if [ "$repo" = biz ]; then repo=$(dist biz-fetch); fi   # the answers record this relative path
     case $repo in /*|"~"/*)
       printf 'warning: %s is a path of this machine; it is saved in %s and fails check-paths (snapshots). Use the Git URL.\n' "$repo" "$answers" >&2 ;;
     esac
@@ -142,11 +146,12 @@ case "$action" in
   merge-memory) merge_memory ;;
   apply) apply ;;
   status) dist status ;;
+  plan) dist plan "$@" ;;
   key)
     key_file="${SOPS_AGE_KEY_FILE:-${MISE_SOPS_AGE_KEY_FILE:-$HOME/.config/mise/age.txt}}"
     [ -f "$key_file" ] || fail "no age key yet; run 'mise run setup'"
     echo "Public key of this installation (give it to the publisher to receive secrets):"
     age-keygen -y "$key_file"
     ;;
-  *) fail 'Usage: dist.sh <publish|add|update|status|key>' ;;
+  *) fail 'Usage: dist.sh <publish|add|update|plan|status|key>' ;;
 esac
