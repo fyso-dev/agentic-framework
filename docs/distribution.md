@@ -32,7 +32,7 @@ secrets: [OPENAI_API_KEY]          # names from secrets.enc.yaml to send; omit o
 recipients: [age1…]                # clients' public keys, printed by `mise run dist:key` on their side
 ```
 
-`mise run dist:publish [version]`:
+`mise run dist:publish [--dry-run [--json]] [version]`:
 
 1. Clones the repository, empties it and writes the files of §1 under `template/`, with a generated `copier.yml` (`_answers_file: .copier-answers.dist.yml`; no file is a Jinja template, so they arrive exactly as committed).
 2. Runs gitleaks and the machine-path check on them. Nothing is pushed if either fails.
@@ -127,3 +127,24 @@ A **publisher** is a project with `repo: biz` in `project/distribution.yaml`; ot
 - `dist:plan --json` on a publisher adds `"merge": {"base":"v3","latest":"v4","conflicts":[files]}`, a dry run of the same merge (`null` when the installed version is not in the history). Members keep the replace behavior of §3.
 
 Exit codes of `dist.sh`: 0 ok, 1 error, 3 `stale_base`, 4 `merge_conflict`, 5 publisher has not installed Biz's setup.
+
+## 9. Publish dry run
+
+`mise run dist:publish --dry-run [--json] [version]` builds exactly what publish would build (committed files, the same exclusions such as `memory/log/**`, the same gitleaks and machine-path checks, the same manifest and recipients) and stops there. Nothing is uploaded, pushed, committed or tagged, and the project and its tracked files are untouched: everything happens in temporary directories. With Biz, the current setup is downloaded into a temporary clone, so even `.data/dist/biz-mirror` is not modified. It works for `repo: biz` and for git repositories.
+
+`--json` prints (names only, never secret values):
+
+```json
+{"transport":"biz","base":"v3","version":"v4","changed":true,
+ "files":{"added":[],"modified":[],"removed":[]},"files_count":234,
+ "bots":{"added":[],"modified":[],"removed":[]},
+ "extensions":{"added":[],"removed":[]},"mcp_servers":{"added":[],"removed":[]},
+ "secrets":["NAME"],"recipients":{"count":2,"changed":false},
+ "framework":"0.1.15","checks":{"gitleaks":"ok","machine_paths":"ok"}}
+```
+
+- `base` is the version this project is built on (`none` if none). For a git repository, which has no such record, it is the repository's latest tag.
+- Files are compared with the latest published version (Biz: its current setup; git: the repository's latest tag). The first publish lists everything as `added`. A bot is `modified` when its team entry, its soul file or its delivered memory changed.
+- `changed: false` means nothing differs (files and recipients): publish would do nothing, and `version` is the latest published one.
+- If a check fails, the command exits non-zero and the JSON has `"failed"` for that check plus `checks.error`.
+- If Biz has a newer version than `base`, the JSON is `{"stale_base":true,"base":...,"current":...}` and the exit code is 3, as for publish (also when `base` is `none`, where publish itself exits 5).
