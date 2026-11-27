@@ -220,22 +220,47 @@ function threeWay(src,base,latest) {
       if(merged.status===0)writes.set(file,merged.stdout);else conflicts.push(file);
     }
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
-  return {writes,conflicts:conflicts.sort()};
+  return {writes,conflicts:conflicts.sort(),theirs:file=>read(t,file)};
+}
+
+/** `dist dist:update [version] [--ours f...] [--theirs f...]` arguments of a publisher. */
+function mergeArgs(args) {
+  const out={version:null,ours:[],theirs:[]};let side=null;
+  for(const arg of args) {
+    if(arg==='--ours'||arg==='--theirs')side=arg.slice(2);
+    else if(arg.startsWith('--'))fail(`unknown option ${arg} (usage: dist:update [version] [--ours <file>...] [--theirs <file>...])`);
+    else if(side)out[side].push(arg.replace(/^\.\//,''));
+    else if(!out.version)out.version=arg;
+    else fail('usage: dist:update [version] [--ours <file>...] [--theirs <file>...]');
+  }
+  const both=out.ours.filter(file=>out.theirs.includes(file));
+  if(both.length)fail(`${both.join(', ')} given to both --ours and --theirs`);
+  return out;
 }
 
 /** `dist:update` on a publisher: merge the latest version into the project, or change nothing. */
-async function merge(requested) {
+async function merge(args) {
+  const {version:requested,ours:keepOurs,theirs:takeTheirs}=mergeArgs(args);
   if(!fs.existsSync(ANSWERS))fail('no distribution installed; use `mise run dist:add biz`');
   const answers=readYaml(ANSWERS)||{},base=String(answers._commit||'');
+  const botsFile=path.join(path.dirname(BIZ_SRC),'memory-bots');
+  fs.rmSync(botsFile,{force:true});
   await bizDownload(bizClient(),path.resolve(BIZ_SRC));
   const available=tags(BIZ_SRC),latest=requested?(requested.startsWith('v')?requested:`v${requested}`):latestTag(available);
   if(!latest||!available.includes(latest))fail(`${requested||'the latest version'} is not published`);
   if(!available.includes(base))fail(`the installed version ${base||'?'} is not in the setup history; cannot merge`);
   if(base===latest){console.log(`already at ${latest}`);return;}
-  const {writes,conflicts}=threeWay(BIZ_SRC,base,latest),report=path.join(path.dirname(BIZ_SRC),'merge-conflicts.json');
+  const result=threeWay(BIZ_SRC,base,latest),{writes}=result,report=path.join(path.dirname(BIZ_SRC),'merge-conflicts.json');
+  // Named files take that side, conflicting or not.
+  for(const file of keepOurs)writes.delete(file);
+  for(const file of takeTheirs) {
+    const content=result.theirs(file);
+    if(content===null&&!fs.existsSync(file))writes.delete(file);else writes.set(file,content);
+  }
+  const conflicts=result.conflicts.filter(file=>!keepOurs.includes(file)&&!takeTheirs.includes(file));
   if(conflicts.length) {
     fs.writeFileSync(report,JSON.stringify({base,latest,files:conflicts},null,2)+'\n');
-    fail(`merge_conflict: ${conflicts.length} file(s) were edited here and in ${latest}; nothing was changed. Resolve them (see ${report}), then run dist:update again:\n  ${conflicts.join('\n  ')}`,4);
+    fail(`merge_conflict: ${conflicts.length} file(s) were edited here and in ${latest}; nothing was changed. Resolve them (see ${report}), then run dist:update again, choosing a side per file with --ours <file> / --theirs <file>:\n  ${conflicts.join('\n  ')}`,4);
   }
   fs.rmSync(report,{force:true});
   for(const [file,content] of writes) {
@@ -246,6 +271,10 @@ async function merge(requested) {
   const paths=[...writes.keys(),ANSWERS];
   git(['add','-A','--',...paths]);
   git(['commit','-q','-m',`dist: merge ${latest}`,'--',...paths]);
+  // Memory delivered with the latest version is union-merged into this project's, as for members.
+  const prefix='template/'+MEMORY+'/',now=tree(BIZ_SRC,latest,prefix),before=tree(BIZ_SRC,base,prefix);
+  const bots=mergeMemoryEntries([...now].map(([rel,sha])=>({rel,incoming:blob(BIZ_SRC,sha),previous:before.has(rel)?blob(BIZ_SRC,before.get(rel)):null})));
+  fs.writeFileSync(botsFile,bots.map(bot=>`${bot}\n`).join(''));
   console.log(`merged ${latest} (${writes.size} files updated)`);
 }
 
@@ -513,11 +542,15 @@ function union(local,base,incoming) {
  * The previous delivery, from git at `base`, is the common ancestor. Prints changed bots.
  */
 function mergeMemory(base) {
+  const entries=walk(MEMORY).map(rel=>({rel,incoming:fs.readFileSync(path.join(MEMORY,rel)),previous:show(base,`${MEMORY}/${rel}`)}));
+  for(const bot of mergeMemoryEntries(entries))console.log(bot);
+}
+
+/** entries: [{rel: '<bot>/<file>', incoming, previous}]; returns the sorted names of bots whose memory changed. */
+function mergeMemoryEntries(entries) {
   const changed=new Set();
-  for(const rel of walk(MEMORY)) {
-    const [bot,...rest]=rel.split('/'),inner=rest.join('/');
-    const incoming=fs.readFileSync(path.join(MEMORY,rel)),local=path.join('state/memory',bot,inner);
-    const previous=show(base,`${MEMORY}/${rel}`);
+  for(const {rel,incoming,previous} of entries) {
+    const [bot,...rest]=rel.split('/'),inner=rest.join('/'),local=path.join('state/memory',bot,inner);
     let merged;
     if(!fs.existsSync(local))merged=incoming;
     else {
@@ -530,7 +563,7 @@ function mergeMemory(base) {
     fs.writeFileSync(local,merged);
     changed.add(bot);
   }
-  for(const bot of [...changed].sort())console.log(bot);
+  return [...changed].sort();
 }
 
 const versionKey=tag=>tag.slice(1).split('.').map(Number);
@@ -693,7 +726,7 @@ if(require.main===module) (async()=>{
     else if(command==='status')await status();
     else if(command==='plan')await plan(process.argv.slice(3));
     else if(command==='biz-fetch'){await bizDownload(bizClient(),path.resolve(BIZ_SRC));console.log(BIZ_SRC);}
-    else if(command==='merge')await merge(arg);
+    else if(command==='merge')await merge(process.argv.slice(3));
     else if(command==='is-publisher')process.exit(isPublisher()?0:1);
     else if(command==='is-biz')process.exit(fs.existsSync(ANSWERS)&&isBiz(readYaml(ANSWERS))?0:1);
     else if(command==='clone-url')console.log(cloneUrl(arg));

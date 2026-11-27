@@ -565,6 +565,7 @@ class BizDistributionTests(DistBase):
             write(root, "project/distribution.yaml", "repo: biz\n")
         write(a, "project/wiki/x.md", "x1\n")
         write(a, "project/wiki/y.md", "y1\n")
+        write(a, "state/memory/Bot/MEMORY.md", "- a1\n")
         self.commit(a, ae, "A v1")
         self.assertIn("published v1", self.run_dist(a, ae, "publish").stdout)
         self.assertIn("_commit: v1", (a / ".copier-answers.dist.yml").read_text())
@@ -574,8 +575,10 @@ class BizDistributionTests(DistBase):
         self.run_dist(b, be, "add", "biz")
         self.assertIn("_commit: v1", (b / ".copier-answers.dist.yml").read_text())
         write(b, "project/wiki/x.md", "x1\nx-from-b\n")
+        write(b, "state/memory/Bot/MEMORY.md", "- a1\n- b\n")
         self.commit(b, be, "B edits X")
         write(a, "project/wiki/y.md", "y1\ny-from-a\n")
+        write(a, "state/memory/Bot/MEMORY.md", "- a1\n- a2\n")
         self.commit(a, ae, "A edits Y")
         self.assertIn("published v2", self.run_dist(a, ae, "publish").stdout)
 
@@ -594,9 +597,15 @@ class BizDistributionTests(DistBase):
         self.assertEqual((b / "project/wiki/x.md").read_text(), "x1\nx-from-b\n")
         self.assertEqual((b / "project/wiki/y.md").read_text(), "y1\ny-from-a\n")
         self.assertIn("_commit: v2", (b / ".copier-answers.dist.yml").read_text())
+        memory = (b / "state/memory/Bot/MEMORY.md").read_text()
+        for line in ("- a1", "- a2", "- b"):
+            self.assertIn(line, memory)
+        self.assertEqual((b / ".data/dist/memory-bots").read_text(), "Bot\n")   # apply loads it into OMB
         log = subprocess.run(["git", "log", "--format=%s", "-1"], cwd=b, capture_output=True, text=True).stdout.strip()
         self.assertEqual(log, "dist: merge v2")
-        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=b, capture_output=True, text=True).stdout, "")
+        # Only the merged memory is left uncommitted (the next snapshot commits it).
+        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=b, capture_output=True, text=True).stdout,
+                         " M state/memory/Bot/MEMORY.md\n")
         self.assertIn("published v3", self.run_dist(b, be, "publish").stdout)
         # A gets B's change on top of its own.
         self.assertIn("merged v3", self.run_dist(a, ae, "update").stdout)
@@ -636,6 +645,48 @@ class BizDistributionTests(DistBase):
         result = self.run_dist(b, be, "publish", check=False)
         self.assertEqual(result.returncode, 5)
         self.assertIn("dist:add biz", result.stderr)
+
+    def test_conflicts_resolved_per_file_with_ours_and_theirs(self):
+        a, ae = self.publisher, self.publisher_env
+        b = self.project("publisher2")
+        be = dict(self.publisher2_env, FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}",
+                  FYSO_DIST_BIZ_ORGANIZATION=FakeBiz.ORG)
+        y, z = "project/wiki/y.md", "project/wiki/z.md"
+        for root in (a, b):
+            write(root, "project/distribution.yaml", "repo: biz\n")
+        write(a, y, "y\n")
+        write(a, z, "z\n")
+        self.commit(a, ae, "A v1")
+        self.run_dist(a, ae, "publish")
+        self.commit(b, be, "B init")
+        self.run_dist(b, be, "add", "biz")
+        write(a, y, "y A\n")
+        write(a, z, "z A\n")
+        write(a, "project/wiki/w.md", "new in A\n")
+        self.commit(a, ae, "A v2")
+        self.run_dist(a, ae, "publish")
+        write(b, y, "y B\n")
+        write(b, z, "z B\n")
+        self.commit(b, be, "B edits")
+        self.assertEqual(json.loads(self.run_dist(b, be, "plan", "--json").stdout)["merge"]["conflicts"], [y, z])
+
+        # Naming only one of the two conflicting files is not enough: exit 4 lists the other.
+        partial = self.run_dist(b, be, "update", "--ours", y, check=False)
+        self.assertEqual(partial.returncode, 4)
+        self.assertIn(z, partial.stderr)
+        self.assertEqual(json.loads((b / ".data/dist/merge-conflicts.json").read_text())["files"], [z])
+        self.assertEqual((b / y).read_text(), "y B\n")
+        self.assertEqual((b / "project/wiki/w.md").exists(), False)
+
+        self.assertIn("merged v2", self.run_dist(b, be, "update", "--ours", y, "--theirs", z).stdout)
+        self.assertEqual((b / y).read_text(), "y B\n")
+        self.assertEqual((b / z).read_text(), "z A\n")
+        self.assertEqual((b / "project/wiki/w.md").read_text(), "new in A\n")   # everything else merged normally
+        self.assertFalse((b / ".data/dist/merge-conflicts.json").exists())
+        self.assertIn("_commit: v2", (b / ".copier-answers.dist.yml").read_text())
+        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=b, capture_output=True, text=True).stdout, "")
+        self.assertIn("published v3", self.run_dist(b, be, "publish").stdout)
+        self.assertEqual(self.biz.requests[-1][2]["X-Setup-Base"], "v2")
 
 
 class DistributionUnitTests(unittest.TestCase):

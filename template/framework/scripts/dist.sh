@@ -56,14 +56,13 @@ fetch() {  # fetch <add|update> [repo] [version]
 }
 
 merge_memory() {
-  if [ "$action" != add ] && dist is-publisher; then return 0; fi   # a publisher merges its own files (dist merge)
+  if [ "$action" != add ] && dist is-publisher; then return 0; fi   # a publisher's memory is merged by `dist merge`
   [ -f "$work/base" ] || fail "run 'dist.sh fetch' first"
   dist merge-memory "$(cat "$work/base")" > "$work/memory-bots"
   while IFS= read -r bot; do echo "memory merged: $bot"; done < "$work/memory-bots"
 }
 
 apply() {
-  if [ "$action" != add ] && dist is-publisher; then return 0; fi
   local file id name
   for file in .config/mise/conf.d/ext-*.toml; do [ ! -f "$file" ] || mise trust -q "$file"; done
   if live; then
@@ -102,7 +101,17 @@ apply() {
     mise exec -- node framework/scripts/mcp-config.cjs
     mise exec -- node framework/scripts/panel-data.cjs config
   fi
+  # A publisher's merge is already committed; its uncommitted work is not this step's to commit.
+  if [ "$action" != add ] && dist is-publisher; then return 0; fi
   commit
+}
+
+# Publisher (repo: biz): merge the latest version with the project's own edits, then apply like a member.
+publisher_update() {
+  local args=("$@")
+  if [ -n "${VERSION:-}" ] && { [ "$#" -eq 0 ] || [[ $1 == --* ]]; }; then args=("$VERSION" "$@"); fi
+  if live; then framework/scripts/snapshot.sh bots && framework/scripts/snapshot.sh memory && framework/scripts/snapshot.sh commit; fi
+  dist merge ${args[@]+"${args[@]}"}
 }
 
 commit() {
@@ -139,12 +148,12 @@ case "$action" in
   update)
     [ -f "$answers" ] || fail "no distribution installed; use 'mise run dist:add <repo>'"
     # A publisher (repo: biz) merges the latest version with its own edits; members are replaced.
-    if dist is-publisher; then dist merge "${1:-${VERSION:-}}"; else fetch update "" "${1:-${VERSION:-}}"; merge_memory; apply; fi
+    if dist is-publisher; then publisher_update "$@"; apply; else fetch update "" "${1:-${VERSION:-}}"; merge_memory; apply; fi
     ;;
   # The steps of fyso-dist-update (Dagu passes VERSION as an env var).
   fetch)
     [ -f "$answers" ] || fail "no distribution installed; use 'mise run dist:add <repo>'"
-    if dist is-publisher; then dist merge "${1:-${VERSION:-}}"; else fetch update "" "${1:-${VERSION:-}}"; fi
+    if dist is-publisher; then publisher_update "$@"; else fetch update "" "${1:-${VERSION:-}}"; fi
     ;;
   merge-memory) merge_memory ;;
   apply) apply ;;
