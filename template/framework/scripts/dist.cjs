@@ -301,18 +301,45 @@ _preserve_symlinks: true
 _exclude: [".git", ".DS_Store"]
 `;
 
-async function publish(requested) {
+/** `dist publish [version] [--dry-run [--json]]` arguments. */
+function publishArgs(args) {
+  const out={version:null,dryRun:false,json:false};
+  for(const arg of args) {
+    if(arg==='--dry-run')out.dryRun=true;
+    else if(arg==='--json')out.json=true;
+    else if(arg.startsWith('--'))fail(`unknown option ${arg} (usage: dist:publish [--dry-run [--json]] [version])`);
+    else if(!out.version)out.version=arg;
+    else fail('usage: dist:publish [--dry-run [--json]] [version]');
+  }
+  if(out.json&&!out.dryRun)fail('--json is only for --dry-run (usage: dist:publish --dry-run [--json] [version])');
+  return out;
+}
+
+async function publish(requested,{dryRun=false,json=false}={}) {
   const {repo,biz,secrets,recipients:listed}=config();
   if(git(['status','--porcelain','--','project','state','extensions']).toString().trim())
     console.error('note: uncommitted changes are not published (run `mise run snapshot` or commit them first)');
-  let client=null,recipients=listed,work,base=null;
+  let client=null,recipients=listed,work,base=null,current=null;
   if(biz) {
     client=bizClient();
     // Everyone Biz knows is a recipient; a person who registers later is added on the next publish.
     if(secrets.length)recipients=[...new Set([...listed,...await bizRecipients(client)])];
     if(secrets.length&&!recipients.length)fail('nobody has registered an age key in Biz yet (members run `mise run dist:key`, the Biz extension registers it)');
-    work=await bizMirror(client);
     base=installedBase();
+    if(dryRun) {
+      // Read-only: Biz's setup goes to a temporary clone; the local mirror is not touched.
+      work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-dry-'));
+      try {current=await bizDownload(client,path.join(work,'src'));}
+      catch(error) {if(!/no setup published/.test(error.message))throw error;}
+      if(current)work=path.join(work,'src');
+      else {work=path.join(work,'src');fs.mkdirSync(work,{recursive:true});git(['init','-q','-b','main',work]);}
+      // The same pre-check Biz applies to the upload.
+      if((current||'none')!==base) {
+        if(json)console.log(JSON.stringify({transport:'biz',base,current,version:null,stale_base:true,changed:null},null,2));
+        fs.rmSync(path.dirname(work),{recursive:true,force:true});
+        fail(`stale_base: Biz has ${current||'a setup'} and this project is based on ${base}; run \`mise run dist:update\` to merge it, then publish again`,3);
+      }
+    } else work=await bizMirror(client);
   } else {
     work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
     git(['clone','-q',cloneUrl(repo),work]);
@@ -331,7 +358,19 @@ async function publish(requested) {
       files.push(dest);
     }
     if(!files.length)fail('nothing to publish: commit the project configuration first');
-    scan(template,files);
+    const checks={gitleaks:'ok',machine_paths:'ok'};
+    if(dryRun) {
+      // Same checks, reported instead of thrown.
+      const leaks=scanLeaks(template),machine=scanPaths(template,files);
+      if(leaks)checks.gitleaks='failed';
+      if(machine.length)checks.machine_paths='failed';
+      if(leaks||machine.length) {
+        const message=[leaks&&'gitleaks found possible secrets in the files to publish',machine.length&&`machine-specific paths in: ${machine.join(', ')}`].filter(Boolean).join('; ');
+        if(json)console.log(JSON.stringify({transport:biz?'biz':'git',base:base??'none',version:null,changed:null,checks:{...checks,error:message}},null,2));
+        fail(`${message}; dry run`);
+      }
+    } else scan(template,files);
+    let recipientsInfo={count:0,changed:previous!==null};
     if(secrets.length) {
       const values=decrypt('secrets.enc.yaml'),picked={};
       const missing=secrets.filter(name=>!(name in values));
@@ -342,6 +381,8 @@ async function publish(requested) {
       // differs on every run, and an unchanged version must not be published again.
       const own=run('age-keygen',['-y',keyFile()]).toString().trim();
       const everyone=[...new Set([...recipients,own])].sort();
+      recipientsInfo={count:everyone.length,changed:true};
+      if(previous){try {recipientsInfo.changed=JSON.stringify((()=>{const f=path.join(work,'.git','fyso-dist-recipients.yaml');fs.writeFileSync(f,previous);try {return (readYaml(f)?.sops?.age||[]).map(entry=>entry.recipient).sort();} finally {fs.rmSync(f,{force:true});}})())!==JSON.stringify(everyone);} catch {/* unreadable: changed */}}
       let encrypted=previous&&sameSecrets(previous,picked,everyone,work)?previous:null;
       if(!encrypted) {
         // An explicit config: the project's .sops.yaml names this project's keys, not the clients'.
@@ -362,6 +403,11 @@ async function publish(requested) {
     git(['-C',work,'add','-A']);
     const tags=git(['-C',work,'tag','--list']).toString().split('\n').filter(Boolean);
     const unchanged=spawnSync('git',['-C',work,'diff','--cached','--quiet']).status===0;
+    if(dryRun) {
+      const report=dryRunReport({work,template,files,tags,unchanged,requested,biz,base,secrets,recipientsInfo,checks});
+      if(json)console.log(JSON.stringify(report,null,2));else printDryRun(report);
+      return;
+    }
     if(unchanged&&tags.length){console.log(`no changes since the last version; nothing published`);return;}
     const version=nextVersion(requested,tags);
     git(['-C',work,'commit','-q','-m',`Distribution ${version}`]);
@@ -379,7 +425,68 @@ async function publish(requested) {
       recordInstalled(version);
     } else git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
     console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${biz?'Biz':repo}`);
-  } finally {if(!biz)fs.rmSync(work,{recursive:true,force:true});}
+  } finally {
+    if(dryRun)fs.rmSync(biz?path.dirname(work):work,{recursive:true,force:true});
+    else if(!biz)fs.rmSync(work,{recursive:true,force:true});
+  }
+}
+
+const hashes=(dir,ref)=>{const map=tree(dir,ref,'template/'),shas=new Map();for(const [file,sha] of map)shas.set(file,sha);return shas;};
+
+/** What publish would send, compared with the latest published version in `work`. Names only. */
+function dryRunReport({work,template,files,tags,unchanged,requested,biz,base,secrets,recipientsInfo,checks}) {
+  const latest=latestTag(versionTags(tags));
+  const old=latest?hashes(work,latest):new Map();
+  const oldFiles=old.has(MANIFEST)?JSON.parse(blob(work,old.get(MANIFEST)).toString('utf8')).files||[]:[];
+  const now=new Set(files),was=new Set(oldFiles);
+  const added=files.filter(file=>!was.has(file)),removed=oldFiles.filter(file=>!now.has(file));
+  const modified=files.filter(file=>was.has(file)&&old.get(file)!==blobSha(fs.readFileSync(path.join(template,file))));
+  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-dry-team-'));
+  const teamOf=(rel,sha)=>{
+    if(sha===undefined)return null;
+    const file=path.join(scratch,'team.yaml');fs.writeFileSync(file,sha===true?fs.readFileSync(path.join(template,rel)):blob(work,sha));
+    return (readTeam(file)?.bots||[]).filter(bot=>typeof bot?.name==='string');
+  };
+  const TEAM='project/bots/team.yaml',MCP='project/mcp.json';
+  const mcpOf=(buffer)=>buffer?names(JSON.parse(buffer.toString('utf8')).mcpServers):[];
+  let bots,mcp;
+  try {
+    const newTeam=teamOf(TEAM,files.includes(TEAM)?true:undefined)||[],oldTeam=teamOf(TEAM,old.get(TEAM))||[];
+    const changedFiles=new Set([...added,...removed,...modified]);
+    const oldByName=new Map(oldTeam.map(bot=>[bot.name,bot]));
+    const botModified=bot=>{
+      const before=oldByName.get(bot.name);
+      if(JSON.stringify(before)!==JSON.stringify(bot))return true;
+      const soul=String(bot.soul?.file||'').replace(/^__FYSO_PATH_ROOT__\//,'');
+      if(soul&&changedFiles.has(soul))return true;
+      return [...changedFiles].some(file=>file.startsWith(`${MEMORY}/${bot.name}/`));
+    };
+    const newNames=newTeam.map(bot=>bot.name),oldNames=oldTeam.map(bot=>bot.name);
+    bots={added:newNames.filter(n=>!oldNames.includes(n)).sort(),
+      modified:newTeam.filter(bot=>oldByName.has(bot.name)&&botModified(bot)).map(bot=>bot.name).sort(),
+      removed:oldNames.filter(n=>!newNames.includes(n)).sort()};
+    const newMcp=files.includes(MCP)?mcpOf(fs.readFileSync(path.join(template,MCP))):[],oldMcp=mcpOf(old.has(MCP)?blob(work,old.get(MCP)):null);
+    mcp={added:newMcp.filter(n=>!oldMcp.includes(n)),removed:oldMcp.filter(n=>!newMcp.includes(n))};
+  } finally {fs.rmSync(scratch,{recursive:true,force:true});}
+  const changed=!(unchanged&&tags.length);
+  const manifest=JSON.parse(fs.readFileSync(path.join(template,MANIFEST),'utf8'));
+  const [newExt,oldExt]=[extensionIds(files),extensionIds(oldFiles)];
+  return {transport:biz?'biz':'git',base:biz?base:(latest||'none'),version:changed?nextVersion(requested,tags):latest,changed,
+    files:{added:added.sort(),modified:modified.sort(),removed:removed.sort()},files_count:manifest.files.length,bots,
+    extensions:{added:newExt.filter(id=>!oldExt.includes(id)),removed:oldExt.filter(id=>!newExt.includes(id))},mcp_servers:mcp,
+    secrets,recipients:recipientsInfo,framework:manifest.framework??null,checks};
+}
+
+function printDryRun(r) {
+  const list=(title,items)=>{if(items.length){console.log(`${title} (${items.length}):`);for(const item of items)console.log(`  ${item}`);}};
+  if(!r.changed){console.log(`Dry run: no changes since ${r.version||'the last version'}; publish would do nothing.`);return;}
+  console.log(`Dry run (${r.transport}): ${r.base} → ${r.version}, ${r.files_count} files`);
+  list('Files added',r.files.added);list('Files modified',r.files.modified);list('Files removed',r.files.removed);
+  list('Bots added',r.bots.added);list('Bots modified',r.bots.modified);list('Bots removed',r.bots.removed);
+  list('Extensions added',r.extensions.added);list('Extensions removed',r.extensions.removed);
+  list('MCP servers added',r.mcp_servers.added);list('MCP servers removed',r.mcp_servers.removed);
+  if(r.secrets.length)console.log(`Secrets: ${r.secrets.join(', ')} (${r.recipients.count} recipients${r.recipients.changed?', changed':''})`);
+  console.log(`Checks: gitleaks ${r.checks.gitleaks}, machine paths ${r.checks.machine_paths}. Nothing was published.`);
 }
 
 async function bizUpload(client,work,version,summary,base) {
@@ -419,10 +526,11 @@ function nextVersion(requested,tags) {
 }
 
 /** Same checks as a snapshot (gitleaks + machine paths), before anything leaves this machine. */
+const scanLeaks=template=>spawnSync('gitleaks',['dir','--no-banner','--redact',template],{stdio:['ignore',2,2]}).status!==0;
+const scanPaths=(template,files)=>files.filter(file=>MACHINE_PATH.test(fs.readFileSync(path.join(template,file),'latin1')));
 function scan(template,files) {
-  const leaks=spawnSync('gitleaks',['dir','--no-banner','--redact',template],{stdio:['ignore','inherit','inherit']});
-  if(leaks.status!==0)fail('gitleaks found possible secrets in the files to publish; nothing was published');
-  const machine=files.filter(file=>MACHINE_PATH.test(fs.readFileSync(path.join(template,file),'latin1')));
+  if(scanLeaks(template))fail('gitleaks found possible secrets in the files to publish; nothing was published');
+  const machine=scanPaths(template,files);
   if(machine.length)fail(`machine-specific paths in: ${machine.join(', ')}; nothing was published`);
 }
 
@@ -717,7 +825,7 @@ function printPlan(p) {
 if(require.main===module) (async()=>{
   const [command,arg]=process.argv.slice(2);
   try {
-    if(command==='publish')await publish(arg);
+    if(command==='publish'){const options=publishArgs(process.argv.slice(3));await publish(options.version,options);}
     else if(command==='prune')prune(arg);
     else if(command==='secrets')secrets();
     else if(command==='ports')ports(arg);
@@ -730,7 +838,7 @@ if(require.main===module) (async()=>{
     else if(command==='is-publisher')process.exit(isPublisher()?0:1);
     else if(command==='is-biz')process.exit(fs.existsSync(ANSWERS)&&isBiz(readYaml(ANSWERS))?0:1);
     else if(command==='clone-url')console.log(cloneUrl(arg));
-    else fail('usage: dist.cjs <publish [version]|plan [repo] [version] [--json]|prune <base>|secrets|merge-memory <base>|status|biz-fetch|is-biz>');
+    else fail('usage: dist.cjs <publish [version] [--dry-run [--json]]|plan [repo] [version] [--json]|prune <base>|secrets|merge-memory <base>|status|biz-fetch|is-biz>');
   } catch(error) {
     console.error(`error: ${error.user?error.message:(error.stderr?.toString()||error.message)}`);
     process.exit(error.exit||1);

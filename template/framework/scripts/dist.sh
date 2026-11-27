@@ -2,7 +2,7 @@
 # Project distributions (D56, docs/distribution.md): one project publishes its configuration,
 # documents and bot memory as a versioned Copier template; other projects install it and
 # update from it. The distribution's files win; delivered memory merges with local memory.
-#   dist.sh publish [version]       publisher: export committed files to project/distribution.yaml's repo
+#   dist.sh publish [--dry-run [--json]] [version]   publisher: export committed files to project/distribution.yaml's repo
 #   dist.sh add <repo|biz> [version]  client: install a distribution (`biz`: the organization's setup in Biz)
 #   dist.sh update [version]        client: fetch, merge-memory, apply (fyso-dist-update runs these steps)
 #   dist.sh plan [repo|biz] [version] [--json]   read-only preview of add/update

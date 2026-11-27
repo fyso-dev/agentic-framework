@@ -120,6 +120,9 @@ class FakeBiz:
         self.url = f"http://127.0.0.1:{self.server.server_port}"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
+    def puts(self):
+        return [request for request in self.requests if request[0] == "PUT"]
+
     def stop(self):
         self.server.shutdown()
         self.server.server_close()
@@ -169,6 +172,10 @@ class DistBase(unittest.TestCase):
 
     def dist(self, root, env, *args):
         return mise(str(root / "framework/scripts/dist.sh"), *args, cwd=root, env=env)
+
+    def git_state(self, root):
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True).stdout
+        return head, subprocess.run(["git", "tag"], cwd=root, capture_output=True, text=True).stdout
 
     def tree_state(self, root):
         """Everything observable in a project: git status plus the content of every file (incl. .data)."""
@@ -336,6 +343,28 @@ class DistributionTests(DistBase):
         # After install nothing is replaced until the publisher changes something.
         plan = json.loads(self.dist(c, ce, "plan", "--json").stdout)
         self.assertEqual((plan["mode"], plan["up_to_date"], plan["files"]["replaced"]), ("update", True, []))
+
+
+    def test_dry_run_git_transport_changes_nothing(self):
+        p, pe = self.publisher, self.publisher_env
+        write(p, "project/wiki/index.md", "# v1\n")
+        write(p, "project/distribution.yaml", f"repo: {self.repo}\n")
+        self.commit(p, pe, "v1")
+        git_before = self.git_state(p)
+        remote = lambda: subprocess.run(["git", "-C", str(self.repo), "for-each-ref"], capture_output=True, text=True).stdout
+        self.assertEqual(remote(), "")
+        out = self.dist(p, pe, "publish", "--dry-run", "--json").stdout
+        report = json.loads(out)
+        self.assertEqual((report["transport"], report["changed"], report["version"]), ("git", True, "v1"))
+        self.assertIn("project/wiki/index.md", report["files"]["added"])
+        self.assertEqual(remote(), "")
+        self.assertEqual(self.git_state(p), git_before)
+        self.assertIn("published v1", self.dist(p, pe, "publish").stdout)
+        write(p, "project/wiki/index.md", "# v2\n")
+        self.commit(p, pe, "v2")
+        report = json.loads(self.dist(p, pe, "publish", "--dry-run", "--json").stdout)
+        self.assertEqual((report["base"], report["version"], report["files"]["modified"]), ("v1", "v2", ["project/wiki/index.md"]))
+        self.assertNotIn("v2", subprocess.run(["git", "-C", str(self.repo), "tag"], capture_output=True, text=True).stdout)
 
 
 class BizDistributionTests(DistBase):
@@ -524,6 +553,113 @@ class BizDistributionTests(DistBase):
         self.biz.deny = True
         result = self.run_dist(c, ce, "plan", "--json", check=False)
         self.assertIn("Biz denied access", result.stderr)
+
+    def dry_run(self, root, env, *args, check=True):
+        result = self.run_dist(root, env, "publish", "--dry-run", *args, check=check)
+        return result, (json.loads(result.stdout) if "--json" in args and result.stdout.strip() else None)
+
+    def test_dry_run_publish_changes_nothing_and_reports_the_diff(self):
+        p, pe = self.publisher, self.publisher_env
+        write(p, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n  - name: Soporte\n    soul: { file: ${FYSO_ROOT}/project/bots/soporte.md }\n")
+        write(p, "project/bots/soporte.md", "soul v1\n")
+        write(p, "project/bots/extra.md", "removed later\n")
+        write(p, "project/wiki/index.md", "# v1\n")
+        write(p, "project/mcp.json", json.dumps({"mcpServers": {"docs": {"url": "http://x"}}}))
+        write(p, "state/memory/Ventas/MEMORY.md", "- fact one\n")
+        write(p, "state/memory/Ventas/memory/log/2026-11-10.md", "private\n")
+        write(p, "project/distribution.yaml", "repo: biz\nsecrets: [API_KEY]\n")
+        self.secrets(p, pe, {"FYSO_ADMIN_PASSWORD": "pp", "API_KEY": "key-1"})
+        self.commit(p, pe, "v1")
+        self.biz.recipients = [self.client_key]
+
+        # First publish: everything is added; nothing is sent, committed, tagged or created.
+        before, git_before = self.tree_state(p), self.git_state(p)
+        result, report = self.dry_run(p, pe, "--json")
+        self.assertEqual(self.biz.puts(), [])
+        self.assertIsNone(self.biz.setup)
+        self.assertEqual(self.tree_state(p), before)
+        self.assertEqual(self.git_state(p), git_before)
+        self.assertEqual((report["transport"], report["base"], report["version"], report["changed"]), ("biz", "none", "v1", True))
+        self.assertEqual(report["files"]["modified"] + report["files"]["removed"], [])
+        self.assertIn("project/wiki/index.md", report["files"]["added"])
+        self.assertIn("state/dist/secrets.sops.yaml", report["files"]["added"])
+        self.assertNotIn("state/dist/memory/Ventas/memory/log/2026-11-10.md", report["files"]["added"])
+        self.assertEqual(report["bots"], {"added": ["Soporte", "Ventas"], "modified": [], "removed": []})
+        self.assertEqual(report["extensions"], {"added": [], "removed": []})
+        self.assertEqual(report["mcp_servers"], {"added": ["docs"], "removed": []})
+        self.assertEqual(report["secrets"], ["API_KEY"])
+        self.assertEqual(report["recipients"]["count"], 2)
+        self.assertEqual(report["checks"], {"gitleaks": "ok", "machine_paths": "ok"})
+        self.assertGreater(report["files_count"], 5)
+        self.assertNotIn("key-1", result.stdout + result.stderr)
+        self.assertFalse((p / ".data/dist/biz-mirror/.git").exists() and
+                         "v1" in subprocess.run(["git", "tag"], cwd=p / ".data/dist/biz-mirror", capture_output=True, text=True).stdout)
+
+        # Human summary.
+        self.assertIn("Dry run", self.dry_run(p, pe)[0].stdout)
+        self.assertIsNone(self.biz.setup)
+
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+        self.assertEqual(self.biz.setup["version"], "v1")
+
+        # Nothing changed: changed false.
+        puts = len(self.biz.puts())
+        _, report = self.dry_run(p, pe, "--json")
+        self.assertFalse(report["changed"])
+        self.assertEqual((report["base"], report["version"]), ("v1", "v1"))
+        self.assertEqual(report["files"], {"added": [], "modified": [], "removed": []})
+        self.assertFalse(report["recipients"]["changed"])
+
+        # Changes: added / modified / removed, a bot modified by its soul, a new recipient.
+        write(p, "project/wiki/index.md", "# v2\n")
+        write(p, "project/wiki/new.md", "new\n")
+        write(p, "project/bots/soporte.md", "soul v2\n")
+        (p / "project/bots/extra.md").unlink()
+        write(p, "project/mcp.json", json.dumps({"mcpServers": {"api": {"url": "http://y"}}}))
+        write(p, "extensions/wiki/README.md", "wiki\n")
+        self.commit(p, pe, "v2")
+        key2 = self.tmp / "second.age"
+        mise("age-keygen", "-o", str(key2), cwd=self.tmp)
+        self.biz.recipients = [self.client_key, mise("age-keygen", "-y", str(key2), cwd=self.tmp).stdout.strip()]
+        before, git_before = self.tree_state(p), self.git_state(p)
+        _, report = self.dry_run(p, pe, "--json")
+        self.assertEqual(len(self.biz.puts()), puts)
+        self.assertEqual(self.tree_state(p), before)
+        self.assertEqual(self.git_state(p), git_before)
+        self.assertTrue(report["changed"])
+        self.assertEqual((report["base"], report["version"]), ("v1", "v2"))
+        self.assertIn("project/wiki/new.md", report["files"]["added"])
+        self.assertIn("project/wiki/index.md", report["files"]["modified"])
+        self.assertIn("project/bots/soporte.md", report["files"]["modified"])
+        self.assertEqual(report["files"]["removed"], ["project/bots/extra.md"])
+        self.assertEqual(report["bots"], {"added": [], "modified": ["Soporte"], "removed": []})
+        self.assertEqual(report["extensions"], {"added": ["wiki"], "removed": []})
+        self.assertEqual(report["mcp_servers"], {"added": ["api"], "removed": ["docs"]})
+        self.assertEqual(report["recipients"], {"count": 3, "changed": True})
+
+    def test_dry_run_reports_failed_checks_and_stale_base(self):
+        p, pe = self.publisher, self.publisher_env
+        write(p, "project/wiki/index.md", "see /Users/" + "someone/project\n")
+        write(p, "project/distribution.yaml", "repo: biz\n")
+        self.commit(p, pe, "bad path")
+        result, report = self.dry_run(p, pe, "--json", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["checks"]["machine_paths"], "failed")
+        self.assertIn("machine-specific paths", report["checks"]["error"])
+        self.assertIsNone(self.biz.setup)
+
+        write(p, "project/wiki/index.md", "fine\n")
+        self.commit(p, pe, "fixed")
+        self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+        write(p, "project/wiki/index.md", "again\n")
+        self.commit(p, pe, "change")
+        self.biz.setup = dict(self.biz.setup, version="v9")
+        puts = len(self.biz.puts())
+        result, report = self.dry_run(p, pe, "--json", check=False)
+        self.assertEqual(result.returncode, 3)
+        self.assertTrue(report["stale_base"])
+        self.assertIn("stale_base", result.stderr)
+        self.assertEqual(len(self.biz.puts()), puts)
 
     def prepare_publisher(self, bots=1):
         p, pe = self.publisher, self.publisher_env
