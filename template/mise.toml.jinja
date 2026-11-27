@@ -179,8 +179,12 @@ description = "Publish this project's configuration, documents and memory as a n
 run = "framework/scripts/dist.sh publish"
 
 [tasks."dist:add"]
-description = "Install a distribution in this project (its files win): mise run dist:add <repo> [version]"
+description = "Install a distribution in this project (its files win): mise run dist:add <repo|biz> [version]"
 run = "framework/scripts/dist.sh add"
+
+[tasks."dist:plan"]
+description = "Preview what dist:add / dist:update would change, without changing anything: mise run dist:plan [repo|biz] [version] [--json]"
+run = "framework/scripts/dist.sh plan"
 
 [tasks."dist:update"]
 description = "Update to the latest distribution version (or the one given), merging bot memory"

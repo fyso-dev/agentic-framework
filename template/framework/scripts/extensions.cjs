@@ -4,6 +4,7 @@ const {createRequire} = require('node:module');
 const {execFileSync, spawnSync} = require('node:child_process');
 const yaml = createRequire(fs.realpathSync(execFileSync('which', ['yaml'], {encoding:'utf8'}).trim()))('yaml');
 const read = file => yaml.parse(fs.readFileSync(file, 'utf8'));
+const parse = text => yaml.parse(text);
 function setSource(file, source) {
   const answers = yaml.parseDocument(fs.readFileSync(file, 'utf8'));
   answers.set('_src_path', source);
@@ -151,7 +152,7 @@ function run(id, command) {
   if (child.error) throw child.error;
   process.exit(child.status ?? 1);
 }
-module.exports = {read, setSource, glob, validId, secrets, missing, setup, switcher, workflows, inventory, check, extensionSocket};
+module.exports = {read, parse, setSource, glob, validId, secrets, missing, setup, switcher, workflows, inventory, check, extensionSocket};
 if (require.main === module) {
   try {
     if (process.argv[2] === 'run') run(process.argv[3],process.argv.slice(4));

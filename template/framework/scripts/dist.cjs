@@ -3,18 +3,23 @@
 // template; clients receive it with `copier copy`/`copier recopy` (its files win), then
 // merge the delivered memory into their own with `git merge-file --union`.
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {execFileSync,spawnSync}=require('node:child_process');
 
 const CONFIG='project/distribution.yaml';
 const DIST='state/dist',MANIFEST=`${DIST}/manifest.json`,SECRETS=`${DIST}/secrets.sops.yaml`,MEMORY=`${DIST}/memory`;
 const ANSWERS='.copier-answers.dist.yml';
+// Biz transport: `repo: biz` in project/distribution.yaml. The publisher keeps a git mirror of the
+// distribution; clients unbundle what Biz serves into BIZ_SRC. Both are relative to the project
+// root, which is also what the (tracked) answers file records as the Copier source: no machine path.
+const PENDING='.data/dist/secrets-pending.json',BIZ_MIRROR='.data/dist/biz-mirror',BIZ_SRC='.data/dist/biz-source',BIZ_ROUTE='/oauth/framework-access';
 // Per-instance credentials are never sent: the Dagu technical password (D19) and web users.
 const PRIVATE=new Set(['FYSO_ADMIN_PASSWORD','FYSO_AUTH_USERS']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
 const MACHINE_PATH=/\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+\/|\/private\/tmp\/|\/var\/folders\/|\/opt\/homebrew\/|C:\\Users\\/;
 
-const fail=message=>{const error=new Error(message);error.user=true;throw error;};
+// `exit` is the process exit code the command ends with (default 1): 3 stale_base, 4 merge conflict.
+const fail=(message,exit)=>{const error=new Error(message);error.user=true;if(exit)error.exit=exit;throw error;};
 const run=(bin,args,options={})=>execFileSync(bin,args,{stdio:['pipe','pipe','pipe'],maxBuffer:1<<28,...options});
 const git=(args,options)=>run('git',args,options);
 // sops reads a file, and on Linux /dev/stdin cannot be opened when stdin is the socket node provides.
@@ -24,6 +29,9 @@ const sopsEncrypt=(args,text,options={})=>{
   finally{fs.rmSync(dir,{recursive:true,force:true});}
 };
 const readYaml=file=>require('./extensions.cjs').read(file);
+// Team files write `${FYSO_ROOT}` unquoted inside flow maps (the template's own does), which YAML cannot parse:
+// parse with a marker, as managed-bots.cjs does. Only bot names are read from it.
+const readTeam=file=>require('./extensions.cjs').parse(fs.readFileSync(file,'utf8').replaceAll('${FYSO_ROOT}','__FYSO_PATH_ROOT__'));
 
 /** Where a committed project file goes in the distribution, or null when it stays here. */
 function target(file) {
@@ -55,8 +63,10 @@ function config() {
   if(!Array.isArray(recipients)||!recipients.every(key=>typeof key==='string'&&/^age1[0-9a-z]+$/.test(key)))fail(`${CONFIG}: recipients must be age public keys (age1…)`);
   const blocked=secrets.filter(name=>PRIVATE.has(name));
   if(blocked.length)fail(`${CONFIG}: ${blocked.join(', ')} belong to each installation and are never sent`);
-  if(secrets.length&&!recipients.length)fail(`${CONFIG}: sending secrets needs the clients' public keys in recipients (they print it with 'mise run dist:key')`);
-  return {repo:data.repo.trim(),secrets,recipients};
+  const repo=data.repo.trim(),biz=repo==='biz';
+  // With Biz the recipients come from the server too, so the yaml list may be empty.
+  if(secrets.length&&!recipients.length&&!biz)fail(`${CONFIG}: sending secrets needs the clients' public keys in recipients (they print it with 'mise run dist:key')`);
+  return {repo,biz,secrets,recipients};
 }
 
 /** Copier understands gh:/gl:; git needs the full URL. */
@@ -77,6 +87,209 @@ function frameworkVersion() {
   try {return String(readYaml('.copier-answers.yml')?._commit||'')||null;} catch {return null;}
 }
 
+/**
+ * HTTP to Biz through a small adapter: base URL and a command that prints a fresh access token
+ * come from the environment (the Biz extension provides both). The token is never logged.
+ * `fetchImpl` is injectable for tests.
+ */
+function bizClient(env=process.env,fetchImpl=globalThis.fetch) {
+  const base=String(env.FYSO_DIST_BIZ_URL||'').replace(/\/+$/,''),command=env.FYSO_DIST_BIZ_TOKEN_CMD,organization=String(env.FYSO_DIST_BIZ_ORGANIZATION||'').trim();
+  if(!base||!command||!organization)fail('the Biz transport needs FYSO_DIST_BIZ_URL, FYSO_DIST_BIZ_TOKEN_CMD and FYSO_DIST_BIZ_ORGANIZATION (the Biz extension sets them)');
+  let token=null;
+  const bearer=()=>{
+    if(token)return token;
+    const result=spawnSync(command,{shell:true,encoding:'utf8',env});
+    if(result.status!==0||!result.stdout.trim())fail('FYSO_DIST_BIZ_TOKEN_CMD did not print an access token; reconnect to Biz');
+    return token=result.stdout.trim();
+  };
+  const request=async(method,route,{headers={},body}={})=>{
+    let response;
+    try {response=await fetchImpl(`${base}${BIZ_ROUTE}${route}?organization=${encodeURIComponent(organization)}`,{method,body,headers:{...headers,Authorization:`Bearer ${bearer()}`}});}
+    catch(error) {fail(`Biz is not reachable (${error.cause?.code||error.message})`);}
+    const bytes=Buffer.from(await response.arrayBuffer());
+    if(response.status>=400) {
+      let payload={};try {payload=JSON.parse(bytes.toString('utf8'))||{};} catch {/* not JSON */}
+      const error=new Error(bizMessage(response.status,payload.error||'',payload.current||''));
+      error.user=true;
+      if(payload.error==='stale_base'){error.staleBase=true;error.current=payload.current||null;}
+      throw error;
+    }
+    return {status:response.status,headers:response.headers,body:bytes};
+  };
+  return {request};
+}
+
+function bizMessage(status,code,current) {
+  if(status===401)return 'Biz rejected the access token; reconnect to Biz';
+  if(status===403)return code==='admin_required'?'publishing a setup needs an organization admin in Biz'
+    :'Biz denied access: this person has no admin role or department, or lost access';
+  if(status===404)return 'Biz has no setup published yet for this organization';
+  if(code==='stale_base')return `stale_base: Biz has ${current||'a setup'} and this project is not based on it; run \`mise run dist:update\` to merge it, then publish again`;
+  if(status===409)return `version conflict: Biz already has ${current||'a newer version'}; publish a version greater than that`;
+  if(code==='manifest_too_large')return 'Biz refused the setup summary (manifest_too_large): too many extensions, MCP servers, bots or secrets';
+  if(status===413)return 'the setup is too large for Biz (limit 50 MiB)';
+  return `Biz answered ${status}${code?` (${code})`:''}`;
+}
+
+const sha256=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+
+/** Download the setup bundle, verify its checksum and unbundle it into `dest` (a git repo with tags). */
+async function bizDownload(client,dest) {
+  const response=await client.request('GET','/setup');
+  const expected=String(response.headers.get('x-setup-sha256')||'').toLowerCase();
+  if(!expected||sha256(response.body)!==expected)fail('the downloaded setup does not match its checksum; nothing was installed');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-bundle-'));
+  try {
+    const file=path.join(dir,'setup.bundle');
+    fs.writeFileSync(file,response.body);
+    fs.rmSync(dest,{recursive:true,force:true});
+    fs.mkdirSync(path.dirname(dest),{recursive:true});
+    git(['clone','-q',file,dest]);
+    git(['-C',dest,'remote','remove','origin']);
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  return response.headers.get('x-setup-version');
+}
+
+async function bizRecipients(client) {
+  const response=await client.request('GET','/recipients');
+  const list=JSON.parse(response.body.toString('utf8')).recipients||[];
+  return list.map(entry=>entry.age_public_key).filter(key=>/^age1[0-9a-z]+$/.test(key));
+}
+
+/** The publisher's mirror: a git repo continuing Biz's history, so versions keep counting up. */
+async function bizMirror(client) {
+  const mirror=path.resolve(BIZ_MIRROR),dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mirror-'));
+  try {
+    // Continue Biz's history: other admins may have published since this mirror was built.
+    let latest=null;
+    try {latest=await bizDownload(client,path.join(dir,'src'));}
+    catch(error) {if(!/no setup published/.test(error.message))throw error;}
+    const known=fs.existsSync(path.join(mirror,'.git'))&&(!latest||tags(mirror).includes(latest));
+    if(!known) {
+      fs.rmSync(mirror,{recursive:true,force:true});
+      if(latest){fs.mkdirSync(path.dirname(mirror),{recursive:true});fs.cpSync(path.join(dir,'src'),mirror,{recursive:true});}
+      else {fs.mkdirSync(mirror,{recursive:true});git(['init','-q','-b','main',mirror]);}
+    } else if(spawnSync('git',['-C',mirror,'rev-parse','-q','--verify','HEAD']).status===0) {
+      git(['-C',mirror,'reset','-q','--hard']);git(['-C',mirror,'clean','-fdxq']);
+    }
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  return mirror;
+}
+
+/** The Biz version this project's files were built on: `none` until it installed or published one. */
+function installedBase() {
+  const answers=fs.existsSync(ANSWERS)?readYaml(ANSWERS)||{}:null;
+  return isBiz(answers)&&answers._commit?String(answers._commit):'none';
+}
+
+/** A publisher is installed at what it published, so the next publish is built on top of it. */
+function recordInstalled(version) {
+  try {
+    fs.writeFileSync(ANSWERS,`# Installed distribution (D56). Updated by \`mise run dist:update\`; do not edit.\n_commit: ${version}\n_src_path: ${BIZ_SRC}\n`);
+    git(['add','--',ANSWERS]);
+    git(['commit','-q','-m',`dist: published ${version}`,'--',ANSWERS]);
+  } catch(error) {console.error(`note: could not record ${version} as installed (${(error.stderr||error.message).toString().trim()})`);}
+}
+
+const isPublisher=()=>fs.existsSync(CONFIG)&&String((readYaml(CONFIG)||{}).repo||'').trim()==='biz';
+
+/**
+ * Three-way merge per file between the installed version (base), this project's current files
+ * (ours, committed and uncommitted) and `latest` (theirs). Read-only: returns what to write
+ * (Buffer, or null to delete) and the files that conflict.
+ */
+function threeWay(src,base,latest) {
+  const prefix='template/',scope=file=>target(file)===file;
+  const [b,t]=[base,latest].map(ref=>new Map([...tree(src,ref,prefix)].filter(([file])=>scope(file))));
+  const mine=git(['ls-files','-z','--cached','--others','--exclude-standard']).toString('utf8').split('\0').filter(Boolean)
+    .filter(file=>scope(file)&&fs.existsSync(file)&&fs.lstatSync(file).isFile());
+  const read=(map,file,ref)=>map.has(file)?blob(src,map.get(file)):null;
+  const writes=new Map(),conflicts=[];
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-merge-'));
+  try {
+    for(const file of [...new Set([...b.keys(),...t.keys(),...mine])].sort()) {
+      const o=mine.includes(file)?fs.readFileSync(file):null,x=read(b,file),y=read(t,file);
+      const same=(p,q)=>(p===null&&q===null)||(p&&q&&p.equals(q));
+      if(same(o,y))continue;                       // already what the latest version has
+      if(same(o,x)){writes.set(file,y);continue;}   // only the latest changed it
+      if(same(x,y))continue;                       // only this project changed it
+      if(o===null||y===null){conflicts.push(file);continue;}   // edited here, deleted there (or the reverse)
+      const [fo,fx,fy]=['ours','base','theirs'].map(name=>path.join(dir,name));
+      fs.writeFileSync(fo,o);fs.writeFileSync(fx,x??Buffer.alloc(0));fs.writeFileSync(fy,y);
+      const merged=spawnSync('git',['merge-file','-p',fo,fx,fy],{maxBuffer:1<<28});
+      if(merged.status===0)writes.set(file,merged.stdout);else conflicts.push(file);
+    }
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  return {writes,conflicts:conflicts.sort(),theirs:file=>read(t,file)};
+}
+
+/** `dist dist:update [version] [--ours f...] [--theirs f...]` arguments of a publisher. */
+function mergeArgs(args) {
+  const out={version:null,ours:[],theirs:[]};let side=null;
+  for(const arg of args) {
+    if(arg==='--ours'||arg==='--theirs')side=arg.slice(2);
+    else if(arg.startsWith('--'))fail(`unknown option ${arg} (usage: dist:update [version] [--ours <file>...] [--theirs <file>...])`);
+    else if(side)out[side].push(arg.replace(/^\.\//,''));
+    else if(!out.version)out.version=arg;
+    else fail('usage: dist:update [version] [--ours <file>...] [--theirs <file>...]');
+  }
+  const both=out.ours.filter(file=>out.theirs.includes(file));
+  if(both.length)fail(`${both.join(', ')} given to both --ours and --theirs`);
+  return out;
+}
+
+/** `dist:update` on a publisher: merge the latest version into the project, or change nothing. */
+async function merge(args) {
+  const {version:requested,ours:keepOurs,theirs:takeTheirs}=mergeArgs(args);
+  if(!fs.existsSync(ANSWERS))fail('no distribution installed; use `mise run dist:add biz`');
+  const answers=readYaml(ANSWERS)||{},base=String(answers._commit||'');
+  const botsFile=path.join(path.dirname(BIZ_SRC),'memory-bots');
+  fs.rmSync(botsFile,{force:true});
+  await bizDownload(bizClient(),path.resolve(BIZ_SRC));
+  const available=tags(BIZ_SRC),latest=requested?(requested.startsWith('v')?requested:`v${requested}`):latestTag(available);
+  if(!latest||!available.includes(latest))fail(`${requested||'the latest version'} is not published`);
+  if(!available.includes(base))fail(`the installed version ${base||'?'} is not in the setup history; cannot merge`);
+  if(base===latest){console.log(`already at ${latest}`);return;}
+  const result=threeWay(BIZ_SRC,base,latest),{writes}=result,report=path.join(path.dirname(BIZ_SRC),'merge-conflicts.json');
+  // Named files take that side, conflicting or not.
+  for(const file of keepOurs)writes.delete(file);
+  for(const file of takeTheirs) {
+    const content=result.theirs(file);
+    if(content===null&&!fs.existsSync(file))writes.delete(file);else writes.set(file,content);
+  }
+  const conflicts=result.conflicts.filter(file=>!keepOurs.includes(file)&&!takeTheirs.includes(file));
+  if(conflicts.length) {
+    fs.writeFileSync(report,JSON.stringify({base,latest,files:conflicts},null,2)+'\n');
+    fail(`merge_conflict: ${conflicts.length} file(s) were edited here and in ${latest}; nothing was changed. Resolve them (see ${report}), then run dist:update again, choosing a side per file with --ours <file> / --theirs <file>:\n  ${conflicts.join('\n  ')}`,4);
+  }
+  fs.rmSync(report,{force:true});
+  for(const [file,content] of writes) {
+    if(content===null)fs.rmSync(file,{force:true});
+    else {fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);}
+  }
+  fs.writeFileSync(ANSWERS,`# Installed distribution (D56). Updated by \`mise run dist:update\`; do not edit.\n_commit: ${latest}\n_src_path: ${BIZ_SRC}\n`);
+  const paths=[...writes.keys(),ANSWERS];
+  git(['add','-A','--',...paths]);
+  git(['commit','-q','-m',`dist: merge ${latest}`,'--',...paths]);
+  // Memory delivered with the latest version is union-merged into this project's, as for members.
+  const prefix='template/'+MEMORY+'/',now=tree(BIZ_SRC,latest,prefix),before=tree(BIZ_SRC,base,prefix);
+  const bots=mergeMemoryEntries([...now].map(([rel,sha])=>({rel,incoming:blob(BIZ_SRC,sha),previous:before.has(rel)?blob(BIZ_SRC,before.get(rel)):null})));
+  fs.writeFileSync(botsFile,bots.map(bot=>`${bot}\n`).join(''));
+  console.log(`merged ${latest} (${writes.size} files updated)`);
+}
+
+/** What Biz displays about a setup: the manifest plus names only (never values). */
+function bizSummary(template,secretNames) {
+  const manifest=JSON.parse(fs.readFileSync(path.join(template,MANIFEST),'utf8'));
+  const read=rel=>{const file=path.join(template,rel);return fs.existsSync(file)?file:null;};
+  const mcp=read('project/mcp.json'),team=read('project/bots/team.yaml');
+  return {framework:manifest.framework??null,files_count:manifest.files.length,extensions:extensionIds(manifest.files),
+    mcp_servers:mcp?Object.keys(JSON.parse(fs.readFileSync(mcp,'utf8')).mcpServers||{}):[],
+    bots:team?botNames(readTeam(team)):[],secrets:secretNames};
+}
+const botNames=team=>(team?.bots||[]).map(bot=>bot?.name).filter(name=>typeof name==='string');
+const extensionIds=files=>[...new Set(files.map(file=>/^extensions\/([^/]+)\//.exec(file)?.[1]||/^\.copier-answers\.ext-(.+)\.yml$/.exec(file)?.[1]).filter(Boolean))].sort();
+
 const COPIER_YML=`# Fyso project distribution (D56). Generated by \`mise run dist:publish\`; do not edit here.
 # Install:  mise run dist:add <this repository>    Update:  mise run dist:update
 _min_copier_version: "9.4.0"
@@ -88,13 +301,23 @@ _preserve_symlinks: true
 _exclude: [".git", ".DS_Store"]
 `;
 
-function publish(requested) {
-  const {repo,secrets,recipients}=config();
+async function publish(requested) {
+  const {repo,biz,secrets,recipients:listed}=config();
   if(git(['status','--porcelain','--','project','state','extensions']).toString().trim())
     console.error('note: uncommitted changes are not published (run `mise run snapshot` or commit them first)');
-  const work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
-  try {
+  let client=null,recipients=listed,work,base=null;
+  if(biz) {
+    client=bizClient();
+    // Everyone Biz knows is a recipient; a person who registers later is added on the next publish.
+    if(secrets.length)recipients=[...new Set([...listed,...await bizRecipients(client)])];
+    if(secrets.length&&!recipients.length)fail('nobody has registered an age key in Biz yet (members run `mise run dist:key`, the Biz extension registers it)');
+    work=await bizMirror(client);
+    base=installedBase();
+  } else {
+    work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
     git(['clone','-q',cloneUrl(repo),work]);
+  }
+  try {
     const previousSecrets=path.join(work,'template',SECRETS);
     const previous=fs.existsSync(previousSecrets)?fs.readFileSync(previousSecrets):null;
     // Rebuild from scratch, so files removed here disappear from the distribution too.
@@ -143,9 +366,33 @@ function publish(requested) {
     const version=nextVersion(requested,tags);
     git(['-C',work,'commit','-q','-m',`Distribution ${version}`]);
     git(['-C',work,'tag',version]);
-    git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
-    console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${repo}`);
-  } finally {fs.rmSync(work,{recursive:true,force:true});}
+    if(biz) {
+      try {await bizUpload(client,work,version,bizSummary(template,secrets),base);}
+      catch(error) {
+        // Not published: forget the version here so the next publish builds it again.
+        git(['-C',work,'tag','-d',version]);
+        if(tags.length)git(['-C',work,'reset','-q','--hard','HEAD~1']);else git(['-C',work,'update-ref','-d','HEAD']);
+        if(error.staleBase&&base==='none'&&error.current)fail(`Biz already has ${error.current} and this project has not installed it (stale_base): run \`mise run dist:add biz\` first`,5);
+        if(error.staleBase)error.exit=3;
+        throw error;
+      }
+      recordInstalled(version);
+    } else git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
+    console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${biz?'Biz':repo}`);
+  } finally {if(!biz)fs.rmSync(work,{recursive:true,force:true});}
+}
+
+async function bizUpload(client,work,version,summary,base) {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-bundle-'));
+  try {
+    const file=path.join(dir,'setup.bundle');
+    git(['-C',work,'bundle','create','-q',file,'--all']);
+    const body=fs.readFileSync(file);
+    const encoded=Buffer.from(JSON.stringify(summary)).toString('base64');
+    if(encoded.length>8192)fail(`the setup summary is too large for Biz (${encoded.length} bytes encoded, limit 8192): too many extensions, MCP servers, bots or secrets`);
+    await client.request('PUT','/setup',{body,headers:{'Content-Type':'application/octet-stream','X-Setup-Version':version,'X-Setup-Base':base,
+      'X-Setup-Sha256':sha256(body),'X-Setup-Manifest':encoded}});
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 }
 
 function sameSecrets(previous,picked,recipients,work) {
@@ -247,7 +494,18 @@ function teamSource() {
 /** Received secrets overwrite this project's values with the same name, re-encrypted for it. */
 function secrets() {
   if(!fs.existsSync(SECRETS))return;
-  const incoming=decrypt(SECRETS);
+  let incoming;
+  try {incoming=decrypt(SECRETS);}
+  catch {
+    // Not a recipient yet: install everything else and remember it (the next update retries).
+    const listed=names(readYaml(SECRETS)).filter(name=>name!=='sops'&&NAME.test(name)&&!PRIVATE.has(name));
+    fs.mkdirSync(path.dirname(PENDING),{recursive:true});
+    fs.writeFileSync(PENDING,JSON.stringify({names:listed,since:new Date().toISOString()}));
+    console.warn(`warning: the received secrets (${listed.join(', ')}) are not encrypted for this installation's key, so they were NOT written. `
+      +'Give your public key (mise run dist:key) to the publisher; the next dist:update installs them.');
+    return;
+  }
+  fs.rmSync(PENDING,{force:true});
   for(const name of Object.keys(incoming))if(PRIVATE.has(name)||!NAME.test(name))delete incoming[name];
   if(!fs.existsSync('secrets.enc.yaml'))fail('run `mise run setup` first: the received secrets go into secrets.enc.yaml');
   const current=decrypt('secrets.enc.yaml');
@@ -284,11 +542,15 @@ function union(local,base,incoming) {
  * The previous delivery, from git at `base`, is the common ancestor. Prints changed bots.
  */
 function mergeMemory(base) {
+  const entries=walk(MEMORY).map(rel=>({rel,incoming:fs.readFileSync(path.join(MEMORY,rel)),previous:show(base,`${MEMORY}/${rel}`)}));
+  for(const bot of mergeMemoryEntries(entries))console.log(bot);
+}
+
+/** entries: [{rel: '<bot>/<file>', incoming, previous}]; returns the sorted names of bots whose memory changed. */
+function mergeMemoryEntries(entries) {
   const changed=new Set();
-  for(const rel of walk(MEMORY)) {
-    const [bot,...rest]=rel.split('/'),inner=rest.join('/');
-    const incoming=fs.readFileSync(path.join(MEMORY,rel)),local=path.join('state/memory',bot,inner);
-    const previous=show(base,`${MEMORY}/${rel}`);
+  for(const {rel,incoming,previous} of entries) {
+    const [bot,...rest]=rel.split('/'),inner=rest.join('/'),local=path.join('state/memory',bot,inner);
     let merged;
     if(!fs.existsSync(local))merged=incoming;
     else {
@@ -301,36 +563,177 @@ function mergeMemory(base) {
     fs.writeFileSync(local,merged);
     changed.add(bot);
   }
-  for(const bot of [...changed].sort())console.log(bot);
+  return [...changed].sort();
 }
 
-function status() {
+const versionKey=tag=>tag.slice(1).split('.').map(Number);
+function latestTag(tags) {
+  return [...tags].sort((a,b)=>{const x=versionKey(a),y=versionKey(b);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0);return 0;}).pop()||null;
+}
+const versionTags=lines=>lines.filter(tag=>/^v\d+(\.\d+){0,2}$/.test(tag));
+const isBiz=answers=>answers?._src_path===BIZ_SRC;
+
+async function status() {
   if(!fs.existsSync(ANSWERS)){console.log('No distribution installed (mise run dist:add <repo>).');return;}
   const answers=readYaml(ANSWERS)||{},current=answers._commit||'?';
-  console.log(`Distribution: ${answers._src_path}\nVersion:      ${current}`);
-  const remote=spawnSync('git',['ls-remote','--tags',cloneUrl(String(answers._src_path))],{encoding:'utf8'});
-  if(remote.status!==0){console.log('Latest:       unknown (repository not reachable)');return;}
-  const tags=remote.stdout.split('\n').map(line=>/refs\/tags\/(v\d+(?:\.\d+){0,2})$/.exec(line)).filter(Boolean).map(match=>match[1]);
-  const key=tag=>tag.slice(1).split('.').map(Number);
-  const latest=tags.sort((a,b)=>{const x=key(a),y=key(b);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0);return 0;}).pop();
+  console.log(`Distribution: ${isBiz(answers)?'Biz (managed setup)':answers._src_path}\nVersion:      ${current}`);
+  if(fs.existsSync(PENDING))console.log(`Secrets:      pending, not decryptable by this key: ${(JSON.parse(fs.readFileSync(PENDING,'utf8')).names||[]).join(', ')}`);
+  let tags;
+  if(isBiz(answers)) {
+    // Read-only: the bundle goes to a temporary directory, not to the cache `update` uses.
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-status-'));
+    try {await bizDownload(bizClient(),path.join(dir,'src'));tags=versionTags(git(['-C',path.join(dir,'src'),'tag','--list']).toString().split('\n'));}
+    catch(error) {console.log(`Latest:       unknown (${error.user?error.message:'Biz not reachable'})`);return;}
+    finally {fs.rmSync(dir,{recursive:true,force:true});}
+  } else {
+    const remote=spawnSync('git',['ls-remote','--tags',cloneUrl(String(answers._src_path))],{encoding:'utf8'});
+    if(remote.status!==0){console.log('Latest:       unknown (repository not reachable)');return;}
+    tags=remote.stdout.split('\n').map(line=>/refs\/tags\/(v\d+(?:\.\d+){0,2})$/.exec(line)?.[1]).filter(Boolean);
+  }
+  const latest=latestTag(tags);
   console.log(`Latest:       ${latest||'?'}${latest&&latest!==current?'  → mise run dist:update':''}`);
 }
 
-if(require.main===module) {
+// Ports are rebound per installation, so a port-only difference is not a local edit.
+const normalize=(file,text)=>/^\.config\/mise\/conf\.d\/ext-[^/]+\.toml$|^\.copier-answers\.ext-[^/]+\.yml$/.test(file)
+  ?text.replace(/^(FYSO_EXT_[A-Z0-9_]*_PORT\s*=|extension_port:).*$/gm,'$1'):text;
+const blobSha=bytes=>crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+
+/** path → blob sha of a tree (empty when the ref has no such tree, e.g. no commit yet). */
+function tree(dir,ref,prefix) {
+  const result=spawnSync('git',['-C',dir,'ls-tree','-r','-z','--full-tree',ref,...(prefix?['--',prefix]:[])],{maxBuffer:1<<28});
+  const map=new Map();
+  if(result.status!==0)return map;
+  for(const line of result.stdout.toString('utf8').split('\0').filter(Boolean)) {
+    const [meta,file]=line.split('\t');map.set(prefix&&file.startsWith(prefix)?file.slice(prefix.length):file,meta.split(' ')[2]);
+  }
+  return map;
+}
+const blob=(dir,sha)=>git(['-C',dir,'cat-file','blob',sha]);
+const names=obj=>Object.keys(obj||{}).sort();
+
+/**
+ * Read-only preview of what `dist:add` / `dist:update` would do. The distribution is fetched into a
+ * temporary directory; nothing in the project changes. Arguments: [repo] [version] [--json].
+ */
+async function plan(args) {
+  const json=args.includes('--json'),positional=args.filter(arg=>arg!=='--json');
+  const installed=fs.existsSync(ANSWERS)?readYaml(ANSWERS)||{}:null;
+  let repo=installed?String(installed._src_path):null,version=null;
+  for(const arg of positional) {
+    if(/^v?\d+(\.\d+){0,2}$/.test(arg))version=arg.startsWith('v')?arg:`v${arg}`;
+    else if(installed)fail('a distribution is already installed: usage dist:plan [version] [--json]');
+    else repo=arg;
+  }
+  if(!repo&&process.env.FYSO_DIST_BIZ_URL)repo='biz';
+  if(!repo)fail('usage: dist:plan [<repo>|biz] [version] [--json]');
+  const biz=repo==='biz'||repo===BIZ_SRC;
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-plan-')),src=path.join(dir,'src');
+  try {
+    if(biz)await bizDownload(bizClient(),src);else git(['clone','-q',cloneUrl(repo),src]);
+    const tags=versionTags(git(['-C',src,'tag','--list']).toString().split('\n'));
+    const target=version||latestTag(tags);
+    if(!target||!tags.includes(target))fail(version?`${version} is not published`:'the distribution has no versions');
+    const current=installed?._commit||null;
+    const result=planAgainst(src,target,current,dir);
+    const output={mode:installed?'update':'add',transport:biz?'biz':'git',source:biz?'biz':repo,current,version:target,up_to_date:current===target,...result};
+    if(installed&&biz&&isPublisher()) {
+      output.merge=git(['-C',src,'tag','--list']).toString().split('\n').includes(current)?{base:current,latest:target,conflicts:current===target?[]:threeWay(src,current,target).conflicts}:null;
+    }
+    if(json)console.log(JSON.stringify(output,null,2));else printPlan(output);
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+}
+
+function planAgainst(src,target,current,scratch) {
+  const prefix='template/',next=tree(src,target,prefix),base=current&&tags(src).includes(current)?tree(src,current,prefix):new Map();
+  const manifest=JSON.parse(blob(src,next.get(MANIFEST)).toString('utf8'));
+  const old=base.has(MANIFEST)?JSON.parse(blob(src,base.get(MANIFEST)).toString('utf8')).files||[]:[];
+  const delivered=(manifest.files||[]).filter(file=>file!==SECRETS);
+  const head=new Map([...tree('.','HEAD')]);
+  const dirty=new Set(git(['status','--porcelain','-z','--untracked-files=all']).toString('utf8').split('\0').filter(Boolean)
+    .map(entry=>entry.slice(3)));
+  const added=[],replaced=[];
+  for(const file of delivered) {
+    const sha=next.get(file);
+    if(!sha||!fs.existsSync(file)||!fs.statSync(file).isFile()){if(sha)added.push(file);continue;}
+    const mine=fs.readFileSync(file),theirs=blob(src,sha);
+    if(normalize(file,mine.toString('latin1'))===normalize(file,theirs.toString('latin1')))continue;
+    const edits=[],committedSha=head.get(file);
+    if(dirty.has(file)||!committedSha)edits.push('uncommitted');
+    if(committedSha) {
+      const was=base.get(file);
+      const same=was&&(committedSha===was||normalize(file,blob('.',committedSha).toString('latin1'))===normalize(file,blob(src,was).toString('latin1')));
+      if(!same)edits.push('committed');
+    }
+    replaced.push({path:file,local_edits:edits});
+  }
+  const now=new Set(delivered);
+  const removed=old.filter(file=>file!==SECRETS&&!now.has(file)&&fs.existsSync(file)).sort();
+  // Secrets: names are readable without a key; values only to a recipient.
+  let secrets={names:[],decryptable:true,pending:false};
+  if(next.has(SECRETS)) {
+    const file=path.join(scratch,'incoming.sops.yaml');
+    fs.writeFileSync(file,blob(src,next.get(SECRETS)));
+    const listed=names(readYaml(file)).filter(name=>name!=='sops'&&NAME.test(name)&&!PRIVATE.has(name));
+    try {
+      const incoming=decrypt(file),mine=fs.existsSync('secrets.enc.yaml')?decrypt('secrets.enc.yaml'):{};
+      secrets={names:listed.filter(name=>mine[name]!==incoming[name]),decryptable:true,pending:false};
+    } catch {secrets={names:listed,decryptable:false,pending:true};}
+  }
+  // Extensions and bots: what this project does not have yet / loses.
+  const local=new Set([...fs.globSync('.copier-answers.ext-*.yml').map(f=>/^\.copier-answers\.ext-(.+)\.yml$/.exec(f)[1]),
+    ...(fs.existsSync('extensions')?fs.readdirSync('extensions'):[])]);
+  const extensions={added:extensionIds(delivered).filter(id=>!local.has(id)),
+    removed:extensionIds(old).filter(id=>!extensionIds(delivered).includes(id)&&local.has(id))};
+  const delivery=file=>{const tmp=path.join(scratch,path.basename(file));fs.writeFileSync(tmp,blob(src,next.get(file)));return tmp;};
+  const teamFile=next.has('state/bots/team.yaml')&&delivered.includes('state/bots/team.yaml')?'state/bots/team.yaml':'project/bots/team.yaml';
+  const mine=new Set(['project/bots/team.yaml','state/bots/team.yaml'].filter(f=>fs.existsSync(f)).flatMap(f=>botNames(readTeam(f))));
+  const incomingBots=next.has(teamFile)?botNames(readTeam(delivery(teamFile))):[];
+  const bots={added:incomingBots.filter(name=>!mine.has(name))};
+  const mcpNow=fs.existsSync('project/mcp.json')?names(JSON.parse(fs.readFileSync('project/mcp.json','utf8')).mcpServers):[];
+  const incomingMcp=next.has('project/mcp.json')?names(JSON.parse(blob(src,next.get('project/mcp.json')).toString('utf8')).mcpServers):[];
+  const mcp_servers={added:incomingMcp.filter(n=>!mcpNow.includes(n))};
+  const mine_framework=frameworkVersion();
+  return {framework:{published:manifest.framework||null,local:mine_framework},
+    files:{added:added.sort(),replaced:replaced.sort((a,b)=>a.path.localeCompare(b.path)),removed},secrets,extensions,bots,mcp_servers,
+    contents:{extensions:extensionIds(delivered),mcp_servers:incomingMcp,bots:incomingBots}};
+}
+const tags=src=>git(['-C',src,'tag','--list']).toString().split('\n').filter(Boolean);
+
+function printPlan(p) {
+  const list=(title,items,format=x=>x)=>{if(items.length){console.log(`${title} (${items.length}):`);for(const item of items)console.log(`  ${format(item)}`);}};
+  console.log(`${p.mode==='add'?'Install':'Update'} ${p.source}: ${p.current||'(nothing installed)'} → ${p.version}${p.up_to_date?' (already at this version; local edits would still be replaced)':''}`);
+  list('Files added',p.files.added);
+  list('Files replaced',p.files.replaced,f=>f.local_edits.length?`${f.path}   LOCAL EDITS LOST (${f.local_edits.join(', ')})`:f.path);
+  list('Files removed',p.files.removed);
+  list(p.secrets.decryptable?'Secrets written':'Secrets written (cannot be read with this key; all listed)',p.secrets.names);
+  list('Extensions added',p.extensions.added);list('Extensions removed',p.extensions.removed);
+  list('Bots added',p.bots.added);list('MCP servers added',p.mcp_servers.added);
+  if(p.framework.published&&p.framework.local&&p.framework.published!==p.framework.local)
+    console.log(`Note: published with framework ${p.framework.published}, this project has ${p.framework.local}`);
+  console.log('Nothing was changed.');
+}
+
+if(require.main===module) (async()=>{
   const [command,arg]=process.argv.slice(2);
   try {
-    if(command==='publish')publish(arg);
+    if(command==='publish')await publish(arg);
     else if(command==='prune')prune(arg);
     else if(command==='secrets')secrets();
     else if(command==='ports')ports(arg);
     else if(command==='team-source')teamSource();
     else if(command==='merge-memory')mergeMemory(arg);
-    else if(command==='status')status();
+    else if(command==='status')await status();
+    else if(command==='plan')await plan(process.argv.slice(3));
+    else if(command==='biz-fetch'){await bizDownload(bizClient(),path.resolve(BIZ_SRC));console.log(BIZ_SRC);}
+    else if(command==='merge')await merge(process.argv.slice(3));
+    else if(command==='is-publisher')process.exit(isPublisher()?0:1);
+    else if(command==='is-biz')process.exit(fs.existsSync(ANSWERS)&&isBiz(readYaml(ANSWERS))?0:1);
     else if(command==='clone-url')console.log(cloneUrl(arg));
-    else fail('usage: dist.cjs <publish [version]|prune <base>|secrets|merge-memory <base>|status>');
+    else fail('usage: dist.cjs <publish [version]|plan [repo] [version] [--json]|prune <base>|secrets|merge-memory <base>|status|biz-fetch|is-biz>');
   } catch(error) {
     console.error(`error: ${error.user?error.message:(error.stderr?.toString()||error.message)}`);
-    process.exit(1);
+    process.exit(error.exit||1);
   }
-}
-module.exports={target,cloneUrl,nextVersion,union,config,ports};
+})();
+module.exports={target,cloneUrl,nextVersion,union,config,ports,bizClient,bizMessage};
