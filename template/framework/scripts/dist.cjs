@@ -119,6 +119,7 @@ function bizMessage(status,code,current) {
     :'Biz denied access: this person has no admin role or department, or lost access';
   if(status===404)return 'Biz has no setup published yet for this organization';
   if(status===409)return `version conflict: Biz already has ${current||'a newer version'}; publish a version greater than that`;
+  if(code==='manifest_too_large')return 'Biz refused the setup summary (manifest_too_large): too many extensions, MCP servers, bots or secrets';
   if(status===413)return 'the setup is too large for Biz (limit 50 MiB)';
   return `Biz answered ${status}${code?` (${code})`:''}`;
 }
@@ -169,7 +170,7 @@ function bizSummary(template,secretNames) {
   const manifest=JSON.parse(fs.readFileSync(path.join(template,MANIFEST),'utf8'));
   const read=rel=>{const file=path.join(template,rel);return fs.existsSync(file)?file:null;};
   const mcp=read('project/mcp.json'),team=read('project/bots/team.yaml');
-  return {...manifest,extensions:extensionIds(manifest.files),
+  return {framework:manifest.framework??null,files_count:manifest.files.length,extensions:extensionIds(manifest.files),
     mcp_servers:mcp?Object.keys(JSON.parse(fs.readFileSync(mcp,'utf8')).mcpServers||{}):[],
     bots:team?botNames(readYaml(team)):[],secrets:secretNames};
 }
@@ -270,8 +271,10 @@ async function bizUpload(client,work,version,summary) {
     const file=path.join(dir,'setup.bundle');
     git(['-C',work,'bundle','create','-q',file,'--all']);
     const body=fs.readFileSync(file);
+    const encoded=Buffer.from(JSON.stringify(summary)).toString('base64');
+    if(encoded.length>8192)fail(`the setup summary is too large for Biz (${encoded.length} bytes encoded, limit 8192): too many extensions, MCP servers, bots or secrets`);
     await client.request('PUT','/setup',{body,headers:{'Content-Type':'application/octet-stream','X-Setup-Version':version,
-      'X-Setup-Sha256':sha256(body),'X-Setup-Manifest':Buffer.from(JSON.stringify(summary)).toString('base64')}});
+      'X-Setup-Sha256':sha256(body),'X-Setup-Manifest':encoded}});
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 }
 

@@ -361,7 +361,8 @@ class BizDistributionTests(DistBase):
         self.assertEqual(sent["manifest"]["extensions"], ["wiki"])
         self.assertEqual(sent["manifest"]["mcp_servers"], ["docs"])
         self.assertEqual(sent["manifest"]["secrets"], ["API_KEY"])
-        self.assertIn("project/wiki/index.md", sent["manifest"]["files"])
+        self.assertEqual(sorted(sent["manifest"]), ["bots", "extensions", "files_count", "framework", "mcp_servers", "secrets"])
+        self.assertGreater(sent["manifest"]["files_count"], 5)
         self.assertNotIn(b"key-1", sent["body"])
         self.assertIn("no changes", self.run_dist(p, pe, "publish").stdout)
 
