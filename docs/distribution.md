@@ -116,3 +116,14 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
 ```
 
 `mode` is `add` when nothing is installed; `transport` is `git` or `biz`. Tests: `tests/test_distribution.py` also runs a fake Biz HTTP server (publish → add → republish for a new recipient → update → plan accuracy and read-only-ness) and a git-transport plan regression.
+
+## 8. Several publishers (Biz): publish on top of the latest
+
+A **publisher** is a project with `repo: biz` in `project/distribution.yaml`; other projects are **members**. A publish is built from the publisher's whole project, so Biz refuses one that is not built on the latest version.
+
+- `dist:publish` sends `X-Setup-Base: vN | none`, the version recorded in the tracked `.copier-answers.dist.yml` (`_commit`, source `.data/dist/biz-source`), or `none`. After a successful publish the publisher records itself as installed at the new version (the answers file is updated and committed on its own), so the next publish is based on it. The mirror is re-synchronised from Biz before every publish, so version numbers continue whoever published last.
+- Biz answers `409 stale_base` when the base is not its current version. The command fails with a message containing `stale_base` and **exit code 3**: run `dist:update`, then publish again. If Biz has a setup and this project never installed one (base `none`), it fails with **exit code 5** and asks for `mise run dist:add biz` first.
+- `dist:update [version]` (also `fyso-dist-update` fetch) on a publisher **merges** instead of replacing. Per file, base = the installed version, ours = the project's current files (committed and uncommitted), theirs = the latest (or given) version; only files that travel in a distribution (`project/**`, `state/bots/**`, extensions) take part. Text is merged with `git merge-file`; a file edited here and deleted there (or the reverse) conflicts. Memory, secrets and the running services are not touched (a publisher owns them). No conflict: the merged files are written and committed together with the new answers file as `dist: merge vN` (**exit 0**; `already at vN` when nothing is newer). Conflict: **nothing in the project changes**, `.data/dist/merge-conflicts.json` is written as `{"base":"v3","latest":"v4","files":["project/wiki/y.md"]}`, and the command exits with **code 4** and a message starting `merge_conflict`. The person resolves the files (their copy is untouched) and runs `dist:update` again.
+- `dist:plan --json` on a publisher adds `"merge": {"base":"v3","latest":"v4","conflicts":[files]}`, a dry run of the same merge (`null` when the installed version is not in the history). Members keep the replace behavior of §3.
+
+Exit codes of `dist.sh`: 0 ok, 1 error, 3 `stale_base`, 4 `merge_conflict`, 5 publisher has not installed Biz's setup.

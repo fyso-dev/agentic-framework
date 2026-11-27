@@ -18,7 +18,8 @@ const PRIVATE=new Set(['FYSO_ADMIN_PASSWORD','FYSO_AUTH_USERS']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
 const MACHINE_PATH=/\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+\/|\/private\/tmp\/|\/var\/folders\/|\/opt\/homebrew\/|C:\\Users\\/;
 
-const fail=message=>{const error=new Error(message);error.user=true;throw error;};
+// `exit` is the process exit code the command ends with (default 1): 3 stale_base, 4 merge conflict.
+const fail=(message,exit)=>{const error=new Error(message);error.user=true;if(exit)error.exit=exit;throw error;};
 const run=(bin,args,options={})=>execFileSync(bin,args,{stdio:['pipe','pipe','pipe'],maxBuffer:1<<28,...options});
 const git=(args,options)=>run('git',args,options);
 // sops reads a file, and on Linux /dev/stdin cannot be opened when stdin is the socket node provides.
@@ -107,9 +108,11 @@ function bizClient(env=process.env,fetchImpl=globalThis.fetch) {
     catch(error) {fail(`Biz is not reachable (${error.cause?.code||error.message})`);}
     const bytes=Buffer.from(await response.arrayBuffer());
     if(response.status>=400) {
-      let code='';try {code=JSON.parse(bytes.toString('utf8')).error||'';} catch {/* not JSON */}
-      let detail='';try {detail=JSON.parse(bytes.toString('utf8')).current||'';} catch {/* not JSON */}
-      fail(bizMessage(response.status,code,detail));
+      let payload={};try {payload=JSON.parse(bytes.toString('utf8'))||{};} catch {/* not JSON */}
+      const error=new Error(bizMessage(response.status,payload.error||'',payload.current||''));
+      error.user=true;
+      if(payload.error==='stale_base'){error.staleBase=true;error.current=payload.current||null;}
+      throw error;
     }
     return {status:response.status,headers:response.headers,body:bytes};
   };
@@ -121,6 +124,7 @@ function bizMessage(status,code,current) {
   if(status===403)return code==='admin_required'?'publishing a setup needs an organization admin in Biz'
     :'Biz denied access: this person has no admin role or department, or lost access';
   if(status===404)return 'Biz has no setup published yet for this organization';
+  if(code==='stale_base')return `stale_base: Biz has ${current||'a setup'} and this project is not based on it; run \`mise run dist:update\` to merge it, then publish again`;
   if(status===409)return `version conflict: Biz already has ${current||'a newer version'}; publish a version greater than that`;
   if(code==='manifest_too_large')return 'Biz refused the setup summary (manifest_too_large): too many extensions, MCP servers, bots or secrets';
   if(status===413)return 'the setup is too large for Biz (limit 50 MiB)';
@@ -154,18 +158,95 @@ async function bizRecipients(client) {
 
 /** The publisher's mirror: a git repo continuing Biz's history, so versions keep counting up. */
 async function bizMirror(client) {
-  const mirror=path.resolve(BIZ_MIRROR);
-  if(!fs.existsSync(path.join(mirror,'.git'))) {
-    try {await bizDownload(client,mirror);}
-    catch(error) {
-      if(!/no setup published/.test(error.message))throw error;
-      fs.mkdirSync(mirror,{recursive:true});
-      git(['init','-q','-b','main',mirror]);
+  const mirror=path.resolve(BIZ_MIRROR),dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-mirror-'));
+  try {
+    // Continue Biz's history: other admins may have published since this mirror was built.
+    let latest=null;
+    try {latest=await bizDownload(client,path.join(dir,'src'));}
+    catch(error) {if(!/no setup published/.test(error.message))throw error;}
+    const known=fs.existsSync(path.join(mirror,'.git'))&&(!latest||tags(mirror).includes(latest));
+    if(!known) {
+      fs.rmSync(mirror,{recursive:true,force:true});
+      if(latest){fs.mkdirSync(path.dirname(mirror),{recursive:true});fs.cpSync(path.join(dir,'src'),mirror,{recursive:true});}
+      else {fs.mkdirSync(mirror,{recursive:true});git(['init','-q','-b','main',mirror]);}
+    } else if(spawnSync('git',['-C',mirror,'rev-parse','-q','--verify','HEAD']).status===0) {
+      git(['-C',mirror,'reset','-q','--hard']);git(['-C',mirror,'clean','-fdxq']);
     }
-  } else if(spawnSync('git',['-C',mirror,'rev-parse','-q','--verify','HEAD']).status===0) {
-    git(['-C',mirror,'reset','-q','--hard']);git(['-C',mirror,'clean','-fdxq']);
-  }
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
   return mirror;
+}
+
+/** The Biz version this project's files were built on: `none` until it installed or published one. */
+function installedBase() {
+  const answers=fs.existsSync(ANSWERS)?readYaml(ANSWERS)||{}:null;
+  return isBiz(answers)&&answers._commit?String(answers._commit):'none';
+}
+
+/** A publisher is installed at what it published, so the next publish is built on top of it. */
+function recordInstalled(version) {
+  try {
+    fs.writeFileSync(ANSWERS,`# Installed distribution (D56). Updated by \`mise run dist:update\`; do not edit.\n_commit: ${version}\n_src_path: ${BIZ_SRC}\n`);
+    git(['add','--',ANSWERS]);
+    git(['commit','-q','-m',`dist: published ${version}`,'--',ANSWERS]);
+  } catch(error) {console.error(`note: could not record ${version} as installed (${(error.stderr||error.message).toString().trim()})`);}
+}
+
+const isPublisher=()=>fs.existsSync(CONFIG)&&String((readYaml(CONFIG)||{}).repo||'').trim()==='biz';
+
+/**
+ * Three-way merge per file between the installed version (base), this project's current files
+ * (ours, committed and uncommitted) and `latest` (theirs). Read-only: returns what to write
+ * (Buffer, or null to delete) and the files that conflict.
+ */
+function threeWay(src,base,latest) {
+  const prefix='template/',scope=file=>target(file)===file;
+  const [b,t]=[base,latest].map(ref=>new Map([...tree(src,ref,prefix)].filter(([file])=>scope(file))));
+  const mine=git(['ls-files','-z','--cached','--others','--exclude-standard']).toString('utf8').split('\0').filter(Boolean)
+    .filter(file=>scope(file)&&fs.existsSync(file)&&fs.lstatSync(file).isFile());
+  const read=(map,file,ref)=>map.has(file)?blob(src,map.get(file)):null;
+  const writes=new Map(),conflicts=[];
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-merge-'));
+  try {
+    for(const file of [...new Set([...b.keys(),...t.keys(),...mine])].sort()) {
+      const o=mine.includes(file)?fs.readFileSync(file):null,x=read(b,file),y=read(t,file);
+      const same=(p,q)=>(p===null&&q===null)||(p&&q&&p.equals(q));
+      if(same(o,y))continue;                       // already what the latest version has
+      if(same(o,x)){writes.set(file,y);continue;}   // only the latest changed it
+      if(same(x,y))continue;                       // only this project changed it
+      if(o===null||y===null){conflicts.push(file);continue;}   // edited here, deleted there (or the reverse)
+      const [fo,fx,fy]=['ours','base','theirs'].map(name=>path.join(dir,name));
+      fs.writeFileSync(fo,o);fs.writeFileSync(fx,x??Buffer.alloc(0));fs.writeFileSync(fy,y);
+      const merged=spawnSync('git',['merge-file','-p',fo,fx,fy],{maxBuffer:1<<28});
+      if(merged.status===0)writes.set(file,merged.stdout);else conflicts.push(file);
+    }
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  return {writes,conflicts:conflicts.sort()};
+}
+
+/** `dist:update` on a publisher: merge the latest version into the project, or change nothing. */
+async function merge(requested) {
+  if(!fs.existsSync(ANSWERS))fail('no distribution installed; use `mise run dist:add biz`');
+  const answers=readYaml(ANSWERS)||{},base=String(answers._commit||'');
+  await bizDownload(bizClient(),path.resolve(BIZ_SRC));
+  const available=tags(BIZ_SRC),latest=requested?(requested.startsWith('v')?requested:`v${requested}`):latestTag(available);
+  if(!latest||!available.includes(latest))fail(`${requested||'the latest version'} is not published`);
+  if(!available.includes(base))fail(`the installed version ${base||'?'} is not in the setup history; cannot merge`);
+  if(base===latest){console.log(`already at ${latest}`);return;}
+  const {writes,conflicts}=threeWay(BIZ_SRC,base,latest),report=path.join(path.dirname(BIZ_SRC),'merge-conflicts.json');
+  if(conflicts.length) {
+    fs.writeFileSync(report,JSON.stringify({base,latest,files:conflicts},null,2)+'\n');
+    fail(`merge_conflict: ${conflicts.length} file(s) were edited here and in ${latest}; nothing was changed. Resolve them (see ${report}), then run dist:update again:\n  ${conflicts.join('\n  ')}`,4);
+  }
+  fs.rmSync(report,{force:true});
+  for(const [file,content] of writes) {
+    if(content===null)fs.rmSync(file,{force:true});
+    else {fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);}
+  }
+  fs.writeFileSync(ANSWERS,`# Installed distribution (D56). Updated by \`mise run dist:update\`; do not edit.\n_commit: ${latest}\n_src_path: ${BIZ_SRC}\n`);
+  const paths=[...writes.keys(),ANSWERS];
+  git(['add','-A','--',...paths]);
+  git(['commit','-q','-m',`dist: merge ${latest}`,'--',...paths]);
+  console.log(`merged ${latest} (${writes.size} files updated)`);
 }
 
 /** What Biz displays about a setup: the manifest plus names only (never values). */
@@ -195,13 +276,14 @@ async function publish(requested) {
   const {repo,biz,secrets,recipients:listed}=config();
   if(git(['status','--porcelain','--','project','state','extensions']).toString().trim())
     console.error('note: uncommitted changes are not published (run `mise run snapshot` or commit them first)');
-  let client=null,recipients=listed,work;
+  let client=null,recipients=listed,work,base=null;
   if(biz) {
     client=bizClient();
     // Everyone Biz knows is a recipient; a person who registers later is added on the next publish.
     if(secrets.length)recipients=[...new Set([...listed,...await bizRecipients(client)])];
     if(secrets.length&&!recipients.length)fail('nobody has registered an age key in Biz yet (members run `mise run dist:key`, the Biz extension registers it)');
     work=await bizMirror(client);
+    base=installedBase();
   } else {
     work=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-dist-'));
     git(['clone','-q',cloneUrl(repo),work]);
@@ -256,19 +338,22 @@ async function publish(requested) {
     git(['-C',work,'commit','-q','-m',`Distribution ${version}`]);
     git(['-C',work,'tag',version]);
     if(biz) {
-      try {await bizUpload(client,work,version,bizSummary(template,secrets));}
+      try {await bizUpload(client,work,version,bizSummary(template,secrets),base);}
       catch(error) {
         // Not published: forget the version here so the next publish builds it again.
         git(['-C',work,'tag','-d',version]);
         if(tags.length)git(['-C',work,'reset','-q','--hard','HEAD~1']);else git(['-C',work,'update-ref','-d','HEAD']);
+        if(error.staleBase&&base==='none'&&error.current)fail(`Biz already has ${error.current} and this project has not installed it (stale_base): run \`mise run dist:add biz\` first`,5);
+        if(error.staleBase)error.exit=3;
         throw error;
       }
+      recordInstalled(version);
     } else git(['-C',work,'push','-q','origin','HEAD',`refs/tags/${version}`]);
     console.log(`published ${version} (${files.length} files${secrets.length?`, secrets: ${secrets.join(', ')}`:''}) to ${biz?'Biz':repo}`);
   } finally {if(!biz)fs.rmSync(work,{recursive:true,force:true});}
 }
 
-async function bizUpload(client,work,version,summary) {
+async function bizUpload(client,work,version,summary,base) {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fyso-bundle-'));
   try {
     const file=path.join(dir,'setup.bundle');
@@ -276,7 +361,7 @@ async function bizUpload(client,work,version,summary) {
     const body=fs.readFileSync(file);
     const encoded=Buffer.from(JSON.stringify(summary)).toString('base64');
     if(encoded.length>8192)fail(`the setup summary is too large for Biz (${encoded.length} bytes encoded, limit 8192): too many extensions, MCP servers, bots or secrets`);
-    await client.request('PUT','/setup',{body,headers:{'Content-Type':'application/octet-stream','X-Setup-Version':version,
+    await client.request('PUT','/setup',{body,headers:{'Content-Type':'application/octet-stream','X-Setup-Version':version,'X-Setup-Base':base,
       'X-Setup-Sha256':sha256(body),'X-Setup-Manifest':encoded}});
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 }
@@ -519,6 +604,9 @@ async function plan(args) {
     const current=installed?._commit||null;
     const result=planAgainst(src,target,current,dir);
     const output={mode:installed?'update':'add',transport:biz?'biz':'git',source:biz?'biz':repo,current,version:target,up_to_date:current===target,...result};
+    if(installed&&biz&&isPublisher()) {
+      output.merge=git(['-C',src,'tag','--list']).toString().split('\n').includes(current)?{base:current,latest:target,conflicts:current===target?[]:threeWay(src,current,target).conflicts}:null;
+    }
     if(json)console.log(JSON.stringify(output,null,2));else printPlan(output);
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 }
@@ -605,12 +693,14 @@ if(require.main===module) (async()=>{
     else if(command==='status')await status();
     else if(command==='plan')await plan(process.argv.slice(3));
     else if(command==='biz-fetch'){await bizDownload(bizClient(),path.resolve(BIZ_SRC));console.log(BIZ_SRC);}
+    else if(command==='merge')await merge(arg);
+    else if(command==='is-publisher')process.exit(isPublisher()?0:1);
     else if(command==='is-biz')process.exit(fs.existsSync(ANSWERS)&&isBiz(readYaml(ANSWERS))?0:1);
     else if(command==='clone-url')console.log(cloneUrl(arg));
     else fail('usage: dist.cjs <publish [version]|plan [repo] [version] [--json]|prune <base>|secrets|merge-memory <base>|status|biz-fetch|is-biz>');
   } catch(error) {
     console.error(`error: ${error.user?error.message:(error.stderr?.toString()||error.message)}`);
-    process.exit(1);
+    process.exit(error.exit||1);
   }
 })();
 module.exports={target,cloneUrl,nextVersion,union,config,ports,bizClient,bizMessage};

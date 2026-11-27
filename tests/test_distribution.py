@@ -48,6 +48,7 @@ class FakeBiz:
         self.deny = False
         self.put_error = None        # (status, payload) answered to PUT /setup
         self.requests = []
+        self.lock = threading.Lock()
         biz = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -93,13 +94,19 @@ class FakeBiz:
                     return self.error(biz.put_error[0], **biz.put_error[1])
                 if method == "PUT" and route == "/setup":
                     version = self.headers.get("X-Setup-Version", "")
-                    current = biz.setup["version"] if biz.setup else "v0"
-                    if int(version[1:]) <= int(current[1:]):
-                        return self.error(409, error="version_conflict", current=current)
-                    if hashlib.sha256(body).hexdigest() != self.headers.get("X-Setup-Sha256"):
-                        return self.error(400, error="bad_sha")
-                    biz.setup = {"version": version, "body": body, "sha256": self.headers["X-Setup-Sha256"],
-                                 "manifest": json.loads(base64.b64decode(self.headers["X-Setup-Manifest"]))}
+                    base = self.headers.get("X-Setup-Base")
+                    if base is None:
+                        return self.error(400, error="invalid_request")
+                    with biz.lock:   # check-and-insert is atomic
+                        current = biz.setup["version"] if biz.setup else None
+                        if (current or "none") != base:
+                            return self.error(409, error="stale_base", current=current)
+                        if int(version[1:]) <= int((current or "v0")[1:]):
+                            return self.error(409, error="version_conflict", current=current)
+                        if hashlib.sha256(body).hexdigest() != self.headers.get("X-Setup-Sha256"):
+                            return self.error(400, error="bad_sha")
+                        biz.setup = {"version": version, "body": body, "sha256": self.headers["X-Setup-Sha256"],
+                                     "manifest": json.loads(base64.b64decode(self.headers["X-Setup-Manifest"]))}
                     return self.reply(201, json.dumps({"version": version, "etag": "e"}).encode(), {"Content-Type": "application/json"})
                 return self.error(404, error="not_found")
 
@@ -132,7 +139,7 @@ class DistBase(unittest.TestCase):
 
     def project(self, name):
         root = self.tmp / name
-        port_base = {"publisher": "29820", "client": "29800"}[name]
+        port_base = {"publisher": "29820", "client": "29800", "publisher2": "29840"}[name]
         shutil.copytree(ROOT / "template/framework/scripts", root / "framework/scripts")
         write(root, ".gitignore", ".data/\n")
         key = self.tmp / f"{name}.age"
@@ -500,7 +507,8 @@ class BizDistributionTests(DistBase):
         self.commit(p, pe, "change")
         real, self.biz.setup = self.biz.setup, dict(self.biz.setup, version="v9")
         result = self.run_dist(p, pe, "publish", "v3", check=False)
-        self.assertIn("version conflict: Biz already has v9", result.stderr)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("stale_base", result.stderr)
         self.biz.setup = real
         self.assertIn("published v2", self.run_dist(p, pe, "publish").stdout)
         # A bad token command and a refused download.
@@ -546,6 +554,88 @@ class BizDistributionTests(DistBase):
         self.assertIsNone(self.biz.setup)
         self.biz.put_error = None
         self.assertIn("published v1", self.run_dist(p, pe, "publish").stdout)
+
+    def test_two_publishers_merge_instead_of_overwriting(self):
+        a, ae = self.publisher, self.publisher_env
+        b = self.project("publisher2")
+        be = self.publisher2_env
+        be.update(FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}",
+                  FYSO_DIST_BIZ_ORGANIZATION=FakeBiz.ORG)
+        for root in (a, b):
+            write(root, "project/distribution.yaml", "repo: biz\n")
+        write(a, "project/wiki/x.md", "x1\n")
+        write(a, "project/wiki/y.md", "y1\n")
+        self.commit(a, ae, "A v1")
+        self.assertIn("published v1", self.run_dist(a, ae, "publish").stdout)
+        self.assertIn("_commit: v1", (a / ".copier-answers.dist.yml").read_text())
+        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=a, capture_output=True, text=True).stdout, "")
+
+        self.commit(b, be, "B init")
+        self.run_dist(b, be, "add", "biz")
+        self.assertIn("_commit: v1", (b / ".copier-answers.dist.yml").read_text())
+        write(b, "project/wiki/x.md", "x1\nx-from-b\n")
+        self.commit(b, be, "B edits X")
+        write(a, "project/wiki/y.md", "y1\ny-from-a\n")
+        self.commit(a, ae, "A edits Y")
+        self.assertIn("published v2", self.run_dist(a, ae, "publish").stdout)
+
+        stale = self.run_dist(b, be, "publish", check=False)
+        self.assertEqual(stale.returncode, 3)
+        self.assertIn("stale_base", stale.stderr)
+        self.assertEqual(self.biz.setup["version"], "v2")
+
+        # Dry run first: read-only, reports no conflicts.
+        before = self.tree_state(b)
+        plan = json.loads(self.run_dist(b, be, "plan", "--json").stdout)
+        self.assertEqual(self.tree_state(b), before)
+        self.assertEqual(plan["merge"], {"base": "v1", "latest": "v2", "conflicts": []})
+
+        self.assertIn("merged v2", self.run_dist(b, be, "update").stdout)
+        self.assertEqual((b / "project/wiki/x.md").read_text(), "x1\nx-from-b\n")
+        self.assertEqual((b / "project/wiki/y.md").read_text(), "y1\ny-from-a\n")
+        self.assertIn("_commit: v2", (b / ".copier-answers.dist.yml").read_text())
+        log = subprocess.run(["git", "log", "--format=%s", "-1"], cwd=b, capture_output=True, text=True).stdout.strip()
+        self.assertEqual(log, "dist: merge v2")
+        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=b, capture_output=True, text=True).stdout, "")
+        self.assertIn("published v3", self.run_dist(b, be, "publish").stdout)
+        # A gets B's change on top of its own.
+        self.assertIn("merged v3", self.run_dist(a, ae, "update").stdout)
+        self.assertEqual((a / "project/wiki/x.md").read_text(), "x1\nx-from-b\n")
+        self.assertEqual((a / "project/wiki/y.md").read_text(), "y1\ny-from-a\n")
+
+        # Both edit the same lines: exit 4, nothing changes, the conflicts are listed.
+        write(a, "project/wiki/y.md", "y1\nA wins\n")
+        self.commit(a, ae, "A edits Y again")
+        self.assertIn("published v4", self.run_dist(a, ae, "publish").stdout)
+        write(b, "project/wiki/y.md", "y1\nB wins\n")
+        self.commit(b, be, "B edits Y again")
+        self.assertEqual(self.run_dist(b, be, "publish", check=False).returncode, 3)
+        before = self.tree_state(b)
+        plan = json.loads(self.run_dist(b, be, "plan", "--json").stdout)
+        self.assertEqual(self.tree_state(b), before)
+        self.assertEqual(plan["merge"], {"base": "v3", "latest": "v4", "conflicts": ["project/wiki/y.md"]})
+        result = self.run_dist(b, be, "update", check=False)
+        self.assertEqual(result.returncode, 4)
+        self.assertIn("merge_conflict", result.stderr)
+        self.assertEqual((b / "project/wiki/y.md").read_text(), "y1\nB wins\n")
+        self.assertIn("_commit: v3", (b / ".copier-answers.dist.yml").read_text())
+        self.assertEqual(subprocess.run(["git", "status", "--porcelain"], cwd=b, capture_output=True, text=True).stdout, "")
+        report = json.loads((b / ".data/dist/merge-conflicts.json").read_text())
+        self.assertEqual(report, {"base": "v3", "latest": "v4", "files": ["project/wiki/y.md"]})
+
+    def test_publisher_never_installed_must_install_first(self):
+        a, ae = self.publisher, self.publisher_env
+        b = self.project("publisher2")
+        be = dict(self.publisher2_env, FYSO_DIST_BIZ_URL=self.biz.url, FYSO_DIST_BIZ_TOKEN_CMD=f"echo {FakeBiz.TOKEN}",
+                  FYSO_DIST_BIZ_ORGANIZATION=FakeBiz.ORG)
+        for root, env in ((a, ae), (b, be)):
+            write(root, "project/distribution.yaml", "repo: biz\n")
+            write(root, "project/wiki/index.md", f"{root.name}\n")
+            self.commit(root, env, "init")
+        self.run_dist(a, ae, "publish")
+        result = self.run_dist(b, be, "publish", check=False)
+        self.assertEqual(result.returncode, 5)
+        self.assertIn("dist:add biz", result.stderr)
 
 
 class DistributionUnitTests(unittest.TestCase):
