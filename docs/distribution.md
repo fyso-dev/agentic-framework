@@ -109,7 +109,7 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
   "extensions": {"added": [], "removed": []},
   "bots": {"added": ["Soporte"]},
   "mcp_servers": {"added": []},
-  "contents": {"extensions": ["wiki"], "mcp_servers": ["docs"], "bots": ["Soporte", "Ventas"]}
+  "contents": {"extensions": ["wiki"], "mcp_servers": ["docs"], "bots": ["Ventas", "Soporte"]}
 }
 ```
 

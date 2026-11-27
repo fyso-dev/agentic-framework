@@ -436,7 +436,7 @@ class BizDistributionTests(DistBase):
         self.assertEqual(plan["secrets"]["names"], ["API_KEY"])
         self.assertEqual(plan["bots"]["added"], ["Soporte"])
         self.assertEqual(plan["extensions"], {"added": [], "removed": []})
-        self.assertEqual(plan["contents"]["bots"], ["Soporte", "Ventas"])
+        self.assertEqual(plan["contents"]["bots"], ["Ventas", "Soporte"])
 
         self.run_dist(c, ce, "update")
         self.assertEqual((c / "project/wiki/index.md").read_text(), "# v2\n")
