@@ -48,7 +48,7 @@ Keep this index current: when a doc is added, a decision is taken or a phase cha
 | Bots and the `dev-task` flow | [PLAN §7](PLAN.md#7-bots) |
 | Engine and model selection: Pi beta integration in progress (D77), switching, mixed providers and recommendations (open issue) | [engine-selection.md](engine-selection.md) |
 | Local web users, shared sessions, application ACLs and future identity providers (D40) | [web-auth.md](web-auth.md) |
-| Biz-managed project access: delivery scope and identity proof | [Delivery brief](biz-access-delivery.md) |
+| Biz-managed access: delivery scope, identity proof and [access by department](biz-access-delivery.md#access-by-department-replaces-project-binding) | [Delivery brief](biz-access-delivery.md) · [proposed policy capability slot](extensions-contract.md#proposed-policy-capability-slot) |
 | Private HTTPS with Cloudflare DNS-01 (D78; implementation in progress) | [cloudflare-extension.md](cloudflare-extension.md) |
 | Shared-access people directory, a page of the human-requests extension, without login accounts (D76) | [people-directory.md](people-directory.md) |
 | Human requests: extension published as [fyso-ext-human-requests v0.1.0](https://github.com/fyso-dev/fyso-ext-human-requests/releases/tag/v0.1.0) in the official catalog, with inbox, structured requests, questions to the agent and a menu counter (D76; beta) | [proposal](human-requests-proposal.md) · [Dagu spike](adr/spikes/human-requests.md) · [historical brief](human-requests-next-steps.md) |
@@ -127,6 +127,13 @@ extension applies that project's teams. The core locks those bots through
 generated stack verified the refusals and the allowed operations through the real
 Dagu and OpenMausBot, and `doctor` passed. Live acceptance with fyso.biz remains.
 [Delivery](biz-access-delivery.md#managed-instance-from-a-biz-project)
+
+2026-11-26: Biz access by department. `Fyso Biz.app` no longer asks for a project: it
+connects with the organization and the Biz extension reads the person's departments and
+framework freedom policy. The project form stays as a fallback for an older Biz. The policy
+capabilities (shell, publish, AI, extensions, MCP servers) are documented as a proposed core
+contract slot and are not enforced by the core yet.
+[Delivery](biz-access-delivery.md#access-by-department-replaces-project-binding)
 
 See the [feedback delivery checkpoint](biz-feedback-delivery.md#checkpoint) for gateway verification and deployment status.
 

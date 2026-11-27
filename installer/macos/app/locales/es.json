@@ -76,5 +76,6 @@
   "cli.biz_project_choose": "Tienes varios proyectos de Fyso Biz asignados. Elige uno con: fyso create --project <id>",
   "cli.biz_project_unknown": "Ese proyecto de Fyso Biz no está asignado a tu cuenta.",
   "cli.biz_project": "Vinculada al proyecto de Fyso Biz {{project}} ({{level}}).",
+  "cli.biz_departments": "Acceso por departamento: {{departments}}.",
   "biz.choose_project": "¿Para qué proyecto de Fyso Biz es esta instancia?"
 }

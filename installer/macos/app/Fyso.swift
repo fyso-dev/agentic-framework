@@ -273,7 +273,7 @@ func showAuthorization(_ url: String) {
 }
 
 /// What `create` did; the Biz steps are nil in the core edition.
-struct Created { let item: Instance; var bizSession: Bool? = nil; var bizExtension: Bool? = nil; var bizProject: BizProject? = nil }
+struct Created { let item: Instance; var bizSession: Bool? = nil; var bizExtension: Bool? = nil; var bizProject: BizProject? = nil; var bizDepartments: [BizDepartment]? = nil }
 
 /// Why `create` stopped before the form, for the CLI and the menu.
 var createStopped: String? = nil
@@ -286,26 +286,36 @@ func createInstance(project requested: String? = nil, choose: ([BizProject]) -> 
     // Biz: a session must be ready before the form, so the new project starts connected.
     if edition == "biz" && !bizSessionReady() { _ = try? bizLogin(open: showAuthorization) }
     if edition == "biz" && !bizSessionReady() { return nil }
-    // A person with assigned Biz projects creates the instance for one of them: it starts bound
-    // to that project (its access levels) and receives the project's teams.
+    // Access is by department: connecting needs only the organization, and the extension reads the
+    // person's departments and policy itself. Only an older Biz without `departamentos_framework`
+    // (or an explicit `--project`) falls back to binding the instance to one assigned project.
+    var organization: String? = nil
+    var departments: [BizDepartment]? = nil
     var project: BizProject? = nil
     if edition == "biz" {
-        let assigned = bizProjects() ?? []
-        if let requested {
-            guard let match = assigned.first(where: { $0.id == requested.lowercased() }) else { createStopped = "cli.biz_project_unknown"; return nil }
-            project = match
-        } else if assigned.count == 1 { project = assigned[0] }
-        else if assigned.count > 1 {
-            guard let picked = choose(assigned) else { createStopped = "cli.biz_project_choose"; return nil }
-            project = picked
+        if requested == nil, let access = bizDepartments() {
+            organization = access.organization
+            departments = access.departments
+        } else {
+            let assigned = bizProjects() ?? []
+            if let requested {
+                guard let match = assigned.first(where: { $0.id == requested.lowercased() }) else { createStopped = "cli.biz_project_unknown"; return nil }
+                project = match
+            } else if assigned.count == 1 { project = assigned[0] }
+            else if assigned.count > 1 {
+                guard let picked = choose(assigned) else { createStopped = "cli.biz_project_choose"; return nil }
+                project = picked
+            }
+            organization = project?.organization
         }
     }
     guard let item = runInstaller() else { return nil }
     guard edition == "biz" else { return Created(item: item) }
     var result = Created(item: item)
     result.bizProject = project
+    result.bizDepartments = departments
     result.bizSession = handOffBizSession(to: item)
-    result.bizExtension = installBizExtension(item, project: project) == 0
+    result.bizExtension = installBizExtension(item, organization: organization, project: project) == 0
     return result
 }
 
@@ -536,8 +546,9 @@ func handOffBizSession(to item: Instance) -> Bool {
     return true
 }
 
-// MARK: - Fyso Biz projects: the framework projects an administrator assigned to this person
+// MARK: - Fyso Biz access: the departments (and, for an older Biz, projects) assigned to this person
 
+struct BizDepartment { let id: String; let name: String; let role: String }
 struct BizProject { let id: String; let name: String; let level: String; let organization: String }
 
 /// One tool call on Biz's MCP server (Streamable HTTP) with the app's own grant. The answer
@@ -576,7 +587,22 @@ func bizMcpCall(_ tool: String, _ arguments: [String: Any], token: String) -> [S
     return text.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
 }
 
-/// The signed-in person's assigned projects; nil when Biz does not answer (an older Biz without
+/// The signed-in person's organization and departments (access is by department; the role per
+/// department and the person's policy are read by the Biz extension). nil when Biz does not offer
+/// the tool (an older Biz): the app then falls back to `bizProjects()`.
+func bizDepartments() -> (organization: String, departments: [BizDepartment])? {
+    guard let token = readJSON(bizGrantFile)?["accessToken"] as? String,
+          let answer = bizMcpCall("departamentos_framework", [:], token: token),
+          let organization = answer["organizacion"] as? String, organization.range(of: "^[a-z0-9][a-z0-9-]{0,62}$", options: .regularExpression) != nil,
+          let list = answer["departamentos"] as? [[String: Any]] else { return nil }
+    let departments = list.compactMap { d -> BizDepartment? in
+        guard let id = d["departamento_id"] as? String, !id.isEmpty else { return nil }
+        return BizDepartment(id: id, name: d["nombre"] as? String ?? id, role: (d["rol"] as? [String: Any])?["name"] as? String ?? "")
+    }
+    return (organization, departments)
+}
+
+/// The signed-in person's assigned projects (legacy); nil when Biz does not answer (an older Biz without
 /// the tool creates an unmanaged instance, as before).
 func bizProjects() -> [BizProject]? {
     guard let token = readJSON(bizGrantFile)?["accessToken"] as? String,
@@ -591,7 +617,7 @@ func bizProjects() -> [BizProject]? {
 }
 
 /// The menu asks which project when there are several (a native list; Cancel creates nothing).
-/// The CLI passes `--project <id>` instead.
+/// The CLI passes `--project <id>` instead. Legacy: only used when Biz has no departments tool.
 func chooseBizProject(_ projects: [BizProject]) -> BizProject? {
     if testMode { return nil }
     let labels = projects.map { $0.level.isEmpty ? $0.name : "\($0.name) — \($0.level)" }
@@ -603,11 +629,14 @@ func chooseBizProject(_ projects: [BizProject]) -> BizProject? {
 
 /// Install fyso-ext-biz (public catalog id `biz`) in the project. The production origin uses the
 /// panel's own install path (one commit, services reloaded); another origin passes biz_url.
-func installBizExtension(_ item: Instance, project: BizProject? = nil) -> Int32 {
+func installBizExtension(_ item: Instance, organization: String? = nil, project: BizProject? = nil) -> Int32 {
     let answers = item.folder + "/.copier-answers.ext-biz.yml"
     if FileManager.default.fileExists(atPath: answers) { return 0 }
-    // Bound to a Biz project: managed access (the extension's `biz_access_*` answers).
-    let managed = project.map { ["-d", "biz_access_organization=\($0.organization)", "-d", "biz_access_project=\($0.id)"] } ?? []
+    // Managed access (the extension's `biz_access_*` answers): the organization alone (by
+    // department), plus the project only in the legacy fallback.
+    var managed: [String] = []
+    if let organization { managed += ["-d", "biz_access_organization=\(organization)"] }
+    if let project { managed += ["-d", "biz_access_project=\(project.id)"] }
     let code = bizOrigin == defaultBizOrigin
         ? runMise(item, ["exec", "--", "framework/scripts/ext.sh", "apply", "add", "biz"] + (managed.isEmpty ? [] : ["--"] + managed), label: "ext add biz")
         : runMise(item, ["run", "ext:add", "biz", "--", "--defaults", "-d", "biz_url=\(bizOrigin)"] + managed, label: "ext add biz")
@@ -739,7 +768,7 @@ func cli(_ args: [String]) -> Int32 {
     case "create", "new":
         say(t("cli.creating"))
         if edition == "biz" && !bizSessionReady() { say(t("cli.biz_login_first")) }
-        // `create --project <id>`: the Biz project to bind when the person has several.
+        // `create --project <id>` (legacy): the Biz project to bind on an older Biz that has no departments.
         let projectIndex = rest.firstIndex(of: "--project")
         let requested = projectIndex.flatMap { rest.indices.contains($0 + 1) ? rest[$0 + 1] : nil }
         if projectIndex != nil && requested == nil { return fail(t("cli.biz_project_choose")) }
@@ -753,6 +782,9 @@ func cli(_ args: [String]) -> Int32 {
         }
         say(t("cli.created", ["name": created.item.name]))
         if let project = created.bizProject { say(t("cli.biz_project", ["project": project.name, "level": project.level])) }
+        if let departments = created.bizDepartments, !departments.isEmpty {
+            say(t("cli.biz_departments", ["departments": departments.map { $0.role.isEmpty ? $0.name : "\($0.name) (\($0.role))" }.joined(separator: ", ")]))
+        }
         if created.bizSession == false { return fail(t("cli.biz_handoff_failed")) }
         if created.bizExtension == false { return fail(t("cli.biz_ext_failed", ["log": created.item.log])) }
         if created.bizExtension == true { say(t("cli.biz_ready", ["name": created.item.name])) }

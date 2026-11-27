@@ -305,3 +305,71 @@ Automatic re-pull of later Biz versions. The administrator level applies them fr
 the Teams screen. Locking a managed department's skill files beyond `team-import`
 is also excluded. Selecting a project in the app's GUI menu is limited to the
 `swiftDialog` list, and the CLI takes `--project`.
+
+## Access by department (replaces project binding)
+
+### Outcome and delivery level
+
+Testable beta, additive. A person's framework access comes from the **departments**
+they belong to and a per-person **framework freedom** policy, not from a Biz project.
+An organization administrator assigns a role per department and chooses the person's
+policy in Fyso Biz. `Fyso Biz.app` connects with the organization only. The project
+form of access keeps working for installs that already bind a project, and for an older
+Biz that has no department tool.
+
+Exclusions: core enforcement of the policy capabilities listed below (a proposed
+contract, see [extensions-contract](extensions-contract.md#proposed-policy-capability-slot)),
+removing the project UI in Biz, and migrating existing project-bound instances.
+
+### Contract with Biz
+
+Everything is additive; the old forms still answer.
+
+- **`GET /oauth/framework-access`**: `organization` is required, `project` is optional
+  (legacy), `capability` is optional. With `capability` it answers `{allowed}`.
+  Without it, it answers `capabilities` (`string[]`), `admin`, `departments`
+  (`id`, `name`, `role` with its levels, `teams`) and `policy`. Without `project`, the
+  capabilities derive from the role per department plus the person's policy; an
+  organization administrator gets all of them. The extension fails closed when
+  `capabilities` is not a string array.
+- **Biz MCP tool `departamentos_framework`** (the app's `mcp` grant). No input. It
+  returns `{organizacion, departamentos: [{departamento_id, nombre, rol, equipos:
+  [{equipo_id, nombre}]}]}`. `proyectos_framework` stays until Biz deprecates it.
+- **App.** After sign-in, `create` calls `departamentos_framework`, never shows a
+  project chooser, and installs the extension with `biz_access_organization` only. The
+  extension reads the departments and the policy itself. Only when the tool is
+  unavailable (an older Biz), or `create --project <id>` is given, does the app use
+  `proyectos_framework`, select or ask for a project and also pass
+  `biz_access_project`. The macOS test suite covers both paths.
+
+### Framework freedom policy
+
+A person's policy has three presets and eight settings. Each setting is an integer
+level, with the same meaning as the presets in Biz.
+
+| Setting | Cuidado | Equilibrado | Libre | Levels |
+| --- | --- | --- | --- | --- |
+| `extensions` | 0 | 1 | 2 | 0 none, 1 from the catalog, 2 any |
+| `mcp_servers` | 0 | 1 | 2 | 0 none, 1 from the catalog, 2 any |
+| `bots` | 0 | 1 | 1 | 0 cannot create, 1 can create |
+| `read` | 1 | 1 | 1 | machine files: 0 none, 1 read |
+| `write` | 0 | 1 | 2 | 0 none, 1 with confirmation, 2 free |
+| `shell` | 0 | 1 | 2 | 0 none, 1 with confirmation, 2 free |
+| `publish` | 0 | 0 | 1 | 0 no, 1 yes |
+| `ai` | 0 | 1 | 2 | 0 none, 1 standard models, 2 high-cost models |
+
+A `personalizado` preset means the administrator changed individual settings. Biz turns
+the policy into capability strings, additional to those the project form already used:
+`framework:extensions:catalog` and `:any`, `framework:mcp_servers:catalog` and `:any`,
+`framework:bots:create`, `framework:machine:read`, `framework:machine:write` (and
+`:ask`), `framework:shell` (and `:ask`), `framework:publish`, `framework:ai:standard`
+and `framework:ai:high`.
+
+### What the core already honors, and what it does not
+
+The existing slots (panel permission report, browser authorization, remote MCP
+authorization) carry capability strings and ignore unknown ones, so the new
+capabilities are safe to send today. They gate nothing else until the core adds hooks.
+The policy is therefore **advisory** outside the slots listed in the contract until the
+proposed slot is accepted. Do not describe a policy level as enforced for shell,
+publish, AI use or installing extensions and MCP servers before then.
