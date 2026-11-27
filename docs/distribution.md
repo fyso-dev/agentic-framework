@@ -93,6 +93,7 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
 - **files.added / replaced / removed:** replaced files carry `local_edits`: `uncommitted` (working tree differs from `HEAD`, or untracked) and/or `committed` (`HEAD` differs from what the installed version delivered; on the first install any differing local file counts). These edits are lost on `add`/`update` (§3 keeps only the patch in `.data/dist/`). Extension port lines are ignored in the comparison: ports are rebound per installation. Removed = in the installed version's manifest, not in the new one, and present here.
 - **secrets:** names that would be written (new or changed value). `decryptable: false` means this installation's key is not a recipient, so all names are listed.
 - **extensions, bots, mcp_servers:** what the project does not have yet (`extensions.removed`: delivered earlier and dropped now).
+- **contents:** the full sets the incoming version carries (`extensions`, `mcp_servers`, `bots`), whether or not they exist locally. An item already here and identical to the setup is in `contents` but not in `added`, so a caller can tell it came with the distribution.
 
 ```json
 {
@@ -107,7 +108,8 @@ Live, on generated projects with a running client stack: `dist:add`, then `fyso-
   "secrets": {"names": ["API_KEY"], "decryptable": true},
   "extensions": {"added": [], "removed": []},
   "bots": {"added": ["Soporte"]},
-  "mcp_servers": {"added": []}
+  "mcp_servers": {"added": []},
+  "contents": {"extensions": ["wiki"], "mcp_servers": ["docs"], "bots": ["Soporte", "Ventas"]}
 }
 ```
 

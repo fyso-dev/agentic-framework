@@ -552,12 +552,15 @@ function planAgainst(src,target,current,scratch) {
   const delivery=file=>{const tmp=path.join(scratch,path.basename(file));fs.writeFileSync(tmp,blob(src,next.get(file)));return tmp;};
   const teamFile=next.has('state/bots/team.yaml')&&delivered.includes('state/bots/team.yaml')?'state/bots/team.yaml':'project/bots/team.yaml';
   const mine=new Set(['project/bots/team.yaml','state/bots/team.yaml'].filter(f=>fs.existsSync(f)).flatMap(f=>botNames(readYaml(f))));
-  const bots={added:next.has(teamFile)?botNames(readYaml(delivery(teamFile))).filter(name=>!mine.has(name)):[]};
+  const incomingBots=next.has(teamFile)?botNames(readYaml(delivery(teamFile))):[];
+  const bots={added:incomingBots.filter(name=>!mine.has(name))};
   const mcpNow=fs.existsSync('project/mcp.json')?names(JSON.parse(fs.readFileSync('project/mcp.json','utf8')).mcpServers):[];
-  const mcp_servers={added:next.has('project/mcp.json')?names(JSON.parse(blob(src,next.get('project/mcp.json')).toString('utf8')).mcpServers).filter(n=>!mcpNow.includes(n)):[]};
+  const incomingMcp=next.has('project/mcp.json')?names(JSON.parse(blob(src,next.get('project/mcp.json')).toString('utf8')).mcpServers):[];
+  const mcp_servers={added:incomingMcp.filter(n=>!mcpNow.includes(n))};
   const mine_framework=frameworkVersion();
   return {framework:{published:manifest.framework||null,local:mine_framework},
-    files:{added:added.sort(),replaced:replaced.sort((a,b)=>a.path.localeCompare(b.path)),removed},secrets,extensions,bots,mcp_servers};
+    files:{added:added.sort(),replaced:replaced.sort((a,b)=>a.path.localeCompare(b.path)),removed},secrets,extensions,bots,mcp_servers,
+    contents:{extensions:extensionIds(delivered),mcp_servers:incomingMcp,bots:incomingBots}};
 }
 const tags=src=>git(['-C',src,'tag','--list']).toString().split('\n').filter(Boolean);
 

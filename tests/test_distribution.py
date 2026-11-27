@@ -323,6 +323,7 @@ class DistributionTests(DistBase):
         self.assertEqual(plan["files"]["replaced"], [{"path": "project/wiki/index.md", "local_edits": ["committed"]}])
         self.assertIn("project/bots/team.yaml", plan["files"]["added"])
         self.assertEqual(plan["bots"]["added"], ["Ventas"])
+        self.assertEqual(plan["contents"], {"extensions": [], "mcp_servers": [], "bots": ["Ventas"]})
         self.assertIn("LOCAL EDITS LOST", self.dist(c, ce, "plan", "../dist.git").stdout)
         self.dist(c, ce, "add", "../dist.git")
         # After install nothing is replaced until the publisher changes something.
@@ -379,6 +380,10 @@ class BizDistributionTests(DistBase):
 
         # Client: plan (read-only), add.
         self.secrets(c, ce, {"FYSO_ADMIN_PASSWORD": "cp"})
+        # Already local and identical to the setup: in contents, not in added.
+        write(c, "project/mcp.json", json.dumps({"mcpServers": {"docs": {"url": "http://x"}}}))
+        write(c, "project/bots/team.yaml", "version: 1\nbots:\n  - name: Ventas\n")
+        write(c, "extensions/wiki/README.md", "wiki\n")
         write(c, "project/wiki/guide.md", "client edit\n")
         self.commit(c, ce, "client init")
         before = self.tree_state(c)
@@ -387,9 +392,10 @@ class BizDistributionTests(DistBase):
         self.assertEqual((plan["mode"], plan["transport"], plan["version"]), ("add", "biz", "v1"))
         self.assertEqual(plan["files"]["replaced"], [{"path": "project/wiki/guide.md", "local_edits": ["committed"]}])
         self.assertEqual(plan["secrets"], {"names": ["API_KEY"], "decryptable": True})
-        self.assertEqual(plan["extensions"]["added"], ["wiki"])
-        self.assertEqual(plan["bots"]["added"], ["Ventas"])
-        self.assertEqual(plan["mcp_servers"]["added"], ["docs"])
+        self.assertEqual(plan["extensions"]["added"], [])
+        self.assertEqual(plan["bots"]["added"], [])
+        self.assertEqual(plan["mcp_servers"]["added"], [])
+        self.assertEqual(plan["contents"], {"extensions": ["wiki"], "mcp_servers": ["docs"], "bots": ["Ventas"]})
         self.run_dist(c, ce, "add", "biz")
         answers = (c / ".copier-answers.dist.yml").read_text()
         self.assertIn("_src_path: .data/dist/biz-source", answers)
@@ -430,6 +436,7 @@ class BizDistributionTests(DistBase):
         self.assertEqual(plan["secrets"]["names"], ["API_KEY"])
         self.assertEqual(plan["bots"]["added"], ["Soporte"])
         self.assertEqual(plan["extensions"], {"added": [], "removed": []})
+        self.assertEqual(plan["contents"]["bots"], ["Soporte", "Ventas"])
 
         self.run_dist(c, ce, "update")
         self.assertEqual((c / "project/wiki/index.md").read_text(), "# v2\n")
