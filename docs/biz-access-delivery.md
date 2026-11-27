@@ -331,10 +331,16 @@ Everything is additive; the old forms still answer.
   (`id`, `name`, `role` with its levels, `teams`) and `policy`. Without `project`, the
   capabilities derive from the role per department plus the person's policy; an
   organization administrator gets all of them. The extension fails closed when
-  `capabilities` is not a string array.
+  `capabilities` is not a string array. An administrator or owner reports the `libre`
+  preset with every setting at its maximum, consistent with `capabilities`; a person with
+  no stored policy is `equilibrado`. A grant from before departments, whose identity Biz
+  cannot recover, answers HTTP 200 with `{capabilities: [], reauthorize_required: true}`
+  (`{allowed: false, reauthorize_required: true}` with `capability`). That is not a person
+  without departments: the extension asks the person to reconnect Fyso Biz and skips the
+  managed-teams delivery without changing anything.
 - **Biz MCP tool `departamentos_framework`** (the app's `mcp` grant). No input. It
   returns `{organizacion, departamentos: [{departamento_id, nombre, rol, equipos:
-  [{equipo_id, nombre}]}]}`. `proyectos_framework` stays until Biz deprecates it.
+  [{equipo_id, nombre}]}]}`. `proyectos_framework` stays until Biz deprecates it. The tool carries no reauthorization signal: a grant that must be renewed is reported by the extension through `reauthorize_required` (above), not by this tool.
 - **App.** After sign-in, `create` calls `departamentos_framework`, never shows a
   project chooser, and installs the extension with `biz_access_organization` only. The
   extension reads the departments and the policy itself. Only when the tool is
@@ -358,7 +364,7 @@ level, with the same meaning as the presets in Biz.
 | `publish` | 0 | 0 | 1 | 0 no, 1 yes |
 | `ai` | 0 | 1 | 2 | 0 none, 1 standard models, 2 high-cost models |
 
-A `personalizado` preset means the administrator changed individual settings. Biz turns
+A person with no stored policy is `equilibrado`, and an organization administrator is `libre` at the maximum (no limits). A `personalizado` preset means the administrator changed individual settings. Biz turns
 the policy into capability strings, additional to those the project form already used:
 `framework:extensions:catalog` and `:any`, `framework:mcp_servers:catalog` and `:any`,
 `framework:bots:create`, `framework:machine:read`, `framework:machine:write` (and
