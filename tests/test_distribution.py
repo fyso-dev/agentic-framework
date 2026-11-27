@@ -639,7 +639,7 @@ class BizDistributionTests(DistBase):
 
     def test_dry_run_reports_failed_checks_and_stale_base(self):
         p, pe = self.publisher, self.publisher_env
-        write(p, "project/wiki/index.md", "see /Users/someone/project\n")
+        write(p, "project/wiki/index.md", "see /Users/" + "someone/project\n")
         write(p, "project/distribution.yaml", "repo: biz\n")
         self.commit(p, pe, "bad path")
         result, report = self.dry_run(p, pe, "--json", check=False)
